@@ -1,18 +1,9 @@
 {
     "name": "com.slz.rendering",
-    "description": "T"
+    "description": "T",
     "version": "0.0.1",
     "unity": "2019.3",
-    "unityRelease": "0a15",
     "displayName": "SLZ RP",
-	"keywords":[
-        "graphics",
-        "performance",
-        "rendering",
-        "mobile",
-		"render",
-		"pipeline"
-    ],
     "repository": {
 		"type": "git",
 		"url": "https://github.com/KevinComerford/com.slz.rendering.git"
