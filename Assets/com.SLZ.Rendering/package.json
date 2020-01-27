@@ -1,0 +1,24 @@
+{
+    "name": "com.SLZ.Rendering",
+    "description": "T"
+    "version": "0.01",
+    "unity": "2019.3",
+    "unityRelease": "0a15",
+    "displayName": "SLZ RP",
+    "dependencies": {
+        "com.unity.render-pipelines.core": "8.0.0",
+        "com.unity.shadergraph": "8.0.0"
+    },
+	"keywords":[
+        "graphics",
+        "performance",
+        "rendering",
+        "mobile",
+		"render",
+		"pipeline"
+    ],
+    "repository": {
+		"type": "git",
+		"url": "https://github.com/KevinComerford/TestPackage.git",
+	}
+}
