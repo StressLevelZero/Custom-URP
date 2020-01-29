@@ -1,9 +1,12 @@
 {
     "name": "com.slz.rendering",
-    "description": "T",
+    "description": "This is depending",
     "version": "0.0.1",
     "unity": "2019.3",
-    "displayName": "SLZ RP",
+    "displayName": "SLZ Render Pipeline",
+    "dependencies": {
+      "com.unity.render-pipelines.core": "8.0.0",
+      "com.unity.shadergraph": "8.0.0" },
     "repository": {
 		"type": "git",
 		"url": "https://github.com/KevinComerford/com.slz.rendering.git"
