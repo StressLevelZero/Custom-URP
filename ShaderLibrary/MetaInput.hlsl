@@ -1,7 +1,7 @@
 #ifndef UNIVERSAL_META_PASS_INCLUDED
 #define UNIVERSAL_META_PASS_INCLUDED
 
-#include "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
 CBUFFER_START(UnityMetaPass)

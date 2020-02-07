@@ -176,7 +176,7 @@ namespace UnityEngine.Rendering.Universal
         [NonSerialized]
         internal UniversalRenderPipelineEditorResources m_EditorResourcesAsset;
 
-        public static readonly string packagePath = "Packages/com.slz.rendering";
+        public static readonly string packagePath = "Packages/com.unity.render-pipelines.universal";
 
         public static UniversalRenderPipelineAsset Create(ScriptableRendererData rendererData = null)
         {

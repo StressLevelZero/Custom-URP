@@ -1,8 +1,8 @@
 #ifndef UNIVERSAL_WAVING_GRASS_INPUT_INCLUDED
 #define UNIVERSAL_WAVING_GRASS_INPUT_INCLUDED
 
-#include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
-#include "Packages/com.slz.rendering/ShaderLibrary/SurfaceInput.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 
 // Terrain engine shader helpers
 CBUFFER_START(TerrainGrass)

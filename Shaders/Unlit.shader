@@ -130,8 +130,8 @@ Shader "Universal Render Pipeline/Unlit"
             // GPU Instancing
             #pragma multi_compile_instancing
 
-            #include "Packages/com.slz.rendering/Shaders/UnlitInput.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/DepthOnlyPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
             ENDHLSL
         }
 
@@ -150,8 +150,8 @@ Shader "Universal Render Pipeline/Unlit"
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaUnlit
 
-            #include "Packages/com.slz.rendering/Shaders/UnlitInput.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/UnlitMetaPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitMetaPass.hlsl"
 
             ENDHLSL
         }

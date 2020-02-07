@@ -28,7 +28,7 @@ Shader "Hidden/Shadow2DRemoveSelf"
             #pragma vertex vert
             #pragma fragment frag
 
-            #include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             struct Attributes
             {

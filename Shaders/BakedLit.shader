@@ -52,8 +52,8 @@ Shader "Universal Render Pipeline/Baked Lit"
             #pragma multi_compile_instancing
 
             // Lighting include is needed because of GI
-            #include "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/BakedLitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
 
             struct Attributes
             {
@@ -160,8 +160,8 @@ Shader "Universal Render Pipeline/Baked Lit"
             // GPU Instancing
             #pragma multi_compile_instancing
 
-            #include "Packages/com.slz.rendering/Shaders/BakedLitInput.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/DepthOnlyPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
             ENDHLSL
         }
 
@@ -180,8 +180,8 @@ Shader "Universal Render Pipeline/Baked Lit"
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaBakedLit
 
-            #include "Packages/com.slz.rendering/Shaders/BakedLitInput.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/BakedLitMetaPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitMetaPass.hlsl"
 
             ENDHLSL
         }
@@ -204,8 +204,8 @@ Shader "Universal Render Pipeline/Baked Lit"
             #pragma shader_feature _ALPHATEST_ON
             #pragma shader_feature _ALPHAPREMULTIPLY_ON
 
-            #include "Packages/com.slz.rendering/Shaders/BakedLitInput.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/Utils/Universal2D.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Universal2D.hlsl"
             ENDHLSL
         }
     }

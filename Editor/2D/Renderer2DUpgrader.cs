@@ -5,7 +5,7 @@ namespace UnityEditor.Experimental.Rendering.Universal
 {
     static class Renderer2DUpgrader
     {
-        static Material s_SpriteLitDefault = AssetDatabase.LoadAssetAtPath<Material>("Packages/com.slz.rendering/Runtime/Materials/Sprite-Lit-Default.mat");
+        static Material s_SpriteLitDefault = AssetDatabase.LoadAssetAtPath<Material>("Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Lit-Default.mat");
 
         delegate void Upgrader<T>(T toUpgrade) where T : Object;
 

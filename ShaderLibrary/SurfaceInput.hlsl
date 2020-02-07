@@ -1,7 +1,7 @@
 #ifndef UNIVERSAL_INPUT_SURFACE_INCLUDED
 #define UNIVERSAL_INPUT_SURFACE_INCLUDED
 
-#include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
 

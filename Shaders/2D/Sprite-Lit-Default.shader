@@ -15,7 +15,7 @@ Shader "Universal Render Pipeline/2D/Sprite-Lit-Default"
     }
 
     HLSLINCLUDE
-    #include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
+    #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
     ENDHLSL
 
     SubShader
@@ -53,7 +53,7 @@ Shader "Universal Render Pipeline/2D/Sprite-Lit-Default"
                 float2	lightingUV  : TEXCOORD1;
             };
 
-            #include "Packages/com.slz.rendering/Shaders/2D/Include/LightingUtility.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/LightingUtility.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -92,7 +92,7 @@ Shader "Universal Render Pipeline/2D/Sprite-Lit-Default"
                 return o;
             }
 
-            #include "Packages/com.slz.rendering/Shaders/2D/Include/CombinedShapeLightShared.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/CombinedShapeLightShared.hlsl"
 
             half4 CombinedShapeLightFragment(Varyings i) : SV_Target
             {
@@ -150,7 +150,7 @@ Shader "Universal Render Pipeline/2D/Sprite-Lit-Default"
                 return o;
             }
 
-            #include "Packages/com.slz.rendering/Shaders/2D/Include/NormalsRenderingShared.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/NormalsRenderingShared.hlsl"
 
             float4 NormalsRenderingFragment(Varyings i) : SV_Target
             {

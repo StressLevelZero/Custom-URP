@@ -6,7 +6,7 @@ Shader "Hidden/Universal Render Pipeline/Sampling"
     }
 
     HLSLINCLUDE
-    #include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
+    #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
     struct Attributes
     {

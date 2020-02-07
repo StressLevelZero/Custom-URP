@@ -22,7 +22,7 @@ Shader "Hidden/Universal Render Pipeline/Blit"
             #pragma multi_compile _ _LINEAR_TO_SRGB_CONVERSION
             #pragma multi_compile _ _KILL_ALPHA
 
-            #include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #ifdef _LINEAR_TO_SRGB_CONVERSION
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
             #endif

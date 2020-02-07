@@ -2,8 +2,8 @@ Shader "Hidden/Universal Render Pipeline/LutBuilderLdr"
 {
     HLSLINCLUDE
 
-        #include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
-        #include "Packages/com.slz.rendering/Shaders/PostProcessing/Common.hlsl"
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        #include "Packages/com.unity.render-pipelines.universal/Shaders/PostProcessing/Common.hlsl"
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
         float4 _Lut_Params;         // x: lut_height, y: 0.5 / lut_width, z: 0.5 / lut_height, w: lut_height / lut_height - 1

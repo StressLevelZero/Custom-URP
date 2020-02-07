@@ -18,8 +18,8 @@ namespace UnityEditor.Experimental.Rendering.Universal
         {
             // Definition
             referenceName = "SHADERPASS_SPRITEUNLIT",
-            passInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/SpriteUnlitPass.hlsl",
-            varyingsInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/Varyings.hlsl",
+            passInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/SpriteUnlitPass.hlsl",
+            varyingsInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/Varyings.hlsl",
             useInPreview = true,
 
             // Port mask
@@ -50,9 +50,9 @@ namespace UnityEditor.Experimental.Rendering.Universal
             includes = new List<string>()
             {
                 "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/ShaderGraphFunctions.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl",
             },
             pragmas = new List<string>()
             {

@@ -39,8 +39,8 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit"
             #pragma multi_compile _ LIGHTMAP_ON
             #pragma multi_compile_fog
 
-            #include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_MainTex);       SAMPLER(sampler_MainTex);
             float4 _MainTex_ST;
@@ -147,8 +147,8 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit"
             // GPU Instancing
             #pragma multi_compile_instancing
 
-            #include "Packages/com.slz.rendering/Shaders/UnlitInput.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/DepthOnlyPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
             ENDHLSL
         }
 
@@ -168,8 +168,8 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit"
 
             #pragma shader_feature _SPECGLOSSMAP
 
-            #include "Packages/com.slz.rendering/Shaders/SimpleLitInput.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/SimpleLitMetaPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitMetaPass.hlsl"
 
             ENDHLSL
         }

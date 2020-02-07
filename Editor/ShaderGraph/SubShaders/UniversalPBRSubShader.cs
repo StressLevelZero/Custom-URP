@@ -23,8 +23,8 @@ namespace UnityEditor.Rendering.Universal
             displayName = "Universal Forward",
             referenceName = "SHADERPASS_FORWARD",
             lightMode = "UniversalForward",
-            passInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/PBRForwardPass.hlsl",
-            varyingsInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/Varyings.hlsl",
+            passInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/PBRForwardPass.hlsl",
+            varyingsInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/Varyings.hlsl",
             useInPreview = true,
 
             // Port mask
@@ -71,10 +71,10 @@ namespace UnityEditor.Rendering.Universal
             includes = new List<string>()
             {
                 "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Shadows.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/ShaderGraphFunctions.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl",
             },
             pragmas = new List<string>()
             {
@@ -103,8 +103,8 @@ namespace UnityEditor.Rendering.Universal
             displayName = "DepthOnly",
             referenceName = "SHADERPASS_DEPTHONLY",
             lightMode = "DepthOnly",
-            passInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/DepthOnlyPass.hlsl",
-            varyingsInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/Varyings.hlsl",
+            passInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/DepthOnlyPass.hlsl",
+            varyingsInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/Varyings.hlsl",
             useInPreview = true,
 
             // Port mask
@@ -128,9 +128,9 @@ namespace UnityEditor.Rendering.Universal
             includes = new List<string>()
             {
                 "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/ShaderGraphFunctions.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl",
             },
             pragmas = new List<string>()
             {
@@ -147,8 +147,8 @@ namespace UnityEditor.Rendering.Universal
             displayName = "ShadowCaster",
             referenceName = "SHADERPASS_SHADOWCASTER",
             lightMode = "ShadowCaster",
-            passInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/ShadowCasterPass.hlsl",
-            varyingsInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/Varyings.hlsl",
+            passInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShadowCasterPass.hlsl",
+            varyingsInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/Varyings.hlsl",
             
             // Port mask
             vertexPorts = new List<int>()
@@ -177,9 +177,9 @@ namespace UnityEditor.Rendering.Universal
             includes = new List<string>()
             {
                 "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/ShaderGraphFunctions.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl",
             },
             pragmas = new List<string>()
             {
@@ -195,8 +195,8 @@ namespace UnityEditor.Rendering.Universal
             displayName = "Meta",
             referenceName = "SHADERPASS_META",
             lightMode = "Meta",
-            passInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/LightingMetaPass.hlsl",
-            varyingsInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/Varyings.hlsl",
+            passInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/LightingMetaPass.hlsl",
+            varyingsInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/Varyings.hlsl",
 
             // Port mask
             vertexPorts = new List<int>()
@@ -228,10 +228,10 @@ namespace UnityEditor.Rendering.Universal
             includes = new List<string>()
             {
                 "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/ShaderGraphFunctions.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/MetaInput.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MetaInput.hlsl",
             },
             pragmas = new List<string>()
             {
@@ -250,8 +250,8 @@ namespace UnityEditor.Rendering.Universal
             // Definition
             referenceName = "SHADERPASS_2D",
             lightMode = "Universal2D",
-            passInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/PBR2DPass.hlsl",
-            varyingsInclude = "Packages/com.slz.rendering/Editor/ShaderGraph/Includes/Varyings.hlsl",
+            passInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/PBR2DPass.hlsl",
+            varyingsInclude = "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/Varyings.hlsl",
 
             // Port mask
             vertexPorts = new List<int>()
@@ -271,9 +271,9 @@ namespace UnityEditor.Rendering.Universal
             includes = new List<string>()
             {
                 "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/Lighting.hlsl",
-                "Packages/com.slz.rendering/ShaderLibrary/ShaderGraphFunctions.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl",
+                "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl",
             },
             pragmas = new List<string>()
             {

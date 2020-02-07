@@ -17,8 +17,8 @@ Shader "Hidden/Light2D-Shape-Volumetric"
             #pragma fragment frag
             #pragma multi_compile_local SPRITE_LIGHT __
 
-            #include "Packages/com.slz.rendering/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.slz.rendering/Shaders/2D/Include/LightingUtility.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/2D/Include/LightingUtility.hlsl"
 
             struct Attributes
             {
