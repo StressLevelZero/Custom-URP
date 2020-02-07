@@ -19,7 +19,6 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/KevinComerford/com.unity.render-pipelines.universal.git",
-    "revision": "373167681d28b3dc4c85bad6cecc48c4c1e4e49f"
+    "url": "https://github.com/KevinComerford/com.unity.render-pipelines.universal.git"
   }
 }

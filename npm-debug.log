@@ -31,33 +31,33 @@
 28 silly mapToRegistry uri https://registry.npmjs.org/com.unity.shadergraph
 29 verbose request uri https://registry.npmjs.org/com.unity.render-pipelines.core
 30 verbose request no auth needed
-31 info attempt registry request try #1 at 3:17:31 PM
-32 verbose request id e4cb8664fabfa757
+31 info attempt registry request try #1 at 3:30:47 PM
+32 verbose request id bb72d7cb73c9e844
 33 http request GET https://registry.npmjs.org/com.unity.render-pipelines.core
 34 verbose request uri https://registry.npmjs.org/com.unity.shadergraph
 35 verbose request no auth needed
-36 info attempt registry request try #1 at 3:17:31 PM
+36 info attempt registry request try #1 at 3:30:47 PM
 37 http request GET https://registry.npmjs.org/com.unity.shadergraph
 38 http 404 https://registry.npmjs.org/com.unity.shadergraph
-39 verbose headers { date: 'Fri, 07 Feb 2020 23:17:41 GMT',
+39 verbose headers { date: 'Fri, 07 Feb 2020 23:30:57 GMT',
 39 verbose headers   'content-type': 'application/json',
 39 verbose headers   'content-length': '21',
 39 verbose headers   connection: 'keep-alive',
-39 verbose headers   'set-cookie': [ '__cfduid=dd1454aa28bdf42caeed644ca048c818c1581117461; expires=Sun, 08-Mar-20 23:17:41 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
-39 verbose headers   'cf-ray': '56191426fb4debb5-LAX',
+39 verbose headers   'set-cookie': [ '__cfduid=d434ec070df8587d6c26cf610215c9faa1581118257; expires=Sun, 08-Mar-20 23:30:57 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
+39 verbose headers   'cf-ray': '56192792cb8ae4b8-LAX',
 39 verbose headers   vary: 'Accept-Encoding',
-39 verbose headers   'cf-cache-status': 'MISS',
+39 verbose headers   'cf-cache-status': 'EXPIRED',
 39 verbose headers   'expect-ct': 'max-age=604800, report-uri="https://report-uri.cloudflare.com/cdn-cgi/beacon/expect-ct"',
 39 verbose headers   server: 'cloudflare' }
 40 silly get cb [ 404,
-40 silly get   { date: 'Fri, 07 Feb 2020 23:17:41 GMT',
+40 silly get   { date: 'Fri, 07 Feb 2020 23:30:57 GMT',
 40 silly get     'content-type': 'application/json',
 40 silly get     'content-length': '21',
 40 silly get     connection: 'keep-alive',
-40 silly get     'set-cookie': [ '__cfduid=dd1454aa28bdf42caeed644ca048c818c1581117461; expires=Sun, 08-Mar-20 23:17:41 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
-40 silly get     'cf-ray': '56191426fb4debb5-LAX',
+40 silly get     'set-cookie': [ '__cfduid=d434ec070df8587d6c26cf610215c9faa1581118257; expires=Sun, 08-Mar-20 23:30:57 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
+40 silly get     'cf-ray': '56192792cb8ae4b8-LAX',
 40 silly get     vary: 'Accept-Encoding',
-40 silly get     'cf-cache-status': 'MISS',
+40 silly get     'cf-cache-status': 'EXPIRED',
 40 silly get     'expect-ct': 'max-age=604800, report-uri="https://report-uri.cloudflare.com/cdn-cgi/beacon/expect-ct"',
 40 silly get     server: 'cloudflare' } ]
 41 silly fetchPackageMetaData Error: Not found : com.unity.shadergraph
@@ -73,23 +73,23 @@
 41 silly fetchPackageMetaData     at IncomingMessage.<anonymous> (A:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\Web\External\node_modules\request\request.js:1187:12)
 41 silly fetchPackageMetaData  error for com.unity.shadergraph@7.1.8 { [Error: Not found : com.unity.shadergraph] pkgid: 'com.unity.shadergraph', statusCode: 404, code: 'E404' }
 42 http 404 https://registry.npmjs.org/com.unity.render-pipelines.core
-43 verbose headers { date: 'Fri, 07 Feb 2020 23:17:41 GMT',
+43 verbose headers { date: 'Fri, 07 Feb 2020 23:30:57 GMT',
 43 verbose headers   'content-type': 'application/json',
 43 verbose headers   'content-length': '21',
 43 verbose headers   connection: 'keep-alive',
-43 verbose headers   'set-cookie': [ '__cfduid=dea05912b5c7c635b82d1cdc8d98ff2d31581117461; expires=Sun, 08-Mar-20 23:17:41 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
-43 verbose headers   'cf-ray': '56191426fd00d346-LAX',
+43 verbose headers   'set-cookie': [ '__cfduid=dccec2ec8595c66ee1f5d008ab328ed801581118257; expires=Sun, 08-Mar-20 23:30:57 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
+43 verbose headers   'cf-ray': '56192792b9619959-LAX',
 43 verbose headers   vary: 'Accept-Encoding',
 43 verbose headers   'cf-cache-status': 'EXPIRED',
 43 verbose headers   'expect-ct': 'max-age=604800, report-uri="https://report-uri.cloudflare.com/cdn-cgi/beacon/expect-ct"',
 43 verbose headers   server: 'cloudflare' }
 44 silly get cb [ 404,
-44 silly get   { date: 'Fri, 07 Feb 2020 23:17:41 GMT',
+44 silly get   { date: 'Fri, 07 Feb 2020 23:30:57 GMT',
 44 silly get     'content-type': 'application/json',
 44 silly get     'content-length': '21',
 44 silly get     connection: 'keep-alive',
-44 silly get     'set-cookie': [ '__cfduid=dea05912b5c7c635b82d1cdc8d98ff2d31581117461; expires=Sun, 08-Mar-20 23:17:41 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
-44 silly get     'cf-ray': '56191426fd00d346-LAX',
+44 silly get     'set-cookie': [ '__cfduid=dccec2ec8595c66ee1f5d008ab328ed801581118257; expires=Sun, 08-Mar-20 23:30:57 GMT; path=/; domain=.npmjs.org; HttpOnly; SameSite=Lax' ],
+44 silly get     'cf-ray': '56192792b9619959-LAX',
 44 silly get     vary: 'Accept-Encoding',
 44 silly get     'cf-cache-status': 'EXPIRED',
 44 silly get     'expect-ct': 'max-age=604800, report-uri="https://report-uri.cloudflare.com/cdn-cgi/beacon/expect-ct"',
