@@ -6,8 +6,8 @@
   "unityRelease": "0f3",
   "displayName": "SLZ Universal RP",
   "dependencies": {
-    "com.unity.render-pipelines.core": "7.1.8",
-    "com.unity.shadergraph": "7.1.8"
+    "com.unity.render-pipelines.core": "7.2.0",
+    "com.unity.shadergraph": "7.2.0"
   },
   "keywords": [
     "graphics",
