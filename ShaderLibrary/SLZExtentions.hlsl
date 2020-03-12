@@ -67,47 +67,47 @@ half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, fl
 //                          Dithering                                        //
 ///////////////////////////////////////////////////////////////////////////////
 
-#define NoisePixels 64
-#define NoiseArraySize 64
+//#define NoisePixels 64
+//#define NoiseArraySize 64
 //uniform  TEXTURE2D_ARRAY(_SLZ_DitherTex2D);
 //TEXTURE2D_ARRAY_PARAM(_SLZ_DitherTex2D, _SLZ_DitherTex2D_sampler);
 //TEXTURE2D_ARRAY_ARGS(_SLZ_DitherTex2D, _SLZ_DitherTex2D_sampler)    
-TEXTURE2D_ARRAY(_SLZ_DitherTex2D);       SAMPLER(_SLZ_DitherTex2D_sampler);
+//TEXTURE2D_ARRAY(_SLZ_DitherTex2D);       SAMPLER(_SLZ_DitherTex2D_sampler);
 
 
 
 
-uniform int _SLZ_TexSel;
+// uniform int _SLZ_TexSel;
 
 
-float4 DitherTex(float2 UV)
-{
- return SAMPLE_TEXTURE2D_ARRAY(_SLZ_DitherTex2D, _SLZ_DitherTex2D_sampler, UV.xy, _SLZ_TexSel );
-}
+// float4 DitherTex(float2 UV)
+// {
+//  return SAMPLE_TEXTURE2D_ARRAY(_SLZ_DitherTex2D, _SLZ_DitherTex2D_sampler, UV.xy, _SLZ_TexSel );
+// }
 
-float4 DitherTex(float2 UV, int FrameOffset)
-{
-    int frame = (_SLZ_TexSel + FrameOffset) ;
-    if (frame > NoiseArraySize ) frame = FrameOffset;
- return SAMPLE_TEXTURE2D_ARRAY(_SLZ_DitherTex2D, _SLZ_DitherTex2D_sampler, UV.xy, _SLZ_TexSel );
-}
+// float4 DitherTex(float2 UV, int FrameOffset)
+// {
+//     int frame = (_SLZ_TexSel + FrameOffset) ;
+//     if (frame > NoiseArraySize ) frame = FrameOffset;
+//  return SAMPLE_TEXTURE2D_ARRAY(_SLZ_DitherTex2D, _SLZ_DitherTex2D_sampler, UV.xy, _SLZ_TexSel );
+// }
 
 
-float2 ScreenSpaceNoiseUVs(float4 projPos){
+// float2 ScreenSpaceNoiseUVs(float4 projPos){
 
- //	ComputeScreenPos(vertex_out);
- //   projPos.z = -UnityObjectToViewPos(vertex_in).z
+//  //	ComputeScreenPos(vertex_out);
+//  //   projPos.z = -UnityObjectToViewPos(vertex_in).z
 
- return	( (projPos.xy / projPos.w) *_ScreenParams.xy /NoisePixels).xy ;
+//  return	( (projPos.xy / projPos.w) *_ScreenParams.xy /NoisePixels).xy ;
 
- }
+//  }
 
- float4 DepthFade_VS_ComputeProjPos(float4 vertex_in, float4 vertex_out)
-{
-    float4 projPos = ComputeScreenPos(vertex_out);
-    //projPos.z = -UnityObjectToViewPos(vertex_in).z; // = COMPUTE_EYEDEPTH
-    return projPos;
-}
+//  float4 DepthFade_VS_ComputeProjPos(float4 vertex_in, float4 vertex_out)
+// {
+//     float4 projPos = ComputeScreenPos(vertex_out);
+//     //projPos.z = -UnityObjectToViewPos(vertex_in).z; // = COMPUTE_EYEDEPTH
+//     return projPos;
+// }
 
 
 #endif
