@@ -1,6 +1,8 @@
 #ifndef SLZ_LightingExtend
 #define SLZ_LightingExtend
 
+//Extention Libary to add into pipeline. Should make future package upgrading simpler.
+
 
 //o.vIndirectSpecular.rgb += BakeryDirectionalLightmapSpecular(vLightmapUV.xy, vNormalWs.xyz, normalize(vPositionWs.xyz - _WorldSpaceCameraPos), 1-vRoughness.x) * o.vIndirectDiffuse.rgb;
 
@@ -14,7 +16,8 @@
 // 	half spec = GGXTerm(nh, roughness);
 // 	return spec;
 // }
-//TEMP port of GGX until SRP replacement is implmented to bakery
+
+//TEMP port of GGX until SRP replacement is implmented to BakeryDirectionalLightmapSpecular 
 float GGXTerm (float NdotH, float roughness)
 {
     float a2 = roughness * roughness;
@@ -23,6 +26,7 @@ float GGXTerm (float NdotH, float roughness)
                                                 // therefore epsilon is smaller than what can be represented by half
 }
 
+//Baked Specular using directional baked maps
 half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 viewDir, float smoothness)
 {
 	float3 dominantDir = LOAD_TEXTURE2D(unity_LightmapInd, lightmapUV).xyz * 2 - 1;
@@ -33,6 +37,20 @@ half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, fl
 	half spec = GGXTerm(nh, roughness);
 	return spec;
  //   return 1;
+}
+
+uniform half4 GradientFogArray[(int)32.0];
+
+float FogGradient(){
+
+
+}
+
+half4 FogLinearInterpolation(half ramp)
+{				
+	half refactoredramp = clamp(ramp * 32, 0, 31) ;	
+	half4 interpolated =  lerp(GradientFogArray[refactoredramp],GradientFogArray[refactoredramp+1], frac(refactoredramp) ) ;
+	return interpolated;
 }
 
 // real3 SampleDirectionalLightmap(TEXTURE2D_PARAM(lightmapTex, lightmapSampler), TEXTURE2D_PARAM(lightmapDirTex, lightmapDirSampler), float2 uv, float4 transform, float3 normalWS, bool encodedLightmap, real4 decodeInstructions)
