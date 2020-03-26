@@ -6,7 +6,6 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
 // If lightmap is not defined than we evaluate GI (ambient + probes) from SH
 // We might do it fully or partially in vertex to save shader ALU
@@ -293,10 +292,9 @@ inline void InitializeBRDFData(half3 albedo, half metallic, half3 specular, half
     half reflectivity = 1.0 - oneMinusReflectivity;
 
     outBRDFData.diffuse = albedo * oneMinusReflectivity;
-    //Add FresnelTerm AA fix here
     outBRDFData.specular = lerp(kDieletricSpec.rgb, albedo, metallic);
 #endif
-    
+
     outBRDFData.grazingTerm = saturate(smoothness + reflectivity);
     outBRDFData.perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(smoothness);
     outBRDFData.roughness = max(PerceptualRoughnessToRoughness(outBRDFData.perceptualRoughness), HALF_MIN);
@@ -432,17 +430,15 @@ half3 SampleLightmap(float2 lightmapUV, half3 normalWS)
     half4 transformCoords = half4(1, 1, 0, 0);
 
 #ifdef DIRLIGHTMAP_COMBINED
-    return SampleDirectionalLightmap(TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap),TEXTURE2D_ARGS(unity_LightmapInd, samplerunity_Lightmap), lightmapUV, transformCoords, normalWS, encodedLightmap, decodeInstructions);
+    return SampleDirectionalLightmap(TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap),
+        TEXTURE2D_ARGS(unity_LightmapInd, samplerunity_Lightmap),
+        lightmapUV, transformCoords, normalWS, encodedLightmap, decodeInstructions);
 #elif defined(LIGHTMAP_ON)
     return SampleSingleLightmap(TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap), lightmapUV, transformCoords, encodedLightmap, decodeInstructions);
 #else
     return half3(0.0, 0.0, 0.0);
 #endif
 }
-
-
-
-/////////////////////////
 
 // We either sample GI from baked lightmap or from probes.
 // If lightmap: sampleData.xy = lightmapUV
@@ -507,24 +503,8 @@ half3 GlobalIllumination(BRDFData brdfData, half3 bakedGI, half occlusion, half3
     half3 indirectDiffuse = bakedGI * occlusion;
     half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion);
 
-  //  indirectSpecular += half3(30,0,0) * fresnelTerm ;
-
     return EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
 }
-
-half3 GlobalIllumination(BRDFData brdfData, half3 bakedGI, half3 bakedDirectionalGI, half occlusion, half3 normalWS, half3 viewDirectionWS)
-{
-    half3 reflectVector = reflect(-viewDirectionWS, normalWS);
-    half fresnelTerm = Pow4(1.0 - saturate(dot(normalWS, viewDirectionWS)));
-
-    half3 indirectDiffuse = bakedGI * occlusion;
-    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion);
-
-  //  indirectSpecular += half3(30,0,0) * fresnelTerm ;
-
-    return EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
-}
-
 
 void MixRealtimeAndBakedGI(inout Light light, half3 normalWS, inout half3 bakedGI, half4 shadowMask)
 {
@@ -591,15 +571,9 @@ half4 UniversalFragmentPBR(InputData inputData, half3 albedo, half metallic, hal
     InitializeBRDFData(albedo, metallic, specular, smoothness, alpha, brdfData);
     
     Light mainLight = GetMainLight(inputData.shadowCoord);
-    //Add Masking functions here
     MixRealtimeAndBakedGI(mainLight, inputData.normalWS, inputData.bakedGI, half4(0, 0, 0, 0));
 
-    #ifdef DIRLIGHTMAP_COMBINED   
     half3 color = GlobalIllumination(brdfData, inputData.bakedGI, occlusion, inputData.normalWS, inputData.viewDirectionWS);
-    #else
-
-    half3 color = GlobalIllumination(brdfData, inputData.bakedGI, inputData.bakedGI, occlusion, inputData.normalWS, inputData.viewDirectionWS);
-    #endif 
     color += LightingPhysicallyBased(brdfData, mainLight, inputData.normalWS, inputData.viewDirectionWS);
 
 #ifdef _ADDITIONAL_LIGHTS

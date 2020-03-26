@@ -190,7 +190,20 @@ namespace UnityEngine.Rendering.Universal
                 throw new ArgumentNullException("camera");
 
             bool isGameCamera = IsGameCamera(camera);
-            return XRGraphics.enabled && isGameCamera && (camera.stereoTargetEye == StereoTargetEyeMask.Both);
+            bool isCompatWithXRDimension = true;
+#if ENABLE_VR && ENABLE_VR_MODULE
+            isCompatWithXRDimension &= (camera.targetTexture ? camera.targetTexture.dimension == UnityEngine.XR.XRSettings.deviceEyeTextureDimension : true);
+#endif
+            return XRGraphics.enabled && isGameCamera && (camera.stereoTargetEye == StereoTargetEyeMask.Both) && isCompatWithXRDimension;
+        }
+
+        /// <summary>
+        /// Returns the current render pipeline asset for the current quality setting.
+        /// If no render pipeline asset is assigned in QualitySettings, then returns the one assigned in GraphicsSettings.
+        /// </summary>
+        public static UniversalRenderPipelineAsset asset
+        {
+            get => GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
         }
 
         /// <summary>
@@ -209,6 +222,46 @@ namespace UnityEngine.Rendering.Universal
             return false;
 #endif
         }
+
+#if ENABLE_VR && ENABLE_VR_MODULE
+        static XR.XRDisplaySubsystem GetXRDisplaySubsystem()
+        {
+            XR.XRDisplaySubsystem display = null;
+            SubsystemManager.GetInstances(displaySubsystemList);
+
+            if (displaySubsystemList.Count > 0)
+                display = displaySubsystemList[0];
+
+            return display;
+        }
+
+        // NB: This method is required for a hotfix in Hololens to prevent creating a render texture when using a renderer
+        // with custom render pass.
+        // TODO: Remove this method and usages when we have proper dependency tracking in the pipeline to know
+        // when a render pass requires camera color as input.
+        internal static bool IsRunningHololens(Camera camera)
+        {
+#if PLATFORM_WINRT
+            if (IsStereoEnabled(camera))
+            {
+                var platform = Application.platform;
+                if (platform == RuntimePlatform.WSAPlayerX86 || platform == RuntimePlatform.WSAPlayerARM)
+                {
+                    var displaySubsystem = GetXRDisplaySubsystem();
+                    var subsystemDescriptor = displaySubsystem?.SubsystemDescriptor ?? null;
+                    string id = subsystemDescriptor?.id ?? "";
+
+                    if (id.Contains("Windows Mixed Reality Display"))
+                        return true;
+
+                    if (!XR.WSA.HolographicSettings.IsDisplayOpaque)
+                        return true;
+                }
+            }
+#endif
+            return false;
+        }
+#endif
 
         void SortCameras(Camera[] cameras)
         {

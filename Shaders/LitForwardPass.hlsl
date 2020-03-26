@@ -74,7 +74,6 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
     inputData.fogCoord = input.fogFactorAndVertexLight.x;
     inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
     inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
-   // inputData.bakedGI = BakeryDirectionalLightmapSpecular(input.lightmapUV, inputData.normalWS, viewDirWS, 0.75);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

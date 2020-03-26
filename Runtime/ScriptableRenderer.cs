@@ -19,7 +19,7 @@ namespace UnityEngine.Rendering.Universal
     /// <seealso cref="ScriptableRendererFeature"/>
     /// <seealso cref="ScriptableRenderPass"/>
     /// </summary>
-    [MovedFrom("UnityEngine.Rendering.LWRP")] public abstract class ScriptableRenderer
+    [MovedFrom("UnityEngine.Rendering.LWRP")] public abstract class ScriptableRenderer : IDisposable
     {
         /// <summary>
         /// Configures the supported features for this renderer. When creating custom renderers
@@ -167,6 +167,16 @@ namespace UnityEngine.Rendering.Universal
             Clear(CameraRenderType.Base);
         }
 
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+        }
+
         /// <summary>
         /// Configures the camera target.
         /// </summary>
@@ -235,11 +245,6 @@ namespace UnityEngine.Rendering.Universal
             
             // Sort the render pass queue
             SortStable(m_ActiveRenderPassQueue);
-
-#if ENABLE_VR
-            if (renderingData.cameraData.isStereoEnabled)
-                XR.XRDevice.UpdateEyeTextureMSAASetting();
-#endif
 
             // Cache the time for after the call to `SetupCameraProperties` and set the time variables in shader
             // For now we set the time variables per camera, as we plan to remove `SetupCamearProperties`.
