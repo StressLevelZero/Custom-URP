@@ -1,7 +1,7 @@
 {
   "name": "com.unity.render-pipelines.universal",
   "description": "Stress Level Zero's moddified Universal Render Pipeline. Keeping same namespace as Unity's to keep compatabitly with external assets and shaders without having to change each one of them to match.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "unity": "2019.3",
   "unityRelease": "0f3",
   "displayName": "SLZ Universal RP",
