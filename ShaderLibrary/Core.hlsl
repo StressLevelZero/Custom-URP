@@ -191,18 +191,64 @@ real ComputeFogIntensity(real fogFactor)
     return fogIntensity;
 }
 
+real3 DecodeHDREnvironment2(real4 encodedIrradiance, real4 decodeInstructions)
+{
+    // Take into account texture alpha if decodeInstructions.w is true(the alpha value affects the RGB channels)
+    real alpha = max(decodeInstructions.w * (encodedIrradiance.a - 1.0) + 1.0, 0.0);
+
+    // If Linear mode is not supported we can skip exponent part
+    return (decodeInstructions.x * PositivePow(alpha, decodeInstructions.y)) * encodedIrradiance.rgb;
+}
+
+half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels){
+
+
+float nearParam=0;
+float farParam =1;
+
+#if defined(FOG_LINEAR)
+  float mipLevel = ((depth/300)) * numMipLevels;
+#else
+  float mipLevel = (1-saturate( (depth - nearParam) / (farParam - nearParam) ) ) * numMipLevels;
+
+#endif
+  return DecodeHDREnvironment2( SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel) , unity_SpecCube0_HDR);
+    //viewDirectionWS
+}
+
 half3 MixFogColor(real3 fragColor, real3 fogColor, real fogFactor)
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
     real fogIntensity = ComputeFogIntensity(fogFactor);
     fragColor = lerp(fogColor, fragColor, fogIntensity);
+
 #endif
     return fragColor;
 }
 
+half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real fogFactor)
+{
+#if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+    real fogIntensity = ComputeFogIntensity(fogFactor);
+    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 10 );
+    fragColor = lerp(mipFog, fragColor, fogIntensity);
+
+#endif
+    return fragColor;
+}
+
+
 half3 MixFog(real3 fragColor, real fogFactor)
 {
+  //  return MipFog();
+
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
+}
+
+
+half3 MixFog(real3 fragColor, float3 viewDirectionWS, real fogFactor)
+{
+    return MixFogColor(fragColor, unity_FogColor.rgb, viewDirectionWS, fogFactor);
 }
 
 // Stereo-related bits

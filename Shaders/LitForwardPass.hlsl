@@ -80,6 +80,37 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
 //                  Vertex and Fragment functions                            //
 ///////////////////////////////////////////////////////////////////////////////
 
+
+float3 CameraPosition;
+float4x4 TransposedCameraProjectionMatrix;
+//sampler3D _3dTex;
+
+TEXTURE3D(_3dTex); SAMPLER(sampler_3dTex);
+
+
+// half4 froxelFog(float3 positionWS ){
+
+
+// half4 ls = half4( positionWS - CameraPosition, 1);
+
+// ls = mul(TransposedCameraProjectionMatrix, ls );
+
+// //unity_StereoEyeIndex 
+
+// //tex3d(_3dTex,positionWS);
+
+// return SAMPLE_TEXTURE3D( _3dTex, sampler_3dTex, positionWS);;
+// }
+
+
+
+
+
+
+
+
+
+
 // Used in Standard (Physically Based) shader
 Varyings LitPassVertex(Attributes input)
 {
@@ -137,9 +168,48 @@ half4 LitPassFragment(Varyings input) : SV_Target
     InitializeInputData(input, surfaceData.normalTS, inputData);
 
     half4 color = UniversalFragmentPBR(inputData, surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.occlusion, surfaceData.emission, surfaceData.alpha);
+     color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
 
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+  //  color.rgb = LinearToLMS(MipFog(-input.viewDirWS, 16));
+
+#if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
+
+
+    // half4 ls = half4( input.positionWS - CameraPosition, -1);
+
+    //  float camdistance = distance(ls.xyz,0);
+
+
+    // ls = mul(ls , TransposedCameraProjectionMatrix );
+
+
+    // ls.xyz = ls.xyz / ls.w; 
+ 
+    // ls.z = (camdistance / 20) + 1;
+
+    // half halfU = ls.x * 0.5;
+
+    // half3 LUV = half3 (halfU.x, ls.yz) *  (1-unity_StereoEyeIndex);
+
+    // half3 RUV = half3(halfU + 0.5, ls.yz ) * (unity_StereoEyeIndex);
+
+    // half3 DoubleUV = LUV + RUV;
+    
+    // half4 FroxelColor = SAMPLE_TEXTURE3D( _3dTex, sampler_3dTex, DoubleUV);
+
+    // color =  FroxelColor.rgba + color * (1-FroxelColor.a);
+
+
+#endif
+
+
+
+  
     return color;
 }
+
+
+
+
 
 #endif

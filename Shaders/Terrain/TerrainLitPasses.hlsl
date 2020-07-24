@@ -210,6 +210,16 @@ void SplatmapFinalColor(inout half4 color, half fogCoord)
     #endif
 }
 
+void SplatmapFinalColor(inout half4 color, half3 viewDirWS, half fogCoord)
+{
+    color.rgb *= color.a;
+    #ifdef TERRAIN_SPLAT_ADDPASS
+        color.rgb = MixFogColor(color.rgb, half3(0,0,0), fogCoord);
+    #else
+        color.rgb = MixFog(color.rgb, -viewDirWS, fogCoord);
+    #endif
+}
+
 void TerrainInstancing(inout float4 positionOS, inout float3 normal, inout float2 uv)
 {
 #ifdef UNITY_INSTANCING_ENABLED
@@ -372,7 +382,7 @@ half4 SplatmapFragment(Varyings IN) : SV_TARGET
     InitializeInputData(IN, normalTS, inputData);
     half4 color = UniversalFragmentPBR(inputData, albedo, metallic, /* specular */ half3(0.0h, 0.0h, 0.0h), smoothness, occlusion, /* emission */ half3(0, 0, 0), alpha);
 
-    SplatmapFinalColor(color, inputData.fogCoord);
+    SplatmapFinalColor(color, IN.viewDir, inputData.fogCoord);
 
     return half4(color.rgb, 1.0h);
 }
