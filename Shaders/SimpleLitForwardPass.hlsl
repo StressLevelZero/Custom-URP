@@ -140,8 +140,12 @@ half4 LitPassFragmentSimple(Varyings input) : SV_Target
     InitializeInputData(input, normalTS, inputData);
 
     half4 color = UniversalFragmentBlinnPhong(inputData, diffuse, specular, smoothness, emission, alpha);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
-    return color;
+    #ifdef _NORMALMAP
+     color.rgb = MixFog(color.rgb, -real3(input.normal.w, input.tangent.w, input.bitangent.w), inputData.fogCoord);
+    #else
+    color.rgb = MixFog(color.rgb, -input.viewDir, inputData.fogCoord);
+    #endif
+        return color;
 };
 
 #endif

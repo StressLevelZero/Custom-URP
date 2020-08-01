@@ -5,6 +5,8 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Version.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
+
 
 #if !defined(SHADER_HINT_NICE_QUALITY)
 #if defined(SHADER_API_MOBILE) || defined(SHADER_API_SWITCH)
@@ -230,7 +232,7 @@ half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real f
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
     real fogIntensity = ComputeFogIntensity(fogFactor);
-    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 10 );
+    real3 mipFog = MipFog(viewDirectionWS, fogFactor, UNITY_SPECCUBE_LOD_STEPS );
     fragColor = lerp(mipFog, fragColor, fogIntensity);
 
 #endif

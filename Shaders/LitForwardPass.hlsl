@@ -26,6 +26,7 @@ struct Varyings
     float4 normalWS                 : TEXCOORD3;    // xyz: normal, w: viewDir.x
     float4 tangentWS                : TEXCOORD4;    // xyz: tangent, w: viewDir.y
     float4 bitangentWS              : TEXCOORD5;    // xyz: bitangent, w: viewDir.z
+    
 #else
     float3 normalWS                 : TEXCOORD3;
     float3 viewDirWS                : TEXCOORD4;
@@ -168,8 +169,13 @@ half4 LitPassFragment(Varyings input) : SV_Target
     InitializeInputData(input, surfaceData.normalTS, inputData);
 
     half4 color = UniversalFragmentPBR(inputData, surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.occlusion, surfaceData.emission, surfaceData.alpha);
-     color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
+    
+    #ifdef _NORMALMAP
+     color.rgb = MixFog(color.rgb, -real3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w), inputData.fogCoord);
+    #else
+    color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
 
+    #endif
   //  color.rgb = LinearToLMS(MipFog(-input.viewDirWS, 16));
 
 #if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
