@@ -210,6 +210,16 @@ void SplatmapFinalColor(inout half4 color, half fogCoord)
     #endif
 }
 
+void SplatmapFinalColor(inout half4 color, half3 viewDirWS, half fogCoord)
+{
+    color.rgb *= color.a;
+    #ifdef TERRAIN_SPLAT_ADDPASS
+        color.rgb = MixFogColor(color.rgb, half3(0,0,0), fogCoord);
+    #else
+    color.rgb = MixFog(color.rgb, -viewDirWS, fogCoord);
+	    #endif
+}
+
 void TerrainInstancing(inout float4 positionOS, inout float3 normal, inout float2 uv)
 {
 #ifdef UNITY_INSTANCING_ENABLED
@@ -372,7 +382,11 @@ half4 SplatmapFragment(Varyings IN) : SV_TARGET
     InitializeInputData(IN, normalTS, inputData);
     half4 color = UniversalFragmentPBR(inputData, albedo, metallic, /* specular */ half3(0.0h, 0.0h, 0.0h), smoothness, occlusion, /* emission */ half3(0, 0, 0), alpha);
 
-    SplatmapFinalColor(color, inputData.fogCoord);
+#ifdef _NORMALMAP
+	SplatmapFinalColor(color, real3(IN.normal.w, IN.tangent.w, IN.bitangent.w), inputData.fogCoord);
+#else
+    SplatmapFinalColor(color, IN.viewDir, inputData.fogCoord);
+#endif
 
     return half4(color.rgb, 1.0h);
 }
@@ -386,10 +400,10 @@ struct AttributesLean
 {
     float4 position     : POSITION;
     float3 normalOS       : NORMAL;
-    UNITY_VERTEX_INPUT_INSTANCE_ID
 #ifdef _ALPHATEST_ON
     float2 texcoord     : TEXCOORD0;
 #endif
+    UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct VaryingsLean
@@ -398,6 +412,7 @@ struct VaryingsLean
 #ifdef _ALPHATEST_ON		
     float2 texcoord     : TEXCOORD0;
 #endif
+    UNITY_VERTEX_OUTPUT_STEREO
 };
 
 VaryingsLean ShadowPassVertex(AttributesLean v)
@@ -440,6 +455,7 @@ VaryingsLean DepthOnlyVertex(AttributesLean v)
 {
     VaryingsLean o = (VaryingsLean)0;
     UNITY_SETUP_INSTANCE_ID(v);
+    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
     TerrainInstancing(v.position, v.normalOS);
     o.clipPos = TransformObjectToHClip(v.position.xyz);
 #ifdef _ALPHATEST_ON		
