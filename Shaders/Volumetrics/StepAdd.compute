@@ -1,0 +1,108 @@
+﻿//Second froxel pass 
+// 	Sebastien Hillaire https://www.slideshare.net/DICEStudio/physically-based-and-unified-volumetric-rendering-in-frostbite/26
+
+#pragma kernel StepAdd
+#define EPSILON  1e-8;
+
+RWTexture3D<float4> Result;
+Texture3D<float4> InLightingTexture;
+SamplerState Custom_trilinear_clamp_sampler;
+float HomogeneousMediumDensity;
+
+float4x4    LeftEyeMatrix;
+float4x4    RightEyeMatrix;
+
+shared float4 _VolumePlaneSettings;
+shared float4 _ZBufferParams;
+
+half4 Accumulate(half4 colorAndDensityFront, half4 colorAndDensityBack)
+{
+	half layerDepth = 1;	//layerDepth temp set 
+
+    half transmittance = exp(colorAndDensityBack.w * layerDepth);
+    half4 accumulatedLightAndTransmittance = half4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1.0f - transmittance) * colorAndDensityFront.w, colorAndDensityFront.w * transmittance);
+	
+    return accumulatedLightAndTransmittance;
+}
+
+float GetSliceEyeDepth(float slice, float numberOfSlices) {
+	
+	float zdepth = slice / numberOfSlices;
+//z = pow(saturate(uv.z), _DepthPow); // Depth power to adjust the depth dispution of voxels
+	zdepth = zdepth * _VolumePlaneSettings.y / (1 + zdepth * _VolumePlaneSettings.z); //UV to device
+	zdepth = 1.0 / (_ZBufferParams.z * zdepth + _ZBufferParams.w);
+
+	return zdepth;
+}
+
+[numthreads(4, 4, 4)]	
+void StepAdd(uint3 id : SV_DispatchThreadID)
+{
+	//Use this to figure out distance between layers
+	float near = _VolumePlaneSettings.x;
+	float far = _VolumePlaneSettings.y;
+
+	// T (A → B) = 𝑒 ^ -({ S [𝐴 - 𝐵]}	𝛽𝑒(𝑥) 𝑑x	)
+	float Absorption = 0.01f; //temp Absorption rate
+
+	float3 whd ; //make floating to avoid interger calulations later. There's likely a better place to do this
+	Result.GetDimensions(whd.x, whd.y, whd.z);
+
+	float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //Current slice
+
+	//Make stereoscopic.
+	float4 Stereo_UVWs = float4(id / whd ,1);	
+	Stereo_UVWs.x = frac(Stereo_UVWs.x * 2);
+	
+	if (id.x < whd.x / 2) 	{
+		Stereo_UVWs = mul(LeftEyeMatrix, Stereo_UVWs);
+	}
+	else	{
+		Stereo_UVWs = mul(RightEyeMatrix, Stereo_UVWs);
+	}
+
+//	float t0 = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
+	
+	float stepLen = 0; //depth per layer //Make this account for current distance
+	float accumTransmittance = 1;
+
+	float DepthPow = 0.5f;
+
+	float normalizationCoefficient  = -((far - near) / 256.0f);
+//
+	for (int depth = 0; depth < whd.z; depth++) {
+		float4 scatteringExtinction = InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,
+			float3(Stereo_UVWs.x, Stereo_UVWs.y, depth / whd.z), 0); //Sample current Layer //Back tex
+
+		//redefine near and far
+		near = GetSliceEyeDepth(depth, whd.z);
+		far  = GetSliceEyeDepth(depth + 1, whd.z);
+
+	//	float cellVolume = (far - near) / whd.z; // TODO Set this value in scpirt
+		//float cellVolume = abs(far - near) * 0.01f; // TODO Set this value in scpirt
+		float cellVolume = 19 / whd.z; //temp fixed length for debuging
+		// (S - S * e ^(-t * D) )  / t;
+
+
+		scatteringExtinction.a += HomogeneousMediumDensity;
+//		scatteringExtinction.a *= normalizationCoefficient; // Temp set density
+
+		//const
+		 float transmittance = exp(-scatteringExtinction.a * cellVolume); //*stepLen
+
+		// half4 accumulatedLightAndTransmittance = half4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1.0f - transmittance) * colorAndDensityFront.w, colorAndDensityFront.w * transmittance);
+		 accumScatteringTransmittance.rgb +=			
+		 accumScatteringTransmittance.w * ( scatteringExtinction.xyz * (1.0f - transmittance) / scatteringExtinction.a + 0.00001f); //Change to max epsi?
+				 
+		 accumScatteringTransmittance.a *= transmittance;
+
+		//accumScatteringTransmittance
+		//https://computergraphics.stackexchange.com/questions/5762/volumetric-integration-in-frostbite
+//		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / scatteringExtinction.a);
+//		accumScatteringTransmittance.a *= transmittance;
+		//Add alpha to baked texture and better controls to system to be physically based. Maybe use Beer's law?
+		// accumScatteringTransmittance.g = depth % 2; //Debug: stripe the layers to see disrubution
+		 Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
+	}
+
+}

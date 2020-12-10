@@ -105,6 +105,9 @@ Shader "Universal Render Pipeline/Lit"
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
 
+            #pragma multi_compile _VOLUMETRICS_DISABLED _VOLUMETRICS_ENABLED
+
+
             // -------------------------------------
             // Unity defined keywords
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED

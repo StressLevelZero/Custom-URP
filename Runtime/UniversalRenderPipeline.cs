@@ -126,13 +126,15 @@ namespace UnityEngine.Rendering.Universal
             PerCameraBuffer._WorldSpaceCameraPos = Shader.PropertyToID("_WorldSpaceCameraPos");
 
             // Let engine know we have MSAA on for cases where we support MSAA backbuffer
-            if (QualitySettings.antiAliasing != asset.msaaSampleCount)
-            {
-                QualitySettings.antiAliasing = asset.msaaSampleCount;
-#if ENABLE_VR && ENABLE_VR_MODULE
-                XR.XRDevice.UpdateEyeTextureMSAASetting();
-#endif
-            }
+//             if (QualitySettings.antiAliasing != asset.msaaSampleCount)
+//             {
+//                 QualitySettings.antiAliasing = asset.msaaSampleCount;
+// #if ENABLE_VR && ENABLE_VR_MODULE
+//                 XR.XRDevice.UpdateEyeTextureMSAASetting();
+// #endif
+//             }
+
+
 
 #if ENABLE_VR && ENABLE_VR_MODULE
             XRGraphics.eyeTextureResolutionScale = asset.renderScale;

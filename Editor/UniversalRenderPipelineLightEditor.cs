@@ -149,7 +149,6 @@ namespace UnityEditor.Rendering.Universal
             using (var group = new EditorGUILayout.FadeGroupScope(m_AnimLightBounceIntensity.faded))
                 if (group.visible)
                     settings.DrawBounceIntensity();
-
             ShadowsGUI();
 
             settings.DrawRenderMode();
@@ -167,6 +166,9 @@ namespace UnityEditor.Rendering.Universal
                 if (!sceneLighting)
                     EditorGUILayout.HelpBox(s_Styles.DisabledLightWarning.text, MessageType.Warning);
             }
+
+            EditorGUILayout.ObjectField("Light Cookie ", lightProperty.cookie, typeof(Texture), false);
+
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -278,6 +280,7 @@ namespace UnityEditor.Rendering.Universal
 
             EditorGUI.indentLevel += 1;
             show *= m_AnimShadowOptions.faded;
+            
             // Baked Shadow radius
             using (var group = new EditorGUILayout.FadeGroupScope(show * m_AnimShadowRadiusOptions.faded))
                 if (group.visible)

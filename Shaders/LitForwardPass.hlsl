@@ -13,6 +13,8 @@ struct Attributes
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
+
+
 struct Varyings
 {
     float2 uv                       : TEXCOORD0;
@@ -82,36 +84,6 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
 ///////////////////////////////////////////////////////////////////////////////
 
 
-float3 CameraPosition;
-float4x4 TransposedCameraProjectionMatrix;
-//sampler3D _3dTex;
-
-TEXTURE3D(_3dTex); SAMPLER(sampler_3dTex);
-
-
-// half4 froxelFog(float3 positionWS ){
-
-
-// half4 ls = half4( positionWS - CameraPosition, 1);
-
-// ls = mul(TransposedCameraProjectionMatrix, ls );
-
-// //unity_StereoEyeIndex 
-
-// //tex3d(_3dTex,positionWS);
-
-// return SAMPLE_TEXTURE3D( _3dTex, sampler_3dTex, positionWS);;
-// }
-
-
-
-
-
-
-
-
-
-
 // Used in Standard (Physically Based) shader
 Varyings LitPassVertex(Attributes input)
 {
@@ -156,6 +128,47 @@ Varyings LitPassVertex(Attributes input)
     return output;
 }
 
+
+    ///VOLUMETRICS
+
+    //float3 CameraPosition;
+    //float4x4 TransposedCameraProjectionMatrix;
+    //float4 _VolumePlaneSettings;
+    //TEXTURE3D(_VolumetricResult); SAMPLER(sampler_VolumetricResult);
+
+    //half4 Volumetrics1(half4 color, half3 positionWS) {
+
+    //    half4 ls = half4(positionWS - GetCameraPositionWS(), -1);
+
+    //    ls = mul(ls, TransposedCameraProjectionMatrix);
+    //    ls.xyz = ls.xyz / ls.w;
+
+    //    //TODO: Makes the froxel read distance and curved based instead of rectilinear. Better use of edge froxels. Compute shader needs to write correctly. 
+    //    //float camdistance = distance(ls.xyz,0);
+    //    //ls.z = (camdistance + 1) / 20 ;     
+    //    //ls.z = FrustumToLinearDepth(ls.z);
+    //    //ls.z = pow(saturate(ls.z), _VaporDepthPow); Adds a curve to the frustum space to control dispution of froxels
+    //    ls.z = ls.z / (_VolumePlaneSettings.y - ls.z * _VolumePlaneSettings.z); // Converts from frustum space To Linear Depth
+
+    //    half halfU = ls.x * 0.5;
+
+    //    //Figuring out both sides at once and zeroing out the other when blending. Is this better than brancing with an if statement?
+    //    half3 LUV = half3 (halfU.x, ls.yz) * (1 - unity_StereoEyeIndex); //Left UV
+    //    half3 RUV = half3(halfU + 0.5, ls.yz) * (unity_StereoEyeIndex); //Right UV
+    //    half3 DoubleUV = LUV + RUV; // Combined
+
+    //    //TODO: Make sampling calulations run or not if they are inside or out of the clipped area
+    //    //float ClipUVW =
+    //    //    step(DoubleUV.x, 1) * step(0, DoubleUV.x) *
+    //    //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
+    //    //
+    //    half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, DoubleUV);// *ClipUVW;
+
+    //    return FroxelColor.rgba + (color * FroxelColor.a  );
+    //}
+    ////
+
+
 // Used in Standard (Physically Based) shader
 half4 LitPassFragment(Varyings input) : SV_Target
 {
@@ -176,46 +189,13 @@ half4 LitPassFragment(Varyings input) : SV_Target
     color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
 
     #endif
-  //  color.rgb = LinearToLMS(MipFog(-input.viewDirWS, 16));
 
 #if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
-
-
-    // half4 ls = half4( input.positionWS - CameraPosition, -1);
-
-    //  float camdistance = distance(ls.xyz,0);
-
-
-    // ls = mul(ls , TransposedCameraProjectionMatrix );
-
-
-    // ls.xyz = ls.xyz / ls.w; 
- 
-    // ls.z = (camdistance / 20) + 1;
-
-    // half halfU = ls.x * 0.5;
-
-    // half3 LUV = half3 (halfU.x, ls.yz) *  (1-unity_StereoEyeIndex);
-
-    // half3 RUV = half3(halfU + 0.5, ls.yz ) * (unity_StereoEyeIndex);
-
-    // half3 DoubleUV = LUV + RUV;
-    
-    // half4 FroxelColor = SAMPLE_TEXTURE3D( _3dTex, sampler_3dTex, DoubleUV);
-
-    // color =  FroxelColor.rgba + color * (1-FroxelColor.a);
-
-
+#if defined(_VOLUMETRICS_ENABLED)
+    color = Volumetrics ( color,  input.positionWS);
+#endif
 #endif
 
-
-
-  
     return color;
 }
-
-
-
-
-
 #endif

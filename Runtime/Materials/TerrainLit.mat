@@ -22,7 +22,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: TerrainLit
   m_Shader: {fileID: 4800000, guid: 69c1f799e772cb6438f56c23efccb782, type: 3}
-  m_ShaderKeywords: _TERRAIN_INSTANCED_PERPIXEL_NORMAL
+  m_ShaderKeywords: _TERRAIN_BLEND_HEIGHT _TERRAIN_INSTANCED_PERPIXEL_NORMAL
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -133,19 +133,19 @@ Material:
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _EnableHeightBlend: 0
+    - _EnableHeightBlend: 1
     - _EnableInstancedPerPixelNormal: 1
     - _EnvironmentReflections: 1
     - _GlossMapScale: 1
     - _Glossiness: 0.5
-    - _HeightTransition: 0
+    - _HeightTransition: 0.5
     - _Metallic: 0
     - _Metallic0: 0
     - _Metallic1: 0
     - _Metallic2: 0
     - _Metallic3: 0
     - _Mode: 0
-    - _NumLayersCount: 0
+    - _NumLayersCount: 3
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _Smoothness0: 1
