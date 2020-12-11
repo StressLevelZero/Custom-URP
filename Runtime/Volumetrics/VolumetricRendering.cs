@@ -197,7 +197,6 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelTexture = new RenderTexture(rtdiscrpt);
         FroxelTexture.Create();
-        Debug.Log("Made scattering RT, " +  FroxelTexture.format + ", " + FroxelTexture.width);
 
 
       rtdiscrpt.width = FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
@@ -205,7 +204,6 @@ public class VolumetricRendering : MonoBehaviour
         StackTexture.format = RenderTextureFormat.ARGB32;
         StackTexture.enableRandomWrite = true;
         StackTexture.Create();
-        Debug.Log("Made accumelation RT, " + StackTexture.format + ", " + StackTexture.width);
 
 
         LightObjects = new List<LightObject>();
@@ -216,7 +214,6 @@ public class VolumetricRendering : MonoBehaviour
         //First Compute pass setup
 
         SetupClipmap();
-        Debug.Log("Made scattering RT, " + ClipmapTexture.format + ", " + ClipmapTexture.width);
 
         FroxelFogCompute.SetFloat("ClipmapScale", ClipmapScale);
         UpdateClipmap();
@@ -303,10 +300,6 @@ public class VolumetricRendering : MonoBehaviour
 
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapTexture); //Set clipmap for
         Shader.SetGlobalFloat("_ClipmapScale", ClipmapScale);
-
-        if (ClipmapTexture == null) Debug.LogError("Clipmap is empty!");
-        Debug.Log(ClipmapTexture.format);
-
     }
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
     {
@@ -322,7 +315,6 @@ public class VolumetricRendering : MonoBehaviour
         //TODO: bake out variables at start to avoid extra math per clip gen
 
         //Clipmap variables
-        ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture);
         ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture);
         ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - ( 0.5f * ClipmapScale * Vector3.one)) ;
         ClipmapCompute.SetFloat("ClipmapScale", ClipmapScale);
@@ -333,12 +325,17 @@ public class VolumetricRendering : MonoBehaviour
         //Loop through bake texture volumes and put into clipmap //TODO: Add daynamic pass for static unbaked elements
         for (int i=0; i < VolumetricRegisters.volumetricAreas.Count; i++)
         {
+           // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
+            ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture);
+
             //Volumetric variables
             ClipmapCompute.SetTexture(ClipmapKernal, "VolumeMap", VolumetricRegisters.volumetricAreas[i].bakedTexture); 
             ClipmapCompute.SetVector("VolumeWorldSize", VolumetricRegisters.volumetricAreas[i].NormalizedScale);
             ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);
 
             ClipmapCompute.Dispatch(ClipmapKernal, ClipMapResolution / 4, ClipMapResolution / 4, ClipMapResolution / 4);
+            //Debug.Log("Rendered " + VolumetricRegisters.volumetricAreas[i].bakedTexture.name);
+           // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
         }
 
         SetClipmap(ClipmapTexture, ClipmapScale, ClipmapTransform);
