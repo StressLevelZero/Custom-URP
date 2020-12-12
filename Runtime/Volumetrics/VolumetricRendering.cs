@@ -296,7 +296,9 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.msaaSamples = 1;
 
         ClipmapTexture = new RenderTexture(ClipRTdiscrpt);
-        ClipmapTexture.Create();
+        ClipmapTexture.Create();        
+        ClipmapTexture2 = new RenderTexture(ClipRTdiscrpt);
+        ClipmapTexture2.Create();
 
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapTexture); //Set clipmap for
         Shader.SetGlobalFloat("_ClipmapScale", ClipmapScale);
@@ -305,9 +307,11 @@ public class VolumetricRendering : MonoBehaviour
     {
         if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > ClipmapResampleThreshold) UpdateClipmap();
     }
+
+    RenderTexture ClipmapTexture2;  //Sampling and combining baked maps asynchronously
+
     void UpdateClipmap()
     {
-        if (ClipmapTexture == null) Debug.LogError("no clipmap");
         //TODO: chache ids 
         int ClipmapKernal = ClipmapCompute.FindKernel("ClipMapGen");
         int ClearClipmapKernal = ClipmapCompute.FindKernel("ClipMapClear");
@@ -315,17 +319,20 @@ public class VolumetricRendering : MonoBehaviour
         //TODO: bake out variables at start to avoid extra math per clip gen
 
         //Clipmap variables
-        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture);
-        ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - ( 0.5f * ClipmapScale * Vector3.one)) ;
+        ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * ClipmapScale * Vector3.one));
         ClipmapCompute.SetFloat("ClipmapScale", ClipmapScale);
 
+
         //Clear previous capture
+        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture);
+        ClipmapCompute.Dispatch(ClearClipmapKernal, ClipMapResolution / 4, ClipMapResolution / 4, ClipMapResolution / 4);
+        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture2);
         ClipmapCompute.Dispatch(ClearClipmapKernal, ClipMapResolution / 4, ClipMapResolution / 4, ClipMapResolution / 4);
 
         //Loop through bake texture volumes and put into clipmap //TODO: Add daynamic pass for static unbaked elements
         for (int i=0; i < VolumetricRegisters.volumetricAreas.Count; i++)
         {
-           // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
+            ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture2);
             ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture);
 
             //Volumetric variables
@@ -335,7 +342,8 @@ public class VolumetricRendering : MonoBehaviour
 
             ClipmapCompute.Dispatch(ClipmapKernal, ClipMapResolution / 4, ClipMapResolution / 4, ClipMapResolution / 4);
             //Debug.Log("Rendered " + VolumetricRegisters.volumetricAreas[i].bakedTexture.name);
-           // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
+            // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
+            Graphics.CopyTexture(ClipmapTexture, ClipmapTexture2); //How heavy is this?? Should I make a copy compute shader or swap inputs?
         }
 
         SetClipmap(ClipmapTexture, ClipmapScale, ClipmapTransform);

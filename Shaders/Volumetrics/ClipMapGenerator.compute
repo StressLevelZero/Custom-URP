@@ -6,10 +6,10 @@
 #pragma kernel ClipMapGen
 #pragma kernel ClipMapClear
 
-//Texture3D<float4>	PreResult;
+Texture3D<float4>	PreResult;
 RWTexture3D<float4> Result;
 
-//SamplerState my_point_clamp_sampler;
+SamplerState my_point_clamp_sampler;
 
 float3 ClipmapWorldPosition;
 float  ClipmapScale;
@@ -53,9 +53,9 @@ void ClipMapGen (uint3 id : SV_DispatchThreadID)
 		step(MapUVW.y, 1) * step(0, MapUVW.y) *
 		step(MapUVW.z, 1) * step(0, MapUVW.z);
 
-	//float4 currentTex = PreResult.SampleLevel(my_point_clamp_sampler, UVW, 0);
+//	float4 currentTex = PreResult.SampleLevel(trilinear_clamp_sampler, UVW.xyz, 0);
 	//Sample baked volume and clip it off to its area
 	//Result[id.xyz] = VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW; 
 	//Doing max of the two results to account for overlaps
-	Result[id.xyz] = max(Result[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW);
+	Result[id.xyz] = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW);
 }
