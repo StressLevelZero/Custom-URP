@@ -440,7 +440,7 @@ void DirectionalLight(uint3 id : SV_DispatchThreadID) {
 	}
 	
 //	AccumulatedLights[id.xyz] += DirectionalColor;
-	SaveLightTexture(id, LightColor * 0.1 * DirectionalShadow); //TODO: remove temp multiplier
+	SaveLightTexture(id, LightColor * 0.01 * DirectionalShadow); //TODO: remove temp multiplier
 }
 
 //
