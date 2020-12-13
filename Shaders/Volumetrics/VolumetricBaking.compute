@@ -96,8 +96,8 @@ bool IntersectTriangle_MT97(Ray ray, float3 vert0, float3 vert1, float3 vert2,
 	float det = dot(edge1, pvec);
 
 	// use backface culling
-	if (det < EPSILON)
-		return false;
+	//if (det < EPSILON)
+	//	return false;
 	float inv_det = 1.0f / det;
 
 	// calculate distance from vert0 to ray origin
@@ -233,6 +233,7 @@ void IntersectMeshObject(Ray ray, inout RayHit bestHit, MeshObject meshObject)
 			//	bestHit.emission = 0.0f;
 			}
 		}
+
 	}
 }
 
