@@ -550,11 +550,7 @@ public class VolumetricBaking : EditorWindow
             //TODO: Handle mixed lights differently in the future
             if (lights[i].lightmapBakeType == LightmapBakeType.Baked || lights[i].lightmapBakeType == LightmapBakeType.Mixed)
             {
-            //No longer needed because it's being checked elsewhere
-            //    if (lights[i].type == lightType && lights[i].enabled)
-           //     {
-                    FilteredLights.Add(lights[i]);
-           //     }
+                if (lights[i].enabled) FilteredLights.Add(lights[i]); 
             }
         }
 

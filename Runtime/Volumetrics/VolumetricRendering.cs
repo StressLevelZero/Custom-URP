@@ -270,8 +270,11 @@ public class VolumetricRendering : MonoBehaviour
         {
             LightObject lightObject = new LightObject();
             lightObject.LightPosition = Lights[i].transform.position;
-            lightObject.LightColor = Lights[i].color * Lights[i].intensity;
-
+            lightObject.LightColor = new Color(
+                Lights[i].color.r * Lights[i].intensity,
+                Lights[i].color.g * Lights[i].intensity,
+                Lights[i].color.b * Lights[i].intensity,
+                Lights[i].color.a);
             lightObject.LightProjectionMatrix = matScaleBias 
                 * Matrix4x4.Perspective(Lights[i].spotAngle, 1, 0.1f, Lights[i].range) 
                 * Matrix4x4.Rotate(Lights[i].transform.rotation).inverse;
@@ -479,8 +482,8 @@ public class VolumetricRendering : MonoBehaviour
     private void OnValidate()
     {
 #if UNITY_EDITOR
-        //Blank Texture in editor
-             if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
+        //Black Texture in editor
+         if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
 #endif
         if (cam == null) cam = GetComponent<Camera>();
         if (near < cam.nearClipPlane || far > cam.farClipPlane)
