@@ -418,6 +418,8 @@ void SpotLight(uint3 id : SV_DispatchThreadID) {
 	SaveLightTexture(id, inverseSquareColor * ShadowColor * vSpotAtten);
 }
 
+
+//Add a skylight portal to better control light leaking
 [numthreads(4, 4, 4)]
 void DirectionalLight(uint3 id : SV_DispatchThreadID) {
 
@@ -438,7 +440,7 @@ void DirectionalLight(uint3 id : SV_DispatchThreadID) {
 	}
 	
 //	AccumulatedLights[id.xyz] += DirectionalColor;
-	SaveLightTexture(id, LightColor * DirectionalShadow);
+	SaveLightTexture(id, LightColor * 0.1 * DirectionalShadow); //TODO: remove temp multiplier
 }
 
 //
