@@ -14,15 +14,16 @@ public class VolumetricBaking : EditorWindow
     {
         //Show existing window instance. If one doesn't exist, make one.
         GetWindow(typeof(VolumetricBaking));
-     //   BuildComboList();
-     //   BuildSelectionGrid();
+        //   BuildComboList();
+        //   BuildSelectionGrid();
     }
     //TODO: Save to scene asset file 
     public float AreaLightSamples = 8;
+    bool saveWarning = false;
+    bool Running = false;
     private void OnGUI()
     {
-
-
+        DisplayProgress();
 
         if (GUILayout.Button("Bake Volumetrics"))
         {
@@ -32,19 +33,19 @@ public class VolumetricBaking : EditorWindow
             BakeLights();
             ReleaseBuffers();
         };
-
-   //     EditorGUILayout.FloatField(AreaLightSamples);
+        //     EditorGUILayout.FloatField(AreaLightSamples);
 
         EditorGUILayout.LabelField(BakingStatus);
         WarningGUI();
+        if (saveWarning) if (GUILayout.Button("Save scene")) SaveScene();
 
         //      EditorGUILayout.HelpBox("Some warning text", MessageType.Warning); //Todo: add warning box to window
     }
 
     struct WarningStatus
     {
-       public bool Display;
-       public string Text;
+        public bool Display;
+        public string Text;
     }
 
     WarningStatus warningStatus;
@@ -55,6 +56,30 @@ public class VolumetricBaking : EditorWindow
         EditorGUILayout.HelpBox(warningStatus.Text, MessageType.Warning);
     }
 
+    struct Progress{
+        public string title;
+        public string info;
+        public float percent;
+    }
+    Progress progress;
+    double ProgressTimeStart;
+    void DisplayProgress()
+    {
+        if (Running)
+        {
+            EditorUtility.DisplayProgressBar(progress.title + EditorApplication.timeSinceStartup, progress.info, progress.percent);
+        }
+    }
+
+    private void UpdateProgress(string title, string info, float percent)
+    {
+        progress.title = title;
+        progress.info = info;
+        progress.percent = percent;
+
+        DisplayProgress();
+
+    }
     string BakingStatus;
 
      void UpdateStatus(string Status)
@@ -75,6 +100,7 @@ public class VolumetricBaking : EditorWindow
     {
         warningStatus.Display = false;
         warningStatus.Text = null;
+        saveWarning = false;
     }
 
     bool VerifySettings()
@@ -93,10 +119,19 @@ public class VolumetricBaking : EditorWindow
         if (UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().isDirty)
         {
             UpdateWarning( "Save your scene before baking.");
+            saveWarning = true;
             return false;
         }
 
         else return true;
+    }
+
+    void SaveScene()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+
+        ClearWarning();
     }
 
 
@@ -143,11 +178,7 @@ public class VolumetricBaking : EditorWindow
     {
         public int DebugCcounter;
     }
-
     ///////////////
-
-
-    #region Old Bake code
     public void BakeVolumetrics()
     {
         System.DateTime startTime = System.DateTime.Now;
@@ -164,7 +195,7 @@ public class VolumetricBaking : EditorWindow
 
         for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
         {
-            EditorUtility.DisplayProgressBar("Baking Volumetrics... ", VolumetricRegisters.volumetricAreas[j].name, (float)j / (float)VolumetricRegisters.volumetricAreas.Count );
+       //     EditorUtility.DisplayProgressBar("Baking Volumetrics... ", VolumetricRegisters.volumetricAreas[j].name, (float)j / (float)VolumetricRegisters.volumetricAreas.Count );
 
             int3 Texels = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
 
@@ -316,18 +347,21 @@ public class VolumetricBaking : EditorWindow
 
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
     }
-    #endregion 
+
+    ComputeShader BakingShader;
+
     void BakeLights()
     {
         System.DateTime startTime = System.DateTime.Now;
-
+         BakingShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricBaking.compute");
         UpdateStatus("Baking " + SceneManager.GetActiveScene().name);
 
+        Running = true;
 
         for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
         {
-            EditorUtility.DisplayProgressBar("Baking Volumetrics... ", VolumetricRegisters.volumetricAreas[j].name, (float)j / (float)VolumetricRegisters.volumetricAreas.Count);
-
+        //    EditorUtility.DisplayProgressBar("Baking Volumetrics... ", VolumetricRegisters.volumetricAreas[j].name, (float)j / (float)VolumetricRegisters.volumetricAreas.Count);
+            
             int3 Texels = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
             RenderTextureDescriptor rtdiscrpt = new RenderTextureDescriptor();
             rtdiscrpt.enableRandomWrite = true;
@@ -344,14 +378,34 @@ public class VolumetricBaking : EditorWindow
             Light[] PointLights = GatherBakedLights(LightType.Point);
             for (int i = 0; i < PointLights.Length; i++)
             {
-                EditorUtility.DisplayProgressBar("Baking " + (j+1) +  "/" + VolumetricRegisters.volumetricAreas.Count + " " 
-                + VolumetricRegisters.volumetricAreas[j].name + " " 
+                UpdateProgress("Baking " + (j + 1) + "/" + VolumetricRegisters.volumetricAreas.Count + " "
+                + VolumetricRegisters.volumetricAreas[j].name + " "
                 + (System.DateTime.Now.Minute - startTime.Minute) + ":" + (System.DateTime.Now.Second - startTime.Second) //TODO: Format correctly
-                , PointLights[i].name , (float)i / PointLights.Length);
+                , PointLights[i].name, (float)i / PointLights.Length);
 
                 //TODO: Do some checking to only render lights affecting the area. AABB?                
                 DispatchLight(PointLights[i], RT3d, Texels, j);
             }
+
+            //do
+            //{
+
+            //} while (i < 0);
+            //bool dothething = true;
+            //while (dothething)
+            //{
+            //    UpdateProgress("Baking " + (j + 1) + "/" + VolumetricRegisters.volumetricAreas.Count + " "
+            //    + VolumetricRegisters.volumetricAreas[j].name + " "
+            //    + (System.DateTime.Now.Minute - startTime.Minute) + ":" + (System.DateTime.Now.Second - startTime.Second) //TODO: Format correctly
+            //    , PointLights[i].name, (float)i / PointLights.Length);
+
+            //    //TODO: Do some checking to only render lights affecting the area. AABB?                
+            //    DispatchLight(PointLights[i], RT3d, Texels, j);
+
+            //    Debug.Log("");
+
+            //    return;
+            //}
 
             //Define path and save 3d texture
             string path = SceneManager.GetActiveScene().path;
@@ -363,7 +417,7 @@ public class VolumetricBaking : EditorWindow
             VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
         }
 
-
+        Running = false;
         EditorUtility.ClearProgressBar();
 
         System.DateTime endTime = System.DateTime.Now;
@@ -376,9 +430,8 @@ public class VolumetricBaking : EditorWindow
 
     }
 
-    RenderTexture DispatchLight(Light light, RenderTexture RT3d, int3 Texels, int AreaID) //Used to render each light indavidually. TODO Generalize into pure pathtracing
+    void DispatchLight(Light light, RenderTexture RT3d, int3 Texels, int AreaID) //Used to render each light indavidually. TODO Generalize into pure pathtracing
     {
-        ComputeShader BakingShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricBaking.compute");
 
         //Setup light data
 
@@ -422,7 +475,7 @@ public class VolumetricBaking : EditorWindow
             //    BakingShader.SetVector("AreaSize", light.areaSize);
             //    break;
             default:
-                return null;
+                return;
         }
 
 
@@ -467,11 +520,12 @@ public class VolumetricBaking : EditorWindow
         while (debuger[0].DebugCcounter == 0)
         {
             BakeBuffer.GetData(debuger);
+            Debug.Log("Counter " + debuger[0].DebugCcounter);
         }
 
         BakeBuffer.Release(); //Avoiding memory leak
 
-        return RT3d;
+      //  return RT3d;
     }
 
     void SetComputeBuffer(string name, ComputeShader shader, int kernel, ComputeBuffer buffer)

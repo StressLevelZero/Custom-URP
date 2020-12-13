@@ -480,7 +480,7 @@ public class VolumetricRendering : MonoBehaviour
     {
 #if UNITY_EDITOR
         //Blank Texture in editor
-        //     if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
+             if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
 #endif
         if (cam == null) cam = GetComponent<Camera>();
         if (near < cam.nearClipPlane || far > cam.farClipPlane)
