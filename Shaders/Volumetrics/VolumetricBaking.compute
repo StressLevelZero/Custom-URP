@@ -419,32 +419,25 @@ void SpotLight(uint3 id : SV_DispatchThreadID) {
 
 [numthreads(4, 4, 4)]
 void DirectionalLight(uint3 id : SV_DispatchThreadID) {
+
 	float3 whd;
 	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
-
-
-	//w -= 1;
-
-	float4 ColoredLights = float4(0, 0, 0, 0);
-	float ParticipatingMedia = 0;
-
 	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
 
 	//Directional Light // Make an array
 	// Shadow test ray
-	bool shadow = false;
-	Ray shadowRay = CreateRay(VoxelWorldPosition, LightDirection.xyz);
+	float4 DirectionalShadow = float4(1, 1, 1, 1);
+
+	Ray shadowRay = CreateRay(VoxelWorldPosition, -LightDirection.xyz);
 	RayHit shadowHit = Trace(shadowRay);
-	float4 DirectionalColor = DirectionalLightColor;
 
-	if (shadowHit.distance != 1.#INF)
+	if (shadowHit.distance != 1.#INF && shadowHit.distance != -1.#INF)
 	{
-		DirectionalColor *= 0;
+		DirectionalShadow *= 0;
 	}
-
 	
 //	AccumulatedLights[id.xyz] += DirectionalColor;
-	SaveLightTexture(id, DirectionalColor);
+	SaveLightTexture(id, LightColor * DirectionalShadow);
 }
 
 //
