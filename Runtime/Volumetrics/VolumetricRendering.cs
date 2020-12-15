@@ -151,8 +151,18 @@ public class VolumetricRendering : MonoBehaviour
         LightProjectionTextures = new Texture2DArray(1, 1, 1, TextureFormat.RGBA32, false);
         Debug.Log("Made blank cookie sheet");
     }
-    
-    void Intialize(){
+
+    bool VerifyVolumetricRegisters()
+    {
+        //Add realtime light check here too
+        if (VolumetricRegisters.volumetricAreas.Count > 0) return true;
+        Debug.Log("No Volumetric volumes in " + UnityEngine.SceneManagement.SceneManager.GetActiveScene().name + ". Disabling froxel rendering.");
+        this.enabled = false;
+        return false;
+    }
+    void Intialize()
+    {
+        if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system.
         CheckCookieList();
         matScaleBias = Matrix4x4.identity;
         matScaleBias.m00 = -0.5f;
@@ -346,7 +356,6 @@ public class VolumetricRendering : MonoBehaviour
         else
         {
             SetClipmap(ClipmapTexture2, volumetricData.ClipmapScale, ClipmapTransform);
-
         }
         ClipmapCurrentPos = ClipmapTransform; //Set History
     }
