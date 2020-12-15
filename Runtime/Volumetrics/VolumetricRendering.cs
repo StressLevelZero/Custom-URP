@@ -506,13 +506,13 @@ public class VolumetricRendering : MonoBehaviour
 //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
 
 #endif
-        if (cam == null) cam = GetComponent<Camera>();
-        if (volumetricData.near < cam.nearClipPlane || volumetricData.far > cam.farClipPlane)
-        {
-            //Auto clamp to inside of the camera's clip planes
-            volumetricData.near = Mathf.Max(volumetricData.near, cam.nearClipPlane);
-            volumetricData.far = Mathf.Min(volumetricData.far, cam.farClipPlane);
-        }
+        //if (cam == null) cam = GetComponent<Camera>();
+        //if (volumetricData.near < cam.nearClipPlane || volumetricData.far > cam.farClipPlane)
+        //{
+        //    //Auto clamp to inside of the camera's clip planes
+        //    volumetricData.near = Mathf.Max(volumetricData.near, cam.nearClipPlane);
+        //    volumetricData.far = Mathf.Min(volumetricData.far, cam.farClipPlane);
+        //}
 
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //enabling here so the editor knows that it exists
     }
