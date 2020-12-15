@@ -6,6 +6,8 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Version.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/VolumetricCore.hlsl"
+
 
 
 #if !defined(SHADER_HINT_NICE_QUALITY)
@@ -202,61 +204,9 @@ real3 DecodeHDREnvironment2(real4 encodedIrradiance, real4 decodeInstructions)
     return (decodeInstructions.x * PositivePow(alpha, decodeInstructions.y)) * encodedIrradiance.rgb;
 }
 
-/////VOLUMETRICS
-//
-////float3 CameraPosition;
-float4x4 TransposedCameraProjectionMatrix;
-float4 _VolumePlaneSettings;
-TEXTURE3D(_VolumetricResult); SAMPLER(sampler_VolumetricResult);
-
-half4 Volumetrics(half4 color, half3 positionWS) {
 
 
-    half4 ls = half4(positionWS - GetCameraPositionWS(), -1);
 
-    ls = mul(ls, TransposedCameraProjectionMatrix);
-    ls.xyz = ls.xyz / ls.w;
-
-    //TODO: Makes the froxel read distance and curved based instead of rectilinear. Better use of edge froxels. Compute shader needs to write correctly. 
-    //float camdistance = distance(ls.xyz,0);
-    //ls.z = (camdistance + 1) / 20 ;     
-    //ls.z = FrustumToLinearDepth(ls.z);
-    //ls.z = pow(saturate(ls.z), _VaporDepthPow); Adds a curve to the frustum space to control dispution of froxels
-    ls.z = ls.z / (_VolumePlaneSettings.y - ls.z * _VolumePlaneSettings.z); // Converts from frustum space To Linear Depth
-
-    half halfU = ls.x * 0.5;
-
-    //Figuring out both sides at once and zeroing out the other when blending. Is this better than brancing with an if statement?
-    half3 LUV = half3 (halfU.x, ls.yz) * (1 - unity_StereoEyeIndex); //Left UV
-    half3 RUV = half3(halfU + 0.5, ls.yz) * (unity_StereoEyeIndex); //Right UV
-    half3 DoubleUV = LUV + RUV; // Combined
-
-    //TODO: Make sampling calulations run or not if they are inside or out of the clipped area
-    //float ClipUVW =
-    //    step(DoubleUV.x, 1) * step(0, DoubleUV.x) *
-    //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
-    //
-    half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, DoubleUV);// *ClipUVW;
-
-    return FroxelColor.rgba + (color * FroxelColor.a);
-}
-//////
-
-half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels){
-
-
-float nearParam=0;
-float farParam =1;
-
-#if defined(FOG_LINEAR)
-  float mipLevel = ((depth/300)) * numMipLevels;
-#else
-  float mipLevel = (1-saturate( (depth - nearParam) / (farParam - nearParam) ) ) * numMipLevels;
-
-#endif
-  return DecodeHDREnvironment2( SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel) , unity_SpecCube0_HDR);
-    //viewDirectionWS
-}
 
 half3 MixFogColor(real3 fragColor, real3 fogColor, real fogFactor)
 {
@@ -282,7 +232,6 @@ half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real f
 
 half3 MixFog(real3 fragColor, real fogFactor)
 {
-  //  return MipFog();
 
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
 }

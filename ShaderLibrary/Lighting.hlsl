@@ -500,7 +500,7 @@ half3 GlobalIllumination(BRDFData brdfData, half3 bakedGI, half occlusion, half3
     half3 reflectVector = reflect(-viewDirectionWS, normalWS);
     half fresnelTerm = Pow4(1.0 - saturate(dot(normalWS, viewDirectionWS)));
 
-    half3 indirectDiffuse = bakedGI * occlusion;
+    half3 indirectDiffuse = bakedGI;// *occlusion;
     half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion);
 
     return EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
@@ -588,7 +588,7 @@ half4 UniversalFragmentPBR(InputData inputData, half3 albedo, half metallic, hal
 #ifdef _ADDITIONAL_LIGHTS_VERTEX
     color += inputData.vertexLighting * brdfData.diffuse;
 #endif
-
+    color *= occlusion;
     color += emission;
     return half4(color, alpha);
 }

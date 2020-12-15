@@ -10,37 +10,41 @@ using UnityEditor;
 //TODO: Add semi dynamic lighting which is generated in the clipmap and not previously baked out. Will need smarter clipmap gen to avoid hitching.
 //Add cascading clipmaps to have higher detail up close and include father clipping without exploding memory.
 
-[RequireComponent(typeof( Camera ) )]
+//[RequireComponent(typeof( Camera ) )]
+[ExecuteInEditMode]
 public class VolumetricRendering : MonoBehaviour
 {
     //  public float tempOffset = 0;
      Texture3D BlackTex; //Temp texture for 
 
-    [Header("Volumetric camera settings")]
-    [Tooltip("Near Clip plane")]
-    public float near = 1;
-    [Tooltip("Far Clip plane")]
-    public float far = 40;
-    [Tooltip("Resolution")]
-    public int FroxelWidthResolution = 128;
-    [Tooltip("Resolution")]
-    public int FroxelHeightResolution = 128;
-    [Tooltip("Resolution")]
-    public int FroxelDepthResolution = 64;
-    //[Tooltip("Controls the bias of the froxel dispution. A value of 1 is linear. ")]
-    //public float FroxelDispution;
+    public Camera cam; //Main camera to base settings on
+    public VolumetricData volumetricData;
 
-    [Header("Prebaked clipmap settings")]
-    [Tooltip("Textile resolution per unit")]
-    public int ClipMapResolution = 128;
-    [Tooltip("Size of clipmap in units")]
-    public float ClipmapScale = 80;
-    [Tooltip("Distance (m) from previous sampling point to trigger resampling clipmap")]
-    public float ClipmapResampleThreshold = 1;
+    //[Header("Volumetric camera settings")]
+    //[Tooltip("Near Clip plane")]
+    //public float near = 1;
+    //[Tooltip("Far Clip plane")]
+    //public float far = 40;
+    //[Tooltip("Resolution")]
+    //public int FroxelWidthResolution = 128;
+    //[Tooltip("Resolution")]
+    //public int FroxelHeightResolution = 128;
+    //[Tooltip("Resolution")]
+    //public int FroxelDepthResolution = 64;
+    ////[Tooltip("Controls the bias of the froxel dispution. A value of 1 is linear. ")]
+    ////public float FroxelDispution;
+
+    //[Header("Prebaked clipmap settings")]
+    //[Tooltip("Textile resolution per unit")]
+    //public int ClipMapResolution = 128;
+    //[Tooltip("Size of clipmap in units")]
+    //public float ClipmapScale = 80;
+    //[Tooltip("Distance (m) from previous sampling point to trigger resampling clipmap")]
+    //public float ClipmapResampleThreshold = 1;
 
 
-    Vector3 ClipmapTransform; //Have this follow the camera and resample when the camera moves enough //Left over
-    Vector3 ClipmapCurrentPos;
+    Vector3 ClipmapTransform; //Have this follow the camera and resample when the camera moves enough 
+    Vector3 ClipmapCurrentPos; //chached location of previous sample point
 
     //Required shaders
     [SerializeField, HideInInspector] ComputeShader FroxelFogCompute;
@@ -52,7 +56,6 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture FroxelTexture;   //Single froxel projection use for scattering and history reprojection
     RenderTexture StackTexture;    //Integration and stereo reprojection
 
-    Camera cam; //Main camera to base settings on
 
     /// Dynamic Light Projection///      
     [SerializeField, HideInInspector] List<Light> Lights; // TODO: Make this a smart dynamic list not living here
@@ -126,46 +129,20 @@ public class VolumetricRendering : MonoBehaviour
 
 
 
-    Texture MakeBlack3DTex()
-    {
-        Debug.Log("Made blank texture");
 
-        int size = 1;
-
-        Texture3D BlackTex = new Texture3D(1, 1, 1, TextureFormat.ARGB32, false);
-        var cols = new Color[size * size * size];
-        float mul = 1.0f / (size - 1);
-        int idx = 0;
-        Color c = Color.white;
-        for (int z = 0; z < size; ++z)
-        {
-            for (int y = 0; y < size; ++y)
-            {
-                for (int x = 0; x < size; ++x, ++idx)
-                {
-                    c.r = 0;
-                    c.g = 0;
-                    c.b = 0;
-                    cols[idx] = c;
-                }
-            }
-        }
-
-        BlackTex.SetPixels(cols);
-        BlackTex.Apply();
-        // SetClipmap(BlackTex, 50, Vector3.zero);
-
-        Shader.SetGlobalTexture("_VolumetricResult", BlackTex);
-
-        //    Shader.SetGlobalTexture("_VolumetricClipmapTexture", BlackTex); //Set clipmap for
-        return BlackTex;
-    }
     private void Awake()
     {
-        Shader.EnableKeyword("_VOLUMETRICS"); //Enable volumetrics. Double check to see if works in build
-        cam = GetComponent<Camera>();
+#if UNITY_EDITOR
+        if (!Application.isPlaying) return;
+#endif
+         Shader.EnableKeyword("_VOLUMETRICS"); //Enable volumetrics. Double check to see if works in build
+        //  cam = GetComponent<Camera>();
+
     }
     void Start() {
+#if UNITY_EDITOR
+        if (!Application.isPlaying) return;
+#endif
         Intialize();
     }
     void CheckCookieList()
@@ -189,9 +166,9 @@ public class VolumetricRendering : MonoBehaviour
         RenderTextureDescriptor rtdiscrpt = new RenderTextureDescriptor();
         rtdiscrpt.enableRandomWrite = true;
         rtdiscrpt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
-        rtdiscrpt.width = FroxelWidthResolution;
-        rtdiscrpt.height = FroxelHeightResolution;
-        rtdiscrpt.volumeDepth = FroxelDepthResolution;
+        rtdiscrpt.width = volumetricData.FroxelWidthResolution;
+        rtdiscrpt.height = volumetricData.FroxelHeightResolution;
+        rtdiscrpt.volumeDepth = volumetricData.FroxelDepthResolution;
         rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         rtdiscrpt.msaaSamples = 1;
 
@@ -199,7 +176,7 @@ public class VolumetricRendering : MonoBehaviour
         FroxelTexture.Create();
 
 
-      rtdiscrpt.width = FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
+      rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
         StackTexture = new RenderTexture(rtdiscrpt);
         StackTexture.format = RenderTextureFormat.ARGB32;
         StackTexture.enableRandomWrite = true;
@@ -215,7 +192,7 @@ public class VolumetricRendering : MonoBehaviour
 
         SetupClipmap();
 
-        FroxelFogCompute.SetFloat("ClipmapScale", ClipmapScale);
+        FroxelFogCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
         UpdateClipmap();
         FroxelFogCompute.SetTexture(FogFroxelKernel, ClipmapTextureID, ClipmapTexture);
 
@@ -230,9 +207,9 @@ public class VolumetricRendering : MonoBehaviour
 
         //Make view projection matricies
 
-        Matrix4x4 CenterProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, near, far);
-        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, near, far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f , 0, 0)); //temp ipd scaler. Combine factors when confirmed
-        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, near, far) * Matrix4x4.Translate(new Vector3(-cam.stereoSeparation * 0.5f , 0, 0));
+        Matrix4x4 CenterProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far);
+        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f , 0, 0)); //temp ipd scaler. Combine factors when confirmed
+        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-cam.stereoSeparation * 0.5f , 0, 0));
 
         //Debug.Log(cam.stereoSeparation);
 
@@ -247,16 +224,16 @@ public class VolumetricRendering : MonoBehaviour
        // DebugRenderCube.material.SetTexture("_3dTexture", StackTexture);
 
         ThreadsToDispatch = new Vector3(
-             Mathf.CeilToInt(FroxelWidthResolution / 4.0f),
-             Mathf.CeilToInt(FroxelHeightResolution / 4.0f),
-             Mathf.CeilToInt(FroxelDepthResolution / 4.0f)
+             Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f),
+             Mathf.CeilToInt(volumetricData.FroxelHeightResolution / 4.0f),
+             Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f)
             );
 
-        Shader.SetGlobalVector("_VolumePlaneSettings", new Vector4(near, far, far - near, near * far) );
+        Shader.SetGlobalVector("_VolumePlaneSettings", new Vector4(volumetricData.near, volumetricData.far, volumetricData.far - volumetricData.near, volumetricData.near * volumetricData.far) );
 
-        float zBfP1 = 1.0f - far / near;
-        float zBfP2 = far / near;
-        Shader.SetGlobalVector("_ZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / far, zBfP2 / far) );
+        float zBfP1 = 1.0f - volumetricData.far / volumetricData.near;
+        float zBfP2 = volumetricData.far / volumetricData.near;
+        Shader.SetGlobalVector("_ZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far) );
 
         Debug.Log("Dispatching " + ThreadsToDispatch);
     }
@@ -292,9 +269,9 @@ public class VolumetricRendering : MonoBehaviour
         RenderTextureDescriptor ClipRTdiscrpt = new RenderTextureDescriptor();
         ClipRTdiscrpt.enableRandomWrite = true;
         ClipRTdiscrpt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
-        ClipRTdiscrpt.width = ClipMapResolution;
-        ClipRTdiscrpt.height = ClipMapResolution;
-        ClipRTdiscrpt.volumeDepth = ClipMapResolution;
+        ClipRTdiscrpt.width = volumetricData.ClipMapResolution;
+        ClipRTdiscrpt.height = volumetricData.ClipMapResolution;
+        ClipRTdiscrpt.volumeDepth = volumetricData.ClipMapResolution;
         ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         ClipRTdiscrpt.msaaSamples = 1;
 
@@ -304,15 +281,15 @@ public class VolumetricRendering : MonoBehaviour
         ClipmapTexture2.Create();
 
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapTexture); //Set clipmap for
-        Shader.SetGlobalFloat("_ClipmapScale", ClipmapScale);
+        Shader.SetGlobalFloat("_ClipmapScale", volumetricData.ClipmapScale);
     }
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
     {
-        if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > ClipmapResampleThreshold) UpdateClipmap();
+        if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > volumetricData.ClipmapResampleThreshold) UpdateClipmap();
     }
 
     RenderTexture ClipmapTexture2;  //Sampling and combining baked maps asynchronously
-
+    bool FlipFlopBuffer = true;
     void UpdateClipmap()
     {
         //TODO: chache ids 
@@ -322,34 +299,55 @@ public class VolumetricRendering : MonoBehaviour
         //TODO: bake out variables at start to avoid extra math per clip gen
 
         //Clipmap variables
-        ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * ClipmapScale * Vector3.one));
-        ClipmapCompute.SetFloat("ClipmapScale", ClipmapScale);
+        ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * Vector3.one));
+        ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
 
 
         //Clear previous capture
         ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture);
-        ClipmapCompute.Dispatch(ClearClipmapKernal, ClipMapResolution / 4, ClipMapResolution / 4, ClipMapResolution / 4);
+        ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
         ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture2);
-        ClipmapCompute.Dispatch(ClearClipmapKernal, ClipMapResolution / 4, ClipMapResolution / 4, ClipMapResolution / 4);
+        ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
+
+       
 
         //Loop through bake texture volumes and put into clipmap //TODO: Add daynamic pass for static unbaked elements
         for (int i=0; i < VolumetricRegisters.volumetricAreas.Count; i++)
         {
-            ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture2);
-            ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture);
+
+            if (FlipFlopBuffer)
+            {
+                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture2);
+                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture);
+            }
+            else
+            {
+                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
+                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture2);
+            }
 
             //Volumetric variables
             ClipmapCompute.SetTexture(ClipmapKernal, "VolumeMap", VolumetricRegisters.volumetricAreas[i].bakedTexture); 
             ClipmapCompute.SetVector("VolumeWorldSize", VolumetricRegisters.volumetricAreas[i].NormalizedScale);
             ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);
 
-            ClipmapCompute.Dispatch(ClipmapKernal, ClipMapResolution / 4, ClipMapResolution / 4, ClipMapResolution / 4);
+            ClipmapCompute.Dispatch(ClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
             //Debug.Log("Rendered " + VolumetricRegisters.volumetricAreas[i].bakedTexture.name);
             // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
-            Graphics.CopyTexture(ClipmapTexture, ClipmapTexture2); //How heavy is this?? Should I make a copy compute shader or swap inputs?
+            //Graphics.CopyTexture(ClipmapTexture, ClipmapTexture2); //How heavy is this?? Should I make a copy compute shader or swap inputs?
+            FlipFlopBuffer = !FlipFlopBuffer;
         }
 
-        SetClipmap(ClipmapTexture, ClipmapScale, ClipmapTransform);
+
+        if (FlipFlopBuffer)
+        {
+            SetClipmap(ClipmapTexture, volumetricData.ClipmapScale, ClipmapTransform);
+        }
+        else
+        {
+            SetClipmap(ClipmapTexture2, volumetricData.ClipmapScale, ClipmapTransform);
+
+        }
         ClipmapCurrentPos = ClipmapTransform; //Set History
     }
 
@@ -367,6 +365,10 @@ public class VolumetricRendering : MonoBehaviour
     #endregion
     void Update()
     {
+#if UNITY_EDITOR
+        if (!Application.isPlaying) return;
+#endif
+
         //Make this jitter with different values over time instead of just back and forth
 
         if (tempjitter >= jitters.Length - 1) {
@@ -381,7 +383,7 @@ public class VolumetricRendering : MonoBehaviour
 
        // Debug.Log(tempjitter + " " + jitterOffet);
 
-        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, near, far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
+        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
         projectionMatrix = matScaleBias * projectionMatrix ; 
         
         //Previous frame's matrix//!!!!!!!!!
@@ -427,21 +429,15 @@ public class VolumetricRendering : MonoBehaviour
 
     private void OnEnable()
     {
-  //      Debug.Log("Enabled Volumetrics");
-        Shader.DisableKeyword("_VOLUMETRICS_DISABLED");
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
     }
-    private void OnDisable()
+    private void OnDisable() //Disable this if we decide to just pause rendering instead of removing. 
     {
-  //      Debug.Log("Disabled Volumetrics");
-        Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
-        Shader.EnableKeyword("_VOLUMETRICS_DISABLED");
+        ReleaseAssets();
     }
     private void OnDestroy()
     {
-  //      Debug.Log("Disabled Volumetrics");
-        Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
-        Shader.EnableKeyword("_VOLUMETRICS_DISABLED");
+        ReleaseAssets();
     }
 
 
@@ -451,24 +447,37 @@ public class VolumetricRendering : MonoBehaviour
 
     }
 
+    /// <summary>
+    /// Editor
+    /// </summary>
+    /// 
     private void OnDrawGizmosSelected()
     {
-        Camera cam = Camera.main;
+        if (cam == null || volumetricData == null) return;
+
         Gizmos.color = Color.black;
 ;
         Gizmos.matrix = Matrix4x4.TRS(cam.transform.position, cam.transform.rotation, Vector3.one);
-        Gizmos.DrawFrustum(Vector3.zero, cam.fieldOfView, near, far, cam.aspect);
+        Gizmos.DrawFrustum(Vector3.zero, cam.fieldOfView, volumetricData.near, volumetricData.far, cam.aspect);
 
         Gizmos.color = Color.cyan;
-        Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * ClipmapScale);
+        Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * volumetricData.ClipmapScale);
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
 
+    }
+
+    void ReleaseAssets()
+    {
+        Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
+        if (ClipmapTexture!= null) ClipmapTexture.Release();
+        if (FroxelTexture != null) FroxelTexture.Release();   
+        if (StackTexture != null)StackTexture.Release();
     }
 
 #if UNITY_EDITOR
     private void Reset()
     {
-        cam = GetComponent<Camera>();
+        cam = GetComponentInChildren<Camera>();
         //Get shaders and seri
         if (FroxelFogCompute == null)
             FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
@@ -482,17 +491,65 @@ public class VolumetricRendering : MonoBehaviour
     private void OnValidate()
     {
 #if UNITY_EDITOR
-        //Black Texture in editor
+        //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
+        // TODO: Add proper scene preview feature
          if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
+//        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
+
 #endif
         if (cam == null) cam = GetComponent<Camera>();
-        if (near < cam.nearClipPlane || far > cam.farClipPlane)
+        if (volumetricData.near < cam.nearClipPlane || volumetricData.far > cam.farClipPlane)
         {
             //Auto clamp to inside of the camera's clip planes
-            near = Mathf.Max(near, cam.nearClipPlane);
-            far = Mathf.Min(far, cam.farClipPlane);
+            volumetricData.near = Mathf.Max(volumetricData.near, cam.nearClipPlane);
+            volumetricData.far = Mathf.Min(volumetricData.far, cam.farClipPlane);
         }
+
+        Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //enabling here so the editor knows that it exists
     }
+
+    Texture MakeBlack3DTex()
+    {
+        Debug.Log("Made blank texture");
+
+        int size = 1;
+
+        Texture3D BlackTex = new Texture3D(1, 1, 1, TextureFormat.ARGB32, false);
+        var cols = new Color[size * size * size];
+        float mul = 1.0f / (size - 1);
+        int idx = 0;
+        Color c = Color.white;
+        for (int z = 0; z < size; ++z)
+        {
+            for (int y = 0; y < size; ++y)
+            {
+                for (int x = 0; x < size; ++x, ++idx)
+                {
+                    c.r = 0;
+                    c.g = 0;
+                    c.b = 0;
+                    cols[idx] = c;
+                }
+            }
+        }
+
+        BlackTex.SetPixels(cols);
+        BlackTex.Apply();
+        // SetClipmap(BlackTex, 50, Vector3.zero);
+
+        Shader.SetGlobalTexture("_VolumetricResult", BlackTex);
+
+        //    Shader.SetGlobalTexture("_VolumetricClipmapTexture", BlackTex); //Set clipmap for
+        return BlackTex;
+    }
+
+
+    //public void UnloadKeyword<Scene>(Scene scene)
+    //{
+    //    Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
+
+    //    print("The scene was unloaded!");
+    //}
 
 
 }

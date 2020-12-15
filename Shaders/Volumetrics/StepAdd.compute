@@ -69,7 +69,13 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 	float DepthPow = 0.5f;
 
 	float normalizationCoefficient  = -((far - near) / 256.0f);
-//
+
+// //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
+//#if defined(SHADER_API_MOBILE)
+//	[unroll(32)]
+//#else
+//	[unroll(128)]
+//#endif 
 	for (int depth = 0; depth < whd.z; depth++) {
 		float4 scatteringExtinction = InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,
 			float3(Stereo_UVWs.x, Stereo_UVWs.y, depth / whd.z), 0); //Sample current Layer //Back tex

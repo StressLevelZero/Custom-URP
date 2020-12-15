@@ -566,7 +566,7 @@ public class VolumetricBaking : EditorWindow
 
         //Loop through GO's and see if the correct static flag is enabled. If it is, then add it to the list;
         for (int i = 0; i < AllRenderers.Length; i++){
-            if (GameObjectUtility.AreStaticEditorFlagsSet(AllRenderers[i].gameObject, staticFlag)) {
+            if (GameObjectUtility.AreStaticEditorFlagsSet(AllRenderers[i].gameObject, staticFlag) && AllRenderers[i].shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off) {
                 StatcGameobject.Add(AllRenderers[i].gameObject);
               }
         }
@@ -598,24 +598,12 @@ public class VolumetricBaking : EditorWindow
             Mesh mesh = staticGOs[i].GetComponent<MeshFilter>().sharedMesh;
 
             if (mesh == null) return;
-         //   Debug.Log("Had " + _vertices.Count + " verts before" );
-         //   Debug.Log("Getting mesh data from " + mesh.name + " , Verts: " + mesh.vertices.Length);
-
             // Add vertex data
             int firstVertex = _vertices.Count;
 
          //   if (_vertices.Count == 0) return;
 
             _vertices.AddRange(mesh.vertices);
-        //    Debug.Log("Added " + _vertices.Count + " verts from " + mesh.name);
-
-
-            //for (int v = 0; v < mesh.vertices.Length; v++)
-            //{
-            //    Debug.Log(mesh.vertices[v].x + " " + mesh.vertices[v].y + " " + mesh.vertices[v].z);
-
-            //}
-
             // Add index data - if the vertex buffer wasn't empty before, the
             // indices need to be offset
 //
@@ -634,7 +622,36 @@ public class VolumetricBaking : EditorWindow
             });
         }
 
-      //  Debug.Log(_meshObjects.Count);
+        for (int i = 0; i < staticGOs.Length; i++)
+        {
+            Mesh mesh = staticGOs[i].GetComponent<MeshFilter>().sharedMesh;
+
+            if (mesh == null) return;
+            // Add vertex data
+            int firstVertex = _vertices.Count;
+
+            //   if (_vertices.Count == 0) return;
+
+            _vertices.AddRange(mesh.vertices);
+            // Add index data - if the vertex buffer wasn't empty before, the
+            // indices need to be offset
+            //
+            //  Debug.Log(_indices.Count + " index");
+            int firstIndex = _indices.Count;
+            var indices = mesh.GetIndices(0); //Extend to support submeshes
+            //    _indices.AddRange(indices.Select(index => index + firstVertex))
+            _indices.AddRange(indices.Select(index => index + firstVertex));
+
+            // Add the object itself
+            _meshObjects.Add(new MeshObject()
+            {
+                localToWorldMatrix = staticGOs[i].transform.localToWorldMatrix,
+                indices_offset = firstIndex,
+                indices_count = indices.Length
+            });
+        }
+
+        //  Debug.Log(_meshObjects.Count);
 
         CreateComputeBuffer(ref _meshObjectBuffer, _meshObjects, 72);
         CreateComputeBuffer(ref _vertexBuffer, _vertices, 12);

@@ -191,9 +191,7 @@ half4 LitPassFragment(Varyings input) : SV_Target
     #endif
 
 #if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
-#if defined(_VOLUMETRICS_ENABLED)
     color = Volumetrics ( color,  input.positionWS);
-#endif
 #endif
 
     return color;
