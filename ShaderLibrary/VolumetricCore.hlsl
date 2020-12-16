@@ -44,6 +44,8 @@ half4 Volumetrics(half4 color, half3 positionWS) {
 
 //Mip fog
 
+float4 _MipFogParameters;
+
 //Cloning function for now
 real3 DecodeHDREnvironmentMip(real4 encodedIrradiance, real4 decodeInstructions)
 {
@@ -54,16 +56,16 @@ real3 DecodeHDREnvironmentMip(real4 encodedIrradiance, real4 decodeInstructions)
     return (decodeInstructions.x * PositivePow(alpha, decodeInstructions.y)) * encodedIrradiance.rgb;
 }
 
-
+// Based on Uncharted 4 "Mip Sky Fog" trick: http://advances.realtimerendering.com/other/2016/naughty_dog/NaughtyDog_TechArt_Final.pdf
 half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
 
-    float nearParam = 2;
-    float farParam = 8;
+    float nearParam = _MipFogParameters.x;
+    float farParam = _MipFogParameters.y;
 
 #if defined(FOG_LINEAR)
     float mipLevel = ((depth )) * numMipLevels;
 #else
-    float mipLevel = ((1 - saturate((depth - nearParam) / (farParam - nearParam))))  * numMipLevels ;
+    float mipLevel = ((1 -  (_MipFogParameters.z * saturate((depth - nearParam) / (farParam - nearParam)))  ) )  * numMipLevels ;
 
 #endif
     return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);

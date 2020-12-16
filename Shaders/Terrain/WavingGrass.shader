@@ -32,6 +32,8 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/WavingDoublePass"
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
+            #pragma shader_feature  _VOLUMETRICS_ENABLED
+
 
             // -------------------------------------
             // Unity defined keywords

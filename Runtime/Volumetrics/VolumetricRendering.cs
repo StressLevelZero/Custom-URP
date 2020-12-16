@@ -3,6 +3,8 @@ using System.Collections.Generic;
 //using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering.Universal;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -52,7 +54,7 @@ public class VolumetricRendering : MonoBehaviour
     [SerializeField, HideInInspector] ComputeShader ClipmapCompute;
 
     //Texture buffers
-    RenderTexture ClipmapTexture;  //Sampling and combining baked maps asynchronously
+    RenderTexture ClipmapBufferA;  //Sampling and combining baked maps asynchronously
     RenderTexture FroxelTexture;   //Single froxel projection use for scattering and history reprojection
     RenderTexture StackTexture;    //Integration and stereo reprojection
 
@@ -155,13 +157,28 @@ public class VolumetricRendering : MonoBehaviour
     bool VerifyVolumetricRegisters()
     {
         //Add realtime light check here too
-        if (VolumetricRegisters.volumetricAreas.Count > 0) return true;
+        if (VolumetricRegisters.volumetricAreas.Count > 0)
+        {
+            Debug.Log(VolumetricRegisters.volumetricAreas.Count + " Volumes ready to render");
+            return true;
+        }
         Debug.Log("No Volumetric volumes in " + UnityEngine.SceneManagement.SceneManager.GetActiveScene().name + ". Disabling froxel rendering.");
         this.enabled = false;
         return false;
     }
+
+    void CheckOverrideVolumes()
+    {
+        var stack = VolumeManager.instance.stack;
+
+        var Volumetrics = stack.GetComponent<Volumetrics>();
+        if (Volumetrics != null)
+        Volumetrics.PushFogShaderParameters();
+    }
+
     void Intialize()
     {
+        CheckOverrideVolumes();
         if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system.
         CheckCookieList();
         matScaleBias = Matrix4x4.identity;
@@ -204,7 +221,7 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelFogCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
         UpdateClipmap();
-        FroxelFogCompute.SetTexture(FogFroxelKernel, ClipmapTextureID, ClipmapTexture);
+        FroxelFogCompute.SetTexture(FogFroxelKernel, ClipmapTextureID, ClipmapBufferA);
 
         FroxelFogCompute.SetTexture(FogFroxelKernel, "LightProjectionTextureArray",  LightProjectionTextures); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
    //     FroxelFogCompute.SetTexture(FogFroxelKernel, "BlueNoise", BlueNoise); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
@@ -285,12 +302,12 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         ClipRTdiscrpt.msaaSamples = 1;
 
-        ClipmapTexture = new RenderTexture(ClipRTdiscrpt);
-        ClipmapTexture.Create();        
-        ClipmapTexture2 = new RenderTexture(ClipRTdiscrpt);
-        ClipmapTexture2.Create();
+        ClipmapBufferA = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferA.Create();        
+        ClipmapBufferB = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferB.Create();
 
-        Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapTexture); //Set clipmap for
+        Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapBufferA); //Set clipmap for
         Shader.SetGlobalFloat("_ClipmapScale", volumetricData.ClipmapScale);
     }
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
@@ -298,7 +315,7 @@ public class VolumetricRendering : MonoBehaviour
         if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > volumetricData.ClipmapResampleThreshold) UpdateClipmap();
     }
 
-    RenderTexture ClipmapTexture2;  //Sampling and combining baked maps asynchronously
+    RenderTexture ClipmapBufferB;  //Second buffer for mobile. Don't seem to need this with the PC version TODO: make this platform dependent?
     bool FlipFlopBuffer = true;
     void UpdateClipmap()
     {
@@ -314,9 +331,9 @@ public class VolumetricRendering : MonoBehaviour
 
 
         //Clear previous capture
-        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture);
+        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapBufferA);
         ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
-        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapTexture2);
+        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapBufferB);
         ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
 
        
@@ -324,16 +341,17 @@ public class VolumetricRendering : MonoBehaviour
         //Loop through bake texture volumes and put into clipmap //TODO: Add daynamic pass for static unbaked elements
         for (int i=0; i < VolumetricRegisters.volumetricAreas.Count; i++)
         {
+                        FlipFlopBuffer = !FlipFlopBuffer;
 
             if (FlipFlopBuffer)
             {
-                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture2);
-                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture);
+                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapBufferB);
+                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapBufferA);
             }
             else
             {
-                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
-                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapTexture2);
+                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapBufferA);
+                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapBufferB);
             }
 
             //Volumetric variables
@@ -345,24 +363,19 @@ public class VolumetricRendering : MonoBehaviour
             //Debug.Log("Rendered " + VolumetricRegisters.volumetricAreas[i].bakedTexture.name);
             // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
             //Graphics.CopyTexture(ClipmapTexture, ClipmapTexture2); //How heavy is this?? Should I make a copy compute shader or swap inputs?
-            FlipFlopBuffer = !FlipFlopBuffer;
         }
 
 
         if (FlipFlopBuffer)
         {
-            SetClipmap(ClipmapTexture, volumetricData.ClipmapScale, ClipmapTransform);
+            SetClipmap(ClipmapBufferA, volumetricData.ClipmapScale, ClipmapTransform);
         }
         else
         {
-            SetClipmap(ClipmapTexture2, volumetricData.ClipmapScale, ClipmapTransform);
+            SetClipmap(ClipmapBufferB, volumetricData.ClipmapScale, ClipmapTransform);
         }
         ClipmapCurrentPos = ClipmapTransform; //Set History
     }
-
-
-
-
     void SetClipmap(Texture ClipmapTexture, float ClipmapScale, Vector3 ClipmapTransform)
     {
         //TODO COMBINE THESE
@@ -374,8 +387,13 @@ public class VolumetricRendering : MonoBehaviour
     #endregion
     void Update()
     {
+        CheckOverrideVolumes();
+
 #if UNITY_EDITOR
-        if (!Application.isPlaying) return;
+        if (!Application.isPlaying)
+        {
+            return;
+        }
 #endif
 
         //Make this jitter with different values over time instead of just back and forth
@@ -439,6 +457,10 @@ public class VolumetricRendering : MonoBehaviour
     private void OnEnable()
     {
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+#if UNITY_EDITOR
+        if (!Application.isPlaying) return;
+#endif
+        Intialize();
     }
     private void OnDisable() //Disable this if we decide to just pause rendering instead of removing. 
     {
@@ -478,7 +500,7 @@ public class VolumetricRendering : MonoBehaviour
     void ReleaseAssets()
     {
         Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
-        if (ClipmapTexture!= null) ClipmapTexture.Release();
+        if (ClipmapBufferA!= null) ClipmapBufferA.Release();
         if (FroxelTexture != null) FroxelTexture.Release();   
         if (StackTexture != null)StackTexture.Release();
     }
