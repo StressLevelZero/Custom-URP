@@ -152,6 +152,7 @@ public class VolumetricBaking : EditorWindow
     public struct LightStruct
     {
         public Color[] color;
+        public float[] extinction;
         public Vector3[] Position;
     }
 
@@ -435,7 +436,9 @@ public class VolumetricBaking : EditorWindow
 
         //Setup light data
 
-        Vector4 lightColor = light.color * light.intensity;
+        Vector4 lightColor = new Vector4(
+            light.color.r * light.intensity, light.color.g * light.intensity, light.color.b * light.intensity,
+            light.color.a);
         Vector4 lightPos = light.transform.position;
         int shaderKernel;
 

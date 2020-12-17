@@ -149,6 +149,7 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] Transform m_VolumeTrigger = null;
 
         [SerializeField] bool m_RenderPostProcessing = false;
+        [SerializeField] bool m_RenderVolumetrics = false;
         [SerializeField] AntialiasingMode m_Antialiasing = AntialiasingMode.None;
         [SerializeField] AntialiasingQuality m_AntialiasingQuality = AntialiasingQuality.High;
         [SerializeField] bool m_StopNaN = false;
@@ -364,6 +365,16 @@ namespace UnityEngine.Rendering.Universal
             get => m_RenderPostProcessing;
             set => m_RenderPostProcessing = value;
         }
+
+        /// <summary>
+        /// Returns true if this camera should render post-processing.
+        /// </summary>
+        public bool RenderVolumetrics
+        {
+            get => m_RenderVolumetrics;
+            set => m_RenderVolumetrics = value;
+        }
+
 
         /// <summary>
         /// Returns the current anti-aliasing mode used by this camera.

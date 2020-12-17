@@ -4,6 +4,15 @@
 #pragma kernel StepAdd
 #define EPSILON  1e-8;
 
+
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GeometricTools.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/EntityLighting.hlsl"
+
+
 RWTexture3D<float4> Result;
 Texture3D<float4> InLightingTexture;
 SamplerState Custom_trilinear_clamp_sampler;
@@ -89,8 +98,8 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 		float cellVolume	 = 19 / whd.z; //temp fixed length for debuging
 		// (S - S * e ^(-t * D) )  / t;
 
-
-		scatteringExtinction.a += HomogeneousMediumDensity;
+		//TODO: readd the += here to get the baked alpha back
+		scatteringExtinction.a = HomogeneousMediumDensity;
 //		scatteringExtinction.a *= normalizationCoefficient; // Temp set density
 
 		//const
@@ -98,7 +107,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 
 		// half4 accumulatedLightAndTransmittance = half4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1.0f - transmittance) * colorAndDensityFront.w, colorAndDensityFront.w * transmittance);
 		 accumScatteringTransmittance.rgb +=			
-		 accumScatteringTransmittance.w * ( scatteringExtinction.xyz * (1.0f - transmittance) / scatteringExtinction.a + 0.00001f); //Change to max epsi?
+		 accumScatteringTransmittance.w * ( scatteringExtinction.xyz * (1.0f - transmittance) / scatteringExtinction.a * float3(1,1,1)  + 0.00001f); //Change to max epsi?
 				 
 		 accumScatteringTransmittance.a *= transmittance;
 

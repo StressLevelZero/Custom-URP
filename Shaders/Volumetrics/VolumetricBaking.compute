@@ -1,6 +1,6 @@
 ﻿///This bakes lights into a 3d texture
 
-#pragma kernel VolumetricAreaBake
+//#pragma kernel VolumetricAreaBake
 #pragma kernel PointLight
 #pragma kernel SpotLight
 #pragma kernel RectangleLight
@@ -12,8 +12,8 @@
 RWTexture3D<float4> AccumulatedLights;
 
 //Obsolete
-float3	DirectionalLightDirection;
-float4	DirectionalLightColor;
+//float3	DirectionalLightDirection;
+//float4	DirectionalLightColor;
 
 //Convert to a structured buffer?
 //Setting single light variable because we are looping through lights on the CPU. 
@@ -507,96 +507,96 @@ void RectangleLight(uint3 id : SV_DispatchThreadID) {
 //}
 
 
-///UNUSED
-
-[numthreads(4, 4, 4)]
-void VolumetricAreaBake(uint3 id : SV_DispatchThreadID)
-{
-	float3 whd;
-	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
-
-
-	Debug debug;
-	debug.debugCount = 0;
-
-	//w -= 1;
-
-	float4 ColoredLights = float4(0,0,0,0);
-	float ParticipatingMedia = 0;
-
-	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
-
-	//Directional Light // Make an array
-	// Shadow test ray
-	bool shadow = false;
-	Ray shadowRay = CreateRay(VoxelWorldPosition, LightDirection.xyz);
-	RayHit shadowHit = Trace(shadowRay);
-	float4 DirectionalColor = DirectionalLightColor;
-	
-	if (shadowHit.distance != 1.#INF)
-	{
-		DirectionalColor *= 0;
-	}
-	///
-		
-
-	ColoredLights += DirectionalColor;
-
-	////Point lights without shadows
-	//for (int i = 0; i < LightCount; i++) {	
-
-	//	//Distance from light
-	//	float LightRadius = (distance(VoxelWorldPosition, LightPosition[i]) ); //Distance from center of voxel
-
-	//	float4 ShadowColor = float4(1,1,1,1);
-
-	//	Ray PointShadowRay = CreateRay(VoxelWorldPosition, -normalize(VoxelWorldPosition - LightPosition[i]) );
-
-	//	RayHit PointShadowHit = Trace(PointShadowRay);
-	//	if (PointShadowHit.distance < LightRadius)
-	//	{
-	//		//todo: Account for tinted materials to make colored shadows
-	//		ShadowColor *=0;
-	//	}
-	//	//Currently just doing the inverse square law for falloff. Figure out physical scattering and absorption 
-	//	float4 inverseSquareColor = LightColor[i] / (4 * M_PI * LightRadius*LightRadius);
-	//	
-	//	ColoredLights += inverseSquareColor * ShadowColor;
-
-	//}
-
-
-	//Bake in fog densitiy
-	for (int s = 0; s < MediaSphereCount; s++) {
-
-		float mediaStep = distance ( MediaSphere[s], VoxelWorldPosition)  ;
-
-
-		if (mediaStep > 0.5)
-		{
-			mediaStep = 0;
-		}
-		else {
-			mediaStep = MediaSphereAbsorption[s].x;
-		}
-		
-		ParticipatingMedia += mediaStep;
-
-	}
-
-	ParticipatingMedia += AmbientMedia;
-	
-
-	//float4 LightColored = (1 - saturate(distance(id / (w / Size), LightPosition))) * LightColor;
-
-
-	//RayHit hit = Trace(ray);
-	//float3 result = Shade(ray, hit);
-	//Result[id.xyz] = float4(result, 1);
-
-	AccumulatedLights[id.xyz] = float4(ColoredLights.xyz, ParticipatingMedia) ;  //Store Light Colors and 
-	//Result[id.xyz] = SimpleGround(LightPosition[0]-ray.direction);
-
-//	Result[id.xyz] = float4(id / (w / Size),1); //DEBUG
-//	DebugBuffer[id.x].debugCount = debug.debugCount;
-}
+/////UNUSED
+//
+//[numthreads(4, 4, 4)]
+//void VolumetricAreaBake(uint3 id : SV_DispatchThreadID)
+//{
+//	float3 whd;
+//	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+//
+//
+//	Debug debug;
+//	debug.debugCount = 0;
+//
+//	//w -= 1;
+//
+//	float4 ColoredLights = float4(0,0,0,0);
+//	float ParticipatingMedia = 0;
+//
+//	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+//
+//	//Directional Light // Make an array
+//	// Shadow test ray
+//	bool shadow = false;
+//	Ray shadowRay = CreateRay(VoxelWorldPosition, LightDirection.xyz);
+//	RayHit shadowHit = Trace(shadowRay);
+//	float4 DirectionalColor = DirectionalLightColor;
+//	
+//	if (shadowHit.distance != 1.#INF)
+//	{
+//		DirectionalColor *= 0;
+//	}
+//	///
+//		
+//
+//	ColoredLights += DirectionalColor;
+//
+//	////Point lights without shadows
+//	//for (int i = 0; i < LightCount; i++) {	
+//
+//	//	//Distance from light
+//	//	float LightRadius = (distance(VoxelWorldPosition, LightPosition[i]) ); //Distance from center of voxel
+//
+//	//	float4 ShadowColor = float4(1,1,1,1);
+//
+//	//	Ray PointShadowRay = CreateRay(VoxelWorldPosition, -normalize(VoxelWorldPosition - LightPosition[i]) );
+//
+//	//	RayHit PointShadowHit = Trace(PointShadowRay);
+//	//	if (PointShadowHit.distance < LightRadius)
+//	//	{
+//	//		//todo: Account for tinted materials to make colored shadows
+//	//		ShadowColor *=0;
+//	//	}
+//	//	//Currently just doing the inverse square law for falloff. Figure out physical scattering and absorption 
+//	//	float4 inverseSquareColor = LightColor[i] / (4 * M_PI * LightRadius*LightRadius);
+//	//	
+//	//	ColoredLights += inverseSquareColor * ShadowColor;
+//
+//	//}
+//
+//
+//	//Bake in fog densitiy
+//	for (int s = 0; s < MediaSphereCount; s++) {
+//
+//		float mediaStep = distance ( MediaSphere[s], VoxelWorldPosition)  ;
+//
+//
+//		if (mediaStep > 0.5)
+//		{
+//			mediaStep = 0;
+//		}
+//		else {
+//			mediaStep = MediaSphereAbsorption[s].x;
+//		}
+//		
+//		ParticipatingMedia += mediaStep;
+//
+//	}
+//
+//	ParticipatingMedia += AmbientMedia;
+//	
+//
+//	//float4 LightColored = (1 - saturate(distance(id / (w / Size), LightPosition))) * LightColor;
+//
+//
+//	//RayHit hit = Trace(ray);
+//	//float3 result = Shade(ray, hit);
+//	//Result[id.xyz] = float4(result, 1);
+//
+//	AccumulatedLights[id.xyz] = float4(ColoredLights.xyz, ParticipatingMedia) ;  //Store Light Colors and 
+//	//Result[id.xyz] = SimpleGround(LightPosition[0]-ray.direction);
+//
+////	Result[id.xyz] = float4(id / (w / Size),1); //DEBUG
+////	DebugBuffer[id.x].debugCount = debug.debugCount;
+//}
