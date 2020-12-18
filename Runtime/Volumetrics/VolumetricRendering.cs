@@ -9,8 +9,37 @@ using UnityEngine.Rendering.Universal;
 using UnityEditor;
 #endif
 
+class VolumeRenderingUtils //Importing some functions from HDRP to have simular terms   
+{
+    public static float MeanFreePathFromExtinction(float extinction)
+    {
+        return 1.0f / extinction;
+    }
+
+    public static float ExtinctionFromMeanFreePath(float meanFreePath)
+    {
+        return 1.0f / meanFreePath;
+    }
+
+    public static Vector3 AbsorptionFromExtinctionAndScattering(float extinction, Vector3 scattering)
+    {
+        return new Vector3(extinction, extinction, extinction) - scattering;
+    }
+
+    public static Vector3 ScatteringFromExtinctionAndAlbedo(float extinction, Vector3 albedo)
+    {
+        return extinction * albedo;
+    }
+
+    public static Vector3 AlbedoFromMeanFreePathAndScattering(float meanFreePath, Vector3 scattering)
+    {
+        return meanFreePath * scattering;
+    }
+}
+
 //TODO: Add semi dynamic lighting which is generated in the clipmap and not previously baked out. Will need smarter clipmap gen to avoid hitching.
 //Add cascading clipmaps to have higher detail up close and include father clipping without exploding memory.
+
 
 //[RequireComponent(typeof( Camera ) )]
 [ExecuteInEditMode]
@@ -156,8 +185,10 @@ public class VolumetricRendering : MonoBehaviour
 
     bool VerifyVolumetricRegisters()
     {
+
         //Add realtime light check here too
-        if (VolumetricRegisters.volumetricAreas.Count > 0)
+        if (FindObjectOfType<BakedVolumetricArea>() != null) //brute force check
+      //  if (VolumetricRegisters.volumetricAreas.Count > 0)
         {
             Debug.Log(VolumetricRegisters.volumetricAreas.Count + " Volumes ready to render");
             return true;

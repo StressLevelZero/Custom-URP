@@ -99,7 +99,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 		// (S - S * e ^(-t * D) )  / t;
 
 		//TODO: readd the += here to get the baked alpha back
-		scatteringExtinction.a = HomogeneousMediumDensity;
+		scatteringExtinction.a += HomogeneousMediumDensity;
 //		scatteringExtinction.a *= normalizationCoefficient; // Temp set density
 
 		//const

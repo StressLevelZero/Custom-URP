@@ -166,7 +166,6 @@ namespace UnityEditor.Rendering.Universal
                 if (!sceneLighting)
                     EditorGUILayout.HelpBox(s_Styles.DisabledLightWarning.text, MessageType.Warning);
             }
-
             EditorGUILayout.ObjectField("Light Cookie ", lightProperty.cookie, typeof(Texture), false);
 
 

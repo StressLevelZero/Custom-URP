@@ -436,9 +436,7 @@ public class VolumetricBaking : EditorWindow
 
         //Setup light data
 
-        Vector4 lightColor = new Vector4(
-            light.color.r * light.intensity, light.color.g * light.intensity, light.color.b * light.intensity,
-            light.color.a);
+        Vector4 lightColor = light.color * light.intensity * light.color.a;
         Vector4 lightPos = light.transform.position;
         int shaderKernel;
 
@@ -625,34 +623,36 @@ public class VolumetricBaking : EditorWindow
             });
         }
 
-        for (int i = 0; i < staticGOs.Length; i++)
-        {
-            Mesh mesh = staticGOs[i].GetComponent<MeshFilter>().sharedMesh;
 
-            if (mesh == null) return;
-            // Add vertex data
-            int firstVertex = _vertices.Count;
+        //TODO: Covert terrain data into an ingestable format!!
+        //for (int i = 0; i < staticGOs.Length; i++)
+        //{
+        //    Mesh mesh = staticGOs[i].GetComponent<MeshFilter>().sharedMesh;
 
-            //   if (_vertices.Count == 0) return;
+        //    if (mesh == null) return;
+        //    // Add vertex data
+        //    int firstVertex = _vertices.Count;
 
-            _vertices.AddRange(mesh.vertices);
-            // Add index data - if the vertex buffer wasn't empty before, the
-            // indices need to be offset
-            //
-            //  Debug.Log(_indices.Count + " index");
-            int firstIndex = _indices.Count;
-            var indices = mesh.GetIndices(0); //Extend to support submeshes
-            //    _indices.AddRange(indices.Select(index => index + firstVertex))
-            _indices.AddRange(indices.Select(index => index + firstVertex));
+        //    //   if (_vertices.Count == 0) return;
 
-            // Add the object itself
-            _meshObjects.Add(new MeshObject()
-            {
-                localToWorldMatrix = staticGOs[i].transform.localToWorldMatrix,
-                indices_offset = firstIndex,
-                indices_count = indices.Length
-            });
-        }
+        //    _vertices.AddRange(mesh.vertices);
+        //    // Add index data - if the vertex buffer wasn't empty before, the
+        //    // indices need to be offset
+        //    //
+        //    //  Debug.Log(_indices.Count + " index");
+        //    int firstIndex = _indices.Count;
+        //    var indices = mesh.GetIndices(0); //Extend to support submeshes
+        //    //    _indices.AddRange(indices.Select(index => index + firstVertex))
+        //    _indices.AddRange(indices.Select(index => index + firstVertex));
+
+        //    // Add the object itself
+        //    _meshObjects.Add(new MeshObject()
+        //    {
+        //        localToWorldMatrix = staticGOs[i].transform.localToWorldMatrix,
+        //        indices_offset = firstIndex,
+        //        indices_count = indices.Length
+        //    });
+        //}
 
         //  Debug.Log(_meshObjects.Count);
 
