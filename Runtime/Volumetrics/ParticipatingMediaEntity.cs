@@ -2,12 +2,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ParticipatingMediaEntity : MonoBehaviour
+public class VolumetricMedia : MonoBehaviour
 {
     //Simple helper scrpit for baker
-    public enum ShapeType { Sphere };
-
+    public enum ShapeType { Sphere, Box };
     public ShapeType shapeType;
+    [Tooltip("3d texture. RGB is color")]
+    public Texture3D Texture;
 
     Vector3 Size;
 

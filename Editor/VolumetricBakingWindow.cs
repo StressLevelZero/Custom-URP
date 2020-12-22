@@ -206,7 +206,7 @@ public class VolumetricBaking : EditorWindow
             rtdiscrpt.width = Texels.x;
             rtdiscrpt.height = Texels.y;
             rtdiscrpt.volumeDepth = Texels.z;
-            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat; //R32G32B32A32_SFloat
             rtdiscrpt.msaaSamples = 1;
 
             RenderTexture RT3d = new RenderTexture(rtdiscrpt);
@@ -232,13 +232,13 @@ public class VolumetricBaking : EditorWindow
 
             //participatingMediaEntities = FindObjectsOfType<ParticipatingMediaEntity>();
 
-            Vector4[] mediaPos = new Vector4[VolumetricRegisters.participatingMediaEntities.Count];
-            Vector4[] mediaAbs = new Vector4[VolumetricRegisters.participatingMediaEntities.Count];
+            Vector4[] mediaPos = new Vector4[VolumetricRegisters.VolumetricMediaEntities.Count];
+            Vector4[] mediaAbs = new Vector4[VolumetricRegisters.VolumetricMediaEntities.Count];
 
             for (int i = 0; i < mediaPos.Length; i++)
             {
-                mediaPos[i] = VolumetricRegisters.participatingMediaEntities[i].transform.position;
-                mediaAbs[i] = new Vector4(VolumetricRegisters.participatingMediaEntities[i].Absorption, 0, 0, 0); //Only Absorption for now
+                mediaPos[i] = VolumetricRegisters.VolumetricMediaEntities[i].transform.position;
+                mediaAbs[i] = new Vector4(VolumetricRegisters.VolumetricMediaEntities[i].Absorption, 0, 0, 0); //Only Absorption for now
             }
 
 

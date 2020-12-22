@@ -45,12 +45,13 @@ class VolumeRenderingUtils //Importing some functions from HDRP to have simular 
 [ExecuteInEditMode]
 public class VolumetricRendering : MonoBehaviour
 {
-    //  public float tempOffset = 0;
-     Texture3D BlackTex; //Temp texture for 
+    public float tempOffset = 0;
+    Texture3D BlackTex; //Temp texture for 
 
     public Camera cam; //Main camera to base settings on
     public VolumetricData volumetricData;
-
+    [Range(0,1)]
+    public float reprojectionAmount = 0.5f;
     //[Header("Volumetric camera settings")]
     //[Tooltip("Near Clip plane")]
     //public float near = 1;
@@ -84,8 +85,17 @@ public class VolumetricRendering : MonoBehaviour
 
     //Texture buffers
     RenderTexture ClipmapBufferA;  //Sampling and combining baked maps asynchronously
-    RenderTexture FroxelTexture;   //Single froxel projection use for scattering and history reprojection
+    RenderTexture ClipmapBufferB;  //Sampling and combining baked maps asynchronously
+    RenderTexture ClipmapBufferC;  //Sampling and combining baked maps asynchronously
+    RenderTexture ClipmapBufferD;  //Sampling and combining baked maps asynchronously //TODO: get rid of this extra buffer and bool
+    bool FlipClipBuffer = true;
+    bool FlipClipBufferFar = true;
+
+    RenderTexture FroxelBufferA;   //Single froxel projection use for scattering and history reprojection
+    RenderTexture FroxelBufferB;   //for history reprojection
+
     RenderTexture StackTexture;    //Integration and stereo reprojection
+
 
 
     /// Dynamic Light Projection///      
@@ -99,9 +109,9 @@ public class VolumetricRendering : MonoBehaviour
     }
 
     //Figure out how much data is in the struct above
-    int LightObjectStride = sizeof(float) * 4*4 + sizeof(float) * 3 + sizeof(float) * 4 + sizeof(int);
+    int LightObjectStride = sizeof(float) * 4 * 4 + sizeof(float) * 3 + sizeof(float) * 4 + sizeof(int);
 
-     Texture2DArray LightProjectionTextures; // TODO: Make this a smart dynamic list pulling from light cookies
+    Texture2DArray LightProjectionTextures; // TODO: Make this a smart dynamic list pulling from light cookies
 
     private static List<LightObject> LightObjects;
     ComputeBuffer LightBuffer;
@@ -109,13 +119,13 @@ public class VolumetricRendering : MonoBehaviour
     /// END Dynamic Light Projection/// 
     /// 
 
-   // public Texture2D BlueNoise; //Temp ref
+    // public Texture2D BlueNoise; //Temp ref
 
     //AABB 
 
     //Stored compute shader IDs and numbers
 
-    protected int FogFroxelKernel = 0;
+    protected int IntegralKernel = 0;
     protected int StackFroxelKernal = 0;
 
     Matrix4x4 matScaleBias;
@@ -139,11 +149,11 @@ public class VolumetricRendering : MonoBehaviour
     int ClipmapTransformID = Shader.PropertyToID("_ClipmapPosition");
 
     int LightObjectsID = Shader.PropertyToID("LightObjects");
-    
+
     //Temp Jitter stuff
     int tempjitter = 0; //TEMP jitter switcher thing 
-    [Header("Extra variables")]
-    public float jitterDistance = .25f; //figure out disance based on froxel depth
+    [Header("Extra variables"), Range(0, 1)]
+    public Vector3 jitterDistance ; //figure out disance based on froxel depth
     float[] jitters = new float[2] { 0.0f, 0.5f };
 
 
@@ -166,7 +176,7 @@ public class VolumetricRendering : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying) return;
 #endif
-         Shader.EnableKeyword("_VOLUMETRICS"); //Enable volumetrics. Double check to see if works in build
+        Shader.EnableKeyword("_VOLUMETRICS"); //Enable volumetrics. Double check to see if works in build
         //  cam = GetComponent<Camera>();
 
     }
@@ -188,7 +198,7 @@ public class VolumetricRendering : MonoBehaviour
 
         //Add realtime light check here too
         if (FindObjectOfType<BakedVolumetricArea>() != null) //brute force check
-      //  if (VolumetricRegisters.volumetricAreas.Count > 0)
+                                                             //  if (VolumetricRegisters.volumetricAreas.Count > 0)
         {
             Debug.Log(VolumetricRegisters.volumetricAreas.Count + " Volumes ready to render");
             return true;
@@ -204,7 +214,7 @@ public class VolumetricRendering : MonoBehaviour
 
         var Volumetrics = stack.GetComponent<Volumetrics>();
         if (Volumetrics != null)
-        Volumetrics.PushFogShaderParameters();
+            Volumetrics.PushFogShaderParameters();
     }
 
     void Intialize()
@@ -230,11 +240,16 @@ public class VolumetricRendering : MonoBehaviour
         rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         rtdiscrpt.msaaSamples = 1;
 
-        FroxelTexture = new RenderTexture(rtdiscrpt);
-        FroxelTexture.Create();
+        FroxelBufferA = new RenderTexture(rtdiscrpt);
+        FroxelBufferA.Create();
+
+        //Ugh... extra android buffer mess
+        FroxelBufferB = new RenderTexture(rtdiscrpt);
+        FroxelBufferB.Create();
 
 
-      rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
+
+        rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
         StackTexture = new RenderTexture(rtdiscrpt);
         StackTexture.format = RenderTextureFormat.ARGB32;
         StackTexture.enableRandomWrite = true;
@@ -243,31 +258,31 @@ public class VolumetricRendering : MonoBehaviour
 
         LightObjects = new List<LightObject>();
 
-        FogFroxelKernel = FroxelFogCompute.FindKernel("Scatter");
-        FroxelFogCompute.SetTexture(FogFroxelKernel, "Result", FroxelTexture);
+        IntegralKernel = FroxelFogCompute.FindKernel("Scatter");
+        FroxelFogCompute.SetTexture(IntegralKernel, "Result", FroxelBufferA);
 
         //First Compute pass setup
 
         SetupClipmap();
 
         FroxelFogCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
-        UpdateClipmap();
-        FroxelFogCompute.SetTexture(FogFroxelKernel, ClipmapTextureID, ClipmapBufferA);
-
-        FroxelFogCompute.SetTexture(FogFroxelKernel, "LightProjectionTextureArray",  LightProjectionTextures); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
-   //     FroxelFogCompute.SetTexture(FogFroxelKernel, "BlueNoise", BlueNoise); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
+        UpdateClipmap(Clipmap.Near);
+        UpdateClipmap(Clipmap.Far);
+        FroxelFogCompute.SetTexture(IntegralKernel, ClipmapTextureID, ClipmapBufferA);
+        FroxelFogCompute.SetTexture(IntegralKernel, "LightProjectionTextureArray", LightProjectionTextures); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
+                                                                                                              //     FroxelFogCompute.SetTexture(FogFroxelKernel, "BlueNoise", BlueNoise); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
 
         ///Second compute pass setup
 
         StackFroxelKernal = FroxelStackingCompute.FindKernel("StepAdd");
         FroxelStackingCompute.SetTexture(StackFroxelKernal, "Result", StackTexture);
-        FroxelStackingCompute.SetTexture(StackFroxelKernal, "InLightingTexture", FroxelTexture);
+        FroxelStackingCompute.SetTexture(StackFroxelKernal, "InLightingTexture", FroxelBufferA);
 
         //Make view projection matricies
 
         Matrix4x4 CenterProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far);
-        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f , 0, 0)); //temp ipd scaler. Combine factors when confirmed
-        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-cam.stereoSeparation * 0.5f , 0, 0));
+        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f, 0, 0)); //temp ipd scaler. Combine factors when confirmed
+        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-cam.stereoSeparation * 0.5f, 0, 0));
 
         //Debug.Log(cam.stereoSeparation);
 
@@ -279,7 +294,7 @@ public class VolumetricRendering : MonoBehaviour
 
         Shader.SetGlobalTexture("_VolumetricResult", StackTexture);
         //   Shader.SetGlobalTexture("_3dTex", StackTexture);
-       // DebugRenderCube.material.SetTexture("_3dTexture", StackTexture);
+        // DebugRenderCube.material.SetTexture("_3dTexture", StackTexture);
 
         ThreadsToDispatch = new Vector3(
              Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f),
@@ -287,11 +302,11 @@ public class VolumetricRendering : MonoBehaviour
              Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f)
             );
 
-        Shader.SetGlobalVector("_VolumePlaneSettings", new Vector4(volumetricData.near, volumetricData.far, volumetricData.far - volumetricData.near, volumetricData.near * volumetricData.far) );
+        Shader.SetGlobalVector("_VolumePlaneSettings", new Vector4(volumetricData.near, volumetricData.far, volumetricData.far - volumetricData.near, volumetricData.near * volumetricData.far));
 
         float zBfP1 = 1.0f - volumetricData.far / volumetricData.near;
         float zBfP2 = volumetricData.far / volumetricData.near;
-        Shader.SetGlobalVector("_ZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far) );
+        Shader.SetGlobalVector("_ZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
 
         Debug.Log("Dispatching " + ThreadsToDispatch);
     }
@@ -310,15 +325,15 @@ public class VolumetricRendering : MonoBehaviour
                 Lights[i].color.g * Lights[i].intensity,
                 Lights[i].color.b * Lights[i].intensity,
                 Lights[i].color.a);
-            lightObject.LightProjectionMatrix = matScaleBias 
-                * Matrix4x4.Perspective(Lights[i].spotAngle, 1, 0.1f, Lights[i].range) 
+            lightObject.LightProjectionMatrix = matScaleBias
+                * Matrix4x4.Perspective(Lights[i].spotAngle, 1, 0.1f, Lights[i].range)
                 * Matrix4x4.Rotate(Lights[i].transform.rotation).inverse;
 
             LightObjects.Add(lightObject);
-        }        
+        }
         LightBuffer = new ComputeBuffer(LightObjects.Count, LightObjectStride);
         LightBuffer.SetData(LightObjects);
-        FroxelFogCompute.SetBuffer(FogFroxelKernel, LightObjectsID , LightBuffer); // TODO: move to an int
+        FroxelFogCompute.SetBuffer(IntegralKernel, LightObjectsID, LightBuffer); // TODO: move to an int
     }
     #region Clipmap funtions
     void SetupClipmap()
@@ -334,88 +349,169 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.msaaSamples = 1;
 
         ClipmapBufferA = new RenderTexture(ClipRTdiscrpt);
-        ClipmapBufferA.Create();        
+        ClipmapBufferA.Create();
         ClipmapBufferB = new RenderTexture(ClipRTdiscrpt);
-        ClipmapBufferB.Create();
+        ClipmapBufferB.Create();        
+        ClipmapBufferC = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferC.Create();        
+        ClipmapBufferD = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferD.Create();
+
+
 
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapBufferA); //Set clipmap for
         Shader.SetGlobalFloat("_ClipmapScale", volumetricData.ClipmapScale);
     }
+    bool ClipFar = false;
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
     {
-        if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > volumetricData.ClipmapResampleThreshold) UpdateClipmap();
+
+        if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > volumetricData.ClipmapResampleThreshold)
+        {
+            //TODO: seperate the frames where this is rendered
+            UpdateClipmap(Clipmap.Near);
+            UpdateClipmap(Clipmap.Far);
+            //if (ClipFar == false) UpdateClipmap(Clipmap.Near);
+            //else {
+            //    UpdateClipmap(Clipmap.Far);
+            //    ClipFar = false;
+            //    };
+        }
     }
 
-    RenderTexture ClipmapBufferB;  //Second buffer for mobile. Don't seem to need this with the PC version TODO: make this platform dependent?
-    bool FlipFlopBuffer = true;
-    void UpdateClipmap()
+    enum Clipmap { Near,Far};
+
+
+    void UpdateClipmap(Clipmap clipmap)
     {
         //TODO: chache ids 
         int ClipmapKernal = ClipmapCompute.FindKernel("ClipMapGen");
         int ClearClipmapKernal = ClipmapCompute.FindKernel("ClipMapClear");
-        ClipmapTransform = cam.transform.position; //don't need this recast ¯\_(ツ)_/¯
+        ClipmapTransform = cam.transform.position;
+
+        float farscale = 5;
+
+        RenderTexture BufferA;
+        RenderTexture BufferB;
         //TODO: bake out variables at start to avoid extra math per clip gen
+        
+        if (clipmap == Clipmap.Near)
+        {
+            BufferA = ClipmapBufferB;
+            BufferB = ClipmapBufferA;
+            ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
+            ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * Vector3.one));
+
+        }
+        else
+        {
+            BufferA = ClipmapBufferC;
+            BufferB = ClipmapBufferD;
+
+            ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale * farscale);
+            ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * farscale * Vector3.one));
+
+        }
 
         //Clipmap variables
-        ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * Vector3.one));
-        ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
+        //ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * Vector3.one));
+    //    ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
 
-
+        FlipClipBuffer = false;
         //Clear previous capture
-        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapBufferA);
+        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", BufferA);
         ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
-        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", ClipmapBufferB);
+        ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", BufferB);
         ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
 
-       
 
         //Loop through bake texture volumes and put into clipmap //TODO: Add daynamic pass for static unbaked elements
-        for (int i=0; i < VolumetricRegisters.volumetricAreas.Count; i++)
+        for (int i = 0; i < VolumetricRegisters.volumetricAreas.Count; i++)
         {
-                        FlipFlopBuffer = !FlipFlopBuffer;
+            FlipClipBuffer = !FlipClipBuffer;
 
-            if (FlipFlopBuffer)
+            if (FlipClipBuffer)
             {
-                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapBufferB);
-                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapBufferA);
+                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", BufferB);
+                ClipmapCompute.SetTexture(ClipmapKernal, "Result", BufferA);
             }
             else
             {
-                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapBufferA);
-                ClipmapCompute.SetTexture(ClipmapKernal, "Result", ClipmapBufferB);
+                ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", BufferA);
+                ClipmapCompute.SetTexture(ClipmapKernal, "Result", BufferB);
             }
 
             //Volumetric variables
-            ClipmapCompute.SetTexture(ClipmapKernal, "VolumeMap", VolumetricRegisters.volumetricAreas[i].bakedTexture); 
+            ClipmapCompute.SetTexture(ClipmapKernal, "VolumeMap", VolumetricRegisters.volumetricAreas[i].bakedTexture);
             ClipmapCompute.SetVector("VolumeWorldSize", VolumetricRegisters.volumetricAreas[i].NormalizedScale);
             ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);
 
             ClipmapCompute.Dispatch(ClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
-            //Debug.Log("Rendered " + VolumetricRegisters.volumetricAreas[i].bakedTexture.name);
-            // ClipmapCompute.SetTexture(ClipmapKernal, "PreResult", ClipmapTexture);
-            //Graphics.CopyTexture(ClipmapTexture, ClipmapTexture2); //How heavy is this?? Should I make a copy compute shader or swap inputs?
         }
 
-
-        if (FlipFlopBuffer)
+        if (FlipClipBuffer)
         {
-            SetClipmap(ClipmapBufferA, volumetricData.ClipmapScale, ClipmapTransform);
+            SetClipmap(BufferA, volumetricData.ClipmapScale, ClipmapTransform, clipmap);
         }
         else
         {
-            SetClipmap(ClipmapBufferB, volumetricData.ClipmapScale, ClipmapTransform);
+            SetClipmap(BufferB, volumetricData.ClipmapScale, ClipmapTransform, clipmap);
         }
+        
         ClipmapCurrentPos = ClipmapTransform; //Set History
     }
-    void SetClipmap(Texture ClipmapTexture, float ClipmapScale, Vector3 ClipmapTransform)
+    void SetClipmap(RenderTexture ClipmapTexture, float ClipmapScale, Vector3 ClipmapTransform, Clipmap clipmap)
     {
-        //TODO COMBINE THESE
-        Shader.SetGlobalTexture(ClipmapTextureID2, ClipmapTexture); //Set clipmap for
-        Shader.SetGlobalTexture(ClipmapTextureID, ClipmapTexture); //Set clipmap for
         Shader.SetGlobalFloat(ClipmapScaleID, ClipmapScale);
         Shader.SetGlobalVector(ClipmapTransformID, ClipmapTransform);
+
+        if (clipmap == Clipmap.Far)
+        {
+            Shader.SetGlobalTexture("_VolumetricClipmapTexture2", ClipmapTexture);
+            Debug.Log("Added clipmap far :" + ClipmapTexture.name);
+        }
+        else
+        {        //TODO COMBINE THESE
+            Shader.SetGlobalTexture(ClipmapTextureID2, ClipmapTexture); //Set clipmap for
+            Shader.SetGlobalTexture(ClipmapTextureID, ClipmapTexture); //Set clipmap for
+        }
     }
     #endregion
+
+    bool FlopIntegralBuffer = false;
+    void FlopIntegralBuffers(){
+
+        FlopIntegralBuffer = !FlopIntegralBuffer;
+
+        if (FlopIntegralBuffer)
+        {
+            FroxelFogCompute.SetTexture(IntegralKernel, "PreviousFrameLighting", FroxelBufferA);
+            FroxelFogCompute.SetTexture(IntegralKernel, "Result", FroxelBufferB);
+            FroxelStackingCompute.SetTexture(StackFroxelKernal, "InLightingTexture", FroxelBufferB);
+        }else
+        {
+            FroxelFogCompute.SetTexture(IntegralKernel, "PreviousFrameLighting", FroxelBufferB);
+            FroxelFogCompute.SetTexture(IntegralKernel, "Result", FroxelBufferA);
+            FroxelStackingCompute.SetTexture(StackFroxelKernal, "InLightingTexture", FroxelBufferA);
+        }
+    }
+
+    float jitterHist = 0.5f; 
+
+    float SamplingJitter()
+    {
+
+        jitterHist = jitterHist + 0.1f;
+        
+        if (jitterHist >= 1)
+        {
+            jitterHist = 0.1f;
+        }
+
+        return jitterHist;
+    }
+
+
     void Update()
     {
         CheckOverrideVolumes();
@@ -429,17 +525,8 @@ public class VolumetricRendering : MonoBehaviour
 
         //Make this jitter with different values over time instead of just back and forth
 
-        if (tempjitter >= jitters.Length - 1) {
-            tempjitter = 0;
-        }
-        else
-        {
-            tempjitter++;    
-        }
 
     //    float jitterOffet = Mathf.Lerp(0, 1, jitters[tempjitter]); //loop through jitters
-
-       // Debug.Log(tempjitter + " " + jitterOffet);
 
         Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
         projectionMatrix = matScaleBias * projectionMatrix ; 
@@ -448,16 +535,12 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix);///
         //   FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix );///
-        ///!!!!!!!!!!!!!!
-        ///
 
         //     UpdateLights();
 
         CheckClipmap(); // UpdateClipmap();
-
+        FlopIntegralBuffers();
         //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
-
-        FroxelFogCompute.SetTexture(FogFroxelKernel, "PreviousFrameLighting", FroxelTexture); //Send as another ref to use built-in sampler
         FroxelStackingCompute.SetFloat("HomogeneousMediumDensity", HomogeneousMediumDensity);
         
         FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
@@ -465,7 +548,9 @@ public class VolumetricRendering : MonoBehaviour
         //FroxelFogCompute.SetMatrix("LightProjectionMatrix", lightMatrix);
         //FroxelFogCompute.SetVector("LightPosition", LightPosition.transform.position);
         //FroxelFogCompute.SetVector("LightColor", LightPosition.color * LightPosition.intensity);
-        //FroxelFogCompute.SetVector("Jittery", new Vector3(0.5f, 0.5f, tempOffset)); //Loop through jitters. 
+        FroxelFogCompute.SetFloat("Jittery", SamplingJitter() ); //Loop through jitters. 
+        FroxelFogCompute.SetFloat("reprojectionAmount", reprojectionAmount );
+
         //jitters[tempjitter]
 
 
@@ -477,7 +562,7 @@ public class VolumetricRendering : MonoBehaviour
         PreviousFrameMatrix = projectionMatrix;
         PreviousCameraPosition = cam.transform.position;
 
-        FroxelFogCompute.Dispatch(FogFroxelKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+        FroxelFogCompute.Dispatch(IntegralKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
     //    FroxelStackingCompute.DispatchIndirect
         //CONVERT TO DISPATCH INDIRECT to avoid CPU callback?
 
@@ -526,13 +611,18 @@ public class VolumetricRendering : MonoBehaviour
         Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * volumetricData.ClipmapScale);
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
 
+        Gizmos.color = Color.blue;
+        Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * volumetricData.ClipmapScale * 5);
+        Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+
+
     }
 
     void ReleaseAssets()
     {
         Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
         if (ClipmapBufferA!= null) ClipmapBufferA.Release();
-        if (FroxelTexture != null) FroxelTexture.Release();   
+        if (FroxelBufferA != null) FroxelBufferA.Release();   
         if (StackTexture != null)StackTexture.Release();
     }
 

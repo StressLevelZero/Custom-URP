@@ -77,7 +77,9 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 
 	float DepthPow = 0.5f;
 
-	float normalizationCoefficient  = -((far - near) / 256.0f);
+	float normalizationCoefficient  =(far - near) / whd.z; // TODO: do this in scrpit instead 
+
+	float  opticalDepth = 0;
 
  //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
 #if defined(SHADER_API_MOBILE)
@@ -89,27 +91,25 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 		float4 scatteringExtinction = InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,
 			float3(Stereo_UVWs.x, Stereo_UVWs.y, depth / whd.z), 0); //Sample current Layer //Back tex
 
-		//redefine near and far
+		//redefine near and far to clipspace
 		near = GetSliceEyeDepth(depth, whd.z);
 		far  = GetSliceEyeDepth(depth + 1, whd.z);
 
 	//	float cellVolume = (far - near) / whd.z; // TODO Set this value in scpirt
 		//float cellVolume = abs(far - near) * 0.01f; // TODO Set this value in scpirt
-		float cellVolume	 = 19 / whd.z; //temp fixed length for debuging
+	//	float cellVolume	 = 19 / whd.z; //temp fixed length for debuging
 		// (S - S * e ^(-t * D) )  / t;
 
-		//TODO: readd the += here to get the baked alpha back
 		scatteringExtinction.a += HomogeneousMediumDensity;
-//		scatteringExtinction.a *= normalizationCoefficient; // Temp set density
-
+		scatteringExtinction.a *= normalizationCoefficient; // Temp set density 
 		//const
-		 float transmittance = exp(-scatteringExtinction.a * cellVolume); //*stepLen
+		 float transmittance = exp(-scatteringExtinction.a ); //*stepLen , * cellVolume
 
 		// half4 accumulatedLightAndTransmittance = half4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1.0f - transmittance) * colorAndDensityFront.w, colorAndDensityFront.w * transmittance);
 		 accumScatteringTransmittance.rgb +=			
 		 accumScatteringTransmittance.w * ( scatteringExtinction.xyz * (1.0f - transmittance) / scatteringExtinction.a * float3(1,1,1)  + 0.00001f); //Change to max epsi?
 				 
-		 accumScatteringTransmittance.a *= transmittance;
+		// accumScatteringTransmittance.a *= transmittance;
 
 		//accumScatteringTransmittance
 		//https://computergraphics.stackexchange.com/questions/5762/volumetric-integration-in-frostbite

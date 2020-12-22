@@ -44,7 +44,7 @@ half4 Volumetrics(half4 color, half3 positionWS) {
 
 //Mip fog
 
-float4 _MipFogParameters;
+float4 _MipFogParameters = float4(0,5,0.5,0);
 
 //Cloning function for now
 real3 DecodeHDREnvironmentMip(real4 encodedIrradiance, real4 decodeInstructions)

@@ -177,7 +177,8 @@ half4 ParticlesLitFragment(VaryingsParticle input) : SV_Target
 
     half4 color = UniversalFragmentBlinnPhong(inputData, diffuse, specularGloss, shininess, emission, alpha);
 
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
+    color.rgb = Volumetrics(color, input.positionWS.xyz).rgb;
     return color;
 }
 

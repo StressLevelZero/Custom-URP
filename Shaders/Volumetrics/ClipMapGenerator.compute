@@ -30,16 +30,9 @@ void ClipMapClear(uint3 id : SV_DispatchThreadID)
 void ClipMapGen (uint3 id : SV_DispatchThreadID)
 {
 	uint count, stride;
-	//BakedVolumes.GetDimensions(count, stride);
-	//float3 whd; 
-
-	//VolumeMap.GetDimensions(whd.x, whd.y, whd.z); 
 
 	float4 UVW = float4(0,0,0,0);
 	Result.GetDimensions(UVW.x, UVW.y, UVW.z);
-
-	//uint3 dimen;
-	//Result.GetDimensions(dimen.x, dimen.y, dimen.z);
 
 	UVW.xyz = (id + 0.5) / UVW.xyz; //0-1 scaling
 	UVW.w = 1;
@@ -53,9 +46,14 @@ void ClipMapGen (uint3 id : SV_DispatchThreadID)
 		step(MapUVW.y, 1) * step(0, MapUVW.y) *
 		step(MapUVW.z, 1) * step(0, MapUVW.z);
 
-//	float4 currentTex = PreResult.SampleLevel(trilinear_clamp_sampler, UVW.xyz, 0);
 	//Sample baked volume and clip it off to its area
-	//Result[id.xyz] = VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW; 
 	//Doing max of the two results to account for overlaps
 	Result[id.xyz] = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW);
+}
+
+
+[numthreads(4, 4, 4)]
+void MediapGen(uint3 id : SV_DispatchThreadID)
+{
+
 }

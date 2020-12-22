@@ -167,7 +167,9 @@ half4 ParticlesLitFragment(VaryingsParticle input) : SV_Target
     half4 color = UniversalFragmentPBR(inputData, surfaceData.albedo,
         surfaceData.metallic, half3(0, 0, 0), surfaceData.smoothness, surfaceData.occlusion, surfaceData.emission, surfaceData.alpha);
 
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
+    color.rgb = Volumetrics(color, input.positionWS.xyz).rgb;
+
     return color;
 }
 
