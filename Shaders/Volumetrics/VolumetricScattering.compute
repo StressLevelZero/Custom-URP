@@ -137,9 +137,9 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//float3 Jitter = Jittery;
 	//Jitter.z = Noised.r;
 
-	float idflip = (fmod(id.x + id.y + id.z, 2) * 2) - 1 ;
+//	float idflip = (fmod(id.x + id.y + id.z, 2) * 2) - 1 ;
 
-	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery * idflip * 0.5); //offsetting  
+	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery  * 0.5); //offsetting  
 
 	float4 UVW = float4( (id + TemporalOffset) / whd, 1); //Make uvs and sample from center of froxel //ID TO UV
 
@@ -224,14 +224,17 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 		step(ClipmapUVW.x, 1) * step(0, ClipmapUVW.x) *
 		step(ClipmapUVW.y, 1) * step(0, ClipmapUVW.y) *
 		step(ClipmapUVW.z, 1) * step(0, ClipmapUVW.z);
-	
-	if (Clipped > 0) {
-		accumLighting += float4(_VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0).xyz, 0);
-	}
-	else
-	{
-		accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0);
-	}
+	Clipped = saturate(Clipped);
+
+	//if (Clipped > 0) { //Android doesn't like ifs :/
+	//	accumLighting += float4(_VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0).xyz, 0);
+	//}
+	//else
+	//{
+	//	accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0);
+	//}
+	accumLighting += float4(_VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0).xyz, 0) * Clipped;
+	accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0) * (1- Clipped);
 
 //	accumLighting.xyz += ClipmapUVW * Clipped;
 

@@ -44,7 +44,7 @@ float GetSliceEyeDepth(float slice, float numberOfSlices) {
 	return zdepth;
 }
 
-[numthreads(4, 4, 4)]	
+[numthreads(4, 4, 1)]	
 void StepAdd(uint3 id : SV_DispatchThreadID)
 {
 	//Use this to figure out distance between layers
@@ -55,20 +55,28 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 	float Absorption = 0.01f; //temp Absorption rate
 
 	float3 whd ; //make floating to avoid interger calulations later. There's likely a better place to do this
-	Result.GetDimensions(whd.x, whd.y, whd.z);
+	Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this instead of getting it
 
 	float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //Current slice
 
 	//Make stereoscopic.
-	float4 Stereo_UVWs = float4(id / whd ,1);	
+	float4 Stereo_UVWs = float4(id / whd ,1);
+
+	int EyeID = floor(Stereo_UVWs.x * 2);
+
 	Stereo_UVWs.x = frac(Stereo_UVWs.x * 2);
 	
-	if (id.x < whd.x / 2) 	{
-		Stereo_UVWs = mul(LeftEyeMatrix, Stereo_UVWs);
-	}
-	else	{
-		Stereo_UVWs = mul(RightEyeMatrix, Stereo_UVWs);
-	}
+	///Doesn't support android?
+	//if (id.x < whd.x / 2) 	{
+	//	Stereo_UVWs = mul(LeftEyeMatrix, Stereo_UVWs);
+	//}
+	//else	{
+	//	Stereo_UVWs = mul(RightEyeMatrix, Stereo_UVWs);
+	//}
+
+	//Mask per eye
+	Stereo_UVWs = (mul(LeftEyeMatrix, Stereo_UVWs) * (1-EyeID)) + (mul(RightEyeMatrix, Stereo_UVWs) * EyeID);
+
 
 //	float t0 = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
 	
@@ -82,11 +90,11 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 	float  opticalDepth = 0;
 
  //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
-#if defined(SHADER_API_MOBILE)
-	[unroll(32)]
-#else
-	[unroll(128)]
-#endif 
+//#if defined(SHADER_API_MOBILE)
+//	[unroll(32)]
+//#else
+//	[unroll(128)]
+//#endif 
 	for (int depth = 0; depth < whd.z; depth++) {
 		float4 scatteringExtinction = InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,
 			float3(Stereo_UVWs.x, Stereo_UVWs.y, depth / whd.z), 0); //Sample current Layer //Back tex

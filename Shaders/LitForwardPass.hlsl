@@ -187,12 +187,11 @@ half4 LitPassFragment(Varyings input) : SV_Target
      color.rgb = MixFog(color.rgb, -real3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w), inputData.fogCoord);
     #else
     color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
-
     #endif
 
-#if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
+//#if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
     color = Volumetrics ( color,  input.positionWS);
-#endif
+//#endif
 
     return color;
 }

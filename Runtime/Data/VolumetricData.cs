@@ -22,10 +22,10 @@ public class VolumetricData : ScriptableObject
     //[Tooltip("Controls the bias of the froxel dispution. A value of 1 is linear. ")]
     //public float FroxelDispution;
 
-    [Header("Prebaked clipmap settings")]
+    [Header("Prebaked clipmap settings - Controls both cascades")]
     [Tooltip("Textile resolution per unit")]
     public int ClipMapResolution = 128;
-    [Tooltip("Size of clipmap in units")]
+    [Tooltip("Size of inner clipmap in units. Outter clipmap is 5x the size")]
     public float ClipmapScale = 80;
     [Tooltip("Distance (m) from previous sampling point to trigger resampling clipmap")]
     public float ClipmapResampleThreshold = 1;

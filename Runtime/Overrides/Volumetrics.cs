@@ -49,7 +49,7 @@ namespace UnityEngine.Rendering.Universal
             //cmd.SetGlobalInt(HDShaderIDs._PBRFogEnabled, IsPBRFogEnabled(hdCamera) ? 1 : 0);
 
             Shader.SetGlobalVector(m_MipFogParam, new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
-            Debug.Log("Pushed fog prams");
+         //   Debug.Log("Pushed fog prams");
 
 
         }
