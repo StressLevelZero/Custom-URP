@@ -131,7 +131,7 @@ namespace UnityEditor
 
         #endregion
         //Seriously, wtf is the reason to abstrat the render queue? And why is this slider clamp at 50?! This is worthless.
-        private const int queueOffsetRange = 2000; 
+        private const int queueOffsetRange = 50; 
         ////////////////////////////////////
         // General Functions              //
         ////////////////////////////////////

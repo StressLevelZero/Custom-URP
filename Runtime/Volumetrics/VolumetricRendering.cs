@@ -125,8 +125,8 @@ public class VolumetricRendering : MonoBehaviour
 
     //Stored compute shader IDs and numbers
 
-    protected int IntegralKernel = 0;
-    protected int StackFroxelKernal = 0;
+    protected int ScatteringKernel = 0;
+    protected int IntegrateKernel = 0;
 
     Matrix4x4 matScaleBias;
     Vector3 ThreadsToDispatch;
@@ -258,8 +258,8 @@ public class VolumetricRendering : MonoBehaviour
 
         LightObjects = new List<LightObject>();
 
-        IntegralKernel = FroxelFogCompute.FindKernel("Scatter");
-        FroxelFogCompute.SetTexture(IntegralKernel, "Result", FroxelBufferA);
+        ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
+        FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferA);
 
         //First Compute pass setup
 
@@ -268,15 +268,15 @@ public class VolumetricRendering : MonoBehaviour
         FroxelFogCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
         UpdateClipmap(Clipmap.Near);
         UpdateClipmap(Clipmap.Far);
-        FroxelFogCompute.SetTexture(IntegralKernel, ClipmapTextureID, ClipmapBufferA);
-        FroxelFogCompute.SetTexture(IntegralKernel, "LightProjectionTextureArray", LightProjectionTextures); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
+        FroxelFogCompute.SetTexture(ScatteringKernel, ClipmapTextureID, ClipmapBufferA);
+        FroxelFogCompute.SetTexture(ScatteringKernel, "LightProjectionTextureArray", LightProjectionTextures); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
                                                                                                               //     FroxelFogCompute.SetTexture(FogFroxelKernel, "BlueNoise", BlueNoise); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
 
         ///Second compute pass setup
 
-        StackFroxelKernal = FroxelStackingCompute.FindKernel("StepAdd");
-        FroxelStackingCompute.SetTexture(StackFroxelKernal, "Result", StackTexture);
-        FroxelStackingCompute.SetTexture(StackFroxelKernal, "InLightingTexture", FroxelBufferA);
+        IntegrateKernel = FroxelStackingCompute.FindKernel("StepAdd");
+        FroxelStackingCompute.SetTexture(IntegrateKernel, "Result", StackTexture);
+        FroxelStackingCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferA);
 
         //Make view projection matricies
 
@@ -333,7 +333,7 @@ public class VolumetricRendering : MonoBehaviour
         }
         LightBuffer = new ComputeBuffer(LightObjects.Count, LightObjectStride);
         LightBuffer.SetData(LightObjects);
-        FroxelFogCompute.SetBuffer(IntegralKernel, LightObjectsID, LightBuffer); // TODO: move to an int
+        FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); // TODO: move to an int
     }
     #region Clipmap funtions
     void SetupClipmap()
@@ -485,14 +485,14 @@ public class VolumetricRendering : MonoBehaviour
 
         if (FlopIntegralBuffer)
         {
-            FroxelFogCompute.SetTexture(IntegralKernel, "PreviousFrameLighting", FroxelBufferA);
-            FroxelFogCompute.SetTexture(IntegralKernel, "Result", FroxelBufferB);
-            FroxelStackingCompute.SetTexture(StackFroxelKernal, "InLightingTexture", FroxelBufferB);
+            FroxelFogCompute.SetTexture(ScatteringKernel, "PreviousFrameLighting", FroxelBufferA);
+            FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferB);
+            FroxelStackingCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferB);
         }else
         {
-            FroxelFogCompute.SetTexture(IntegralKernel, "PreviousFrameLighting", FroxelBufferB);
-            FroxelFogCompute.SetTexture(IntegralKernel, "Result", FroxelBufferA);
-            FroxelStackingCompute.SetTexture(StackFroxelKernal, "InLightingTexture", FroxelBufferA);
+            FroxelFogCompute.SetTexture(ScatteringKernel, "PreviousFrameLighting", FroxelBufferB);
+            FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferA);
+            FroxelStackingCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferA);
         }
     }
 
@@ -562,11 +562,11 @@ public class VolumetricRendering : MonoBehaviour
         PreviousFrameMatrix = projectionMatrix;
         PreviousCameraPosition = cam.transform.position;
 
-        FroxelFogCompute.Dispatch(IntegralKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+        FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
     //    FroxelStackingCompute.DispatchIndirect
         //CONVERT TO DISPATCH INDIRECT to avoid CPU callback?
 
-        FroxelStackingCompute.Dispatch(StackFroxelKernal, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
+        FroxelStackingCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
 
     }
 
