@@ -1,6 +1,8 @@
 #ifndef VOLUMETRIC_CORE_INCLUDED
 #define VOLUMETRIC_CORE_INCLUDED
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
+
 float4x4 TransposedCameraProjectionMatrix;
 float4 _VolumePlaneSettings;
 TEXTURE3D(_VolumetricResult); SAMPLER(sampler_VolumetricResult);
@@ -25,7 +27,8 @@ half4 Volumetrics(half4 color, half3 positionWS) {
 
     half halfU = ls.x * 0.5;
 
-    //Figuring out both sides at once and zeroing out the other when blending. Is this better than brancing with an if statement?
+    //Figuring out both sides at once and zeroing out the other when blending. 
+    //Is this better than brancing with an if statement? Andorid doesn't like if statements anyway.
     half3 LUV = half3 (halfU.x, ls.yz) * (1 - unity_StereoEyeIndex); //Left UV
     half3 RUV = half3(halfU + 0.5, ls.yz) * (unity_StereoEyeIndex); //Right UV
     half3 DoubleUV = LUV + RUV; // Combined
@@ -37,7 +40,7 @@ half4 Volumetrics(half4 color, half3 positionWS) {
     //
     half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, DoubleUV);// *ClipUVW;
 
-    color = FroxelColor.rgba + (color * FroxelColor.a);
+    color.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
 #endif
     return color;
 }

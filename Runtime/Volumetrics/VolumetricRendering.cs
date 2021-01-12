@@ -80,8 +80,9 @@ public class VolumetricRendering : MonoBehaviour
 
     //Required shaders
     [SerializeField, HideInInspector] ComputeShader FroxelFogCompute;
-    [SerializeField, HideInInspector] ComputeShader FroxelStackingCompute;
+    [SerializeField, HideInInspector] ComputeShader FroxelIntegrationCompute;
     [SerializeField, HideInInspector] ComputeShader ClipmapCompute;
+    [SerializeField, HideInInspector] ComputeShader BlurCompute;
 
     //Texture buffers
     RenderTexture ClipmapBufferA;  //Sampling and combining baked maps asynchronously
@@ -94,7 +95,8 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture FroxelBufferA;   //Single froxel projection use for scattering and history reprojection
     RenderTexture FroxelBufferB;   //for history reprojection
 
-    RenderTexture StackTexture;    //Integration and stereo reprojection
+    RenderTexture IntegrationBuffer;    //Integration and stereo reprojection
+    RenderTexture BlurBuffer;    //blur
 
 
 
@@ -127,6 +129,7 @@ public class VolumetricRendering : MonoBehaviour
 
     protected int ScatteringKernel = 0;
     protected int IntegrateKernel = 0;
+    protected int BlurKernel = 0;
 
     Matrix4x4 matScaleBias;
     Vector3 ThreadsToDispatch;
@@ -153,7 +156,6 @@ public class VolumetricRendering : MonoBehaviour
     //Temp Jitter stuff
     int tempjitter = 0; //TEMP jitter switcher thing 
     [Header("Extra variables"), Range(0, 1)]
-    public Vector3 jitterDistance ; //figure out disance based on froxel depth
     float[] jitters = new float[2] { 0.0f, 0.5f };
 
 
@@ -165,8 +167,9 @@ public class VolumetricRendering : MonoBehaviour
     Quaternion previousQuat;
 
     //General fog settings
-
-    public float HomogeneousMediumDensity = 0.01f;
+    [HideInInspector]
+    public Color albedo = Color.white;
+    public float meanFreePath = 15.0f;
 
 
 
@@ -176,7 +179,7 @@ public class VolumetricRendering : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying) return;
 #endif
-        Shader.EnableKeyword("_VOLUMETRICS"); //Enable volumetrics. Double check to see if works in build
+        Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //Enable volumetrics. Double check to see if works in build
         //  cam = GetComponent<Camera>();
 
     }
@@ -243,23 +246,35 @@ public class VolumetricRendering : MonoBehaviour
         FroxelBufferA = new RenderTexture(rtdiscrpt);
         FroxelBufferA.Create();
 
-        //Ugh... extra android buffer mess
+        //Ugh... extra android buffer mess. Can I use a custom RT double buffer instead?
         FroxelBufferB = new RenderTexture(rtdiscrpt);
         FroxelBufferB.Create();
 
 
 
         rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
-        StackTexture = new RenderTexture(rtdiscrpt);
-        StackTexture.format = RenderTextureFormat.ARGB32;
-        StackTexture.enableRandomWrite = true;
-        StackTexture.Create();
+        IntegrationBuffer = new RenderTexture(rtdiscrpt);
+        IntegrationBuffer.format = RenderTextureFormat.ARGB32;
+        IntegrationBuffer.enableRandomWrite = true;
+        IntegrationBuffer.Create();
+
+        BlurBuffer = new RenderTexture(rtdiscrpt);
+        BlurBuffer.format = RenderTextureFormat.ARGB32;
+        BlurBuffer.enableRandomWrite = true;
+        BlurBuffer.Create();
 
 
         LightObjects = new List<LightObject>();
 
         ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
         FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferA);
+
+        ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
+
+        BlurKernel = BlurCompute.FindKernel("VolBlur");
+        BlurCompute.SetTexture(BlurKernel, "InTex", IntegrationBuffer);
+        BlurCompute.SetTexture(BlurKernel, "Result", BlurBuffer);
+
 
         //First Compute pass setup
 
@@ -274,9 +289,9 @@ public class VolumetricRendering : MonoBehaviour
 
         ///Second compute pass setup
 
-        IntegrateKernel = FroxelStackingCompute.FindKernel("StepAdd");
-        FroxelStackingCompute.SetTexture(IntegrateKernel, "Result", StackTexture);
-        FroxelStackingCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferA);
+        IntegrateKernel = FroxelIntegrationCompute.FindKernel("StepAdd");
+        FroxelIntegrationCompute.SetTexture(IntegrateKernel, "Result", IntegrationBuffer);
+        FroxelIntegrationCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferA);
 
         //Make view projection matricies
 
@@ -286,15 +301,14 @@ public class VolumetricRendering : MonoBehaviour
 
         //Debug.Log(cam.stereoSeparation);
 
-        FroxelStackingCompute.SetMatrix("LeftEyeMatrix", LeftProjectionMatrix * CenterProjectionMatrix.inverse);
-        FroxelStackingCompute.SetMatrix("RightEyeMatrix", RightProjectionMatrix * CenterProjectionMatrix.inverse);
+        FroxelIntegrationCompute.SetMatrix("LeftEyeMatrix", LeftProjectionMatrix * CenterProjectionMatrix.inverse);
+        FroxelIntegrationCompute.SetMatrix("RightEyeMatrix", RightProjectionMatrix * CenterProjectionMatrix.inverse);
 
 
         //Global Variable setup
 
-        Shader.SetGlobalTexture("_VolumetricResult", StackTexture);
-        //   Shader.SetGlobalTexture("_3dTex", StackTexture);
-        // DebugRenderCube.material.SetTexture("_3dTexture", StackTexture);
+        Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
+    //    Shader.SetGlobalTexture("_VolumetricResult", BlurBuffer); //HARDCODING blur for now
 
         ThreadsToDispatch = new Vector3(
              Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f),
@@ -468,7 +482,7 @@ public class VolumetricRendering : MonoBehaviour
         if (clipmap == Clipmap.Far)
         {
             Shader.SetGlobalTexture("_VolumetricClipmapTexture2", ClipmapTexture);
-            Debug.Log("Added clipmap far :" + ClipmapTexture.name);
+         //   Debug.Log("Added clipmap far :" + ClipmapTexture.name);
         }
         else
         {        //TODO COMBINE THESE
@@ -487,12 +501,12 @@ public class VolumetricRendering : MonoBehaviour
         {
             FroxelFogCompute.SetTexture(ScatteringKernel, "PreviousFrameLighting", FroxelBufferA);
             FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferB);
-            FroxelStackingCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferB);
+            FroxelIntegrationCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferB);
         }else
         {
             FroxelFogCompute.SetTexture(ScatteringKernel, "PreviousFrameLighting", FroxelBufferB);
             FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferA);
-            FroxelStackingCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferA);
+            FroxelIntegrationCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferA);
         }
     }
 
@@ -541,8 +555,13 @@ public class VolumetricRendering : MonoBehaviour
         CheckClipmap(); // UpdateClipmap();
         FlopIntegralBuffers();
         //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
-        FroxelStackingCompute.SetFloat("HomogeneousMediumDensity", HomogeneousMediumDensity);
-        
+        //TODO: figure out why the meanFreePath has to be so high and fix it. Baking in a large value to compinstate for now.
+        float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath * 1000);
+
+        FroxelIntegrationCompute.SetFloat("extinction", extinction ) ; //ExtinctionFromMeanFreePath
+        FroxelIntegrationCompute.SetVector("Scattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
+
+
         FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
         FroxelFogCompute.SetMatrix(Camera2WorldID, cam.transform.worldToLocalMatrix);
         //FroxelFogCompute.SetMatrix("LightProjectionMatrix", lightMatrix);
@@ -566,7 +585,9 @@ public class VolumetricRendering : MonoBehaviour
     //    FroxelStackingCompute.DispatchIndirect
         //CONVERT TO DISPATCH INDIRECT to avoid CPU callback?
 
-        FroxelStackingCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
+        FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
+
+        BlurCompute.Dispatch(BlurKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
 
     }
 
@@ -623,20 +644,29 @@ public class VolumetricRendering : MonoBehaviour
         Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
         if (ClipmapBufferA!= null) ClipmapBufferA.Release();
         if (FroxelBufferA != null) FroxelBufferA.Release();   
-        if (StackTexture != null)StackTexture.Release();
+        if (IntegrationBuffer != null)IntegrationBuffer.Release();
     }
 
 #if UNITY_EDITOR
-    private void Reset()
+
+    void assignVaris()
     {
         cam = GetComponentInChildren<Camera>();
         //Get shaders and seri
         if (FroxelFogCompute == null)
             FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
-        if (FroxelStackingCompute == null)
-            FroxelStackingCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/StepAdd.compute");
+        if (FroxelIntegrationCompute == null)
+            FroxelIntegrationCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/StepAdd.compute");
         if (ClipmapCompute == null)
             ClipmapCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/ClipMapGenerator.compute");
+        if (BlurCompute == null)
+            BlurCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricBlur.compute");
+    }
+
+
+    private void Reset()
+    {
+        assignVaris();
     }
 #endif
 
@@ -646,8 +676,8 @@ public class VolumetricRendering : MonoBehaviour
         //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
         // TODO: Add proper scene preview feature
          if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
-//        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
-
+        //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
+        assignVaris();
 #endif
         //if (cam == null) cam = GetComponent<Camera>();
         //if (volumetricData.near < cam.nearClipPlane || volumetricData.far > cam.farClipPlane)

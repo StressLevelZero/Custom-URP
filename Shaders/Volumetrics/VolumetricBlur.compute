@@ -1,0 +1,29 @@
+﻿#pragma kernel VolBlur
+
+#define Samples 5
+
+RWTexture3D<float4> Result;
+Texture3D<float4> InTex;
+
+[numthreads(4,4,4)]
+void VolBlur (uint3 id : SV_DispatchThreadID)
+{
+  //  int Samples = 20;
+
+    //for (int i = 0; i < Samples; i++) {
+
+    //    Result[id.xyz] += InTex[ uint3(id.x, id.y + i, id.z) ].rgba / Samples;
+    //}
+
+    
+
+    Result[id.xyz] = InTex[uint3(id.x, id.y, id.z)].rgba * 0.38774;
+
+    Result[id.xyz] += InTex[uint3(id.x + 1, id.y, id.z)].rgba * 0.24477;
+    Result[id.xyz] += InTex[uint3(id.x + 2, id.y, id.z)].rgba * 0.06136;
+
+    Result[id.xyz] += InTex[uint3(id.x - 1, id.y, id.z)].rgba * 0.24477;
+    Result[id.xyz] += InTex[uint3(id.x - 2, id.y, id.z)].rgba * 0.06136;
+
+
+}

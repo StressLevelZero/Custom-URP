@@ -85,6 +85,8 @@ float4 TrilinearInterpolation(float3 UVW) {
 	return (c0 * PixelDifference_1minus.z) + (c1 * PixelDifference.z);
 };
 
+
+//Realtime spot evaluation
 float4 SpotLightLoop(float4 WS_coordinate) {
 
 	float4 accumLighting = float4(0,0,0,0);
@@ -168,17 +170,17 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//WS_coordinate.z
 	//float4 PreviousFrameProjection = mul(PreviousFrameMatrix, UVW); // inverse previous frame camera matrix
 
-	float4 PreviousFrameProjection = WS_coordinate; // Catch WS relitive to the camera
+	float4 PreviousFrameProjection = -WS_coordinate; // Catch WS relitive to the camera
 
 	WS_coordinate = -WS_coordinate + CameraPosition; //move to postion.
 	///
 //	WS_coordinate.z += Noised;
 	/// Previous frame space
 
-//	PreviousFrameProjection.xyz -= CameraMotionVector.xyz; //Move back previous frame's pos TODO: Add to matrix instead
-//	PreviousFrameProjection.w = 1;
-//	PreviousFrameProjection = mul(PreviousFrameMatrix, PreviousFrameProjection); // convert using previous matrix
-//	//PreviousFrameProjection = PreviousFrameProjection /  PreviousFrameProjection.w; //Untapper coord
+	PreviousFrameProjection.xyz += CameraMotionVector.xyz; //Move back previous frame's pos TODO: Add to matrix instead
+	PreviousFrameProjection.w = 1;
+	PreviousFrameProjection = mul(PreviousFrameMatrix, PreviousFrameProjection); // convert using previous matrix
+	PreviousFrameProjection = PreviousFrameProjection /  PreviousFrameProjection.w; //Untapper coord
 /////
 //	PreviousFrameProjection.z = PreviousFrameProjection.z / (_VolumePlaneSettings.y - PreviousFrameProjection.z * _VolumePlaneSettings.z);
 //	PreviousFrameProjection.xy = (PreviousFrameProjection.xy + 1.0f) * 0.5f;
@@ -200,8 +202,10 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	//float4 previousResult = TrilinearInterpolation( PreviousFrameProjection.xyz * whd.xyz - 0.5); //Custom trilinear interpolation of RW texture. can't use this on mobile because can't read a RW tex. 
 	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, id / UVW, 0 );
-	float4 previousResult = PreviousFrameLighting[id];
-	//previousResult = PreviousFrameProjection;
+	float4 previousResult = PreviousFrameLighting[id]; //using current fram for reprojection
+
+//	float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, PreviousFrameProjection, 0 );
+
 	////Light loops
 
 	//	accumLighting += SpotLightLoop(WS_coordinate);
