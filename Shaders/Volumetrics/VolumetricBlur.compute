@@ -16,14 +16,25 @@ void VolBlur (uint3 id : SV_DispatchThreadID)
     //}
 
     
+    //Box blur
+    Result[id.xyz] = InTex[uint3(id.x, id.y, id.z)].rgba ;
 
-    Result[id.xyz] = InTex[uint3(id.x, id.y, id.z)].rgba * 0.38774;
+    Result[id.xyz] += InTex[uint3(id.x + 1, id.y, id.z)].rgba ;
+    Result[id.xyz] += InTex[uint3(id.x - 1, id.y, id.z)].rgba ;
 
-    Result[id.xyz] += InTex[uint3(id.x + 1, id.y, id.z)].rgba * 0.24477;
-    Result[id.xyz] += InTex[uint3(id.x + 2, id.y, id.z)].rgba * 0.06136;
+    Result[id.xyz] += InTex[uint3(id.x , id.y + 1, id.z)].rgba ;
+    Result[id.xyz] += InTex[uint3(id.x , id.y - 1, id.z)].rgba ;
 
-    Result[id.xyz] += InTex[uint3(id.x - 1, id.y, id.z)].rgba * 0.24477;
-    Result[id.xyz] += InTex[uint3(id.x - 2, id.y, id.z)].rgba * 0.06136;
+    Result[id.xyz] += InTex[uint3(id.x + 1, id.y + 1, id.z)].rgba ;
+    Result[id.xyz] += InTex[uint3(id.x - 1, id.y - 1, id.z)].rgba ;
+
+    Result[id.xyz] += InTex[uint3(id.x - 1, id.y + 1, id.z)].rgba ;
+    Result[id.xyz] += InTex[uint3(id.x + 1, id.y - 1, id.z)].rgba ;
+
+    Result[id.xyz] += InTex[uint3(id.x, id.y, id.z + 1)].rgba;
+    Result[id.xyz] += InTex[uint3(id.x, id.y, id.z) - 1].rgba;
 
 
+
+    Result[id.xyz] = Result[id.xyz] ;
 }

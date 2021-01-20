@@ -2,10 +2,13 @@
 #define VOLUMETRIC_CORE_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 float4x4 TransposedCameraProjectionMatrix;
 float4 _VolumePlaneSettings;
+float3 _VolCameraPos;
 TEXTURE3D(_VolumetricResult); SAMPLER(sampler_VolumetricResult);
+float4 _VBufferDistanceEncodingParams;
 
 half4 Volumetrics(half4 color, half3 positionWS) {
 
@@ -13,24 +16,29 @@ half4 Volumetrics(half4 color, half3 positionWS) {
 
   //  return half4(1, 0, 0, 1);
 
-    half4 ls = half4(positionWS - _WorldSpaceCameraPos, -1);
+    half4 ls = half4(positionWS - _VolCameraPos, -1); //_WorldSpaceCameraPos
 
     ls = mul(ls, TransposedCameraProjectionMatrix);
     ls.xyz = ls.xyz / ls.w;
+
+    float vdistance = distance(positionWS, _VolCameraPos);
 
     //TODO: Makes the froxel read distance and curved based instead of rectilinear. Better use of edge froxels. Compute shader needs to write correctly too. 
     //float camdistance = distance(ls.xyz,0);
     //ls.z = (camdistance + 1) / 20 ;     
     //ls.z = FrustumToLinearDepth(ls.z);
     //ls.z = pow(saturate(ls.z), _VaporDepthPow); Adds a curve to the frustum space to control dispution of froxels
-    ls.z = ls.z / (_VolumePlaneSettings.y - ls.z * _VolumePlaneSettings.z); // Converts from frustum space To Linear Depth
+  //  ls.z = ls.z / (_VolumePlaneSettings.y - ls.z * _VolumePlaneSettings.z); // Converts from frustum space To Linear Depth
+
+
+    float W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
 
     half halfU = ls.x * 0.5;
 
     //Figuring out both sides at once and zeroing out the other when blending. 
-    //Is this better than brancing with an if statement? Andorid doesn't like if statements anyway.
-    half3 LUV = half3 (halfU.x, ls.yz) * (1 - unity_StereoEyeIndex); //Left UV
-    half3 RUV = half3(halfU + 0.5, ls.yz) * (unity_StereoEyeIndex); //Right UV
+    //Is this better than branching with an if statement? Andorid doesn't like if statements anyway.
+    half3 LUV = half3 (halfU.x, ls.y, W) * (1 - unity_StereoEyeIndex); //Left UV
+    half3 RUV = half3(halfU + 0.5, ls.y, W) * (unity_StereoEyeIndex); //Right UV
     half3 DoubleUV = LUV + RUV; // Combined
 
     //TODO: Make sampling calulations run or not if they are inside or out of the clipped area
@@ -41,6 +49,7 @@ half4 Volumetrics(half4 color, half3 positionWS) {
     half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, DoubleUV);// *ClipUVW;
 
     color.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
+ //   color.rgb = frac(DoubleUV);
 #endif
     return color;
 }

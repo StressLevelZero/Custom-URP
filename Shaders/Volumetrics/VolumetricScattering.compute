@@ -5,8 +5,7 @@
 #define M_PI 3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
 
-
-//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 Texture3D<float4> PreviousFrameLighting;
 RWTexture3D<float4> Result;
@@ -14,6 +13,7 @@ RWTexture3D<float4> Result;
 //Texture2D<float4> BlueNoise;
 
 Texture2DArray<float4> LightProjectionTextureArray;
+
 
 
 //Currently only Supports spot lights
@@ -32,9 +32,14 @@ shared float4 CameraMotionVector; //camera's motion per frame
 shared float4 _VolumePlaneSettings; 
 shared float4 _ZBufferParams;
 
+shared float4 _VBufferDistanceEncodingParams;
+shared float4 _VBufferDistanceDecodingParams;
+
 float4x4 inverseCameraProjectionMatrix;
 shared float4x4 CameraProjectionMatrix;
 float4x4 PreviousFrameMatrix;
+
+shared float4x4 _VBufferCoordToViewDirWS; // >_>
 
 SamplerState _LinearClamp;
 SamplerState _point_repeat;
@@ -46,8 +51,9 @@ shared float3 _ClipmapPosition;
 shared float _ClipmapScale;
 shared float _ClipmapScale2;
 
-float Jittery;
+float SeqOffset; //z offseter
 float reprojectionAmount;
+
 
 //Custom trilinear interpolation
 //Apparently you can't use a sampler with a RWtexture, but you can directly read the data. 
@@ -120,9 +126,7 @@ float4 SpotLightLoop(float4 WS_coordinate) {
 }
 
 
-//float LinearToVaporDeviceDepth(float lin) {
-//	return lin * _VaporPlaneSettings.y / (1 + lin * _VaporPlaneSettings.z);
-//}
+
 
 [numthreads(4,4,4)]
 void Scatter(uint3 id : SV_DispatchThreadID)
@@ -132,47 +136,60 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float3 whd;
 	Result.GetDimensions(whd.x, whd.y, whd.z);
 
-	//float2 noiseDimensions;
-	//BlueNoise.GetDimensions(noiseDimensions.x, noiseDimensions.y);
-	//float4 Noised = BlueNoise.SampleLevel(_point_repeat, id.xy / (whd.xy / 32), 0);
-
-	//float3 Jitter = Jittery;
-	//Jitter.z = Noised.r;
-
-//	float idflip = (fmod(id.x + id.y + id.z, 2) * 2) - 1 ;
-
-	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery  * 0.5); //offsetting  
-
-	float4 UVW = float4( (id + TemporalOffset) / whd, 1); //Make uvs and sample from center of froxel //ID TO UV
 
 
+//	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery  * 0.5); //offsetting  
+	float3 TemporalOffset = float3(0.5, 0.5, 0.5 ); //offsetting  
 
-	//!!!!!!!!!!!!!!!!
-	//TODO: Add pow curve here
+	float4 UVW = float4( (id + TemporalOffset) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
 
-	//UVW.z = UVW.z / (_VolumePlaneSettings.y - UVW.z * _VolumePlaneSettings.z); // Converts from frustum space To Linear Depth
-	UVW.z = UVW.z * _VolumePlaneSettings.y / (1 + UVW.z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
-	//UVW.z = 1.0 / (_ZBufferParams.z * UVW.z + _ZBufferParams.w); // VaporDeviceToEyeDepth
-	
+	UVW.z = DecodeLogarithmicDepthGeneralized(id.z / whd.z, _VBufferDistanceDecodingParams);
+
+
+	// Perform per-pixel randomization by adding an offset and then sampling uniformly
+// (in the log space) in a vein similar to Stochastic Universal Sampling:
+// https://en.wikipedia.org/wiki/Stochastic_universal_sampling
+	float perPixelRandomOffset = GenerateHashedRandomFloat(UVW); //posInput.positionSS
+
+	// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
+	// Each of them is the centroid of the interval of length 2/14.
+	float rndVal = frac(perPixelRandomOffset + SeqOffset);
+
+
+		/// Invert the assumed perspective projection from the UVW to World Space
+	float4 WS_coordinate = mul(inverseCameraProjectionMatrix, UVW); //inverse camera matrix
+	WS_coordinate.xyz = WS_coordinate.xyz / WS_coordinate.w;	//tapper coord and flip around
+
+	float2 centerCoord = id.xy + float2(0.5, 0.5);
+
+	// Compute a ray direction s.t. ViewSpace(rayDirWS).z = 1.
+	//float3 rayDirWS = mul(-float4(centerCoord, 1, 1), _VBufferCoordToViewDirWS[unity_StereoEyeIndex]).xyz;
+	float3 rayDirWS = normalize(mul(-float4(centerCoord, 1, 1), _VBufferCoordToViewDirWS)).xyz ;
+	float  rcpLenRayDir = rsqrt(dot(rayDirWS, rayDirWS));
+
+	//JitteredRay ray;
+
+	//ray.originWS = GetCurrentViewPosition(); //WS pos of camera 
+	//ray.centerDirWS = rayDirWS * rcpLenRayDir; // Normalize
+	//float originWS = GetCurrentViewPosition(); //WS pos of camera 
+	float3 originWS = CameraPosition.xyz; //WS pos of camera 
+	float3 centerDirWS = rayDirWS * rcpLenRayDir; // Normalize
+
+//	ray.jitterDirWS = ray.centerDirWS;
+
+	float e1 = (UVW.z + 1) / whd.z; //linearZ
+
+	float  t = DecodeLogarithmicDepthGeneralized(e1 - rndVal * (1/whd.z), _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+//jittered ray
+	float3 centerWS = originWS + t * centerDirWS; //Cast ray along direction to get WS pos
 
 	float4 accumLighting = float4(0,0,0,0);
 	//	
 
-	/// Invert the assumed perspective projection from the IDs to World Space
-	float4 WS_coordinate = mul(inverseCameraProjectionMatrix, UVW); //inverse camera matrix
-	WS_coordinate.xyz = WS_coordinate.xyz / WS_coordinate.w;	//tapper coord and flip around
-
-
-	//WS_coordinate.z = WS_coordinate.z / (_VolumePlaneSettings.y - WS_coordinate.z * _VolumePlaneSettings.z); // Converts from frustum space To Linear Depth
-	//WS_coordinate *= WS_coordinate;
-//	WS_coordinate.z = UVW.z / 20;
-	//Noised *= 2;
-	//WS_coordinate.z
-	//float4 PreviousFrameProjection = mul(PreviousFrameMatrix, UVW); // inverse previous frame camera matrix
-
 	float4 PreviousFrameProjection = -WS_coordinate; // Catch WS relitive to the camera
 
-	WS_coordinate = -WS_coordinate + CameraPosition; //move to postion.
+	//WS_coordinate = -WS_coordinate + CameraPosition; //move to postion.
+	WS_coordinate.xyz = centerWS;
 	///
 //	WS_coordinate.z += Noised;
 	/// Previous frame space
@@ -184,18 +201,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 /////
 //	PreviousFrameProjection.z = PreviousFrameProjection.z / (_VolumePlaneSettings.y - PreviousFrameProjection.z * _VolumePlaneSettings.z);
 //	PreviousFrameProjection.xy = (PreviousFrameProjection.xy + 1.0f) * 0.5f;
-		//float3 VaporDeviceToUv(float3 device) {
-		//	float3 uv;
-		//	uv.z = VaporDeviceToLinearDepth(device.z);
-		////	uv.z = pow(saturate(uv.z), 1.0f / _VaporDepthPow);
-		//	uv.x = (device.x + 1.0f) * 0.5f;
-		//	uv.y = (device.y + 1.0f) * 0.5f;
-		//	return uv;
-		//}
-		//float VaporDeviceToLinearDepth(float device) {
-		//	return device / (_VaporPlaneSettings.y - device * _VaporPlaneSettings.z);
-		//}
-///
+
 
 	//float t0 = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
 	//	float de = _VBufferRcpSliceCount; // Log-encoded distance between slices
@@ -213,11 +219,6 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//Combined clipmap of baked maps. Reduces the amount of 3d texture look-ups per frame.
 	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)
 	
-	//Single debug
-	//if (WS_coordinate.z < 5) {
-	//	accumLighting.xyz = float3(0, 0.1, 0);
-	//}
-	//else accumLighting.xyz = float3(.1,0,.1);
 
 	float3 ClipmapUVW =  (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale *.5) )  ) / _ClipmapScale.xxx;
 	
@@ -240,19 +241,23 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	accumLighting += float4(_VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0).xyz, 0) * Clipped;
 	accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0) * (1- Clipped);
 
-//	accumLighting.xyz += ClipmapUVW * Clipped;
-
 //	ClipUVW = max(ClipUVW, 0);
 	//accumLighting += ClipmapTexture.SampleLevel(_LinearClamp,UVW, 0 );
 	//accumLighting += float4(1, 0, 1, 1);
 //	float4 lightstuff = 1 - saturate(distance(WS_coordinate, inputPosition)); //Realtime Light things
 
 	Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount ); // average previous frame 
+
+	//float asd = id.z;
+//	Result[id.xyz] = floor(fmod(asd, 2));
+//	Result[id.xyz] = frac(centerWS).rgbb;
+//	Result[id.xyz] = distance(centerWS, CameraPosition);
+//	Result[id.xyz] = WS_coordinate.xyzz;
+//	Result[id.xyz] = frac(WS_coordinate.xyzz);
+//	Result[id.xyz] = float4(rayDirWS,1);
+
 	//Result[id.xyz] = accumLighting ; // average previous frame 
 //	Result[id.xyz] = float4(idflip, idflip, idflip, 1) ; // average previous frame 
-
-	
-
 	//Result[id.xyz] = bakedLightTex;
 	//WS_coordinate.xyz -= CameraPosition.xyz;
 	//WS_coordinate.xyz = -WS_coordinate.xyz * WS_coordinate.w;

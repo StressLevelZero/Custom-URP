@@ -5,7 +5,7 @@
 #define EPSILON  1e-8;
 
 
-//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GeometricTools.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
@@ -18,6 +18,7 @@ Texture3D<float4> InLightingTexture;
 SamplerState Custom_trilinear_clamp_sampler;
 //float HomogeneousMediumDensity;
 float extinction;
+float StaticMultiplier;
 float4 Scattering;
 
 float4x4    LeftEyeMatrix;
@@ -25,6 +26,8 @@ float4x4    RightEyeMatrix;
 
 shared float4 _VolumePlaneSettings;
 shared float4 _ZBufferParams;
+shared float4 _VBufferDistanceEncodingParams;
+shared float4 _VBufferDistanceDecodingParams;
 
 //half4 Accumulate(half4 colorAndDensityFront, half4 colorAndDensityBack)
 //{
@@ -36,67 +39,81 @@ shared float4 _ZBufferParams;
 //    return accumulatedLightAndTransmittance;
 //}
 
-float GetSliceEyeDepth(float slice, float numberOfSlices) {
-	
-	float zdepth = slice / numberOfSlices; //Pos of current slice in UV space
-//z = pow(saturate(uv.z), _DepthPow); // Depth power to adjust the depth dispution of voxels
-	zdepth = zdepth * _VolumePlaneSettings.y / (1 + zdepth * _VolumePlaneSettings.z); //UV to depth //LinearToVaporDeviceDepth
-
-	zdepth = 1.0 / (_ZBufferParams.z * zdepth + _ZBufferParams.w); // VaporDeviceToEyeDepth 
-
-	return zdepth;
-}
-//hist, current, distance, extinction
-float4 AccumulateFog(float4 colorAndDensityFront, float4 colorAndDensityBack, float traveledDistance, float extinction)
-{
-
-	float absorbance = traveledDistance * extinction;
-	float transmittance = exp(-absorbance * colorAndDensityBack.w);
-
-	float4 accumulatedLightAndTransmittance = float4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1 - transmittance) * colorAndDensityFront.w, (transmittance * colorAndDensityFront.w));
-
-	return accumulatedLightAndTransmittance;
-}
-
-
-void Accumulate(inout float3 AccumulatedColor, float3 currentColor, float distance, float extinction, inout float opticalDepth)
-{
-
-	float absorbance = distance * extinction;
-
-  //float4 blendValue = float4(current, absorbance); //Current slice color & absorbance
-
-	float transmittance = exp(-opticalDepth);
-
-	AccumulatedColor +=   transmittance * currentColor; // * Scattering.rgb ?
-
-	opticalDepth += absorbance ;
-
-}
-
-//float HDBlend()
-//{
-//  float4 blendValue = float4(aggregateLighting.radianceNoPhase,  extinction * dt); //Current slice color & absorbance
-
-//	float transmittance = exp(-opticalDepth)
-//	totalRadiance += transmittance * blendValue.rgb
-//  opticalDepth +=  blendValue.a;
-
+//float GetSliceEyeDepth(float slice, float numberOfSlices) {
+//	
+//	float zdepth = slice / numberOfSlices; //Pos of current slice in UV space
+////z = pow(saturate(uv.z), _DepthPow); // Depth power to adjust the depth dispution of voxels
+//	zdepth = zdepth * _VolumePlaneSettings.y / (1 + zdepth * _VolumePlaneSettings.z); //UV to depth //LinearToVaporDeviceDepth
+//
+//	zdepth = 1.0 / (_ZBufferParams.z * zdepth + _ZBufferParams.w); // VaporDeviceToEyeDepth 
+//
+//	return zdepth;
 //}
+//hist, current, distance, extinction
+//float4 AccumulateFog(float4 colorAndDensityFront, float4 colorAndDensityBack, float traveledDistance, float extinction)
+//{
+//
+//	float absorbance = traveledDistance * extinction;
+//	float transmittance = exp(-absorbance * colorAndDensityBack.w);
+//
+//	float4 accumulatedLightAndTransmittance = float4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1 - transmittance) * colorAndDensityFront.w, (transmittance * colorAndDensityFront.w));
+//
+//	return accumulatedLightAndTransmittance;
+//}
+//
+//
+//void Accumulate(inout float3 AccumulatedColor, float3 currentColor, float distance, float extinction, inout float opticalDepth)
+//{
+//
+//	float absorbance = distance * extinction;
+//
+//  //float4 blendValue = float4(current, absorbance); //Current slice color & absorbance
+//
+//	float transmittance = exp(-opticalDepth);
+//
+//	AccumulatedColor +=   transmittance * currentColor * Scattering.rgb; // * Scattering.rgb ?
+//
+//	opticalDepth += absorbance ;
+//
+//}
+//
+//float GetDepth(float currentSlice, float numberOfSlices) {
+//
+//	float Z = (currentSlice + 0.5) / numberOfSlices;
+//
+//	Z =  Z * _VolumePlaneSettings.y / (1 + Z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
+//	return 1.0 / (_ZBufferParams.z * Z + _ZBufferParams.w); // VaporDeviceToEyeDepth 
+//
+//}
+//
+//float GetWDepth(float currentW) {
+//
+//
+//	float near = _VolumePlaneSettings.x;
+//	float far = _VolumePlaneSettings.y;
+//
+//	float newZ = currentW * _VolumePlaneSettings.y / (1 + currentW * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
+//
+//	float lerped = lerp(near, far, newZ);
+//
+//	return lerped;
+//}
+
+
 
 
 [numthreads(8, 8, 1)]	
 void StepAdd(uint3 id : SV_DispatchThreadID)
 {
 	//Use this to figure out distance between layers
-	float near = _VolumePlaneSettings.x;
-	float far = _VolumePlaneSettings.y;
+	//float near = _VolumePlaneSettings.x;
+	//float far = _VolumePlaneSettings.y;
 
 	// T (A → B) = 𝑒 ^ -({ S [𝐴 - 𝐵]}	𝛽𝑒(𝑥) 𝑑x	)
-	float Absorption = 0.01f; //temp Absorption rate
+	//float Absorption = 0.01f; //temp Absorption rate
 
 	float3 whd ; //make floating to avoid interger calulations later. There's likely a better place to do this
-	Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this instead of getting it
+	Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this in scrpit instead of getting it here
 
 	float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //used for current slice output
 
@@ -104,7 +121,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 	float4 Stereo_UVWs = float4(id / whd ,1);
 
 	//Shift space to linear. TODO: link to a shared file and add bias
-	Stereo_UVWs.z = Stereo_UVWs.z * _VolumePlaneSettings.y / (1 + Stereo_UVWs.z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
+	//Stereo_UVWs.z = Stereo_UVWs.z * _VolumePlaneSettings.y / (1 + Stereo_UVWs.z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
 
 	int EyeID = floor(Stereo_UVWs.x * 2); //Assume left and right eyes
 
@@ -119,21 +136,14 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 	//}
 
 	//Mask matrix transforms per eye
-	Stereo_UVWs = (mul(LeftEyeMatrix, Stereo_UVWs) * (1-EyeID)) + (mul(RightEyeMatrix, Stereo_UVWs) * EyeID);
+//	Stereo_UVWs = (mul(LeftEyeMatrix, Stereo_UVWs) * (1-EyeID)) + (mul(RightEyeMatrix, Stereo_UVWs) * EyeID);
+
+	Stereo_UVWs.z = DecodeLogarithmicDepthGeneralized(Stereo_UVWs.z, _VBufferDistanceDecodingParams);
 
 
-//	float t0 = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
-	
-	float stepLen = 0; //depth per layer //Make this account for current distance
-	float accumTransmittance = 1;
+	float invDepthNum = 1.0 / whd.z; // used to avoid division
 
-	//float DepthPow = 0.5f;
-
-	//float normalizationCoefficient  = (far - near) / whd.z; // TODO: do this in scrpit instead 
-
-	float  opticalDepth = 0;
-
-	float invDepthNum = 1 / whd.z; // used to avoid division
+	float previousDepth = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
 
  //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
 //#if defined(SHADER_API_MOBILE)
@@ -141,44 +151,41 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 //#else
 //	[unroll(128)]
 //#endif 
-	for (int depth = 0; depth < whd.z; depth++) {
+	for (float depth = 0.0; depth < whd.z; depth++) {
+
+		float UVSlice = depth * invDepthNum; // slice / slicecount
 
 		//Sampling the input texture here instead of doing an ID lookup because we are offsetting the UVs to get stereo instead of doing it the previous step
-		float4 scatteringExtinction = InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,
-			float3(Stereo_UVWs.x, Stereo_UVWs.y, depth * invDepthNum), 0) ; //Sample current Layer 
+		//TODO: remove extinction multiplication here and do it in previous step
+		float4 scatteringExtinction = 
+			InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0) * extinction * StaticMultiplier; //Sample current Layer 
+		//float zDepth = GetWDepth(UVSlice);
+		float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
+		float travelDis = zDepth - previousDepth; //Distance between layers
 
-		//redefine near and far to clipspace
-		near = GetSliceEyeDepth(depth, whd.z);
-		far  = GetSliceEyeDepth(depth + 1, whd.z);
 
-		float cellVolume = distance(far, near) ;
-		//float cellVolume = (far - near) / whd.z; // TODO Set this value in scpirt
-		//float cellVolume = abs(far - near) * 0.01f; // TODO Set this value in scpirt
-		// (S - S * e ^(-t * D) )  / t;
-		//float extinction = HomogeneousMediumDensity;
-		//scatteringExtinction.a += HomogeneousMediumDensity;
-	//	scatteringExtinction.a *= normalizationCoefficient; // Temp set density 
-		//const
-	//	 float transmittance = exp(-scatteringExtinction.a * cellVolume); //*stepLen , * cellVolume
+		 float transmittance = exp(-extinction * travelDis );
 
-		// half4 accumulatedLightAndTransmittance = half4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1.0f - transmittance) * colorAndDensityFront.w, colorAndDensityFront.w * transmittance);
-		 //accumScatteringTransmittance.rgb +=			
-		 //accumScatteringTransmittance.w * ( scatteringExtinction.xyz * (1.0f - transmittance) / scatteringExtinction.a * float3(1,1,1)  + 0.00001f); //Change to max epsi?
-			//	 
-		 //accumScatteringTransmittance.a *= transmittance;
+		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a;
+		//accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction);
+		accumScatteringTransmittance.a *= transmittance;
 
-	//	 accumScatteringTransmittance =  AccumulateFog(accumScatteringTransmittance, scatteringExtinction, cellVolume, scatteringExtinction.a);
-//		void Accumulate(inout float3 AccumulatedColor, float3 currentColor, float distance, float extinction, inout float opticalDepth)
 
-		Accumulate(accumScatteringTransmittance.rgb , scatteringExtinction.rgb, cellVolume, extinction, opticalDepth);
-		//accumScatteringTransmittance
-		//https://computergraphics.stackexchange.com/questions/5762/volumetric-integration-in-frostbite
-//		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / scatteringExtinction.a);
-//		accumScatteringTransmittance.a *= transmittance;
-		//Add alpha to baked texture and better controls to system to be physically based. Maybe use Beer's law?
-		// accumScatteringTransmittance.g = depth % 2; //Debug: stripe the layers to see disrubution
-		 Result[int3(id.x, id.y, depth)] = float4(accumScatteringTransmittance.rgb, 1-opticalDepth);
+	//	float mods = floor(fmod(depth, 2));
+	//	Result[int3(id.x, id.y, depth)] = float4(mods.rrr, 1);
+	//	Result[int3(id.x, id.y, depth)] = float4(scatteringExtinction.rgb,0);
+	//	Result[int3(id.x, id.y, depth)] = frac(float4(Stereo_UVWs.xy, depth / whd.z,0));
+	//	Result[int3(id.x, id.y, depth)] = float4( float3(Stereo_UVWs.xy, depth / whd.z) - float3(scatteringExtinction.rgb) ,0);
+	//	Result[int3(id.x, id.y, depth)] = InLightingTexture[int3(id.x, id.y, depth)];
+	//	Result[int3(id.x, id.y, depth)] = float4(mods.rrr, .25);
+	//	Result[int3(id.x, id.y, depth)] = float4(UVSlice, UVSlice, UVSlice, 1-(travelDis / 50));
 
+	//	 Result[int3(id.x, id.y, depth)] = float4(accumScatteringTransmittance.rgb, 1-opticalDepth);
+
+
+		Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
+
+		 previousDepth = zDepth;
 	}
 
 }
