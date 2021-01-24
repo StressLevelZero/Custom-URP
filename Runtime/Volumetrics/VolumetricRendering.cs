@@ -188,6 +188,7 @@ public class VolumetricRendering : MonoBehaviour
     //General fog settings
    // [HideInInspector]
     public Color albedo = Color.white;
+    public Color extinctionTint = Color.white;
     public float meanFreePath = 15.0f;
     public float StaticLightMultiplier = 1.0f;
 
@@ -241,7 +242,7 @@ public class VolumetricRendering : MonoBehaviour
     void Intialize()
     {
         CheckOverrideVolumes();
-        if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system.
+        if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Romove this 
         CheckCookieList();
         matScaleBias = Matrix4x4.identity;
         matScaleBias.m00 = -0.5f;
@@ -258,7 +259,7 @@ public class VolumetricRendering : MonoBehaviour
         rtdiscrpt.width = volumetricData.FroxelWidthResolution;
         rtdiscrpt.height = volumetricData.FroxelHeightResolution;
         rtdiscrpt.volumeDepth = volumetricData.FroxelDepthResolution;
-        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
+        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
         rtdiscrpt.msaaSamples = 1;
 
         FroxelBufferA = new RenderTexture(rtdiscrpt);
@@ -341,6 +342,8 @@ public class VolumetricRendering : MonoBehaviour
         Shader.SetGlobalVector("_ZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
 
         Debug.Log("Dispatching " + ThreadsToDispatch);
+
+        SetVariables();
     }
 
     void UpdateLights()
@@ -528,6 +531,18 @@ public class VolumetricRendering : MonoBehaviour
         }
     }
 
+    Matrix4x4 PrevViewProjMatrix = Matrix4x4.identity;
+
+    void SetVariables()
+    {
+        float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
+
+        Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
+        Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights //TODO: move this to the scatter pass
+        Shader.SetGlobalVector("_GlobalScattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
+
+
+    }
 
 
     void Update()
@@ -540,11 +555,8 @@ public class VolumetricRendering : MonoBehaviour
             return;
         }
 #endif
-        //Make this jitter with different values over time instead of just back and forth
 
-    //    float jitterOffet = Mathf.Lerp(0, 1, jitters[tempjitter]); //loop through jitters
-
-        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
+        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, cam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
         projectionMatrix = matScaleBias * projectionMatrix ; 
         
         //Previous frame's matrix//!!!!!!!!!
@@ -558,12 +570,6 @@ public class VolumetricRendering : MonoBehaviour
         FlopIntegralBuffers();
         //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
         //TODO: figure out why the meanFreePath has to be so high and fix it. Baking in a large value to compinstate for now.
-        float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
-
-        FroxelIntegrationCompute.SetFloat("extinction", extinction ) ; //ExtinctionFromMeanFreePath
-        FroxelIntegrationCompute.SetFloat("StaticMultiplier", StaticLightMultiplier ) ; //ExtinctionFromMeanFreePath
-        FroxelIntegrationCompute.SetVector("Scattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
-
         VBufferParameters vbuff =  new VBufferParameters(new Vector3Int(64,1,1), volumetricData.far,
                                          cam.nearClipPlane,
                                          cam.farClipPlane,
@@ -577,6 +583,8 @@ public class VolumetricRendering : MonoBehaviour
         Shader.SetGlobalVector("_VBufferDistanceEncodingParams", vbuff.depthEncodingParams);
         Shader.SetGlobalVector("_VBufferDistanceDecodingParams", vbuff.depthDecodingParams);
         Shader.SetGlobalMatrix("_VBufferCoordToViewDirWS", PixelCoordToViewDirWS);
+
+        Shader.SetGlobalMatrix("_PrevViewProjMatrix", PrevViewProjMatrix);
 
 
         FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
@@ -598,6 +606,9 @@ public class VolumetricRendering : MonoBehaviour
 
         PreviousFrameMatrix = projectionMatrix;
         PreviousCameraPosition = cam.transform.position;
+        ////MATRIX
+        PrevViewProjMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * cam.worldToCameraMatrix;
+                  //  PreviousFrameMatrix = cam.transformprojectionMatrix * cam.worldToCameraMatrix;
 
         FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
     //    FroxelStackingCompute.DispatchIndirect
@@ -609,7 +620,8 @@ public class VolumetricRendering : MonoBehaviour
 
     }
 
-    struct VBufferParameters
+    //Coping the parms from HDRP to get the log encoded depth.
+    struct VBufferParameters 
     {
         public Vector3Int viewportSize;
         public Vector4 depthEncodingParams;

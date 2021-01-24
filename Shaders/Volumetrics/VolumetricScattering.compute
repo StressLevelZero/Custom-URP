@@ -32,12 +32,15 @@ shared float4 CameraMotionVector; //camera's motion per frame
 shared float4 _VolumePlaneSettings; 
 shared float4 _ZBufferParams;
 
+shared float _GlobalExtinction;
+
 shared float4 _VBufferDistanceEncodingParams;
 shared float4 _VBufferDistanceDecodingParams;
 
 float4x4 inverseCameraProjectionMatrix;
 shared float4x4 CameraProjectionMatrix;
 float4x4 PreviousFrameMatrix;
+shared float4x4 PrevViewProjMatrix;
 
 shared float4x4 _VBufferCoordToViewDirWS; // >_>
 
@@ -53,6 +56,7 @@ shared float _ClipmapScale2;
 
 float SeqOffset; //z offseter
 float reprojectionAmount;
+shared float _StaticLightMultiplier;
 
 
 //Custom trilinear interpolation
@@ -127,7 +131,7 @@ float4 SpotLightLoop(float4 WS_coordinate) {
 
 
 
-
+///Main scattering pass. Intergration is done seperately so we can reproject this result for XR.
 [numthreads(4,4,4)]
 void Scatter(uint3 id : SV_DispatchThreadID)
 {
@@ -145,11 +149,11 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	UVW.z = DecodeLogarithmicDepthGeneralized(id.z / whd.z, _VBufferDistanceDecodingParams);
 
-
+	//TODO: replace this with the global baked bluenoise texture used elsewhere
 	// Perform per-pixel randomization by adding an offset and then sampling uniformly
 // (in the log space) in a vein similar to Stochastic Universal Sampling:
 // https://en.wikipedia.org/wiki/Stochastic_universal_sampling
-	float perPixelRandomOffset = GenerateHashedRandomFloat(UVW); //posInput.positionSS
+	float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
 
 	// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
 	// Each of them is the centroid of the interval of length 2/14.
@@ -157,8 +161,8 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 
 		/// Invert the assumed perspective projection from the UVW to World Space
-	float4 WS_coordinate = mul(inverseCameraProjectionMatrix, UVW); //inverse camera matrix
-	WS_coordinate.xyz = WS_coordinate.xyz / WS_coordinate.w;	//tapper coord and flip around
+	//float4 WS_coordinate = mul(inverseCameraProjectionMatrix, UVW); //inverse camera matrix
+	//WS_coordinate.xyz = WS_coordinate.xyz / WS_coordinate.w;	//tapper coord and flip around
 
 	float2 centerCoord = id.xy + float2(0.5, 0.5);
 
@@ -173,7 +177,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//ray.centerDirWS = rayDirWS * rcpLenRayDir; // Normalize
 	//float originWS = GetCurrentViewPosition(); //WS pos of camera 
 	float3 originWS = CameraPosition.xyz; //WS pos of camera 
-	float3 centerDirWS = rayDirWS * rcpLenRayDir; // Normalize
+	float3 centerDirWS = rayDirWS ; // Normalize
 
 //	ray.jitterDirWS = ray.centerDirWS;
 
@@ -186,13 +190,20 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float4 accumLighting = float4(0,0,0,0);
 	//	
 
-	float4 PreviousFrameProjection = -WS_coordinate; // Catch WS relitive to the camera
 
 	//WS_coordinate = -WS_coordinate + CameraPosition; //move to postion.
-	WS_coordinate.xyz = centerWS;
+	float4 WS_coordinate = float4(centerWS,1);
 	///
 //	WS_coordinate.z += Noised;
 	/// Previous frame space
+
+
+////
+//REPROJECTION
+///
+
+	float4 PreviousFrameProjection = -WS_coordinate; // Catch WS relitive to the camera
+
 
 	PreviousFrameProjection.xyz += CameraMotionVector.xyz; //Move back previous frame's pos TODO: Add to matrix instead
 	PreviousFrameProjection.w = 1;
@@ -208,18 +219,42 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	//float4 previousResult = TrilinearInterpolation( PreviousFrameProjection.xyz * whd.xyz - 0.5); //Custom trilinear interpolation of RW texture. can't use this on mobile because can't read a RW tex. 
 	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, id / UVW, 0 );
+
+	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
+
+	float2	positionNDC = ComputeNormalizedDeviceCoordinates(WS_coordinate, PrevViewProjMatrix );
+
+
+	///
+	//half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
+
+	//ls = mul(ls, transpose(PreviousFrameMatrix));
+	//ls.xyz = ls.xyz / ls.w;
+
+	float vdistance = distance(WS_coordinate, prevPos);
+	float W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+
+	//float3 reprojection = float3(ls.xy, W);
+	float3 reprojection = float3(positionNDC, W);
+
+
 	float4 previousResult = PreviousFrameLighting[id]; //using current fram for reprojection
 
-//	float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, PreviousFrameProjection, 0 );
+	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, PreviousFrameProjection, 0 );
+	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, reprojection, 0 );
+	//float4 previousResult = float4(reprojection,1);
 
-	////Light loops
-
+	/////
+	//Light loops
+	/////
 	//	accumLighting += SpotLightLoop(WS_coordinate);
 
-	//Combined clipmap of baked maps. Reduces the amount of 3d texture look-ups per frame.
-	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)
-	
+	/////
+	//Baked light volumes
+	/////
 
+	//Using combined clipmap instead of direct baked maps. Reduces the amount of 3d texture look-ups per frame.
+	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)	
 	float3 ClipmapUVW =  (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale *.5) )  ) / _ClipmapScale.xxx;
 	
 	float3 LargeClipmapUVW = (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale * 5 *.5) )  ) / (_ClipmapScale.xxx * 5);
@@ -241,31 +276,12 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	accumLighting += float4(_VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0).xyz, 0) * Clipped;
 	accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0) * (1- Clipped);
 
-//	ClipUVW = max(ClipUVW, 0);
-	//accumLighting += ClipmapTexture.SampleLevel(_LinearClamp,UVW, 0 );
-	//accumLighting += float4(1, 0, 1, 1);
-//	float4 lightstuff = 1 - saturate(distance(WS_coordinate, inputPosition)); //Realtime Light things
+	accumLighting *= _StaticLightMultiplier * _GlobalExtinction;
 
-	Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount ); // average previous frame 
+	accumLighting += max((rndVal - 0.5) * 0.03,0);
 
-	//float asd = id.z;
-//	Result[id.xyz] = floor(fmod(asd, 2));
-//	Result[id.xyz] = frac(centerWS).rgbb;
-//	Result[id.xyz] = distance(centerWS, CameraPosition);
-//	Result[id.xyz] = WS_coordinate.xyzz;
-//	Result[id.xyz] = frac(WS_coordinate.xyzz);
-//	Result[id.xyz] = float4(rayDirWS,1);
+	Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount ); // Temporal sampling 
 
-	//Result[id.xyz] = accumLighting ; // average previous frame 
-//	Result[id.xyz] = float4(idflip, idflip, idflip, 1) ; // average previous frame 
-	//Result[id.xyz] = bakedLightTex;
-	//WS_coordinate.xyz -= CameraPosition.xyz;
-	//WS_coordinate.xyz = -WS_coordinate.xyz * WS_coordinate.w;
-	//Result[id.xyz] = mul(CameraProjectionMatrix, WS_coordinate);
-	//Result[id.xyz] = frac(PreviousFrameProjection);
-	//Result[id.xyz] = bakedLightTex;
-	//Result[id.xyz] = PreviousFrameProjection;
-	//Result[id.xyz] = WS_coordinate;
-	//Result[id.xyz] = float4(id.xy / whd.xy , frac( id.z / (whd.z * .1)), 1 ) ;
+
 
 }

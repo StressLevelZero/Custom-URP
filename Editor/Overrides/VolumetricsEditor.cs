@@ -12,10 +12,13 @@ namespace UnityEditor.Rendering.Universal
         SerializedDataParameter m_MipMax;
         SerializedDataParameter m_EnableFroxelVolumetrics;
         SerializedDataParameter m_HomogeneousDensity;
-        SerializedDataParameter m_Response;
-        SerializedDataParameter m_Texture;
+        //SerializedDataParameter m_Response;
+        // SerializedDataParameter m_Texture;
 
-        //public override void OnEnable()
+        SerializedDataParameter m_GlobalStaticLightMultiplier;
+        SerializedDataParameter m_FogDistance;
+        SerializedDataParameter m_MaxRenderDistance;
+        SerializedDataParameter m_VolumetricAlbedo;
         //{
         //    var o = new PropertyFetcher<FilmGrain>(serializedObject);
 

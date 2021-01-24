@@ -5,6 +5,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
 float4x4 TransposedCameraProjectionMatrix;
+float4x4 CameraProjectionMatrix;
 float4 _VolumePlaneSettings;
 float3 _VolCameraPos;
 TEXTURE3D(_VolumetricResult); SAMPLER(sampler_VolumetricResult);
@@ -14,7 +15,7 @@ half4 Volumetrics(half4 color, half3 positionWS) {
 
 #if defined(_VOLUMETRICS_ENABLED)
 
-  //  return half4(1, 0, 0, 1);
+    //float2 positionNDC = ComputeNormalizedDeviceCoordinates(positionWS, _PrevViewProjMatrix);//viewProjMatrix
 
     half4 ls = half4(positionWS - _VolCameraPos, -1); //_WorldSpaceCameraPos
 
@@ -23,17 +24,12 @@ half4 Volumetrics(half4 color, half3 positionWS) {
 
     float vdistance = distance(positionWS, _VolCameraPos);
 
-    //TODO: Makes the froxel read distance and curved based instead of rectilinear. Better use of edge froxels. Compute shader needs to write correctly too. 
-    //float camdistance = distance(ls.xyz,0);
-    //ls.z = (camdistance + 1) / 20 ;     
-    //ls.z = FrustumToLinearDepth(ls.z);
-    //ls.z = pow(saturate(ls.z), _VaporDepthPow); Adds a curve to the frustum space to control dispution of froxels
-  //  ls.z = ls.z / (_VolumePlaneSettings.y - ls.z * _VolumePlaneSettings.z); // Converts from frustum space To Linear Depth
-
+   // vdistance = LinearEyeDepth(vdistance, GetWorldToViewMatrix());
 
     float W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
 
-    half halfU = ls.x * 0.5;
+     half halfU = ls.x * 0.5;
+   // half halfU = positionNDC.x * 0.5;
 
     //Figuring out both sides at once and zeroing out the other when blending. 
     //Is this better than branching with an if statement? Andorid doesn't like if statements anyway.
@@ -45,11 +41,14 @@ half4 Volumetrics(half4 color, half3 positionWS) {
     //float ClipUVW =
     //    step(DoubleUV.x, 1) * step(0, DoubleUV.x) *
     //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
-    //
-    half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, DoubleUV);// *ClipUVW;
+    
+//    float random = GenerateHashedRandomFloat(DoubleUV * 4000) * 0.003;
+    half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, DoubleUV) ;// *ClipUVW;
+ //   half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, float3(positionNDC,W) ) ;// *ClipUVW;
 
     color.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
- //   color.rgb = frac(DoubleUV);
+
+  //  color.rgb = DoubleUV * ClipUVW;
 #endif
     return color;
 }

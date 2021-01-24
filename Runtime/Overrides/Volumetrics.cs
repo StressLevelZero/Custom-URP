@@ -9,7 +9,10 @@ namespace UnityEngine.Rendering.Universal
     public sealed class Volumetrics : VolumeComponent
     {
         static readonly int m_MipFogParam = Shader.PropertyToID("_MipFogParameters");
-
+        static readonly int m_GlobalExtinction = Shader.PropertyToID("_GlobalExtinction");
+        static readonly int m_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
+        static readonly int m_VolumetricAlbedo = Shader.PropertyToID("_GlobalScattering");
+        [Header("Fog Mipmap controls")]
         [Tooltip("How close the mipfog starts")]
         public MinFloatParameter mipFogNear = new MinFloatParameter( 0.0f , 0 );
         [Tooltip("Where the mipfog ends")]
@@ -17,23 +20,20 @@ namespace UnityEngine.Rendering.Universal
         [Tooltip("Max mip level.")]
         public ClampedFloatParameter mipFogMaxMip = new ClampedFloatParameter(1.0f, 0.0f, 1);
 
-        [Tooltip("Controls froxel based volumetrics"), Header("Camera froxel Volumetrics")]
-        public BoolParameter EnableFroxelVolumetrics = new BoolParameter(false);
-
+        [Space, Header("Voulmetric Controls")]
         [Tooltip("Controls the global fog Density.")]
-        public ClampedFloatParameter HomogeneousDensity = new ClampedFloatParameter(0f, 0.5f, 1f);
-
-        [Tooltip("Controls the noisiness response curve based on scene luminance. Higher values mean less noise in light areas.")]
-        public ClampedFloatParameter response = new ClampedFloatParameter(0.8f, 0f, 1f);
-
-        [Tooltip("A tileable texture to use for the grain. The neutral value is 0.5 where no grain is applied.")]
-        public NoInterpTextureParameter texture = new NoInterpTextureParameter(null);
+        public MinFloatParameter GlobalStaticLightMultiplier = new MinFloatParameter(1f, .1f);
+        [Tooltip("Controls the global fog Density.")]
+        public MinFloatParameter FogViewDistance = new MinFloatParameter(50, 1f);
+        [Tooltip("Controls the global fog Density."),HideInInspector]
+        public ClampedFloatParameter MaxRenderDistance = new ClampedFloatParameter(50, 1f, 3000f); //Disabled until hooked up
+        public ColorParameter VolumetricAlbedo = new ColorParameter(Color.white,false);
 
         //       public bool IsActive() => intensity.value > 0f && (type.value != FilmGrainLookup.Custom || texture.value != null);
 
         //       public bool IsTileCompatible() => true;
 
-        internal  void PushFogShaderParameters()
+        internal void PushFogShaderParameters()
         {
             // TODO Handle user override
             //var fogSettings = hdCamera.volumeStack.GetComponent<Fog>();
@@ -49,9 +49,9 @@ namespace UnityEngine.Rendering.Universal
             //cmd.SetGlobalInt(HDShaderIDs._PBRFogEnabled, IsPBRFogEnabled(hdCamera) ? 1 : 0);
 
             Shader.SetGlobalVector(m_MipFogParam, new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
-         //   Debug.Log("Pushed fog prams");
-
-
+            Shader.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value) ); //ExtinctionFromMeanFreePath
+            Shader.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
+            Shader.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
         }
     }
 

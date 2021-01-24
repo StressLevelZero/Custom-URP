@@ -13,13 +13,16 @@
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/EntityLighting.hlsl"
 
 
+
 RWTexture3D<float4> Result;
 Texture3D<float4> InLightingTexture;
 SamplerState Custom_trilinear_clamp_sampler;
-//float HomogeneousMediumDensity;
-float extinction;
-float StaticMultiplier;
-float4 Scattering;
+
+shared float4 _GlobalScattering;
+//shared float4 _GlobalExtinctionTint;
+
+shared float _GlobalExtinction;
+#define extinction _GlobalExtinction
 
 float4x4    LeftEyeMatrix;
 float4x4    RightEyeMatrix;
@@ -28,79 +31,6 @@ shared float4 _VolumePlaneSettings;
 shared float4 _ZBufferParams;
 shared float4 _VBufferDistanceEncodingParams;
 shared float4 _VBufferDistanceDecodingParams;
-
-//half4 Accumulate(half4 colorAndDensityFront, half4 colorAndDensityBack)
-//{
-//	half layerDepth = 1;	//layerDepth temp set 
-//
-//    half transmittance = exp(colorAndDensityBack.w * layerDepth);
-//    half4 accumulatedLightAndTransmittance = half4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1.0f - transmittance) * colorAndDensityFront.w, colorAndDensityFront.w * transmittance);
-//	
-//    return accumulatedLightAndTransmittance;
-//}
-
-//float GetSliceEyeDepth(float slice, float numberOfSlices) {
-//	
-//	float zdepth = slice / numberOfSlices; //Pos of current slice in UV space
-////z = pow(saturate(uv.z), _DepthPow); // Depth power to adjust the depth dispution of voxels
-//	zdepth = zdepth * _VolumePlaneSettings.y / (1 + zdepth * _VolumePlaneSettings.z); //UV to depth //LinearToVaporDeviceDepth
-//
-//	zdepth = 1.0 / (_ZBufferParams.z * zdepth + _ZBufferParams.w); // VaporDeviceToEyeDepth 
-//
-//	return zdepth;
-//}
-//hist, current, distance, extinction
-//float4 AccumulateFog(float4 colorAndDensityFront, float4 colorAndDensityBack, float traveledDistance, float extinction)
-//{
-//
-//	float absorbance = traveledDistance * extinction;
-//	float transmittance = exp(-absorbance * colorAndDensityBack.w);
-//
-//	float4 accumulatedLightAndTransmittance = float4(colorAndDensityFront.xyz + colorAndDensityBack.xyz * (1 - transmittance) * colorAndDensityFront.w, (transmittance * colorAndDensityFront.w));
-//
-//	return accumulatedLightAndTransmittance;
-//}
-//
-//
-//void Accumulate(inout float3 AccumulatedColor, float3 currentColor, float distance, float extinction, inout float opticalDepth)
-//{
-//
-//	float absorbance = distance * extinction;
-//
-//  //float4 blendValue = float4(current, absorbance); //Current slice color & absorbance
-//
-//	float transmittance = exp(-opticalDepth);
-//
-//	AccumulatedColor +=   transmittance * currentColor * Scattering.rgb; // * Scattering.rgb ?
-//
-//	opticalDepth += absorbance ;
-//
-//}
-//
-//float GetDepth(float currentSlice, float numberOfSlices) {
-//
-//	float Z = (currentSlice + 0.5) / numberOfSlices;
-//
-//	Z =  Z * _VolumePlaneSettings.y / (1 + Z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
-//	return 1.0 / (_ZBufferParams.z * Z + _ZBufferParams.w); // VaporDeviceToEyeDepth 
-//
-//}
-//
-//float GetWDepth(float currentW) {
-//
-//
-//	float near = _VolumePlaneSettings.x;
-//	float far = _VolumePlaneSettings.y;
-//
-//	float newZ = currentW * _VolumePlaneSettings.y / (1 + currentW * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
-//
-//	float lerped = lerp(near, far, newZ);
-//
-//	return lerped;
-//}
-
-
-
 
 [numthreads(8, 8, 1)]	
 void StepAdd(uint3 id : SV_DispatchThreadID)
@@ -137,6 +67,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 
 	//Mask matrix transforms per eye
 //	Stereo_UVWs = (mul(LeftEyeMatrix, Stereo_UVWs) * (1-EyeID)) + (mul(RightEyeMatrix, Stereo_UVWs) * EyeID);
+	//Disabled until it's done correctly for log space
 
 	Stereo_UVWs.z = DecodeLogarithmicDepthGeneralized(Stereo_UVWs.z, _VBufferDistanceDecodingParams);
 
@@ -158,7 +89,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 		//Sampling the input texture here instead of doing an ID lookup because we are offsetting the UVs to get stereo instead of doing it the previous step
 		//TODO: remove extinction multiplication here and do it in previous step
 		float4 scatteringExtinction = 
-			InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0) * extinction * StaticMultiplier; //Sample current Layer 
+			InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0)  ; //Sample current Layer 
 		//float zDepth = GetWDepth(UVSlice);
 		float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
 		float travelDis = zDepth - previousDepth; //Distance between layers
@@ -166,22 +97,9 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 
 		 float transmittance = exp(-extinction * travelDis );
 
-		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a;
-		//accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction);
-		accumScatteringTransmittance.a *= transmittance;
-
-
-	//	float mods = floor(fmod(depth, 2));
-	//	Result[int3(id.x, id.y, depth)] = float4(mods.rrr, 1);
-	//	Result[int3(id.x, id.y, depth)] = float4(scatteringExtinction.rgb,0);
-	//	Result[int3(id.x, id.y, depth)] = frac(float4(Stereo_UVWs.xy, depth / whd.z,0));
-	//	Result[int3(id.x, id.y, depth)] = float4( float3(Stereo_UVWs.xy, depth / whd.z) - float3(scatteringExtinction.rgb) ,0);
-	//	Result[int3(id.x, id.y, depth)] = InLightingTexture[int3(id.x, id.y, depth)];
-	//	Result[int3(id.x, id.y, depth)] = float4(mods.rrr, .25);
-	//	Result[int3(id.x, id.y, depth)] = float4(UVSlice, UVSlice, UVSlice, 1-(travelDis / 50));
-
-	//	 Result[int3(id.x, id.y, depth)] = float4(accumScatteringTransmittance.rgb, 1-opticalDepth);
-
+		//accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a; //Non-energy conserve
+		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction) * _GlobalScattering; //Corrected version
+		accumScatteringTransmittance.a *= transmittance ;
 
 		Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
 

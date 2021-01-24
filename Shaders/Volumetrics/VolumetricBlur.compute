@@ -31,10 +31,10 @@ void VolBlur (uint3 id : SV_DispatchThreadID)
     Result[id.xyz] += InTex[uint3(id.x - 1, id.y + 1, id.z)].rgba ;
     Result[id.xyz] += InTex[uint3(id.x + 1, id.y - 1, id.z)].rgba ;
 
-    Result[id.xyz] += InTex[uint3(id.x, id.y, id.z + 1)].rgba;
-    Result[id.xyz] += InTex[uint3(id.x, id.y, id.z) - 1].rgba;
+    //Result[id.xyz] += InTex[uint3(id.x, id.y, id.z + 1)].rgba;
+    //Result[id.xyz] += InTex[uint3(id.x, id.y, id.z) - 1].rgba;
 
 
 
-    Result[id.xyz] = Result[id.xyz] ;
+    Result[id.xyz] = Result[id.xyz] / 9 ;
 }
