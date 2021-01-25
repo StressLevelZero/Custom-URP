@@ -97,7 +97,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 
 		 float transmittance = exp(-extinction * travelDis );
 
-		//accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a; //Non-energy conserve
+	//	accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * _GlobalScattering; //Non-energy conserve
 		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction) * _GlobalScattering; //Corrected version
 		accumScatteringTransmittance.a *= transmittance ;
 

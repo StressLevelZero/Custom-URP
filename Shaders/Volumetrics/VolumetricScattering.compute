@@ -278,7 +278,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	accumLighting *= _StaticLightMultiplier * _GlobalExtinction;
 
-	accumLighting += max((rndVal - 0.5) * 0.03,0);
+//	accumLighting.rgb += max((float3(rndVal, frac(rndVal+.2), frac(rndVal+.5)) - 0.5) * 0.03,0);  //dithering
 
 	Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount ); // Temporal sampling 
 

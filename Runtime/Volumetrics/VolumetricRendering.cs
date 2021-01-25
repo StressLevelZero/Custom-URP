@@ -188,7 +188,7 @@ public class VolumetricRendering : MonoBehaviour
     //General fog settings
    // [HideInInspector]
     public Color albedo = Color.white;
-    public Color extinctionTint = Color.white;
+//    public Color extinctionTint = Color.white;
     public float meanFreePath = 15.0f;
     public float StaticLightMultiplier = 1.0f;
 
