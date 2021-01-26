@@ -570,11 +570,13 @@ public class VolumetricRendering : MonoBehaviour
         FlopIntegralBuffers();
         //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
         //TODO: figure out why the meanFreePath has to be so high and fix it. Baking in a large value to compinstate for now.
-        VBufferParameters vbuff =  new VBufferParameters(new Vector3Int(64,1,1), volumetricData.far,
-                                         cam.nearClipPlane,
-                                         cam.farClipPlane,
-                                         cam.fieldOfView,
-                                         1);
+        VBufferParameters vbuff =  new VBufferParameters(
+                                        new Vector3Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelWidthResolution, volumetricData.FroxelDepthResolution), 
+                                        volumetricData.far,
+                                        cam.nearClipPlane,
+                                        cam.farClipPlane,
+                                        cam.fieldOfView,
+                                        1);
 
         Vector4  vres = new Vector4(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution, 1.0f / volumetricData.FroxelWidthResolution, 1.0f / volumetricData.FroxelHeightResolution);
 

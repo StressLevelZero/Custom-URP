@@ -6,6 +6,7 @@
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
 Texture3D<float4> PreviousFrameLighting;
 RWTexture3D<float4> Result;
@@ -58,6 +59,17 @@ float SeqOffset; //z offseter
 float reprojectionAmount;
 shared float _StaticLightMultiplier;
 
+//float3 GetViewUpDir()
+//{
+//	float4x4 viewMat = PrevViewProjMatrix; //GetWorldToViewMatrix();
+//	return viewMat[1].xyz;
+//}
+//
+//float3 GetViewForwardDir()
+//{
+//	float4x4 viewMat = GetWorldToViewMatrix(); // UNITY_MATRIX_V
+//	return -viewMat[2].xyz;
+//}
 
 //Custom trilinear interpolation
 //Apparently you can't use a sampler with a RWtexture, but you can directly read the data. 
@@ -147,8 +159,13 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	float4 UVW = float4( (id + TemporalOffset) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
 
-	UVW.z = DecodeLogarithmicDepthGeneralized(id.z / whd.z, _VBufferDistanceDecodingParams);
+	float e1 = (id.z + 1) / whd.z; // (slice + 1) / sliceCount //Todo: Bake Rcp 
 
+	float t1 = DecodeLogarithmicDepthGeneralized(e1, _VBufferDistanceDecodingParams);
+
+
+
+	 UVW.z = t1;
 	//TODO: replace this with the global baked bluenoise texture used elsewhere
 	// Perform per-pixel randomization by adding an offset and then sampling uniformly
 // (in the log space) in a vein similar to Stochastic Universal Sampling:
@@ -179,13 +196,19 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float3 originWS = CameraPosition.xyz; //WS pos of camera 
 	float3 centerDirWS = rayDirWS ; // Normalize
 
+	//float3 F = GetViewForwardDir();
+	//float3 U = GetViewUpDir();
+
+	//float3 rightDirWS = cross(rayDirWS, U);
+	//float  rcpLenRightDir = rsqrt(dot(rightDirWS, rightDirWS));
+
 //	ray.jitterDirWS = ray.centerDirWS;
 
-	float e1 = (UVW.z + 1) / whd.z; //linearZ
+//	float e1 = (UVW.z + 1) / whd.z; //linearZ
 
-	float  t = DecodeLogarithmicDepthGeneralized(e1 - rndVal * (1/whd.z), _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	float  t = DecodeLogarithmicDepthGeneralized(e1 - (rndVal * (1/whd.z) ), _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
 //jittered ray
-	float3 centerWS = originWS + t * centerDirWS; //Cast ray along direction to get WS pos
+	float3 centerWS = originWS + t * centerDirWS; //Cast ray along direction and add cam pos to get WS pos
 
 	float4 accumLighting = float4(0,0,0,0);
 	//	
