@@ -37,11 +37,14 @@ shared float _GlobalExtinction;
 
 shared float4 _VBufferDistanceEncodingParams;
 shared float4 _VBufferDistanceDecodingParams;
+//shared float4 _VBufferSharedUvScaleAndLimit;
 
 float4x4 inverseCameraProjectionMatrix;
 shared float4x4 CameraProjectionMatrix;
+shared  float4x4 TransposedCameraProjectionMatrix;
+
 float4x4 PreviousFrameMatrix;
-shared float4x4 PrevViewProjMatrix;
+shared float4x4 _PrevViewProjMatrix;
 
 shared float4x4 _VBufferCoordToViewDirWS; // >_>
 
@@ -55,7 +58,7 @@ shared float3 _ClipmapPosition;
 shared float _ClipmapScale;
 shared float _ClipmapScale2;
 
-float SeqOffset; //z offseter
+shared float SeqOffset; //z offseter
 float reprojectionAmount;
 shared float _StaticLightMultiplier;
 
@@ -136,14 +139,14 @@ float4 SpotLightLoop(float4 WS_coordinate) {
 		spotlightTex *= LightObjects[i].LightColor / (PI_x4 *  LightRadius*LightRadius);	// inverse square
 
 		accumLighting += spotlightTex * step(0,-lightDirection); // clip only to the front and add to the lightinbg
-	}
+	}	
 
 	return accumLighting;
 }
 
 
 
-///Main scattering pass. Intergration is done seperately so we can reproject this result for XR.
+///Main scattering pass. Intergration is done seperately so we can reproject this result for XR rather than do it twice.
 [numthreads(4,4,4)]
 void Scatter(uint3 id : SV_DispatchThreadID)
 {
@@ -152,20 +155,13 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float3 whd;
 	Result.GetDimensions(whd.x, whd.y, whd.z);
 
-
-
 //	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery  * 0.5); //offsetting  
 	float3 TemporalOffset = float3(0.5, 0.5, 0.5 ); //offsetting  
-
-	float4 UVW = float4( (id + TemporalOffset) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
-
+	float4 UVW = float4( (id ) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
 	float e1 = (id.z + 1) / whd.z; // (slice + 1) / sliceCount //Todo: Bake Rcp 
+//	float t1 = DecodeLogarithmicDepthGeneralized(e1, _VBufferDistanceDecodingParams);
 
-	float t1 = DecodeLogarithmicDepthGeneralized(e1, _VBufferDistanceDecodingParams);
-
-
-
-	 UVW.z = t1;
+	// UVW.z = t1;
 	//TODO: replace this with the global baked bluenoise texture used elsewhere
 	// Perform per-pixel randomization by adding an offset and then sampling uniformly
 // (in the log space) in a vein similar to Stochastic Universal Sampling:
@@ -178,22 +174,23 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 
 		/// Invert the assumed perspective projection from the UVW to World Space
-	//float4 WS_coordinate = mul(inverseCameraProjectionMatrix, UVW); //inverse camera matrix
+	//float4 WS_coordinate = mul(CameraProjectionMatrix, UVW); //inverse camera matrix
 	//WS_coordinate.xyz = WS_coordinate.xyz / WS_coordinate.w;	//tapper coord and flip around
-
+	//WS_coordinate += CameraPosition;
 	float2 centerCoord = id.xy + float2(0.5, 0.5);
 
 	// Compute a ray direction s.t. ViewSpace(rayDirWS).z = 1.
 	//float3 rayDirWS = mul(-float4(centerCoord, 1, 1), _VBufferCoordToViewDirWS[unity_StereoEyeIndex]).xyz;
-	float3 rayDirWS = normalize(mul(-float4(centerCoord, 1, 1), _VBufferCoordToViewDirWS)).xyz ;
+	float3 rayDirWS = normalize(mul(-float4(centerCoord , 1, 1), _VBufferCoordToViewDirWS)).xyz ;
 	float  rcpLenRayDir = rsqrt(dot(rayDirWS, rayDirWS));
+	//rayDirWS *= rcpLenRayDir;
 
 	//JitteredRay ray;
 
 	//ray.originWS = GetCurrentViewPosition(); //WS pos of camera 
 	//ray.centerDirWS = rayDirWS * rcpLenRayDir; // Normalize
 	//float originWS = GetCurrentViewPosition(); //WS pos of camera 
-	float3 originWS = CameraPosition.xyz; //WS pos of camera 
+//	float3 originWS = CameraPosition.xyz; //WS pos of camera 
 	float3 centerDirWS = rayDirWS ; // Normalize
 
 	//float3 F = GetViewForwardDir();
@@ -203,16 +200,16 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//float  rcpLenRightDir = rsqrt(dot(rightDirWS, rightDirWS));
 
 //	ray.jitterDirWS = ray.centerDirWS;
-
+//	float de = 1 / whd.z;
 //	float e1 = (UVW.z + 1) / whd.z; //linearZ
-
+	//float  t = DecodeLogarithmicDepthGeneralized(e1 - 0.5 * de, _VBufferDistanceDecodingParams);
 	float  t = DecodeLogarithmicDepthGeneralized(e1 - (rndVal * (1/whd.z) ), _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
 //jittered ray
-	float3 centerWS = originWS + t * centerDirWS; //Cast ray along direction and add cam pos to get WS pos
+	float3 centerWS = CameraPosition.xyz + (t * centerDirWS); //Cast ray along direction and add cam pos to get WS pos
 
 	float4 accumLighting = float4(0,0,0,0);
 	//	
-
+	//centerWS *= .99;
 
 	//WS_coordinate = -WS_coordinate + CameraPosition; //move to postion.
 	float4 WS_coordinate = float4(centerWS,1);
@@ -225,13 +222,11 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 //REPROJECTION
 ///
 
-	float4 PreviousFrameProjection = -WS_coordinate; // Catch WS relitive to the camera
-
-
-	PreviousFrameProjection.xyz += CameraMotionVector.xyz; //Move back previous frame's pos TODO: Add to matrix instead
-	PreviousFrameProjection.w = 1;
-	PreviousFrameProjection = mul(PreviousFrameMatrix, PreviousFrameProjection); // convert using previous matrix
-	PreviousFrameProjection = PreviousFrameProjection /  PreviousFrameProjection.w; //Untapper coord
+	//float4 PreviousFrameProjection = WS_coordinate; // Catch WS relitive to the camera
+	//PreviousFrameProjection.xyz -= CameraMotionVector.xyz; //Move back previous frame's pos TODO: Add to matrix instead
+	//PreviousFrameProjection.w = 1;
+	//PreviousFrameProjection = mul(PreviousFrameMatrix, PreviousFrameProjection); // convert using previous matrix
+	//PreviousFrameProjection = PreviousFrameProjection /  PreviousFrameProjection.w; //Untapper coord
 /////
 //	PreviousFrameProjection.z = PreviousFrameProjection.z / (_VolumePlaneSettings.y - PreviousFrameProjection.z * _VolumePlaneSettings.z);
 //	PreviousFrameProjection.xy = (PreviousFrameProjection.xy + 1.0f) * 0.5f;
@@ -243,29 +238,28 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//float4 previousResult = TrilinearInterpolation( PreviousFrameProjection.xyz * whd.xyz - 0.5); //Custom trilinear interpolation of RW texture. can't use this on mobile because can't read a RW tex. 
 	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, id / UVW, 0 );
 
-	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
-
-	float2	positionNDC = ComputeNormalizedDeviceCoordinates(WS_coordinate, PrevViewProjMatrix );
-
-
-	///
 	//half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
 
 	//ls = mul(ls, transpose(PreviousFrameMatrix));
 	//ls.xyz = ls.xyz / ls.w;
 
-	float vdistance = distance(WS_coordinate, prevPos);
-	float W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
+	float3 ws_repro = WS_coordinate.xyz ;
 
+	float2	positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, _PrevViewProjMatrix);
+	float	vdistance = distance(ws_repro, prevPos);
+	float	W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+//	float	W = vdistance;
+
+	//half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
+	//ls = mul(ls, transpose(PreviousFrameMatrix));
+	//ls.xyz = ls.xyz / ls.w;
 	//float3 reprojection = float3(ls.xy, W);
+
 	float3 reprojection = float3(positionNDC, W);
 
-
-	float4 previousResult = PreviousFrameLighting[id]; //using current fram for reprojection
-
-	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, PreviousFrameProjection, 0 );
-	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, reprojection, 0 );
-	//float4 previousResult = float4(reprojection,1);
+	float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, reprojection, 0 );
+	//float4 previousResult = PreviousFrameLighting[id];
 
 	/////
 	//Light loops
@@ -304,7 +298,5 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 //	accumLighting.rgb += max((float3(rndVal, frac(rndVal+.2), frac(rndVal+.5)) - 0.5) * 0.03,0);  //dithering
 
 	Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount ); // Temporal sampling 
-
-
 
 }

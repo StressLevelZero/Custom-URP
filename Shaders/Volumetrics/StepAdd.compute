@@ -24,6 +24,9 @@ shared float4 _GlobalScattering;
 shared float _GlobalExtinction;
 #define extinction _GlobalExtinction
 
+shared float SeqOffset; //z offseter
+
+
 float4x4    LeftEyeMatrix;
 float4x4    RightEyeMatrix;
 
@@ -31,6 +34,51 @@ shared float4 _VolumePlaneSettings;
 shared float4 _ZBufferParams;
 shared float4 _VBufferDistanceEncodingParams;
 shared float4 _VBufferDistanceDecodingParams;
+
+float ComputeHistoryWeight()
+{
+	// Compute the exponential moving average over 'n' frames:
+	// X = (1 - a) * ValueAtFrame[n] + a * AverageOverPreviousFrames.
+	// We want each sample to be uniformly weighted by (1 / n):
+	// X = (1 / n) * Sum{i from 1 to n}{ValueAtFrame[i]}.
+	// Therefore, we get:
+	// (1 - a) = (1 / n) => a = (1 - 1 / n) = (n - 1) / n,
+	// X = (1 / n) * ValueAtFrame[n] + (1 - 1 / n) * AverageOverPreviousFrames.
+	// Why does it work? We need to make the following assumption:
+	// AverageOverPreviousFrames ≈ AverageOverFrames[n - 1].
+	// AverageOverFrames[n - 1] = (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+	// This implies that the reprojected (accumulated) value has mostly converged.
+	// X = (1 / n) * ValueAtFrame[n] + ((n - 1) / n) * (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+	// X = (1 / n) * ValueAtFrame[n] + (1 / n) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+	// X = Sum{i from 1 to n}{ValueAtFrame[i] / n}.
+	float numFrames = 7;
+	float frameWeight = 1 / numFrames;
+	float historyWeight = 1 - frameWeight;
+
+	return historyWeight;
+}
+
+//float4 StereoOffset() {
+//
+//
+//	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
+//	float3 ws_repro = WS_coordinate - CameraMotionVector;
+//
+//	//float2	positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, PrevViewProjMatrix );
+//	float	vdistance = distance(ws_repro, prevPos);
+//	float	W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+//
+//
+//	half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
+//
+//	ls = mul(ls, transpose(PreviousFrameMatrix));
+//	ls.xyz = ls.xyz / ls.w;
+//
+//	float3 reprojection = float3(ls.xy, W);
+//
+//
+//}
+
 
 [numthreads(8, 8, 1)]	
 void StepAdd(uint3 id : SV_DispatchThreadID)
@@ -42,7 +90,13 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 	// T (A → B) = 𝑒 ^ -({ S [𝐴 - 𝐵]}	𝛽𝑒(𝑥) 𝑑x	)
 	//float Absorption = 0.01f; //temp Absorption rate
 
-	float3 whd ; //make floating to avoid interger calulations later. There's likely a better place to do this
+	float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
+
+// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
+// Each of them is the centroid of the interval of length 2/14.
+	float rndVal = frac(perPixelRandomOffset + SeqOffset);
+
+	float3 whd ; //make floating to avoid interger calulations later
 	Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this in scrpit instead of getting it here
 
 	float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //used for current slice output
@@ -71,10 +125,11 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 
 	Stereo_UVWs.z = DecodeLogarithmicDepthGeneralized(Stereo_UVWs.z, _VBufferDistanceDecodingParams);
 
-
 	float invDepthNum = 1.0 / whd.z; // used to avoid division
 
 	float previousDepth = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
+
+	//float4 previousResult = Result[id];
 
  //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
 //#if defined(SHADER_API_MOBILE)
@@ -92,7 +147,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 			InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0)  ; //Sample current Layer 
 		//float zDepth = GetWDepth(UVSlice);
 		float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
-		float travelDis = zDepth - previousDepth; //Distance between layers
+		float travelDis = (zDepth - previousDepth);// *rndVal; //Distance between layers. Jittering and do temporal blend
 
 
 		 float transmittance = exp(-extinction * travelDis );
@@ -101,9 +156,13 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction) * _GlobalScattering; //Corrected version
 		accumScatteringTransmittance.a *= transmittance ;
 
-		Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
 
-		 previousDepth = zDepth;
+	//	float4 normalizedVoxelValue = accumScatteringTransmittance * rcp(travelDis);
+
+		Result[int3(id.x, id.y, depth)] =  accumScatteringTransmittance;
+	//	Result[int3(id.x, id.y, depth)] = lerp(normalizedVoxelValue, previousResult, ComputeHistoryWeight()) * travelDis;
+
+		previousDepth = zDepth;
 	}
 
 }

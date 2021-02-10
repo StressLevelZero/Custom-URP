@@ -39,6 +39,7 @@ class VolumeRenderingUtils //Importing some functions from HDRP to have simular 
 
 //TODO: Add semi dynamic lighting which is generated in the clipmap and not previously baked out. Will need smarter clipmap gen to avoid hitching.
 //Add cascading clipmaps to have higher detail up close and include father clipping without exploding memory.
+//Convert this to a render feature. This should remove the need for the platform switcher too because that would be handled by the quality settings pipeline asset instead
 
 
 //[RequireComponent(typeof( Camera ) )]
@@ -79,6 +80,8 @@ public class VolumetricRendering : MonoBehaviour
 
     Vector3 ClipmapTransform; //Have this follow the camera and resample when the camera moves enough 
     Vector3 ClipmapCurrentPos; //chached location of previous sample point
+
+    //public Matrix4x4 randomatrix;
 
     //Required shaders
     [SerializeField, HideInInspector] ComputeShader FroxelFogCompute;
@@ -230,7 +233,7 @@ public class VolumetricRendering : MonoBehaviour
         return false;
     }
 
-    void CheckOverrideVolumes()
+    void CheckOverrideVolumes() //TODO: Is there a better way to do this?
     {
         var stack = VolumeManager.instance.stack;
 
@@ -242,8 +245,10 @@ public class VolumetricRendering : MonoBehaviour
     void Intialize()
     {
         CheckOverrideVolumes();
-        if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Romove this 
+        if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
         CheckCookieList();
+
+        //Making prescaled matrix 
         matScaleBias = Matrix4x4.identity;
         matScaleBias.m00 = -0.5f;
         matScaleBias.m11 = -0.5f;
@@ -326,8 +331,8 @@ public class VolumetricRendering : MonoBehaviour
 
         //Global Variable setup
 
-    //    Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
-        Shader.SetGlobalTexture("_VolumetricResult", BlurBuffer); //HARDCODING blur for now
+        Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
+    //    Shader.SetGlobalTexture("_VolumetricResult", BlurBuffer); //HARDCODING blur for now
 
         ThreadsToDispatch = new Vector3(
              Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f),
@@ -380,7 +385,7 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.width = volumetricData.ClipMapResolution;
         ClipRTdiscrpt.height = volumetricData.ClipMapResolution;
         ClipRTdiscrpt.volumeDepth = volumetricData.ClipMapResolution;
-        ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
+        ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
         ClipRTdiscrpt.msaaSamples = 1;
 
         ClipmapBufferA = new RenderTexture(ClipRTdiscrpt);
@@ -391,8 +396,7 @@ public class VolumetricRendering : MonoBehaviour
         ClipmapBufferC.Create();        
         ClipmapBufferD = new RenderTexture(ClipRTdiscrpt);
         ClipmapBufferD.Create();
-
-
+        //TODO: Loop through and remove one of the buffers
 
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapBufferA); //Set clipmap for
         Shader.SetGlobalFloat("_ClipmapScale", volumetricData.ClipmapScale);
@@ -538,9 +542,8 @@ public class VolumetricRendering : MonoBehaviour
         float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
 
         Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
-        Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights //TODO: move this to the scatter pass
+        Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
         Shader.SetGlobalVector("_GlobalScattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
-
 
     }
 
@@ -557,13 +560,14 @@ public class VolumetricRendering : MonoBehaviour
 #endif
 
         Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, cam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
-        projectionMatrix = matScaleBias * projectionMatrix ; 
-        
+        projectionMatrix = matScaleBias * projectionMatrix ;
+
         //Previous frame's matrix//!!!!!!!!!
+
 
         FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix);///
         //   FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix );///
-
+        //            var controller = hdCamera.volumeStack.GetComponent<Fog>(); //TODO: Link with controller
         //     UpdateLights();
 
         CheckClipmap(); // UpdateClipmap();
@@ -578,7 +582,11 @@ public class VolumetricRendering : MonoBehaviour
                                         cam.fieldOfView,
                                         1);
 
+   //     Vector2Int sharedBufferSize = new Vector2Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution); //Taking scaler functuion from HDRP for reprojection
+   //     Shader.SetGlobalVector("_VBufferSharedUvScaleAndLimit", vbuff.ComputeUvScaleAndLimit(sharedBufferSize) ); //Just assuming same scale
+
         Vector4  vres = new Vector4(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution, 1.0f / volumetricData.FroxelWidthResolution, 1.0f / volumetricData.FroxelHeightResolution);
+        //Vector4  vres = new Vector4(cam.pixelWidth, cam.pixelHeight, 1.0f / cam.pixelWidth, cam.pixelHeight);
 
         Matrix4x4 PixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(cam, vres);
 
@@ -594,7 +602,7 @@ public class VolumetricRendering : MonoBehaviour
         //FroxelFogCompute.SetMatrix("LightProjectionMatrix", lightMatrix);
         //FroxelFogCompute.SetVector("LightPosition", LightPosition.transform.position);
         //FroxelFogCompute.SetVector("LightColor", LightPosition.color * LightPosition.intensity);
-        FroxelFogCompute.SetFloat("SeqOffset", m_zSeq[ Time.renderedFrameCount % 7] ); //Loop through jitters. 
+        Shader.SetGlobalFloat("SeqOffset", m_zSeq[ Time.renderedFrameCount % 7] ); //Loop through jitters. 
         FroxelFogCompute.SetFloat("reprojectionAmount", reprojectionAmount );
 
         //jitters[tempjitter]
@@ -609,7 +617,10 @@ public class VolumetricRendering : MonoBehaviour
         PreviousFrameMatrix = projectionMatrix;
         PreviousCameraPosition = cam.transform.position;
         ////MATRIX
-        PrevViewProjMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * cam.worldToCameraMatrix;
+        var gpuProj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, true);
+        PrevViewProjMatrix = gpuProj * cam.worldToCameraMatrix;
+//
+  //      Debug.Log(PrevViewProjMatrix);
                   //  PreviousFrameMatrix = cam.transformprojectionMatrix * cam.worldToCameraMatrix;
 
         FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
@@ -618,9 +629,11 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
 
-        BlurCompute.Dispatch(BlurKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+   //     BlurCompute.Dispatch(BlurKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
 
     }
+
+
 
     //Coping the parms from HDRP to get the log encoded depth.
     struct VBufferParameters 
@@ -652,11 +665,11 @@ public class VolumetricRendering : MonoBehaviour
             depthDecodingParams = ComputeLogarithmicDepthDecodingParams(nearDist, farDist, c);
         }
 
-        //internal Vector4 ComputeUvScaleAndLimit(Vector2Int bufferSize)
-        //{
-        //    // The slice count is fixed for now.
-        //    return HDUtils.ComputeUvScaleAndLimit(new Vector2Int(viewportSize.x, viewportSize.y), bufferSize);
-        //}
+        internal Vector4 ComputeUvScaleAndLimit(Vector2Int bufferSize)
+        {
+            // The slice count is fixed for now.
+            return ComputeUvScaleAndLimitFun(new Vector2Int(viewportSize.x, viewportSize.y), bufferSize);
+        }
 
         internal float ComputeLastSliceDistance(int sliceCount)
         {
@@ -700,6 +713,21 @@ public class VolumetricRendering : MonoBehaviour
         }
     }
 
+    internal static Vector4 ComputeUvScaleAndLimitFun(Vector2Int viewportResolution, Vector2Int bufferSize)
+    {
+        Vector2 rcpBufferSize = new Vector2(1.0f / bufferSize.x, 1.0f / bufferSize.y);
+
+        // vp_scale = vp_dim / tex_dim.
+        Vector2 uvScale = new Vector2(viewportResolution.x * rcpBufferSize.x,
+                                      viewportResolution.y * rcpBufferSize.y);
+
+        // clamp to (vp_dim - 0.5) / tex_dim.
+        Vector2 uvLimit = new Vector2((viewportResolution.x - 0.5f) * rcpBufferSize.x,
+                                      (viewportResolution.y - 0.5f) * rcpBufferSize.y);
+
+        return new Vector4(uvScale.x, uvScale.y, uvLimit.x, uvLimit.y);
+    }
+
     private void OnEnable()
     {
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
@@ -717,17 +745,20 @@ public class VolumetricRendering : MonoBehaviour
         ReleaseAssets();
     }
 
+
     Matrix4x4 ComputePixelCoordToWorldSpaceViewDirectionMatrix(Camera cam, Vector4 resolution)
     {
-        var proj = cam.projectionMatrix; //  GL.GetGPUProjectionMatrix(cameraProj, true); //Use this if we run into platform issues
-        var view = cam.worldToCameraMatrix;
+        //   var proj = cam.projectionMatrix; //  GL.GetGPUProjectionMatrix(cameraProj, true); //Use this if we run into platform issues
+        //bandaid fix. There's an issue with the far clip plane in the matrix projection. 
+        var proj = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, cam.nearClipPlane, 100000f); 
+        var view = cam.worldToCameraMatrix ;
 
         var invViewProjMatrix = (proj * view).inverse;
 
         var transform = Matrix4x4.Scale(new Vector3(-1.0f, -1.0f, -1.0f)) * invViewProjMatrix; // (gpuProj * gpuView).inverse
      //   transform = transform * Matrix4x4.Scale(new Vector3(1.0f, -1.0f, 1.0f));
         transform = transform * Matrix4x4.Translate(new Vector3(-1.0f, -1.0f, 0.0f));
-        transform = transform * Matrix4x4.Scale(new Vector3(2.0f * resolution.z, 2.0f * resolution.w, 1.0f));
+        transform = transform * Matrix4x4.Scale(new Vector3(2.0f * resolution.z, 2.0f * resolution.w, 1.0f)) ;
 
         return transform.transpose;
     }
