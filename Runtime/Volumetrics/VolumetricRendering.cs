@@ -101,7 +101,7 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture FroxelBufferB;   //for history reprojection
 
     RenderTexture IntegrationBuffer;    //Integration and stereo reprojection
-    RenderTexture IntegrationBufferB;    //Integration and stereo reprojection
+  //  RenderTexture IntegrationBufferB;    //Integration and stereo reprojection
     RenderTexture BlurBuffer;    //blur
     RenderTexture BlurBufferB;    //blur
 
@@ -324,10 +324,10 @@ public class VolumetricRendering : MonoBehaviour
         IntegrationBuffer.enableRandomWrite = true;
         IntegrationBuffer.Create();
 
-        IntegrationBufferB = new RenderTexture(rtdiscrpt);
-        IntegrationBufferB.format = RenderTextureFormat.ARGB32;
-        IntegrationBufferB.enableRandomWrite = true;
-        IntegrationBufferB.Create();
+        //IntegrationBufferB = new RenderTexture(rtdiscrpt);
+        //IntegrationBufferB.format = RenderTextureFormat.ARGB32;
+        //IntegrationBufferB.enableRandomWrite = true;
+        //IntegrationBufferB.Create();
 
         BlurBuffer = new RenderTexture(rtdiscrpt);
         BlurBuffer.format = RenderTextureFormat.ARGB32;
