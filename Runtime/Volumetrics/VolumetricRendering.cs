@@ -101,7 +101,9 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture FroxelBufferB;   //for history reprojection
 
     RenderTexture IntegrationBuffer;    //Integration and stereo reprojection
+    RenderTexture IntegrationBufferB;    //Integration and stereo reprojection
     RenderTexture BlurBuffer;    //blur
+    RenderTexture BlurBufferB;    //blur
 
 
     // This is a sequence of 7 equidistant numbers from 1/14 to 13/14.
@@ -118,6 +120,45 @@ public class VolumetricRendering : MonoBehaviour
     // | x | x | x | x | x | x | o |
     // | x | x | x | x | x | x | x |
     float[] m_zSeq = { 7.0f / 14.0f, 3.0f / 14.0f, 11.0f / 14.0f, 5.0f / 14.0f, 9.0f / 14.0f, 1.0f / 14.0f, 13.0f / 14.0f };
+
+
+    // Ref: https://en.wikipedia.org/wiki/Close-packing_of_equal_spheres
+    // The returned {x, y} coordinates (and all spheres) are all within the (-0.5, 0.5)^2 range.
+    // The pattern has been rotated by 15 degrees to maximize the resolution along X and Y:
+    // https://www.desmos.com/calculator/kcpfvltz7c
+    static void GetHexagonalClosePackedSpheres7(Vector2[] coords)
+    {
+
+        float r = 0.17054068870105443882f;
+        float d = 2 * r;
+        float s = r * Mathf.Sqrt(3);
+
+        // Try to keep the weighted average as close to the center (0.5) as possible.
+        //  (7)(5)    ( )( )    ( )( )    ( )( )    ( )( )    ( )(o)    ( )(x)    (o)(x)    (x)(x)
+        // (2)(1)(3) ( )(o)( ) (o)(x)( ) (x)(x)(o) (x)(x)(x) (x)(x)(x) (x)(x)(x) (x)(x)(x) (x)(x)(x)
+        //  (4)(6)    ( )( )    ( )( )    ( )( )    (o)( )    (x)( )    (x)(o)    (x)(x)    (x)(x)
+        coords[0] = new Vector2(0, 0);
+        coords[1] = new Vector2(-d, 0);
+        coords[2] = new Vector2(d, 0);
+        coords[3] = new Vector2(-r, -s);
+        coords[4] = new Vector2(r, s);
+        coords[5] = new Vector2(r, -s);
+        coords[6] = new Vector2(-r, s);
+
+        // Rotate the sampling pattern by 15 degrees.
+        const float cos15 = 0.96592582628906828675f;
+        const float sin15 = 0.25881904510252076235f;
+
+        for (int i = 0; i < 7; i++)
+        {
+            Vector2 coord = coords[i];
+
+            coords[i].x = coord.x * cos15 - coord.y * sin15;
+            coords[i].y = coord.x * sin15 + coord.y * cos15;
+        }
+    }
+
+    Vector2[] m_xySeq = new Vector2[7];
 
 
 
@@ -151,7 +192,8 @@ public class VolumetricRendering : MonoBehaviour
 
     protected int ScatteringKernel = 0;
     protected int IntegrateKernel = 0;
-    protected int BlurKernel = 0;
+    protected int BlurKernelX = 0;
+    protected int BlurKernelY = 0;
 
     Matrix4x4 matScaleBias;
     Vector3 ThreadsToDispatch;
@@ -282,10 +324,20 @@ public class VolumetricRendering : MonoBehaviour
         IntegrationBuffer.enableRandomWrite = true;
         IntegrationBuffer.Create();
 
+        IntegrationBufferB = new RenderTexture(rtdiscrpt);
+        IntegrationBufferB.format = RenderTextureFormat.ARGB32;
+        IntegrationBufferB.enableRandomWrite = true;
+        IntegrationBufferB.Create();
+
         BlurBuffer = new RenderTexture(rtdiscrpt);
         BlurBuffer.format = RenderTextureFormat.ARGB32;
         BlurBuffer.enableRandomWrite = true;
         BlurBuffer.Create();
+
+        BlurBufferB = new RenderTexture(rtdiscrpt);
+        BlurBufferB.format = RenderTextureFormat.ARGB32;
+        BlurBufferB.enableRandomWrite = true;
+        BlurBufferB.Create();
 
 
         LightObjects = new List<LightObject>();
@@ -295,9 +347,12 @@ public class VolumetricRendering : MonoBehaviour
 
         ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
 
-        BlurKernel = BlurCompute.FindKernel("VolBlur");
-        BlurCompute.SetTexture(BlurKernel, "InTex", IntegrationBuffer);
-        BlurCompute.SetTexture(BlurKernel, "Result", BlurBuffer);
+        BlurKernelX = BlurCompute.FindKernel("VolBlurX");
+        BlurKernelY = BlurCompute.FindKernel("VolBlurY");
+        BlurCompute.SetTexture(BlurKernelX, "InTex", IntegrationBuffer);
+        BlurCompute.SetTexture(BlurKernelX, "Result", BlurBuffer);
+        BlurCompute.SetTexture(BlurKernelY, "InTex",  BlurBuffer);
+        BlurCompute.SetTexture(BlurKernelY, "Result", BlurBufferB);
 
 
         //First Compute pass setup
@@ -331,14 +386,17 @@ public class VolumetricRendering : MonoBehaviour
 
         //Global Variable setup
 
-        Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
-    //    Shader.SetGlobalTexture("_VolumetricResult", BlurBuffer); //HARDCODING blur for now
+    //    Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
+        Shader.SetGlobalTexture("_VolumetricResult", BlurBufferB); //HARDCODING blur for now
 
         ThreadsToDispatch = new Vector3(
              Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f),
              Mathf.CeilToInt(volumetricData.FroxelHeightResolution / 4.0f),
              Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f)
             );
+
+    //    ComputZPlaneTexelSpacing(1.0f, vFoV, parameters.resolution.y);
+
 
         Shader.SetGlobalVector("_VolumePlaneSettings", new Vector4(volumetricData.near, volumetricData.far, volumetricData.far - volumetricData.near, volumetricData.near * volumetricData.far));
 
@@ -527,12 +585,28 @@ public class VolumetricRendering : MonoBehaviour
             FroxelFogCompute.SetTexture(ScatteringKernel, "PreviousFrameLighting", FroxelBufferA);
             FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferB);
             FroxelIntegrationCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferB);
-        }else
+
+  //          FroxelIntegrationCompute.SetTexture(IntegrateKernel, "HistoryBuffer", IntegrationBuffer);
+   //         FroxelIntegrationCompute.SetTexture(IntegrateKernel, "Result", IntegrationBufferB);
+
+    //        Shader.SetGlobalTexture("_VolumetricResult", IntegrationBufferB);
+
+        }
+        else
         {
             FroxelFogCompute.SetTexture(ScatteringKernel, "PreviousFrameLighting", FroxelBufferB);
             FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferA);
             FroxelIntegrationCompute.SetTexture(IntegrateKernel, "InLightingTexture", FroxelBufferA);
+
+    //        FroxelIntegrationCompute.SetTexture(IntegrateKernel, "HistoryBuffer", IntegrationBufferB);
+   //         FroxelIntegrationCompute.SetTexture(IntegrateKernel, "Result", IntegrationBuffer);
+
+   //         Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
+
         }
+
+        FroxelIntegrationCompute.SetTexture(IntegrateKernel, "HistoryBuffer", IntegrationBuffer);
+        FroxelIntegrationCompute.SetTexture(IntegrateKernel, "Result", IntegrationBuffer);
     }
 
     Matrix4x4 PrevViewProjMatrix = Matrix4x4.identity;
@@ -590,11 +664,15 @@ public class VolumetricRendering : MonoBehaviour
 
         Matrix4x4 PixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(cam, vres);
 
+        GetHexagonalClosePackedSpheres7(m_xySeq);
+        int sampleIndex = Time.renderedFrameCount % 7;
+
         Shader.SetGlobalVector("_VBufferDistanceEncodingParams", vbuff.depthEncodingParams);
         Shader.SetGlobalVector("_VBufferDistanceDecodingParams", vbuff.depthDecodingParams);
         Shader.SetGlobalMatrix("_VBufferCoordToViewDirWS", PixelCoordToViewDirWS);
 
         Shader.SetGlobalMatrix("_PrevViewProjMatrix", PrevViewProjMatrix);
+        Shader.SetGlobalMatrix("_ViewMatrix", cam.worldToCameraMatrix);
 
 
         FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
@@ -602,7 +680,7 @@ public class VolumetricRendering : MonoBehaviour
         //FroxelFogCompute.SetMatrix("LightProjectionMatrix", lightMatrix);
         //FroxelFogCompute.SetVector("LightPosition", LightPosition.transform.position);
         //FroxelFogCompute.SetVector("LightColor", LightPosition.color * LightPosition.intensity);
-        Shader.SetGlobalFloat("SeqOffset", m_zSeq[ Time.renderedFrameCount % 7] ); //Loop through jitters. 
+        Shader.SetGlobalVector("SeqOffset", new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex] ) ); //Loop through jitters. 
         FroxelFogCompute.SetFloat("reprojectionAmount", reprojectionAmount );
 
         //jitters[tempjitter]
@@ -629,7 +707,8 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
 
-   //     BlurCompute.Dispatch(BlurKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+        BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+        BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
 
     }
 
@@ -726,6 +805,12 @@ public class VolumetricRendering : MonoBehaviour
                                       (viewportResolution.y - 0.5f) * rcpBufferSize.y);
 
         return new Vector4(uvScale.x, uvScale.y, uvLimit.x, uvLimit.y);
+    }
+
+    internal static float ComputZPlaneTexelSpacing(float planeDepth, float verticalFoV, float resolutionY)
+    {
+        float tanHalfVertFoV = Mathf.Tan(0.5f * verticalFoV);
+        return tanHalfVertFoV * (2.0f / resolutionY) * planeDepth;
     }
 
     private void OnEnable()

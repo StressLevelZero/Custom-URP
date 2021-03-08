@@ -79,7 +79,13 @@ half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
     float mipLevel = ((1 -  (_MipFogParameters.z * saturate((depth - nearParam) / (farParam - nearParam)))  ) )  * numMipLevels ;
 
 #endif
+
+//#if defined(REFLECTIONFOG)
     return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
+
+
+
+
     //viewDirectionWS
 }
 
