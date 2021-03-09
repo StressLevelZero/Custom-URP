@@ -1,7 +1,7 @@
 ﻿#pragma kernel VolBlurX VolBlur=VolBlurX 
 #pragma kernel VolBlurY VolBlur=VolBlurY VERTICAL_PASS
 
-#define TapSamples 3
+#define TapSamples 4
 //#define SIGMA_FILTER 1
 
 
@@ -11,7 +11,7 @@ Texture3D<float4> InTex;
 //static float KernelLUT[3] = {0.38774, 0.24477, 0.06136};
 
 //Gaussian dispubution baked as a LUT. SIGMA = 2 http://dev.theomader.com/gaussian-kernel-calculator/
-static float KernelLUT[4] = { 0.214607, 0.189879, 0.131514, 0.071303 };
+static float KernelLUT[5] = { 0.20236, 0.179044, 0.124009, 0.067234, 0.028532 };
 
 //float Gaussian(float radius, float sigma)
 //{

@@ -65,6 +65,7 @@ shared float _ClipmapScale2;
 
 shared float3 SeqOffset; //z offseter
 float reprojectionAmount;
+float _VBufferUnitDepthTexelSpacing;
 shared float _StaticLightMultiplier;
 
 // Returns the forward (central) direction of the current view in the world space.
@@ -239,7 +240,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float3 centerDirWS = rayDirWS; // //jittered ray
 
 	float FdotD = dot(F, centerDirWS);
-	float _VBufferUnitDepthTexelSpacing = .01; //TODO: make this smart
+	//float _VBufferUnitDepthTexelSpacing = .01; //TODO: make this smart
 	float unitDistFaceSize = _VBufferUnitDepthTexelSpacing * FdotD * rcpLenRayDir;
 
 	float3 xDirDerivWS = rightDirWS * (rcpLenRightDir * unitDistFaceSize); // Normalize & rescale
@@ -250,6 +251,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	//TODO: add the left right jitter too. Helps smooth out rough edges.
 	float3 centerWS =  CameraPosition.xyz + ( t * jitterDirWS); //Cast ray along direction and add cam pos to get WS pos
+	float3 centWSNJIT = CameraPosition.xyz + t * centerDirWS ; //non-jittered version for reprojection
 
 	float4 accumLighting = float4(0,0,0,0);
 	//	
@@ -288,7 +290,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//ls.xyz = ls.xyz / ls.w;
 
 	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
-	float3 ws_repro = WS_coordinate.xyz ;
+	float3 ws_repro = centWSNJIT.xyz ;
 
 	float2	positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, _PrevViewProjMatrix);
 	float	vdistance = distance(ws_repro, prevPos);

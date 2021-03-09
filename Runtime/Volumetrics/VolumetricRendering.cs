@@ -360,6 +360,7 @@ public class VolumetricRendering : MonoBehaviour
         SetupClipmap();
 
         FroxelFogCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
+        FroxelFogCompute.SetFloat("_VBufferUnitDepthTexelSpacing", ComputZPlaneTexelSpacing(1, cam.fieldOfView, volumetricData.FroxelHeightResolution) );
         UpdateClipmap(Clipmap.Near);
         UpdateClipmap(Clipmap.Far);
         FroxelFogCompute.SetTexture(ScatteringKernel, ClipmapTextureID, ClipmapBufferA);
@@ -792,6 +793,12 @@ public class VolumetricRendering : MonoBehaviour
         }
     }
 
+    internal static float ComputZPlaneTexelSpacing(float planeDepth, float verticalFoV, float resolutionY)
+    {
+        float tanHalfVertFoV = Mathf.Tan(0.5f * verticalFoV);
+        return tanHalfVertFoV * (2.0f / resolutionY) * planeDepth;
+    }
+
     internal static Vector4 ComputeUvScaleAndLimitFun(Vector2Int viewportResolution, Vector2Int bufferSize)
     {
         Vector2 rcpBufferSize = new Vector2(1.0f / bufferSize.x, 1.0f / bufferSize.y);
@@ -807,11 +814,7 @@ public class VolumetricRendering : MonoBehaviour
         return new Vector4(uvScale.x, uvScale.y, uvLimit.x, uvLimit.y);
     }
 
-    internal static float ComputZPlaneTexelSpacing(float planeDepth, float verticalFoV, float resolutionY)
-    {
-        float tanHalfVertFoV = Mathf.Tan(0.5f * verticalFoV);
-        return tanHalfVertFoV * (2.0f / resolutionY) * planeDepth;
-    }
+
 
     private void OnEnable()
     {
