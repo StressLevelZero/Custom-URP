@@ -12,6 +12,7 @@ namespace UnityEngine.Rendering.Universal
         static readonly int m_GlobalExtinction = Shader.PropertyToID("_GlobalExtinction");
         static readonly int m_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
         static readonly int m_VolumetricAlbedo = Shader.PropertyToID("_GlobalScattering");
+        static readonly int m_SkyTexture = Shader.PropertyToID("_SkyTexture");
         [Header("Fog Mipmap controls")]
         [Tooltip("How close the mipfog starts")]
         public MinFloatParameter mipFogNear = new MinFloatParameter( 0.0f , 0 );
@@ -19,6 +20,8 @@ namespace UnityEngine.Rendering.Universal
         public MinFloatParameter mipFogFar = new MinFloatParameter( 1, 1 );
         [Tooltip("Max mip level.")]
         public ClampedFloatParameter mipFogMaxMip = new ClampedFloatParameter(1.0f, 0.0f, 1);
+        public CubemapParameter SkyTexture = new CubemapParameter( null );
+
 
         [Space, Header("Voulmetric Controls")]
         [Tooltip("Controls the global fog Density.")]
@@ -28,7 +31,6 @@ namespace UnityEngine.Rendering.Universal
         [Tooltip("Controls the global fog Density."),HideInInspector]
         public ClampedFloatParameter MaxRenderDistance = new ClampedFloatParameter(50, 1f, 3000f); //Disabled until hooked up
         public ColorParameter VolumetricAlbedo = new ColorParameter(Color.white,false);
-
         //       public bool IsActive() => intensity.value > 0f && (type.value != FilmGrainLookup.Custom || texture.value != null);
 
         //       public bool IsTileCompatible() => true;
@@ -52,8 +54,18 @@ namespace UnityEngine.Rendering.Universal
             Shader.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value) ); //ExtinctionFromMeanFreePath
             Shader.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
             Shader.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
+            Shader.SetGlobalTexture(m_SkyTexture, SkyTexture.value);
+            Shader.SetGlobalInt("_SkyMipCount", SkyTexture.value.mipmapCount);
         }
+
+        private void OnValidate()
+        {
+            PushFogShaderParameters();
+        }
+
     }
+
+    
 
     //[Serializable]
     //public sealed class VolumetricLookupParameter : VolumeParameter<FilmGrainLookup> { public VolumetricLookupParameter(FilmGrainLookup value, bool overrideState = false) : base(value, overrideState) { } }

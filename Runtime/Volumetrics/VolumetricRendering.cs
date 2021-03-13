@@ -55,6 +55,7 @@ public class VolumetricRendering : MonoBehaviour
     public VolumetricData volumetricData;
     [Range(0,1)]
     public float reprojectionAmount = 0.5f;
+    //public Texture skytex;
     //[Header("Volumetric camera settings")]
     //[Tooltip("Near Clip plane")]
     //public float near = 1;
@@ -232,6 +233,7 @@ public class VolumetricRendering : MonoBehaviour
 
     //General fog settings
    // [HideInInspector]
+    [Header("Base values that are overridden by Volumes")]
     public Color albedo = Color.white;
 //    public Color extinctionTint = Color.white;
     public float meanFreePath = 15.0f;
@@ -261,6 +263,20 @@ public class VolumetricRendering : MonoBehaviour
         Debug.Log("Made blank cookie sheet");
     }
 
+    //void dedbugRTC()
+    //{
+    //    RenderTexture.active = (RenderTexture)skytex;
+    //    GL.Clear(true, true, Color.yellow);
+    //    RenderTexture.active = null;
+
+    //}
+    //void SetSkyTexture(Texture cubemap)
+    //{
+    //  //  cam.RenderToCubemap((Cubemap)cubemap);
+    // //   dedbugRTC();
+    //    Shader.SetGlobalTexture("_SkyTexture", cubemap);
+    //}
+
     bool VerifyVolumetricRegisters()
     {
         //Add realtime light check here too
@@ -289,6 +305,8 @@ public class VolumetricRendering : MonoBehaviour
         CheckOverrideVolumes();
         if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
         CheckCookieList();
+
+     //   SetSkyTexture( skytex);
 
         //Making prescaled matrix 
         matScaleBias = Matrix4x4.identity;

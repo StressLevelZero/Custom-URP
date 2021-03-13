@@ -222,7 +222,7 @@ half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real f
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
     real fogIntensity = ComputeFogIntensity(fogFactor);
-    real3 mipFog = MipFog(viewDirectionWS, fogFactor, UNITY_SPECCUBE_LOD_STEPS );
+    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
     fragColor = lerp(mipFog, fragColor, fogIntensity);
 
 #endif

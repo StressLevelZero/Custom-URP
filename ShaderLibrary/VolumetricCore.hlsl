@@ -4,6 +4,10 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
+TEXTURECUBE(_SkyTexture);
+SAMPLER(sampler_SkyTexture);
+int _SkyMipCount;
+
 float4x4 TransposedCameraProjectionMatrix;
 float4x4 CameraProjectionMatrix;
 float4 _VolumePlaneSettings;
@@ -74,14 +78,16 @@ half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
     float farParam = _MipFogParameters.y;
 
 #if defined(FOG_LINEAR)
-    float mipLevel = ((depth )) * numMipLevels;
+    float mipLevel = ((depth )) * _SkyMipCount;
 #else
-    float mipLevel = ((1 -  (_MipFogParameters.z * saturate((depth - nearParam) / (farParam - nearParam)))  ) )  * numMipLevels ;
+    float mipLevel = ((1 -  (_MipFogParameters.z * saturate((depth - nearParam) / (farParam - nearParam)))  ) )  * _SkyMipCount;
 
 #endif
 
 //#if defined(REFLECTIONFOG)
-    return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
+  //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
+  //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(_SkyTexture, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
+    return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_SkyTexture, viewDirectionWS, mipLevel));
 
 
 

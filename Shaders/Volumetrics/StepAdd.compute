@@ -36,28 +36,6 @@ shared float4 _ZBufferParams;
 shared float4 _VBufferDistanceEncodingParams;
 shared float4 _VBufferDistanceDecodingParams;
 
-float ComputeHistoryWeight()
-{
-	// Compute the exponential moving average over 'n' frames:
-	// X = (1 - a) * ValueAtFrame[n] + a * AverageOverPreviousFrames.
-	// We want each sample to be uniformly weighted by (1 / n):
-	// X = (1 / n) * Sum{i from 1 to n}{ValueAtFrame[i]}.
-	// Therefore, we get:
-	// (1 - a) = (1 / n) => a = (1 - 1 / n) = (n - 1) / n,
-	// X = (1 / n) * ValueAtFrame[n] + (1 - 1 / n) * AverageOverPreviousFrames.
-	// Why does it work? We need to make the following assumption:
-	// AverageOverPreviousFrames ≈ AverageOverFrames[n - 1].
-	// AverageOverFrames[n - 1] = (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
-	// This implies that the reprojected (accumulated) value has mostly converged.
-	// X = (1 / n) * ValueAtFrame[n] + ((n - 1) / n) * (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
-	// X = (1 / n) * ValueAtFrame[n] + (1 / n) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
-	// X = Sum{i from 1 to n}{ValueAtFrame[i] / n}.
-	float numFrames = 7;
-	float frameWeight = 1 / numFrames;
-	float historyWeight = 1 - frameWeight;
-
-	return historyWeight;
-}
 
 //float4 StereoOffset() {
 //
@@ -164,7 +142,6 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 	//	float4 normalizedVoxelValue = accumScatteringTransmittance * rcp(travelDis);
 
 		Result[int3(id.x, id.y, depth)] =  accumScatteringTransmittance;
-	//Result[int3(id.x, id.y, depth)] = lerp(accumScatteringTransmittance, previousResult, ComputeHistoryWeight());
 
 		previousDepth = zDepth;
 	}
