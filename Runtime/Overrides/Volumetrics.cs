@@ -55,7 +55,7 @@ namespace UnityEngine.Rendering.Universal
             Shader.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
             Shader.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
             Shader.SetGlobalTexture(m_SkyTexture, SkyTexture.value);
-            Shader.SetGlobalInt("_SkyMipCount", SkyTexture.value.mipmapCount);
+            if (SkyTexture.value != null ) Shader.SetGlobalInt("_SkyMipCount", SkyTexture.value.mipmapCount);
         }
 
         private void OnValidate()
