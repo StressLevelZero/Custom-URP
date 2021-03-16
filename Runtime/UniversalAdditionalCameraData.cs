@@ -408,6 +408,16 @@ namespace UnityEngine.Rendering.Universal
             set => m_Dithering = value;
         }
 
+        public void Awake()
+        {
+            if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom)
+            {
+                Shader.SetGlobalVector("_MipFogParameters", new Vector4(0, 1000f, 0.7f, 0.0f));
+                Shader.SetGlobalTexture("_SkyTexture", RenderSettings.customReflection);
+                Shader.SetGlobalInt("_SkyMipCount", RenderSettings.customReflection.mipmapCount);
+            }
+        }
+
         public void OnBeforeSerialize()
         {
         }
