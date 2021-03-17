@@ -320,11 +320,11 @@ public class VolumetricRendering : MonoBehaviour
         //Create 3D Render Texture 1
         RenderTextureDescriptor rtdiscrpt = new RenderTextureDescriptor();
         rtdiscrpt.enableRandomWrite = true;
-        rtdiscrpt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
+        rtdiscrpt.dimension = TextureDimension.Tex3D;
         rtdiscrpt.width = volumetricData.FroxelWidthResolution;
         rtdiscrpt.height = volumetricData.FroxelHeightResolution;
         rtdiscrpt.volumeDepth = volumetricData.FroxelDepthResolution;
-        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+        rtdiscrpt.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
         rtdiscrpt.msaaSamples = 1;
 
         FroxelBufferA = new RenderTexture(rtdiscrpt);
@@ -338,7 +338,8 @@ public class VolumetricRendering : MonoBehaviour
 
         rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
         IntegrationBuffer = new RenderTexture(rtdiscrpt);
-        IntegrationBuffer.format = RenderTextureFormat.ARGB32;
+      //  IntegrationBuffer.format = RenderTextureFormat.ARGB32;
+        IntegrationBuffer.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
         IntegrationBuffer.enableRandomWrite = true;
         IntegrationBuffer.Create();
 
@@ -348,12 +349,12 @@ public class VolumetricRendering : MonoBehaviour
         //IntegrationBufferB.Create();
 
         BlurBuffer = new RenderTexture(rtdiscrpt);
-        BlurBuffer.format = RenderTextureFormat.ARGB32;
+        BlurBuffer.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
         BlurBuffer.enableRandomWrite = true;
         BlurBuffer.Create();
 
         BlurBufferB = new RenderTexture(rtdiscrpt);
-        BlurBufferB.format = RenderTextureFormat.ARGB32;
+        BlurBufferB.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
         BlurBufferB.enableRandomWrite = true;
         BlurBufferB.Create();
 
