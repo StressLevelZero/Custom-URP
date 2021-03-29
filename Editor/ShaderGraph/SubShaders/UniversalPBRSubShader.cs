@@ -94,7 +94,8 @@ namespace UnityEditor.Rendering.Universal
                 s_AdditionalLightShadowsKeyword,
                 s_ShadowsSoftKeyword,
                 s_MixedLightingSubtractiveKeyword,
-            },
+                s_VolumetricsKeyword,
+            }, 
         };
 
         ShaderPass m_DepthOnlyPass = new ShaderPass()
@@ -385,7 +386,16 @@ namespace UnityEditor.Rendering.Universal
             definition = KeywordDefinition.ShaderFeature,
             scope = KeywordScope.Global,
         };
-#endregion
+
+        static KeywordDescriptor s_VolumetricsKeyword = new KeywordDescriptor()
+        {
+            displayName = "Volumetrics",
+            referenceName = "_VOLUMETRICS_ENABLED",
+            type = KeywordType.Boolean,
+            definition = KeywordDefinition.MultiCompile,
+            scope = KeywordScope.Global,
+        };
+        #endregion
 
         public int GetPreviewPassIndex() { return 0; }
 

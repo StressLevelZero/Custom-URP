@@ -37,7 +37,7 @@ public class VolumetricBaking : EditorWindow
 
         EditorGUILayout.LabelField(BakingStatus);
         WarningGUI();
-        if (saveWarning) if (GUILayout.Button("Save scene")) SaveScene();
+        if (saveWarning) if (GUILayout.Button("Save scene(s)")) SaveScenes();
 
         //      EditorGUILayout.HelpBox("Some warning text", MessageType.Warning); //Todo: add warning box to window
     }
@@ -105,25 +105,47 @@ public class VolumetricBaking : EditorWindow
 
     bool VerifySettings()
     {
-        if (SceneManager.sceneCount > 1)
-        {
-            UpdateWarning( "More than one scene open. Did not bake volumetrics.");
-        }
 
-        if (VolumetricRegisters.volumetricAreas.Count < 1)
+
+        if (VolumetricRegisters.volumetricAreas.Count < 1) //Checking volumes
         {
             UpdateWarning("No volumetric areas in the scene. Nothing to bake.");
             return false;
         }
 
-        if (UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().isDirty)
+        if (AreScenesDirty() == true) //Checking if scenes are dirty then ask to save
         {
-            UpdateWarning( "Save your scene before baking.");
-            saveWarning = true;
-            return false;
+           bool notCancelled = UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+            if (notCancelled)
+            {
+                if (AreScenesDirty()) //checking AGAIN because only sets to false when cancelled
+                {
+                    UpdateWarning("Save your scene before baking."); //This is not techincally required, but it helps save progress incase of crash
+                    saveWarning = true;
+                    return false;
+                }
+            }
+            
+            else
+            {
+                return false; //cancelled
+            }
         }
 
-        else return true;
+        if (SceneManager.sceneCount > 1) //Checking scene count
+        {
+            UpdateWarning("More than one scene open. Saving to active scene.");
+        }
+
+        return true; //everything checks out
+    }
+    bool AreScenesDirty()
+    {
+        for (int i = 0; i < SceneManager.sceneCount; i++)
+        {
+            if (SceneManager.GetSceneAt(i).isDirty) return true;
+        }
+        return false;
     }
 
     void SaveScene()
@@ -134,11 +156,26 @@ public class VolumetricBaking : EditorWindow
         ClearWarning();
     }
 
+    void SaveScenes()
+    {
+
+        for (int i = 0; i < SceneManager.sceneCount; i++)
+        {
+            Scene currentS = SceneManager.GetSceneAt(i);
+            if (currentS.isDirty)
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(currentS);
+                Debug.Log("Saved " + currentS.name);
+            }
+        }
+        ClearWarning();
+    }
+
 
    // public int tex1Res = 64;
    //  ComputeShader BakingShader; // Baking shader
-                                 // ComputeShader slicer; //Slicer shader for saving
-                                 //public Light[] BakeLights;
+   // ComputeShader slicer; //Slicer shader for saving
+   //public Light[] BakeLights;
 
     //  public Vector3 DirectionalLight = new Vector3(0,1,0);
 
@@ -333,7 +370,6 @@ public class VolumetricBaking : EditorWindow
             MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
             propertyBlock.SetTexture("_3dTexture", VolumetricRegisters.volumetricAreas[j].bakedTexture);
             //    VolumetricRegisters.volumetricAreas[j].DebugCube.SetPropertyBlock(propertyBlock);
-
             Repaint();
 
         }
@@ -416,6 +452,9 @@ public class VolumetricBaking : EditorWindow
             RT3d.Release();
 
             VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
+         //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
+
         }
 
         Running = false;
@@ -427,7 +466,7 @@ public class VolumetricBaking : EditorWindow
             (endTime.Second - startTime.Second) + " Seconds. Baked " + VolumetricRegisters.volumetricAreas.Count + " areas."
             );
 
-        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+     //   UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
     }
 

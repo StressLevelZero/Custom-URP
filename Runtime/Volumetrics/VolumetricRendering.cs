@@ -461,7 +461,7 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.enableRandomWrite = true;
         ClipRTdiscrpt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
         ClipRTdiscrpt.width = volumetricData.ClipMapResolution;
-        ClipRTdiscrpt.height = volumetricData.ClipMapResolution;
+        ClipRTdiscrpt.height = volumetricData.ClipMapResolution;    
         ClipRTdiscrpt.volumeDepth = volumetricData.ClipMapResolution;
         ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
         ClipRTdiscrpt.msaaSamples = 1;
