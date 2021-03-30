@@ -410,7 +410,7 @@ namespace UnityEngine.Rendering.Universal
 
         public void Awake()
         {
-            if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom)
+            if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom && RenderSettings.customReflection != null)
             {
                 Shader.SetGlobalVector("_MipFogParameters", new Vector4(0, 1000f, 0.7f, 0.0f));
                 Shader.SetGlobalTexture("_SkyTexture", RenderSettings.customReflection);
