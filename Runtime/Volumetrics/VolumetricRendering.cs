@@ -280,7 +280,7 @@ public class VolumetricRendering : MonoBehaviour
     bool VerifyVolumetricRegisters()
     {
         //Add realtime light check here too
-        if (FindObjectOfType<BakedVolumetricArea>() != null) //brute force check
+        if (VolumetricRegisters.volumetricAreas.Count > 0) //brute force check
                                                              //  if (VolumetricRegisters.volumetricAreas.Count > 0)
         {
             Debug.Log(VolumetricRegisters.volumetricAreas.Count + " Volumes ready to render");
@@ -303,7 +303,7 @@ public class VolumetricRendering : MonoBehaviour
     void Intialize()
     {
         CheckOverrideVolumes();
-        if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
+     //   if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
         CheckCookieList();
 
      //   SetSkyTexture( skytex);

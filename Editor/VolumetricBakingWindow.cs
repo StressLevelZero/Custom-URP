@@ -18,7 +18,7 @@ public class VolumetricBaking : EditorWindow
         //   BuildSelectionGrid();
     }
     //TODO: Save to scene asset file 
-    public float AreaLightSamples = 8;
+    public float AreaLightSamples = 1; 
     bool saveWarning = false;
     bool Running = false;
     private void OnGUI()
