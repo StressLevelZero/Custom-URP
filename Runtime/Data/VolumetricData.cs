@@ -27,6 +27,7 @@ public class VolumetricData : ScriptableObject
     public int ClipMapResolution = 128;
     [Tooltip("Size of inner clipmap in units. Outter clipmap is 5x the size")]
     public float ClipmapScale = 80;
+    public float ClipmapScale2 = 160;
     [Tooltip("Distance (m) from previous sampling point to trigger resampling clipmap")]
     public float ClipmapResampleThreshold = 1;
 

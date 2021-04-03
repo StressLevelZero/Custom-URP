@@ -47,14 +47,21 @@ class VolumeRenderingUtils //Importing some functions from HDRP to have simular 
 public class VolumetricRendering : MonoBehaviour
 {
 
-#region variables
+    #region variables
     public float tempOffset = 0;
     Texture3D BlackTex; //Temp texture for 
 
     public Camera cam; //Main camera to base settings on
     public VolumetricData volumetricData;
-    [Range(0,1)]
+    [Range(0, 1)]
     public float reprojectionAmount = 0.5f;
+    //   [Tooltip("Does a final blur pass on the rendered fog")]
+    //    public bool FroxelBlur = false;
+
+    public enum BlurType {None, Gaussian};
+    public BlurType FroxelBlur = BlurType.None;
+
+
     //public Texture skytex;
     //[Header("Volumetric camera settings")]
     //[Tooltip("Near Clip plane")]
@@ -102,7 +109,7 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture FroxelBufferB;   //for history reprojection
 
     RenderTexture IntegrationBuffer;    //Integration and stereo reprojection
-  //  RenderTexture IntegrationBufferB;    //Integration and stereo reprojection
+                                        //  RenderTexture IntegrationBufferB;    //Integration and stereo reprojection
     RenderTexture BlurBuffer;    //blur
     RenderTexture BlurBufferB;    //blur
 
@@ -232,14 +239,14 @@ public class VolumetricRendering : MonoBehaviour
     Quaternion previousQuat;
 
     //General fog settings
-   // [HideInInspector]
+    // [HideInInspector]
     [Header("Base values that are overridden by Volumes")]
     public Color albedo = Color.white;
-//    public Color extinctionTint = Color.white;
+    //    public Color extinctionTint = Color.white;
     public float meanFreePath = 15.0f;
     public float StaticLightMultiplier = 1.0f;
 
-#endregion
+    #endregion
 
     private void Awake()
     {
@@ -281,7 +288,7 @@ public class VolumetricRendering : MonoBehaviour
     {
         //Add realtime light check here too
         if (VolumetricRegisters.volumetricAreas.Count > 0) //brute force check
-                                                             //  if (VolumetricRegisters.volumetricAreas.Count > 0)
+                                                           //  if (VolumetricRegisters.volumetricAreas.Count > 0)
         {
             Debug.Log(VolumetricRegisters.volumetricAreas.Count + " Volumes ready to render");
             return true;
@@ -298,6 +305,26 @@ public class VolumetricRendering : MonoBehaviour
         var Volumetrics = stack.GetComponent<Volumetrics>();
         if (Volumetrics != null)
             Volumetrics.PushFogShaderParameters();
+    }
+
+    void IntializeBlur(RenderTextureDescriptor rtdiscrpt)
+    {
+        BlurBuffer = new RenderTexture(rtdiscrpt);
+        BlurBuffer.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
+        BlurBuffer.enableRandomWrite = true;
+        BlurBuffer.Create();
+
+        BlurBufferB = new RenderTexture(rtdiscrpt);
+        BlurBufferB.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
+        BlurBufferB.enableRandomWrite = true;
+        BlurBufferB.Create();
+
+        BlurKernelX = BlurCompute.FindKernel("VolBlurX");
+        BlurKernelY = BlurCompute.FindKernel("VolBlurY");
+        BlurCompute.SetTexture(BlurKernelX, "InTex", IntegrationBuffer);
+        BlurCompute.SetTexture(BlurKernelX, "Result", BlurBuffer);
+        BlurCompute.SetTexture(BlurKernelY, "InTex", BlurBuffer);
+        BlurCompute.SetTexture(BlurKernelY, "Result", BlurBufferB);
     }
 
     void Intialize()
@@ -348,16 +375,7 @@ public class VolumetricRendering : MonoBehaviour
         //IntegrationBufferB.enableRandomWrite = true;
         //IntegrationBufferB.Create();
 
-        BlurBuffer = new RenderTexture(rtdiscrpt);
-        BlurBuffer.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
-        BlurBuffer.enableRandomWrite = true;
-        BlurBuffer.Create();
-
-        BlurBufferB = new RenderTexture(rtdiscrpt);
-        BlurBufferB.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
-        BlurBufferB.enableRandomWrite = true;
-        BlurBufferB.Create();
-
+        if (FroxelBlur == BlurType.Gaussian) IntializeBlur(rtdiscrpt);
 
         LightObjects = new List<LightObject>();
 
@@ -365,13 +383,6 @@ public class VolumetricRendering : MonoBehaviour
         FroxelFogCompute.SetTexture(ScatteringKernel, "Result", FroxelBufferA);
 
         ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
-
-        BlurKernelX = BlurCompute.FindKernel("VolBlurX");
-        BlurKernelY = BlurCompute.FindKernel("VolBlurY");
-        BlurCompute.SetTexture(BlurKernelX, "InTex", IntegrationBuffer);
-        BlurCompute.SetTexture(BlurKernelX, "Result", BlurBuffer);
-        BlurCompute.SetTexture(BlurKernelY, "InTex",  BlurBuffer);
-        BlurCompute.SetTexture(BlurKernelY, "Result", BlurBufferB);
 
 
         //First Compute pass setup
@@ -406,8 +417,8 @@ public class VolumetricRendering : MonoBehaviour
 
         //Global Variable setup
 
-    //    Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
-        Shader.SetGlobalTexture("_VolumetricResult", BlurBufferB); //HARDCODING blur for now
+     if ((FroxelBlur == BlurType.Gaussian)) Shader.SetGlobalTexture("_VolumetricResult", BlurBufferB);
+     else   Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
 
         ThreadsToDispatch = new Vector3(
              Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f),
@@ -478,6 +489,7 @@ public class VolumetricRendering : MonoBehaviour
 
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapBufferA); //Set clipmap for
         Shader.SetGlobalFloat("_ClipmapScale", volumetricData.ClipmapScale);
+        Shader.SetGlobalFloat("_ClipmapScale2", volumetricData.ClipmapScale2);
     }
     bool ClipFar = false;
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
@@ -506,7 +518,7 @@ public class VolumetricRendering : MonoBehaviour
         int ClearClipmapKernal = ClipmapCompute.FindKernel("ClipMapClear");
         ClipmapTransform = cam.transform.position;
 
-        float farscale = 5;
+        float farscale = volumetricData.ClipmapScale2;
 
         RenderTexture BufferA;
         RenderTexture BufferB;
@@ -525,8 +537,8 @@ public class VolumetricRendering : MonoBehaviour
             BufferA = ClipmapBufferC;
             BufferB = ClipmapBufferD;
 
-            ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale * farscale);
-            ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * farscale * Vector3.one));
+            ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale2);
+            ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale2 * Vector3.one));
 
         }
 
@@ -895,7 +907,7 @@ public class VolumetricRendering : MonoBehaviour
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
 
         Gizmos.color = Color.blue;
-        Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * volumetricData.ClipmapScale * 5);
+        Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * volumetricData.ClipmapScale2);
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
 
 

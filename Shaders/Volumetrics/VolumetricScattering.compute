@@ -189,7 +189,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	Result.GetDimensions(whd.x, whd.y, whd.z);
 
 //	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery  * 0.5); //offsetting  
-	float3 TemporalOffset = float3(0.5, 0.5, 0.5 ); //offsetting  
+//	float3 TemporalOffset = float3(0.5, 0.5, 0.5 ); //offsetting  
 	float4 UVW = float4( (id ) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
 	float e1 = (id.z + 1) / whd.z; // (slice + 1) / sliceCount //Todo: Bake Rcp 
 //	float t1 = DecodeLogarithmicDepthGeneralized(e1, _VBufferDistanceDecodingParams);
@@ -203,7 +203,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
 	// Each of them is the centroid of the interval of length 2/14.
-	float rndVal = frac(perPixelRandomOffset + SeqOffset.z);
+	float rndVal = frac(perPixelRandomOffset  );
 
 
 		/// Invert the assumed perspective projection from the UVW to World Space
@@ -235,6 +235,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 //	float de = 1 / whd.z;
 //	float e1 = (UVW.z + 1) / whd.z; //linearZ
 	//float  t = DecodeLogarithmicDepthGeneralized(e1 - 0.5 * de, _VBufferDistanceDecodingParams);
+	rndVal =  SeqOffset.z ;
 	float  t = DecodeLogarithmicDepthGeneralized(  ( e1 - (rndVal * (1/whd.z))  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
 	
 	float3 centerDirWS = rayDirWS; // //jittered ray
@@ -245,6 +246,8 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	float3 xDirDerivWS = rightDirWS * (rcpLenRightDir * unitDistFaceSize); // Normalize & rescale
 	float3 yDirDerivWS = cross(xDirDerivWS, centerDirWS); // Will have the length of 'unitDistFaceSize' by construction
+
+	SeqOffset.xy = 0;
 
 	float3 jitterDirWS = normalize(centerDirWS + SeqOffset.x * xDirDerivWS
 												+ SeqOffset.y * yDirDerivWS);
@@ -325,7 +328,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)	
 	float3 ClipmapUVW =  (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale *.5) )  ) / _ClipmapScale.xxx;
 	
-	float3 LargeClipmapUVW = (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale * 5 *.5) )  ) / (_ClipmapScale.xxx * 5);
+	float3 LargeClipmapUVW = (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale2 *.5) )  ) / (_ClipmapScale2.xxx);
 
 	//For clipping the clipmap. Isn't needed if the view volume is smaller than the clipmap
 	float Clipped =
