@@ -58,6 +58,7 @@ public class VolumetricRendering : MonoBehaviour
     //   [Tooltip("Does a final blur pass on the rendered fog")]
     //    public bool FroxelBlur = false;
 
+    [HideInInspector]
     public enum BlurType {None, Gaussian};
     public BlurType FroxelBlur = BlurType.None;
 
@@ -739,8 +740,8 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
 
-        BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
-        BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+//        BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+//        BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
 
     }
 
