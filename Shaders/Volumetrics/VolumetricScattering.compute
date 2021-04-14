@@ -64,6 +64,7 @@ shared float _ClipmapScale;
 shared float _ClipmapScale2;
 
 shared float3 SeqOffset; //z offseter
+shared float SeqOffsetPrv; //z offseter
 float reprojectionAmount;
 float _VBufferUnitDepthTexelSpacing;
 shared float _StaticLightMultiplier;
@@ -190,7 +191,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 //	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery  * 0.5); //offsetting  
 //	float3 TemporalOffset = float3(0.5, 0.5, 0.5 ); //offsetting  
-	float4 UVW = float4( (id ) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
+	float4 UVW = float4( (id) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
 	float e1 = (id.z + 1) / whd.z; // (slice + 1) / sliceCount //Todo: Bake Rcp 
 //	float t1 = DecodeLogarithmicDepthGeneralized(e1, _VBufferDistanceDecodingParams);
 
@@ -203,7 +204,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
 	// Each of them is the centroid of the interval of length 2/14.
-	float rndVal = frac(perPixelRandomOffset  );
+	float rndVal = frac(perPixelRandomOffset + SeqOffset.z);
 
 
 		/// Invert the assumed perspective projection from the UVW to World Space
@@ -237,6 +238,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//float  t = DecodeLogarithmicDepthGeneralized(e1 - 0.5 * de, _VBufferDistanceDecodingParams);
 	rndVal =  SeqOffset.z ;
 	float  t = DecodeLogarithmicDepthGeneralized(  ( e1 - (rndVal * (1/whd.z))  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	float  pt = DecodeLogarithmicDepthGeneralized(  ( e1 - (.5 * (1/whd.z))  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
 	
 	float3 centerDirWS = rayDirWS; // //jittered ray
 
@@ -254,7 +256,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	//TODO: add the left right jitter too. Helps smooth out rough edges.
 	float3 centerWS =  CameraPosition.xyz + ( t * jitterDirWS); //Cast ray along direction and add cam pos to get WS pos
-	float3 centWSNJIT = CameraPosition.xyz + t * centerDirWS ; //non-jittered version for reprojection
+	float3 centWSNJIT = CameraPosition.xyz + pt * centerDirWS ; //non-jittered version for reprojection
 
 	float4 accumLighting = float4(0,0,0,0);
 	//	
