@@ -119,7 +119,7 @@ float4 TrilinearInterpolation(float3 UVW) {
 	return (c0 * PixelDifference_1minus.z) + (c1 * PixelDifference.z);
 };
 
-float ComputeHistoryWeight()
+float ComputeHistoryWeight(float frameMulti)
 {
 	// Compute the exponential moving average over 'n' frames:
 	// X = (1 - a) * ValueAtFrame[n] + a * AverageOverPreviousFrames.
@@ -135,7 +135,7 @@ float ComputeHistoryWeight()
 	// X = (1 / n) * ValueAtFrame[n] + ((n - 1) / n) * (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
 	// X = (1 / n) * ValueAtFrame[n] + (1 / n) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
 	// X = Sum{i from 1 to n}{ValueAtFrame[i] / n}.
-	float numFrames = 7;
+	float numFrames = 7 * frameMulti;
 	float frameWeight = 1 / numFrames;
 	float historyWeight = 1 - frameWeight;
 
@@ -354,7 +354,8 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 //	accumLighting.rgb += max((float3(rndVal, frac(rndVal+.2), frac(rndVal+.5)) - 0.5) * 0.03,0);  //dithering
 
 	//Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount); // Temporal sampling ComputeHistoryWeight()
-	Result[id.xyz] = lerp(accumLighting , previousResult, ComputeHistoryWeight()); // Temporal sampling 
+	//Doing a simple curve based on depth so nearer slices take longer to converge. This is to get rid of the near flickering. There is likely something else to fix and this is just a bandaid solution.
+	Result[id.xyz] = lerp(accumLighting , previousResult, ComputeHistoryWeight((1 / (id.z * id.z + .5) + 1)) ); // Temporal sampling 
 	
 }
 
