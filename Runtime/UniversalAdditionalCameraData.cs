@@ -149,6 +149,7 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] Transform m_VolumeTrigger = null;
 
         [SerializeField] bool m_RenderPostProcessing = false;
+        [SerializeField] bool m_RenderVolumetrics = false;
         [SerializeField] AntialiasingMode m_Antialiasing = AntialiasingMode.None;
         [SerializeField] AntialiasingQuality m_AntialiasingQuality = AntialiasingQuality.High;
         [SerializeField] bool m_StopNaN = false;
@@ -366,6 +367,16 @@ namespace UnityEngine.Rendering.Universal
         }
 
         /// <summary>
+        /// Returns true if this camera should render post-processing.
+        /// </summary>
+        public bool RenderVolumetrics
+        {
+            get => m_RenderVolumetrics;
+            set => m_RenderVolumetrics = value;
+        }
+
+
+        /// <summary>
         /// Returns the current anti-aliasing mode used by this camera.
         /// <see cref="AntialiasingMode"/>.
         /// </summary>
@@ -395,6 +406,16 @@ namespace UnityEngine.Rendering.Universal
         {
             get => m_Dithering;
             set => m_Dithering = value;
+        }
+
+        public void Awake()
+        {
+            if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom && RenderSettings.customReflection != null)
+            {
+                Shader.SetGlobalVector("_MipFogParameters", new Vector4(0, 1000f, 0.7f, 0.0f));
+                Shader.SetGlobalTexture("_SkyTexture", RenderSettings.customReflection);
+                Shader.SetGlobalInt("_SkyMipCount", RenderSettings.customReflection.mipmapCount);
+            }
         }
 
         public void OnBeforeSerialize()

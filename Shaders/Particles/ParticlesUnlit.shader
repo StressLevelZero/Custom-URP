@@ -91,6 +91,8 @@ Shader "Universal Render Pipeline/Particles/Unlit"
             #pragma shader_feature _FADING_ON
             #pragma shader_feature _DISTORTION_ON
 
+            #pragma multi_compile _ _VOLUMETRICS_ENABLED
+
             // -------------------------------------
             // Unity defined keywords
             #pragma multi_compile_fog

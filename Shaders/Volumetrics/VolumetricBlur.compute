@@ -1,0 +1,46 @@
+﻿#pragma kernel VolBlurX VolBlur=VolBlurX 
+#pragma kernel VolBlurY VolBlur=VolBlurY VERTICAL_PASS
+
+#define TapSamples 2
+//#define SIGMA_FILTER 1
+
+
+RWTexture3D<float4> Result;
+Texture3D<float4> InTex;
+
+static float KernelLUT[3] = {0.38774, 0.24477, 0.06136};
+
+//Gaussian dispubution baked as a LUT. SIGMA = 2 http://dev.theomader.com/gaussian-kernel-calculator/
+//static float KernelLUT[5] = { 0.20236, 0.179044, 0.124009, 0.067234, 0.028532 };
+
+//float Gaussian(float radius, float sigma)
+//{
+//    float v = radius / sigma;
+//    return exp(-(v * v));
+//}
+
+//float GaussianLUT(int currentKernal) 
+//{
+//    return KernelLUT[currentKernal];
+//}
+
+[numthreads(4,4,4)]
+void VolBlur (uint3 id : SV_DispatchThreadID)
+{    
+
+    float4 sum = float4(0, 0, 0, 0);
+
+   // [unroll(TapSamples*2 + 1)] //Unroll all potential samples
+    for (int i = -TapSamples; i < TapSamples; i++) {
+
+#if VERTICAL_PASS
+        int3 ids = uint3(id.x, id.y + i, id.z);
+#else
+        int3 ids = uint3(id.x + i, id.y, id.z);
+#endif
+    //    float weight = GaussianLUT( abs(i) );
+
+        sum += InTex[ids].rgba * KernelLUT[abs(i)];
+    }
+    Result[id.xyz] = sum;
+}

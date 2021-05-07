@@ -145,6 +145,8 @@ half4 LitPassFragmentSimple(Varyings input) : SV_Target
     #else
     color.rgb = MixFog(color.rgb, -input.viewDir, inputData.fogCoord);
     #endif
+    color = Volumetrics(color, input.posWS);
+
         return color;
 };
 

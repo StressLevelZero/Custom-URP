@@ -124,7 +124,7 @@ Shader "Universal Render Pipeline/Unlit"
 
             // -------------------------------------
             // Material Keywords
-            #pragma shader_feature _ALPHATEST_ON
+            #pragma shader_feature_local _ALPHATEST_ON
 
             //--------------------------------------
             // GPU Instancing

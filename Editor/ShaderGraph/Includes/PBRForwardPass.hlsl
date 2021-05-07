@@ -75,5 +75,7 @@ half4 frag(PackedVaryings packedInput) : SV_TARGET
 			surfaceDescription.Alpha); 
 
     color.rgb = MixFog(color.rgb, -inputData.viewDirectionWS, inputData.fogCoord); 
+    color = Volumetrics(color, inputData.positionWS);
+
     return color;
 }

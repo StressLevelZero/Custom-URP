@@ -1,0 +1,59 @@
+﻿
+
+////This generates a combined clipmap so we don't have to sample every volume map every frame////
+//TODO: Add cascades or tapper
+
+#pragma kernel ClipMapGen
+#pragma kernel ClipMapClear
+
+Texture3D<float4>	PreResult;
+RWTexture3D<float4> Result;
+
+SamplerState my_point_clamp_sampler;
+
+float3 ClipmapWorldPosition;
+float  ClipmapScale;
+
+float3	VolumeWorldSize; 
+float3	VolumeWorldPosition;
+
+Texture3D<float4> VolumeMap;
+SamplerState trilinear_clamp_sampler;
+
+[numthreads(4, 4, 4)]
+void ClipMapClear(uint3 id : SV_DispatchThreadID)
+{
+	Result[id.xyz] = float4(0, 0, 0, 0);
+}
+
+[numthreads(4,4,4)]
+void ClipMapGen (uint3 id : SV_DispatchThreadID)
+{
+	uint count, stride;
+
+	float4 UVW = float4(0,0,0,0);
+	Result.GetDimensions(UVW.x, UVW.y, UVW.z);
+
+	UVW.xyz = (id + 0.5) / UVW.xyz; //0-1 scaling
+	UVW.w = 1;
+
+	float4 WorldCoord = UVW * ClipmapScale + ClipmapWorldPosition.xyzz;
+	float3 MapUVW = (WorldCoord.xyz - VolumeWorldPosition) / VolumeWorldSize;
+
+	//TODO: Make sampling calulations run or not if they are inside or out of the clipped area
+	float ClipUVW  =
+		step(MapUVW.x, 1) * step(0, MapUVW.x) *
+		step(MapUVW.y, 1) * step(0, MapUVW.y) *
+		step(MapUVW.z, 1) * step(0, MapUVW.z);
+
+	//Sample baked volume and clip it off to its area
+	//Doing max of the two results to account for overlaps
+	Result[id.xyz] = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW);
+}
+
+
+[numthreads(4, 4, 4)]
+void MediapGen(uint3 id : SV_DispatchThreadID)
+{
+
+}

@@ -66,13 +66,13 @@ Shader "Universal Render Pipeline/Simple Lit"
 
             // -------------------------------------
             // Material Keywords
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _ALPHAPREMULTIPLY_ON
-            #pragma shader_feature _ _SPECGLOSSMAP _SPECULAR_COLOR
-            #pragma shader_feature _GLOSSINESS_FROM_BASE_ALPHA
-            #pragma shader_feature _NORMALMAP
-            #pragma shader_feature _EMISSION
-            #pragma shader_feature _RECEIVE_SHADOWS_OFF
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local _ALPHAPREMULTIPLY_ON
+            #pragma shader_feature_local _ _SPECGLOSSMAP _SPECULAR_COLOR
+            #pragma shader_feature_local _GLOSSINESS_FROM_BASE_ALPHA
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _EMISSION
+            #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -87,6 +87,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             // Unity defined keywords
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
             #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ _VOLUMETRICS_ENABLED
             #pragma multi_compile_fog
 
             //--------------------------------------

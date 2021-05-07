@@ -6,6 +6,8 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
+
 
 // If lightmap is not defined than we evaluate GI (ambient + probes) from SH
 // We might do it fully or partially in vertex to save shader ALU
@@ -500,7 +502,7 @@ half3 GlobalIllumination(BRDFData brdfData, half3 bakedGI, half occlusion, half3
     half3 reflectVector = reflect(-viewDirectionWS, normalWS);
     half fresnelTerm = Pow4(1.0 - saturate(dot(normalWS, viewDirectionWS)));
 
-    half3 indirectDiffuse = bakedGI * occlusion;
+    half3 indirectDiffuse = bakedGI;// *occlusion;
     half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, occlusion);
 
     return EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
@@ -575,7 +577,6 @@ half4 UniversalFragmentPBR(InputData inputData, half3 albedo, half metallic, hal
 
     half3 color = GlobalIllumination(brdfData, inputData.bakedGI, occlusion, inputData.normalWS, inputData.viewDirectionWS);
     color += LightingPhysicallyBased(brdfData, mainLight, inputData.normalWS, inputData.viewDirectionWS);
-
 #ifdef _ADDITIONAL_LIGHTS
     uint pixelLightCount = GetAdditionalLightsCount();
     for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
@@ -588,7 +589,7 @@ half4 UniversalFragmentPBR(InputData inputData, half3 albedo, half metallic, hal
 #ifdef _ADDITIONAL_LIGHTS_VERTEX
     color += inputData.vertexLighting * brdfData.diffuse;
 #endif
-
+    color *= occlusion;
     color += emission;
     return half4(color, alpha);
 }
@@ -601,6 +602,8 @@ half4 UniversalFragmentBlinnPhong(InputData inputData, half3 diffuse, half4 spec
     half3 attenuatedLightColor = mainLight.color * (mainLight.distanceAttenuation * mainLight.shadowAttenuation);
     half3 diffuseColor = inputData.bakedGI + LightingLambert(attenuatedLightColor, mainLight.direction, inputData.normalWS);
     half3 specularColor = LightingSpecular(attenuatedLightColor, mainLight.direction, inputData.normalWS, inputData.viewDirectionWS, specularGloss, smoothness);
+
+
 
 #ifdef _ADDITIONAL_LIGHTS
     uint pixelLightCount = GetAdditionalLightsCount();

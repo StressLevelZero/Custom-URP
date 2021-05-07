@@ -6,6 +6,8 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Version.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/VolumetricCore.hlsl"
+
 
 
 #if !defined(SHADER_HINT_NICE_QUALITY)
@@ -202,21 +204,9 @@ real3 DecodeHDREnvironment2(real4 encodedIrradiance, real4 decodeInstructions)
     return (decodeInstructions.x * PositivePow(alpha, decodeInstructions.y)) * encodedIrradiance.rgb;
 }
 
-half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels){
 
 
-float nearParam=0;
-float farParam =1;
 
-#if defined(FOG_LINEAR)
-  float mipLevel = ((depth/300)) * numMipLevels;
-#else
-  float mipLevel = (1-saturate( (depth - nearParam) / (farParam - nearParam) ) ) * numMipLevels;
-
-#endif
-  return DecodeHDREnvironment2( SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel) , unity_SpecCube0_HDR);
-    //viewDirectionWS
-}
 
 half3 MixFogColor(real3 fragColor, real3 fogColor, real fogFactor)
 {
@@ -232,7 +222,7 @@ half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real f
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
     real fogIntensity = ComputeFogIntensity(fogFactor);
-    real3 mipFog = MipFog(viewDirectionWS, fogFactor, UNITY_SPECCUBE_LOD_STEPS );
+    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
     fragColor = lerp(mipFog, fragColor, fogIntensity);
 
 #endif
@@ -242,7 +232,6 @@ half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real f
 
 half3 MixFog(real3 fragColor, real fogFactor)
 {
-  //  return MipFog();
 
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
 }
@@ -250,8 +239,11 @@ half3 MixFog(real3 fragColor, real fogFactor)
 
 half3 MixFog(real3 fragColor, float3 viewDirectionWS, real fogFactor)
 {
-    return MixFogColor(fragColor, unity_FogColor.rgb, viewDirectionWS, fogFactor);
+
+    return  (  half4(MixFogColor(fragColor, unity_FogColor.rgb, viewDirectionWS, fogFactor),1) ).rgb;
 }
+
+
 
 // Stereo-related bits
 #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)

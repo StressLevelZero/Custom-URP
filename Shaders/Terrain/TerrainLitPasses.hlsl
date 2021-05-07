@@ -3,6 +3,7 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+
 #if defined(UNITY_INSTANCING_ENABLED) && defined(_TERRAIN_INSTANCED_PERPIXEL_NORMAL)
     #define ENABLE_TERRAIN_PERPIXEL_NORMAL
 #endif
@@ -387,7 +388,7 @@ half4 SplatmapFragment(Varyings IN) : SV_TARGET
 #else
     SplatmapFinalColor(color, IN.viewDir, inputData.fogCoord);
 #endif
-
+    color = Volumetrics ( color,  inputData.positionWS);
     return half4(color.rgb, 1.0h);
 }
 

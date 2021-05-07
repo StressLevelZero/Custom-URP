@@ -40,9 +40,9 @@ Shader "Universal Render Pipeline/Baked Lit"
 
             #pragma vertex vert
             #pragma fragment frag
-            #pragma shader_feature _ _NORMALMAP
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _ALPHAPREMULTIPLY_ON
+            #pragma shader_feature_local _ _NORMALMAP
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local _ALPHAPREMULTIPLY_ON
 
             // -------------------------------------
             // Unity defined keywords

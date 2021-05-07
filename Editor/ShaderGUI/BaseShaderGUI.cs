@@ -130,8 +130,8 @@ namespace UnityEditor
         SavedBool m_AdvancedFoldout;
 
         #endregion
-
-        private const int queueOffsetRange = 50;
+        //Seriously, wtf is the reason to abstrat the render queue? And why is this slider clamp at 50?! This is worthless.
+        private const int queueOffsetRange = 50; 
         ////////////////////////////////////
         // General Functions              //
         ////////////////////////////////////
@@ -286,6 +286,7 @@ namespace UnityEditor
                 EditorGUI.BeginChangeCheck();
                 EditorGUI.showMixedValue = queueOffsetProp.hasMixedValue;
                 var queue = EditorGUILayout.IntSlider(Styles.queueSlider, (int)queueOffsetProp.floatValue, -queueOffsetRange, queueOffsetRange);
+           //     EditorGUILayout.LabelField("Render queue: " + queueOffsetProp.floatValue);
                 if (EditorGUI.EndChangeCheck())
                     queueOffsetProp.floatValue = queue;
                 EditorGUI.showMixedValue = false;

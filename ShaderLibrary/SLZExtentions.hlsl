@@ -1,6 +1,9 @@
 #ifndef SLZ_LightingExtend
 #define SLZ_LightingExtend
 
+#define M_PI 3.1415926535897932384626433832795		//Standard stored Pi.
+#define PI_x4 12.566370614359172953850573533118		//For inverse square.
+
 //Extention Libary to add into pipeline. Should make future package upgrading simpler.
 
 
@@ -22,11 +25,11 @@ float GGXTerm (float NdotH, float roughness)
 {
     float a2 = roughness * roughness;
     float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
-    return 0.31830988618f * a2 / (d * d + 1e-7f); // This function is not intended to be running on Mobile,
+    return M_PI * a2 / (d * d + 1e-7f); // This function is not intended to be running on Mobile,
                                                 // therefore epsilon is smaller than what can be represented by half
 }
 
-//Baked Specular using directional baked maps
+////Baked Specular using directional baked maps
 half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 viewDir, float smoothness)
 {
 	float3 dominantDir = LOAD_TEXTURE2D(unity_LightmapInd, lightmapUV).xyz * 2 - 1;
@@ -38,48 +41,62 @@ half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, fl
 	return spec;
  //   return 1;
 }
-
-uniform half4 GradientFogArray[(int)32.0];
-
-float FogGradient(){
-
-
+//Baked Specular using directional baked maps
+half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 viewDir, float smoothness)
+{
+    float3 dominantDir = direction.xyz * 2 - 1;
+    half3 halfDir = (normalize(dominantDir) - viewDir);
+    half nh = saturate(dot(normalWorld, halfDir));
+    half perceptualRoughness = 1 - smoothness;
+    half roughness = perceptualRoughness * perceptualRoughness;
+    half spec = GGXTerm(nh, roughness);
+    return spec;
+    //   return 1;
 }
 
-half4 FogLinearInterpolation(half ramp)
-{				
-	half refactoredramp = clamp(ramp * 32, 0, 31) ;	
-	half4 interpolated =  lerp(GradientFogArray[refactoredramp],GradientFogArray[refactoredramp+1], frac(refactoredramp) ) ;
-	return interpolated;
-}
+//uniform half4 GradientFogArray[(int)32.0];
+//
+//float FogGradient(){
+//
+//
+//}
 
-// real3 SampleDirectionalLightmap(TEXTURE2D_PARAM(lightmapTex, lightmapSampler), TEXTURE2D_PARAM(lightmapDirTex, lightmapDirSampler), float2 uv, float4 transform, float3 normalWS, bool encodedLightmap, real4 decodeInstructions)
-// {
-//     // In directional mode Enlighten bakes dominant light direction
-//     // in a way, that using it for half Lambert and then dividing by a "rebalancing coefficient"
-//     // gives a result close to plain diffuse response lightmaps, but normalmapped.
+//half4 FogLinearInterpolation(half ramp)
+//{				
+//	half refactoredramp = clamp(ramp * 32, 0, 31) ;	
+//	half4 interpolated =  lerp(GradientFogArray[refactoredramp],GradientFogArray[refactoredramp+1], frac(refactoredramp) ) ;
+//	return interpolated;
+//}
+//Making a copy from the core to avoid sampling the directional map twice
+ real3 SampleDirectionalLightmapSLZ(TEXTURE2D_PARAM(lightmapTex, lightmapSampler), TEXTURE2D_PARAM(lightmapDirTex, lightmapDirSampler), float2 uv, float4 transform, float3 normalWS, bool encodedLightmap, real4 decodeInstructions)
+ {
+     // In directional mode Enlighten bakes dominant light direction
+     // in a way, that using it for half Lambert and then dividing by a "rebalancing coefficient"
+     // gives a result close to plain diffuse response lightmaps, but normalmapped.
 
-//     // Note that dir is not unit length on purpose. Its length is "directionality", like
-//     // for the directional specular lightmaps.
+     // Note that dir is not unit length on purpose. Its length is "directionality", like
+     // for the directional specular lightmaps.
 
-//     // transform is scale and bias
-//     uv = uv * transform.xy + transform.zw;
+     // transform is scale and bias
+     uv = uv * transform.xy + transform.zw;
 
-//     real4 direction = SAMPLE_TEXTURE2D(lightmapDirTex, lightmapDirSampler, uv);
-//     // Remark: baked lightmap is RGBM for now, dynamic lightmap is RGB9E5
-//     real3 illuminance = real3(0.0, 0.0, 0.0);
-//     if (encodedLightmap)
-//     {
-//         real4 encodedIlluminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgba;
-//         illuminance = DecodeLightmap(encodedIlluminance, decodeInstructions);
-//     }
-//     else
-//     {
-//         illuminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgb;
-//     }
-//     real halfLambert = dot(normalWS, direction.xyz - 0.5) + 0.5;
-//     return illuminance * halfLambert / max(1e-4, direction.w);
-// }
+     real4 direction = SAMPLE_TEXTURE2D(lightmapDirTex, lightmapDirSampler, uv);
+     // Remark: baked lightmap is RGBM for now, dynamic lightmap is RGB9E5
+     real3 illuminance = real3(0.0, 0.0, 0.0);
+     if (encodedLightmap)
+     {
+         real4 encodedIlluminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgba;
+         illuminance = DecodeLightmap(encodedIlluminance, decodeInstructions);
+     }
+     else
+     {
+         illuminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgb;
+     }
+   //  BakeryDirectionalLightmapSpecular(direction, normalWS, float3 viewDir, float smoothness);
+
+     real halfLambert = dot(normalWS, direction.xyz - 0.5) + 0.5;
+     return illuminance * halfLambert / max(1e-4, direction.w);
+ }
 
 ///////////////////////////////////////////////////////////////////////////////
 //                          Dithering                                        //

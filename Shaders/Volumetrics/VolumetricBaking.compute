@@ -1,0 +1,602 @@
+﻿///This bakes lights into a 3d texture
+
+//#pragma kernel VolumetricAreaBake
+#pragma kernel PointLight
+#pragma kernel SpotLight
+#pragma kernel RectangleLight
+#pragma kernel DirectionalLight
+//#pragma editor_sync_compilation
+
+#define M_PI 3.1415926535897932384626433832795
+
+RWTexture3D<float4> AccumulatedLights;
+
+//Obsolete
+//float3	DirectionalLightDirection;
+//float4	DirectionalLightColor;
+
+//Convert to a structured buffer?
+//Setting single light variable because we are looping through lights on the CPU. 
+//TODO: batch groups of lights together?
+float3	LightPosition;
+float3	LightDirection;
+float4	LightColor;
+int		LightCount; //not used ATM
+float	SpotPram;
+float	InnerSpotPram;
+
+float2	AreaSize;
+float	AreaLightSamples;
+float4x4 AreaMatrix;
+
+
+///Volume Variables
+float3	Size;
+float3	Position;
+///
+
+
+///TODO: Depreciate this
+float4	OpaqueSphere[128];
+int		SphereCount;
+
+float	AmbientMedia;
+
+float3	MediaSphere;
+float4	MediaSphereAbsorption[128];
+int		MediaSphereCount;
+
+Texture3D<float4> ParticipatingMediaTexture;
+
+//
+
+struct Debug{
+	int debugCount;
+};
+
+RWStructuredBuffer<Debug> DebugBuffer;
+
+struct MeshObject
+{
+	float4x4	localToWorldMatrix;
+	int			indices_offset;
+	int			indices_count;
+};
+
+StructuredBuffer<MeshObject> _MeshObjects;
+StructuredBuffer<float3> _Vertices;
+StructuredBuffer<int> _Indices;
+
+//Bakes Lights into a volumetic texture to use later
+//Raytracer using some code from http://three-eyed-games.com/2018/05/03/gpu-ray-tracing-in-unity-part-1/
+
+struct Ray {
+	float3 origin;
+	float3 direction;
+};
+
+void SaveLightTexture(int3 id, float4 colorData) {
+	DebugBuffer[0].debugCount = 1;
+	AccumulatedLights[id] += colorData;
+}
+
+static const float EPSILON = 1e-8;
+
+bool IntersectTriangle_MT97(Ray ray, float3 vert0, float3 vert1, float3 vert2,
+	inout float t, inout float u, inout float v)
+{
+	// find vectors for two edges sharing vert0
+	float3 edge1 = vert1 - vert0;
+	float3 edge2 = vert2 - vert0;
+
+	// begin calculating determinant - also used to calculate U parameter
+	float3 pvec = cross(ray.direction, edge2);
+
+	// if determinant is near zero, ray lies in plane of triangle
+	float det = dot(edge1, pvec);
+
+	// use backface culling
+	//if (det < EPSILON)
+	//	return false;
+	float inv_det = 1.0f / det;
+
+	// calculate distance from vert0 to ray origin
+	float3 tvec = ray.origin - vert0;
+
+	// calculate U parameter and test bounds
+	u = dot(tvec, pvec) * inv_det;
+	if (u < 0.0 || u > 1.0f)
+		return false;
+
+	// prepare to test V parameter
+	float3 qvec = cross(tvec, edge1);
+
+	// calculate V parameter and test bounds
+	v = dot(ray.direction, qvec) * inv_det;
+	if (v < 0.0 || u + v > 1.0f)
+		return false;
+
+	// calculate t, ray intersects triangle
+	t = dot(edge2, qvec) * inv_det;
+
+	return true;
+}
+
+Ray CreateRay(float3 origin, float3 direction) {
+	Ray ray;
+	ray.origin = origin;
+	ray.direction = direction;
+	return ray;
+}
+
+Ray DirectionToPoint(float3 LightPosition, float3 UVW) {
+
+	float3 direction = UVW - LightPosition;
+	return CreateRay(LightPosition,direction);
+}
+
+struct RayHit
+{	
+	float3	position;
+	float	distance;
+
+	float3	normal;
+};
+
+RayHit CreateRayHit()
+{
+	RayHit hit;
+	hit.position = float3(0.0f, 0.0f, 0.0f);
+	hit.distance = 1.#INF;
+	hit.normal = float3(0.0f, 0.0f, 0.0f);
+	return hit;
+}
+
+///////////////
+//
+//Intersection types
+//
+///////////////
+
+void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
+{
+	// Calculate distance along the ray where the ground plane is intersected
+	float t = -ray.origin.y / ray.direction.y;
+	if (t > 0 && t < bestHit.distance)
+	{
+		bestHit.distance = t;
+		bestHit.position = ray.origin + t * ray.direction;
+		bestHit.normal = float3(0.0f, 1.0f, 0.0f);
+	}
+}
+
+void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
+{
+	// Calculate distance along the ray where the sphere is intersected
+	float3 d = ray.origin - sphere.xyz;
+	float p1 = -dot(ray.direction, d);
+	float p2sqr = p1 * p1 - dot(d, d) + sphere.w * sphere.w;
+	if (p2sqr < 0)
+		return;
+	float p2 = sqrt(p2sqr);
+	float t = p1 - p2 > 0 ? p1 - p2 : p1 + p2;
+	if (t > 0 && t < bestHit.distance)
+	{
+		bestHit.distance = t;
+		bestHit.position = ray.origin + t * ray.direction;
+		bestHit.normal = normalize(bestHit.position - sphere.xyz);
+	}
+}
+
+//A debuging triangle
+void IntersectTriangle(Ray ray, inout RayHit bestHit ){
+	// Trace single triangle
+	float3 v0 = float3(10, 2, 0);
+	float3 v1 = float3(20, 2, 0);
+	float3 v2 = float3(15, 8, 15);
+	float t, u, v;
+	if (IntersectTriangle_MT97(ray, v0, v1, v2, t, u, v))
+	{
+		if (t > 0 && t < bestHit.distance)
+		{
+			bestHit.distance = t;
+			bestHit.position = ray.origin + t * ray.direction;
+			bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+			//	bestHit.albedo = 0.00f;
+			//	bestHit.specular = 0.65f * float3(1, 0.4f, 0.2f);
+			//	bestHit.smoothness = 0.9f;
+			//	bestHit.emission = 0.0f;
+			}
+		}
+}
+
+void IntersectMeshObject(Ray ray, inout RayHit bestHit, MeshObject meshObject)
+{
+	uint offset = meshObject.indices_offset;
+	uint count = offset + meshObject.indices_count;
+	for (uint i = offset; i < count; i += 3)
+	{
+		float3 v2 = (mul(meshObject.localToWorldMatrix, float4(_Vertices[_Indices[i]], 1))).xyz;
+		float3 v1 = (mul(meshObject.localToWorldMatrix, float4(_Vertices[_Indices[i + 1]], 1))).xyz;
+		float3 v0 = (mul(meshObject.localToWorldMatrix, float4(_Vertices[_Indices[i + 2]], 1))).xyz;
+		float t, u, v;
+		if (IntersectTriangle_MT97(ray, v0, v1, v2, t, u, v))
+		{
+			if (t > 0 && t < bestHit.distance)
+			{
+				bestHit.distance = t;
+				bestHit.position = ray.origin + t * ray.direction;
+				bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+			//	bestHit.albedo = 0.0f;
+			//	bestHit.specular = 0.65f;
+			//	bestHit.smoothness = 0.99f;
+			//	bestHit.emission = 0.0f;
+			}
+		}
+
+	}
+}
+
+
+//Set up interactions here
+RayHit Trace(Ray ray)
+{
+	RayHit bestHit = CreateRayHit();
+	uint count, stride;
+	//IntersectGroundPlane(ray, bestHit);
+
+	//Sphere tracing
+	for (int i = 0; i < SphereCount; i++) {
+		IntersectSphere( ray, bestHit, OpaqueSphere[i] );
+	}
+
+//	IntersectTriangle(ray, bestHit);
+
+	//// Trace mesh objects
+	_MeshObjects.GetDimensions(count, stride);
+	for (uint r = 0; r < count; r++)
+	{
+		IntersectMeshObject(ray, bestHit, _MeshObjects[r]);
+	}
+
+
+
+	return bestHit;
+}
+
+
+float3 Shade(inout Ray ray, RayHit hit)
+{
+	if (hit.distance < 1.#INF)
+	{
+		// Return the normal
+		//return hit.normal * 0.5f + 0.5f;
+		return hit.distance;
+			//Inverse square law
+		//float LightRadius = (hit.distance( (id + 0.5 ) / (w / Size), LightPosition[i]) ); //Distance from center of voxel
+			 
+		//return 1 / (4 * M_PI * LightRadius*LightRadius);
+
+	}
+	else
+	{
+		// Sample the skybox and write it
+		float theta = acos(ray.direction.y) / -M_PI;
+		float phi = atan2(ray.direction.x, -ray.direction.z) / -M_PI * 0.5f;
+		return float3(1, 0, 1);
+	}
+}
+
+
+
+float4 SimpleGround(float3 pos) {
+
+
+	if (pos.y > 1) {
+
+		return float4(0, 1, 1, 0);
+	}
+	else {
+		return float4(.25, .125, 0, 1);
+	}
+}
+
+float _Seed;
+
+float rand(float2 Pixel)
+{
+	float result = frac(sin(_Seed / 100.0f * dot(Pixel, float2(12.9898f, 78.233f) ) ) * 43758.5453f);
+	_Seed += 1.0f;
+	return result;
+}
+
+///////////////////
+///
+///Media passes
+///
+///////////////////
+
+SamplerState _LinearClamp;
+
+
+[numthreads(4, 4, 4)]
+void ParticipatingMedia(uint3 id : SV_DispatchThreadID) {
+
+
+//	ParticipatingMediaTexture.SampleLevel(_LinearClamp, POS ,0,0)
+
+//	SaveLightTexture(id, inverseSquareColor * ShadowColor);
+}
+
+[numthreads(4, 4, 4)]
+void ParticipatingSphere(uint3 id : SV_DispatchThreadID) {
+
+
+	//	ParticipatingMediaTexture.SampleLevel(_LinearClamp, POS ,0,0)
+
+	//	SaveLightTexture(id, inverseSquareColor * ShadowColor);
+}
+
+
+///////////////////
+///
+///Light Passes
+///
+///////////////////
+
+[numthreads(4, 4, 4)]
+void PointLight(uint3 id : SV_DispatchThreadID) {
+
+	float3 whd;
+	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+
+	//Distance from light
+	float LightRadius = (distance(VoxelWorldPosition, LightPosition)); //Distance from center of voxel
+
+	float4 ShadowColor = float4(1, 1, 1, 1);
+
+	Ray PointShadowRay = CreateRay(VoxelWorldPosition, -normalize(VoxelWorldPosition - LightPosition));
+
+	RayHit PointShadowHit = Trace(PointShadowRay);
+	if (PointShadowHit.distance < LightRadius)
+	{
+		//todo: Account for tinted materials to make colored shadows
+		ShadowColor *= 0;
+	}
+	//Currently just doing the inverse square law for falloff. Figure out physical scattering and absorption 
+	float4 inverseSquareColor = LightColor / (4 * M_PI * LightRadius * LightRadius);
+
+	SaveLightTexture(id, inverseSquareColor * ShadowColor);
+	//AccumulatedLights[id] += inverseSquareColor * ShadowColor;
+}
+
+[numthreads(4, 4, 4)]
+void SpotLight(uint3 id : SV_DispatchThreadID) {
+
+	float3 whd;
+	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+	float3 VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosition);
+
+
+	//LightDirection = float3(0, -1, 0);
+
+
+	//Currently taking a point light and adding attenuation
+	float attenuation = clamp(dot(LightDirection, -VoxelDirectionToLight), 0, 1);
+
+	///
+	float flOuterConeCos = SpotPram;
+	float flTemp = dot(LightDirection, -VoxelDirectionToLight) - flOuterConeCos;
+	float vSpotAtten = saturate(flTemp * InnerSpotPram);
+	///
+
+	//Distance from light
+	float LightRadius = (distance(VoxelWorldPosition, LightPosition)); //Distance from center of voxel
+
+	float4 ShadowColor = float4(1, 1, 1, 1);
+
+	//Only casting rays in lit areas
+	if (attenuation > 0) {
+
+		Ray PointShadowRay = CreateRay(VoxelWorldPosition, VoxelDirectionToLight);
+
+		RayHit PointShadowHit = Trace(PointShadowRay);
+		if (PointShadowHit.distance < LightRadius)
+		{
+			//todo: Account for tinted materials to make colored shadows
+			ShadowColor *= 0;
+		}
+	}
+	//Currently just doing the inverse square law for falloff. 
+	//TODO: Figure out physical scattering and absorption for more accuraete color and falloff
+	float4	inverseSquareColor = LightColor / (4 * M_PI * LightRadius * LightRadius);
+
+
+	//AccumulatedLights[id] += inverseSquareColor * ShadowColor * vSpotAtten;
+	SaveLightTexture(id, inverseSquareColor * ShadowColor * vSpotAtten);
+}
+
+
+//Add a skylight portal to better control light leaking
+[numthreads(4, 4, 4)]
+void DirectionalLight(uint3 id : SV_DispatchThreadID) {
+
+	float3 whd;
+	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+
+	//Directional Light // Make an array
+	// Shadow test ray
+	float4 DirectionalShadow = float4(1, 1, 1, 1);
+
+	Ray shadowRay = CreateRay(VoxelWorldPosition, -LightDirection.xyz);
+	RayHit shadowHit = Trace(shadowRay);
+
+	if (shadowHit.distance != 1.#INF && shadowHit.distance != -1.#INF)
+	{
+		DirectionalShadow *= 0;
+	}
+	
+//	AccumulatedLights[id.xyz] += DirectionalColor;
+	SaveLightTexture(id, LightColor * 0.01 * DirectionalShadow); //TODO: remove temp multiplier
+}
+
+//
+[numthreads(4, 4, 4)]
+void RectangleLight(uint3 id : SV_DispatchThreadID) {
+
+	float3 whd;
+	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+
+	float4 MonteCarlointegration = float4(0, 0, 0, 0);
+
+	for (int i = 0; i < AreaLightSamples; i++) {
+
+		float4 ShadowColor = float4(1, 1, 1, 1);
+
+		float3 VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosition);
+
+		float Facing = saturate(dot(LightDirection, -VoxelDirectionToLight)); //Intal direction check
+
+		//Only cast rays from one side of the light
+		if (Facing > 0){
+
+			float3 LightPosSample = LightPosition + mul(AreaMatrix, float3( (rand(id.xy)-0.5) * AreaSize.x , (rand(id.xy) - 0.5) * AreaSize.y, 0) );
+
+			VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosSample);
+
+			float LightRadius = (distance(VoxelWorldPosition, LightPosSample)); //Distance from center of voxel
+
+			float attenuation = saturate(dot(LightDirection, -VoxelDirectionToLight));
+
+			Ray PointShadowRay = CreateRay(VoxelWorldPosition, -normalize(VoxelWorldPosition - LightPosSample) );
+
+			RayHit PointShadowHit = Trace(PointShadowRay);
+
+			if (PointShadowHit.distance < LightRadius)
+			{
+				//todo: Account for tinted materials to make colored shadows
+				ShadowColor *= 0;
+			}
+			//TODO: figure out what's unity's area lighting model is and match it 
+			float4 inverseSquareColor = (LightColor ) / (4 * M_PI * LightRadius * LightRadius);
+
+			MonteCarlointegration += (inverseSquareColor * ShadowColor * attenuation) / AreaLightSamples;
+
+		}
+		//Currently just doing the inverse square law for falloff. Figure out physical scattering and absorption 
+	}
+
+//	AccumulatedLights[id] += MonteCarlointegration;
+	SaveLightTexture(id, MonteCarlointegration);
+}
+
+//
+//[numthreads(4, 4, 4)]
+//void DiskLight(uint3 id : SV_DispatchThreadID){
+//
+//	float3 whd;
+//	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+//	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+//	float3 VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosition);
+//
+
+//}
+
+
+/////UNUSED
+//
+//[numthreads(4, 4, 4)]
+//void VolumetricAreaBake(uint3 id : SV_DispatchThreadID)
+//{
+//	float3 whd;
+//	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+//
+//
+//	Debug debug;
+//	debug.debugCount = 0;
+//
+//	//w -= 1;
+//
+//	float4 ColoredLights = float4(0,0,0,0);
+//	float ParticipatingMedia = 0;
+//
+//	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+//
+//	//Directional Light // Make an array
+//	// Shadow test ray
+//	bool shadow = false;
+//	Ray shadowRay = CreateRay(VoxelWorldPosition, LightDirection.xyz);
+//	RayHit shadowHit = Trace(shadowRay);
+//	float4 DirectionalColor = DirectionalLightColor;
+//	
+//	if (shadowHit.distance != 1.#INF)
+//	{
+//		DirectionalColor *= 0;
+//	}
+//	///
+//		
+//
+//	ColoredLights += DirectionalColor;
+//
+//	////Point lights without shadows
+//	//for (int i = 0; i < LightCount; i++) {	
+//
+//	//	//Distance from light
+//	//	float LightRadius = (distance(VoxelWorldPosition, LightPosition[i]) ); //Distance from center of voxel
+//
+//	//	float4 ShadowColor = float4(1,1,1,1);
+//
+//	//	Ray PointShadowRay = CreateRay(VoxelWorldPosition, -normalize(VoxelWorldPosition - LightPosition[i]) );
+//
+//	//	RayHit PointShadowHit = Trace(PointShadowRay);
+//	//	if (PointShadowHit.distance < LightRadius)
+//	//	{
+//	//		//todo: Account for tinted materials to make colored shadows
+//	//		ShadowColor *=0;
+//	//	}
+//	//	//Currently just doing the inverse square law for falloff. Figure out physical scattering and absorption 
+//	//	float4 inverseSquareColor = LightColor[i] / (4 * M_PI * LightRadius*LightRadius);
+//	//	
+//	//	ColoredLights += inverseSquareColor * ShadowColor;
+//
+//	//}
+//
+//
+//	//Bake in fog densitiy
+//	for (int s = 0; s < MediaSphereCount; s++) {
+//
+//		float mediaStep = distance ( MediaSphere[s], VoxelWorldPosition)  ;
+//
+//
+//		if (mediaStep > 0.5)
+//		{
+//			mediaStep = 0;
+//		}
+//		else {
+//			mediaStep = MediaSphereAbsorption[s].x;
+//		}
+//		
+//		ParticipatingMedia += mediaStep;
+//
+//	}
+//
+//	ParticipatingMedia += AmbientMedia;
+//	
+//
+//	//float4 LightColored = (1 - saturate(distance(id / (w / Size), LightPosition))) * LightColor;
+//
+//
+//	//RayHit hit = Trace(ray);
+//	//float3 result = Shade(ray, hit);
+//	//Result[id.xyz] = float4(result, 1);
+//
+//	AccumulatedLights[id.xyz] = float4(ColoredLights.xyz, ParticipatingMedia) ;  //Store Light Colors and 
+//	//Result[id.xyz] = SimpleGround(LightPosition[0]-ray.direction);
+//
+////	Result[id.xyz] = float4(id / (w / Size),1); //DEBUG
+////	DebugBuffer[id.x].debugCount = debug.debugCount;
+//}

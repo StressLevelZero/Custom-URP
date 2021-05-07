@@ -154,7 +154,15 @@ half4 fragParticleUnlit(VaryingsParticle input) : SV_Target
 
     half3 result = albedo.rgb + emission;
     half fogFactor = input.positionWS.w;
-    result = MixFogColor(result, half3(0, 0, 0), fogFactor);
+#ifdef _NORMALMAP
+    half3 viewDirWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
+    result = MixFogColor(result, half3(0, 0, 0), -viewDirWS, fogFactor);
+#else
+    result = MixFogColor(result, half3(0, 0, 0), -input.viewDirWS, fogFactor);
+#endif
+   // color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
+    result = Volumetrics(result.rgbb, input.positionWS.xyz).rgb;
+
     return half4(result, albedo.a);
 }
 
