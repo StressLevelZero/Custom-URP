@@ -1,12 +1,9 @@
 {
   "name": "com.unity.render-pipelines.universal",
-<<<<<<< HEAD
   "description": "The Universal Render Pipeline is a prebuilt Scriptable Render Pipeline, made by Unity. The technology offers graphics that are scalable to mobile platforms, and you can also use it for higher-end consoles and PCs. You\u2019re able to achieve quick rendering at a high quality without needing compute shader technology. The Universal Render Pipeline uses simplified, physically based Lighting and Materials. The Universal Render Pipeline uses single-pass forward rendering. Use this pipeline to get optimized real-time performance on several platforms.",
   "version": "0.0.2",
-=======
   "description": "Stress Level Zero's moddified Universal Render Pipeline. Keeping same namespace as Unity's to keep compatabitly with external assets and shaders without having to change each one of them to match.",
   "version": "0.0.5",
->>>>>>> 0.0.5
   "unity": "2019.3",
   "unityRelease": "0f3",
   "displayName": "SLZ Universal RP",

@@ -61,8 +61,8 @@ public class VolumetricRendering : MonoBehaviour
     [HideInInspector]
     public enum BlurType {None, Gaussian};
     public BlurType FroxelBlur = BlurType.None;
-
-
+    [Range(0, 1)]
+    public float SliceDistributionUniformity = 0.5f;
     //public Texture skytex;
     //[Header("Volumetric camera settings")]
     //[Tooltip("Near Clip plane")]
@@ -680,14 +680,13 @@ public class VolumetricRendering : MonoBehaviour
         CheckClipmap(); // UpdateClipmap();
         FlopIntegralBuffers();
         //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
-        //TODO: figure out why the meanFreePath has to be so high and fix it. Baking in a large value to compinstate for now.
         VBufferParameters vbuff =  new VBufferParameters(
                                         new Vector3Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelWidthResolution, volumetricData.FroxelDepthResolution), 
                                         volumetricData.far,
                                         cam.nearClipPlane,
                                         cam.farClipPlane,
                                         cam.fieldOfView,
-                                        1);
+                                        SliceDistributionUniformity);
 
    //     Vector2Int sharedBufferSize = new Vector2Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution); //Taking scaler functuion from HDRP for reprojection
    //     Shader.SetGlobalVector("_VBufferSharedUvScaleAndLimit", vbuff.ComputeUvScaleAndLimit(sharedBufferSize) ); //Just assuming same scale
