@@ -499,8 +499,7 @@ public class VolumetricRendering : MonoBehaviour
         if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > volumetricData.ClipmapResampleThreshold)
         {
             //TODO: seperate the frames where this is rendered
-            UpdateClipmap(Clipmap.Near);
-            UpdateClipmap(Clipmap.Far);
+            UpdateClipmaps();
             //if (ClipFar == false) UpdateClipmap(Clipmap.Near);
             //else {
             //    UpdateClipmap(Clipmap.Far);
@@ -509,10 +508,16 @@ public class VolumetricRendering : MonoBehaviour
         }
     }
 
-    enum Clipmap { Near,Far};
+    public void UpdateClipmaps()
+    {
+        UpdateClipmap(Clipmap.Near);
+        UpdateClipmap(Clipmap.Far);
+    }
+
+    public enum Clipmap { Near,Far};
 
 
-    void UpdateClipmap(Clipmap clipmap)
+    public void UpdateClipmap(Clipmap clipmap)
     {
         //TODO: chache ids 
         int ClipmapKernal = ClipmapCompute.FindKernel("ClipMapGen");
