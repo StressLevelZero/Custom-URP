@@ -116,6 +116,7 @@ public class BakedVolumetricArea : MonoBehaviour
         DebugCube.transform.parent = gameObject.transform;
         DebugCube.transform.localPosition = Vector3.zero;
         DebugCube.transform.localScale = BoxScale;
+        DebugCube.transform.rotation = Quaternion.identity;
         DestroyImmediate(DebugCube.GetComponent<Collider>());
 
         Renderer rnd = DebugCube.GetComponent<Renderer>();

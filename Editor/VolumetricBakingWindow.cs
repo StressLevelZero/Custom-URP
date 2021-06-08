@@ -809,6 +809,7 @@ public class VolumetricBaking : EditorWindow
 
         //  Debug.Log(_meshObjects.Count);
 
+
         CreateComputeBuffer(ref _meshObjectBuffer, _meshObjects, 72);
         CreateComputeBuffer(ref _vertexBuffer, _vertices, 12);
         CreateComputeBuffer(ref _indexBuffer, _indices, 4);
@@ -817,14 +818,18 @@ public class VolumetricBaking : EditorWindow
     void ReleaseBuffers()
     {
         _meshObjectBuffer.Release();
+        _meshObjectBuffer = null;
         _vertexBuffer.Release();
+        _vertexBuffer = null;
         _indexBuffer.Release();
+        _indexBuffer = null;
     }
 
     private static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, List<T> data, int stride)
     where T : struct
     {
-  //      Debug.Log("Making computebuffer ");
+        //Debug.Log("Making computebuffer ");
+        //buffer = new ComputeBuffer(data.Count, stride);
 
         // Do we already have a compute buffer?
         if (buffer != null && data != null && stride != null)
@@ -832,7 +837,7 @@ public class VolumetricBaking : EditorWindow
             // If no data or buffer doesn't match the given criteria, release it
             if (data.Count == 0 || buffer.count != data.Count || buffer.stride != stride)
             {
-   //             Debug.Log("Buffer count = " + buffer.count);
+            //    Debug.Log("Buffer count = " + buffer.count);
 
                 buffer.Release();
                 buffer = null;
