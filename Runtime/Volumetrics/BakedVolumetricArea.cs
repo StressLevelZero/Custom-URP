@@ -9,7 +9,7 @@ public class BakedVolumetricArea : MonoBehaviour
   //  [SerializeField, Tooltip("Texel density ratio scaler. Multiples Texel density per dimension")] Vector3 TexelRatio = new Vector3(1,1,1);
     [SerializeField] Vector3 BoxScale = new Vector3(10,5,10);
     [SerializeField] public Texture3D bakedTexture;
-    [SerializeField] public int3 NormalizedTexelDensity; //exposed to see target resolution
+    [SerializeField] public Vector3Int NormalizedTexelDensity; //exposed to see target resolution
     [HideInInspector,SerializeField] public Vector3 NormalizedScale;
     [HideInInspector,SerializeField] public Vector3 Corner;
 
@@ -46,11 +46,11 @@ public class BakedVolumetricArea : MonoBehaviour
 
         float Maxres = Mathf.Max(UnclampedResolution.x, UnclampedResolution.y, UnclampedResolution.z);
 
-        float rescaler = Mathf.Min(1, 4096 / Maxres); 
+        float rescaler = Mathf.Min(1, 4096 / Maxres);
 
-     //   Debug.Log("Clamped resolution to " + Mathf.RoundToInt(UnclampedResolution.x * rescaler));
+        //   Debug.Log("Clamped resolution to " + Mathf.RoundToInt(UnclampedResolution.x * rescaler));
 
-       int3 tempTexelDensity = new int3
+        Vector3Int tempTexelDensity = new Vector3Int
         {
             x = Mathf.RoundToInt(UnclampedResolution.x * rescaler),
             y = Mathf.RoundToInt(UnclampedResolution.y * rescaler),
@@ -97,7 +97,7 @@ public class BakedVolumetricArea : MonoBehaviour
     //    Gizmos.DrawWireSphere(transform.position - (NormalizedScale* 0.5f), .5f);
         Gizmos.color = new Color(0.5f,0.5f,0.5f,0.25f);
         Gizmos.matrix = Matrix4x4.TRS(gameObject.transform.position, Quaternion.identity, NormalizedScale);
-        Gizmos.DrawCube(Vector3.zero, Vector3.one);
+        if (!DEBUG) Gizmos.DrawCube(Vector3.zero, Vector3.one);
         Gizmos.color = Color.white;
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
    //     Gizmos.DrawWireSphere(Corner, 0.5f);

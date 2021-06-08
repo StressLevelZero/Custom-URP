@@ -4,7 +4,9 @@
 #pragma kernel PointLight
 #pragma kernel SpotLight
 #pragma kernel RectangleLight
+#pragma kernel DiscLight
 #pragma kernel DirectionalLight
+#pragma kernel ClearBuffer
 //#pragma editor_sync_compilation
 
 #define M_PI 3.1415926535897932384626433832795
@@ -310,6 +312,13 @@ float rand(float2 Pixel)
 	return result;
 }
 
+float rand(float3 Pixel)
+{
+	float result = frac(sin(_Seed / 100.0f * dot(Pixel, float3(12.9898f, 49.1165f, 29.1165f))) * 43758.5453f);
+	_Seed += 1.0f;
+	return result;
+}
+
 ///////////////////
 ///
 ///Media passes
@@ -317,6 +326,11 @@ float rand(float2 Pixel)
 ///////////////////
 
 SamplerState _LinearClamp;
+
+[numthreads(4, 4, 4)]
+void ClearBuffer(uint3 id : SV_DispatchThreadID) {
+	AccumulatedLights[id] = float4(0,0,0,0);
+}
 
 
 [numthreads(4, 4, 4)]
@@ -464,7 +478,7 @@ void RectangleLight(uint3 id : SV_DispatchThreadID) {
 		//Only cast rays from one side of the light
 		if (Facing > 0){
 
-			float3 LightPosSample = LightPosition + mul(AreaMatrix, float3( (rand(id.xy)-0.5) * AreaSize.x , (rand(id.xy) - 0.5) * AreaSize.y, 0) );
+			float3 LightPosSample = LightPosition + mul(AreaMatrix, float3( (rand(id.xyz)-0.5) * AreaSize.x , (rand(id.xyz) - 0.5) * AreaSize.y, 0) );
 
 			VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosSample);
 
@@ -494,17 +508,75 @@ void RectangleLight(uint3 id : SV_DispatchThreadID) {
 	SaveLightTexture(id, MonteCarlointegration);
 }
 
-//
-//[numthreads(4, 4, 4)]
-//void DiskLight(uint3 id : SV_DispatchThreadID){
-//
-//	float3 whd;
-//	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
-//	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
-//	float3 VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosition);
-//
+[numthreads(4, 4, 4)]
+void DiscLight(uint3 id : SV_DispatchThreadID) {
 
-//}
+	float3 whd;
+	AccumulatedLights.GetDimensions(whd.x, whd.y, whd.z);
+	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
+
+	float4 MonteCarlointegration = float4(0, 0, 0, 0);
+
+	for (int i = 0; i < AreaLightSamples; i++) {
+
+		float4 ShadowColor = float4(1, 1, 1, 1);
+
+		float3 VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosition);
+
+		float Facing = saturate(dot(LightDirection, -VoxelDirectionToLight)); //Intal direction check
+
+		//Only cast rays from one side of the light
+		if (Facing > 0) {
+
+			//https://stackoverflow.com/questions/5837572/generate-a-random-point-within-a-circle-uniformly
+			float t = 2 * M_PI * rand(id.xyz);
+			float u = rand(id.xyz) + rand(id.xyz);
+			float r;
+			if (u > 1)
+			{
+				r = (2 - u);
+			}
+			else { r = u; }
+
+
+			//	[r * cos(t), r * sin(t)]
+
+			float3 LightPosSample = LightPosition + mul(AreaMatrix, 
+				float3( ( r * cos(t)) * AreaSize.x,
+						( r * sin(t)) * AreaSize.x,
+						0));
+
+			//TEMP
+			//float3 LightPosSample = LightPosition + mul(AreaMatrix, float3((rand(id.xyz) - 0.5) * AreaSize.x, (rand(id.xyz) - 0.5) * AreaSize.x, 0));
+
+
+			VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosSample);
+
+			float LightRadius = (distance(VoxelWorldPosition, LightPosSample)); //Distance from center of voxel
+
+			float attenuation = saturate(dot(LightDirection, -VoxelDirectionToLight));
+
+			Ray PointShadowRay = CreateRay(VoxelWorldPosition, -normalize(VoxelWorldPosition - LightPosSample));
+
+			RayHit PointShadowHit = Trace(PointShadowRay);
+
+			if (PointShadowHit.distance < LightRadius)
+			{
+				//todo: Account for tinted materials to make colored shadows
+				ShadowColor *= 0;
+			}
+			//TODO: figure out what's unity's area lighting model is and match it 
+			float4 inverseSquareColor = (LightColor) / (4 * M_PI * LightRadius * LightRadius);
+
+			MonteCarlointegration += (inverseSquareColor * ShadowColor * attenuation) / AreaLightSamples;
+
+		}
+		//Currently just doing the inverse square law for falloff. Figure out physical scattering and absorption 
+	}
+
+	//	AccumulatedLights[id] += MonteCarlointegration;
+	SaveLightTexture(id, MonteCarlointegration);
+}
 
 
 /////UNUSED

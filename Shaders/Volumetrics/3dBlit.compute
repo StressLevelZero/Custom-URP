@@ -1,0 +1,26 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel BlitBucket
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture3D<float4> BucketBuffer;
+SamplerState sampler_point_clamp;
+
+float3 BucketOffset;
+int BucketSize; 
+
+RWTexture3D<float4> Result;
+
+[numthreads(4,4,4)]
+void BlitBucket(uint3 id : SV_DispatchThreadID)
+{
+
+    float3 UV = float3(id - BucketOffset) / BucketSize;
+    float clip = step(UV.x,1) * step(UV.y, 1) * step(UV.z, 1) * 
+                 step(0,UV.x) * step(0, UV.y) * step(0, UV.z);       
+
+    uint3 bucketID = id.xyz - BucketOffset.xyz;
+
+    Result[id.xyz] += BucketBuffer[bucketID] * clip;
+
+}

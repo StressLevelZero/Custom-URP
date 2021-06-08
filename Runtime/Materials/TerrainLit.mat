@@ -145,7 +145,7 @@ Material:
     - _Metallic2: 0
     - _Metallic3: 0
     - _Mode: 0
-    - _NumLayersCount: 0
+    - _NumLayersCount: 5
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _Smoothness0: 1

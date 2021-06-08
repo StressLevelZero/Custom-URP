@@ -17,13 +17,25 @@ public class VolumetricBaking : EditorWindow
         //   BuildComboList();
         //   BuildSelectionGrid();
     }
+
     //TODO: Save to scene asset file 
-    public float AreaLightSamples = 1; 
+    //Public variables
+    [Range(1, 2048)]
+    public int AreaLightSamples = 256;
+    [Range(4, 128), Tooltip("Size of the render buckets.")]
+    public int BucketSize = 16;
+
+    //interal
     bool saveWarning = false;
     bool Running = false;
     private void OnGUI()
     {
         DisplayProgress();
+
+        AreaLightSamples = EditorGUILayout.IntSlider("Area Samples", AreaLightSamples, 1, 1024);
+        BucketSize = EditorGUILayout.IntSlider("Bucket Size", BucketSize, 4, 64);
+ //       EditorGUILayout.IntField(AreaLightSamples, "Area light samples" );
+
 
         if (GUILayout.Button("Bake Volumetrics"))
         {
@@ -33,7 +45,6 @@ public class VolumetricBaking : EditorWindow
             BakeLights();
             ReleaseBuffers();
         };
-        //     EditorGUILayout.FloatField(AreaLightSamples);
 
         EditorGUILayout.LabelField(BakingStatus);
         WarningGUI();
@@ -216,7 +227,7 @@ public class VolumetricBaking : EditorWindow
     {
         public int DebugCcounter;
     }
-    ///////////////
+    /////////////// Unused
     public void BakeVolumetrics()
     {
         System.DateTime startTime = System.DateTime.Now;
@@ -235,7 +246,7 @@ public class VolumetricBaking : EditorWindow
         {
        //     EditorUtility.DisplayProgressBar("Baking Volumetrics... ", VolumetricRegisters.volumetricAreas[j].name, (float)j / (float)VolumetricRegisters.volumetricAreas.Count );
 
-            int3 Texels = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+            Vector3Int Texels = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
 
             RenderTextureDescriptor rtdiscrpt = new RenderTextureDescriptor();
             rtdiscrpt.enableRandomWrite = true;
@@ -256,7 +267,6 @@ public class VolumetricBaking : EditorWindow
 
             Light[] PointLights = GatherBakedLights(LightType.Point);
             Light[] DirectionalLights = GatherBakedLights(LightType.Directional);
-
 
             Vector4[] lightColors = new Vector4[PointLights.Length];
             Vector4[] lightPos = new Vector4[PointLights.Length];
@@ -283,6 +293,8 @@ public class VolumetricBaking : EditorWindow
 
         //    Debug.Log("Baking " + PointLights.Length + " lights");
        //     Debug.Log("Baking " + mediaPos.Length + " Media");
+
+            //Setting shader variables
 
             int shaderKernel = BakingShader.FindKernel("VolumetricAreaBake");
             BakingShader.SetTexture(shaderKernel, "AccumulatedLights", RT3d);
@@ -347,6 +359,8 @@ public class VolumetricBaking : EditorWindow
          //   Graphics.CreateGraphicsFence ?
          
 
+            //DISPATCHING
+            
             BakingShader.Dispatch(shaderKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
 
 
@@ -384,6 +398,7 @@ public class VolumetricBaking : EditorWindow
 
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
     }
+    //////
 
     ComputeShader BakingShader;
 
@@ -392,6 +407,8 @@ public class VolumetricBaking : EditorWindow
         System.DateTime startTime = System.DateTime.Now;
          BakingShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricBaking.compute");
         UpdateStatus("Baking " + SceneManager.GetActiveScene().name);
+        ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
+        int BlitBucketKernal = BlitShader.FindKernel("BlitBucket");
 
         Running = true;
 
@@ -399,7 +416,7 @@ public class VolumetricBaking : EditorWindow
         {
         //    EditorUtility.DisplayProgressBar("Baking Volumetrics... ", VolumetricRegisters.volumetricAreas[j].name, (float)j / (float)VolumetricRegisters.volumetricAreas.Count);
             
-            int3 Texels = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+            Vector3Int Texels = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
             RenderTextureDescriptor rtdiscrpt = new RenderTextureDescriptor();
             rtdiscrpt.enableRandomWrite = true;
             rtdiscrpt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
@@ -409,21 +426,92 @@ public class VolumetricBaking : EditorWindow
             rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
             rtdiscrpt.msaaSamples = 1;
 
+            //Target buffer
             RenderTexture RT3d = new RenderTexture(rtdiscrpt);
             RT3d.Create();
-  
+            
+
+            //Bucket
+            rtdiscrpt.width = BucketSize;
+            rtdiscrpt.height = BucketSize;
+            rtdiscrpt.volumeDepth = BucketSize;
+
+            RenderTexture bucketBuffer = new RenderTexture(rtdiscrpt);
+            bucketBuffer.Create();
+
             Light[] PointLights = GatherBakedLights(LightType.Point);
-            for (int i = 0; i < PointLights.Length; i++)
+
+            //Figuring out the buckets per dimension
+
+            int bx = Mathf.CeilToInt((float)Texels.x / BucketSize);
+            int by = Mathf.CeilToInt((float)Texels.y / BucketSize);
+            int bz = Mathf.CeilToInt((float)Texels.z / BucketSize);
+
+            //Total number of buckets
+            int BucketCount = bx * by * bz;
+
+            Debug.Log(BucketCount + " buckets");
+
+            BlitShader.SetTexture(BlitBucketKernal, "BucketBuffer", bucketBuffer);
+            BlitShader.SetTexture(BlitBucketKernal, "Result", RT3d);
+
+
+            //Bucket Loop
+            for (int b = 0; b < BucketCount; b++)
             {
-                UpdateProgress("Baking " + (j + 1) + "/" + VolumetricRegisters.volumetricAreas.Count + " "
-                + VolumetricRegisters.volumetricAreas[j].name + " "
-                + (System.DateTime.Now.Minute - startTime.Minute) + ":" + (System.DateTime.Now.Second - startTime.Second) //TODO: Format correctly
-                , PointLights[i].name, (float)i / PointLights.Length);
 
-                //TODO: Do some checking to only render lights affecting the area. AABB?                
-                DispatchLight(PointLights[i], RT3d, Texels, j);
+                Vector3 ThreadsToDispatch = new Vector3(
+                            Mathf.CeilToInt((float)Texels.x / 4.0f),
+                            Mathf.CeilToInt((float)Texels.y / 4.0f),
+                            Mathf.CeilToInt((float)Texels.z / 4.0f) );
+
+                Vector3 BucketThreads = new Vector3(
+                            Mathf.CeilToInt((float)BucketSize / 4.0f),
+                            Mathf.CeilToInt((float)BucketSize / 4.0f),
+                            Mathf.CeilToInt((float)BucketSize / 4.0f));
+
+
+                //Generate cell offset
+              
+                int x = b % bx;
+                int y = (b / bx) % by;
+                int z = b / (by * bx);
+
+                Vector3Int CellOffset = new Vector3Int(x, y, z);
+                Vector3Int TextileOffset = CellOffset * BucketSize;
+
+            //    Debug.Log(TextileOffset + ", size:" + BucketSize);
+
+                ///    BlitShader.set
+                ///    
+                //Clear buffer
+                BakingShader.SetTexture(BakingShader.FindKernel("ClearBuffer"), "AccumulatedLights", bucketBuffer);
+                BakingShader.Dispatch(BakingShader.FindKernel("ClearBuffer"), (int)BucketThreads.x, (int)BucketThreads.y, (int)BucketThreads.z);
+
+                //Light Loop
+                for (int i = 0; i < PointLights.Length; i++)
+                {
+                    UpdateProgress("Baking " + (j + 1) + "/" + VolumetricRegisters.volumetricAreas.Count + " "
+                    + VolumetricRegisters.volumetricAreas[j].name + " "
+                    + (System.DateTime.Now.Minute - startTime.Minute) + ":" + (System.DateTime.Now.Second - startTime.Second) //TODO: Format correctly
+                    , PointLights[i].name, (float)i / PointLights.Length);
+
+                    //TODO: Do some checking to only render lights affecting the area. AABB?      
+
+                    //Render to bucket buffer
+                    DispatchLight(PointLights[i], bucketBuffer, new Vector3Int(BucketSize, BucketSize, BucketSize), j, TextileOffset);                
+                }
+
+                //Blit from bucket to larger buffer
+                BlitShader.SetTexture(BlitBucketKernal, "BucketBuffer", bucketBuffer); //bucket buffer
+                BlitShader.SetTexture(BlitBucketKernal, "Result", RT3d); //target buffer
+                BlitShader.SetVector( "BucketOffset", (Vector3)TextileOffset) ;
+                BlitShader.SetInt( "BucketSize", BucketSize) ;
+                BlitShader.Dispatch(BlitBucketKernal, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+
+                //     RT3d
+
             }
-
             //do
             //{
 
@@ -450,6 +538,7 @@ public class VolumetricBaking : EditorWindow
             RT3d.SaveToTexture3D(path);
 
             RT3d.Release();
+            bucketBuffer.Release();
 
             VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
          //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
@@ -470,7 +559,12 @@ public class VolumetricBaking : EditorWindow
 
     }
 
-    void DispatchLight(Light light, RenderTexture RT3d, int3 Texels, int AreaID) //Used to render each light indavidually. TODO Generalize into pure pathtracing
+    void ClearBuffer()
+    {
+
+    }
+
+    void DispatchLight(Light light, RenderTexture RT3d, Vector3Int Texels, int AreaID, Vector3Int TextileOffset ) //Used to render each light indavidually. TODO Generalize into pure pathtracing
     {
 
         //Setup light data
@@ -510,10 +604,14 @@ public class VolumetricBaking : EditorWindow
                 BakingShader.SetFloat("_Seed", Random.value);
 
                 break;
-            //case LightType.Disc:
-            //    shaderKernel = BakingShader.FindKernel("DiskLight");
-            //    BakingShader.SetVector("AreaSize", light.areaSize);
-            //    break;
+            case LightType.Disc:
+                shaderKernel = BakingShader.FindKernel("DiscLight");
+                BakingShader.SetVector("AreaSize", light.areaSize); //Only the first float is used for radius
+                BakingShader.SetFloat("AreaLightSamples", AreaLightSamples);
+                BakingShader.SetMatrix("AreaMatrix", Matrix4x4.Rotate(light.transform.rotation));
+
+                BakingShader.SetFloat("_Seed", Random.value);
+                break;
             default:
                 return;
         }
@@ -525,8 +623,25 @@ public class VolumetricBaking : EditorWindow
         BakingShader.SetVector("LightPosition", lightPos);
 
         BakingShader.SetVector("LightDirection", light.transform.rotation * Vector3.forward);
-        BakingShader.SetVector("Size", VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale);
-        BakingShader.SetVector("Position", VolumetricRegisters.volumetricAreas[AreaID].Corner);
+        //  BakingShader.SetVector("Size", VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale);
+
+        Vector3 BucketScaler =  (Vector3)VolumetricRegisters.volumetricAreas[AreaID].NormalizedTexelDensity / (float)BucketSize ;
+      //  BucketScaler = Vector3.one * 1.5f;
+
+        //Debug.Log("Bucket Scaler" + BucketScaler+
+        //    "NormalizedTexelDensity" + (VolumetricRegisters.volumetricAreas[AreaID].NormalizedTexelDensity)+
+        //    "BucketSize" + BucketSize       );
+
+        //Offset each cell in world space based on the textiles 
+        Vector3 D = VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale;
+        Vector3 T = (Vector3)VolumetricRegisters.volumetricAreas[AreaID].NormalizedTexelDensity;
+        Vector3 PositionOffset = new Vector3( (D.x / T.x) * TextileOffset.x, (D.y / T.y) * TextileOffset.y, (D.z / T.z) * TextileOffset.z);
+
+        BakingShader.SetVector("Size", new Vector3(VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale.x / BucketScaler.x,
+            VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale.y / BucketScaler.y,
+            VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale.z / BucketScaler.z) );
+        //  BakingShader.SetVector("Size", (Vector3)(Vector3Int.one * BucketSize) );
+        BakingShader.SetVector("Position", VolumetricRegisters.volumetricAreas[AreaID].Corner + PositionOffset);
 
 
         ///Temp Shadow spheres
@@ -560,11 +675,10 @@ public class VolumetricBaking : EditorWindow
         while (debuger[0].DebugCcounter == 0)
         {
             BakeBuffer.GetData(debuger);
-            Debug.Log("Counter " + debuger[0].DebugCcounter);
+         //   Debug.Log("Counter " + debuger[0].DebugCcounter);
         }
 
         BakeBuffer.Release(); //Avoiding memory leak
-
       //  return RT3d;
     }
 
@@ -617,10 +731,10 @@ public class VolumetricBaking : EditorWindow
 
     public void RebuildMeshObjectBuffers()
     {
-        if (!VolumetricRegisters._meshObjectsNeedRebuilding)
-        {
-            return;
-        }
+        //if (!VolumetricRegisters._meshObjectsNeedRebuilding)
+        //{
+        //    return;
+        //}
 
     //    VolumetricBakingRegisters._meshObjectsNeedRebuilding = false;
         int _currentSample = 0;
