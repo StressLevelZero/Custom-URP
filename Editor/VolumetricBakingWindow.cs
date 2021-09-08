@@ -25,12 +25,8 @@ public class VolumetricBaking : EditorWindow
     [Range(1, 2048)]
     public int AreaLightSamples = 256;
     [Range(4, 128), Tooltip("Size of the render buckets.")]
-<<<<<<< Updated upstream
-    public int BucketSize = 16;
-=======
     public int BucketSize = 32;
     public bool DXRAcceletration = true;
->>>>>>> Stashed changes
 
     //interal
     bool saveWarning = false;
@@ -40,12 +36,8 @@ public class VolumetricBaking : EditorWindow
         DisplayProgress();
 
         AreaLightSamples = EditorGUILayout.IntSlider("Area Samples", AreaLightSamples, 1, 1024);
-<<<<<<< Updated upstream
-        BucketSize = EditorGUILayout.IntSlider("Bucket Size", BucketSize, 4, 64);
-=======
         BucketSize = EditorGUILayout.IntSlider("Bucket Size", BucketSize, 4, 256);
         DXRAcceletration = EditorGUILayout.Toggle("DXR Acceletration", DXRAcceletration);
->>>>>>> Stashed changes
  //       EditorGUILayout.IntField(AreaLightSamples, "Area light samples" );
 
 
@@ -489,7 +481,6 @@ public class VolumetricBaking : EditorWindow
                             Mathf.CeilToInt((float)BucketSize / 4.0f),
                             Mathf.CeilToInt((float)BucketSize / 4.0f),
                             Mathf.CeilToInt((float)BucketSize / 4.0f));
-<<<<<<< Updated upstream
 
 
                 //Generate cell offset
@@ -501,19 +492,6 @@ public class VolumetricBaking : EditorWindow
                 Vector3Int CellOffset = new Vector3Int(x, y, z);
                 Vector3Int TextileOffset = CellOffset * BucketSize;
 
-=======
-
-
-                //Generate cell offset
-              
-                int x = b % bx;
-                int y = (b / bx) % by;
-                int z = b / (by * bx);
-
-                Vector3Int CellOffset = new Vector3Int(x, y, z);
-                Vector3Int TextileOffset = CellOffset * BucketSize;
-
->>>>>>> Stashed changes
             //    Debug.Log(TextileOffset + ", size:" + BucketSize);
 
                 ///    BlitShader.set
@@ -593,8 +571,6 @@ public class VolumetricBaking : EditorWindow
 
     }
 
-<<<<<<< Updated upstream
-=======
     RenderTexture initializeVolume(int i)
     {
 
@@ -796,7 +772,6 @@ public class VolumetricBaking : EditorWindow
 
     }
 
->>>>>>> Stashed changes
     void ClearBuffer()
     {
 
