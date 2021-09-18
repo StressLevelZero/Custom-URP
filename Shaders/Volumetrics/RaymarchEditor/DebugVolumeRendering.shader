@@ -13,7 +13,7 @@
 
 
 	SubShader {
-		Blend SrcAlpha OneMinusSrcAlpha
+		Blend One One
 		ZTest Always
 		Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Transparent" "Queue" = "Transparent" }
 		Cull front
@@ -187,10 +187,10 @@ float3 get_uv(float3 p) {
 		src.rgb *= src.a;
 
 		// blend
-		dst = (1.0 - dst.a) * src + dst;
+		dst =  src + dst;
 		p += ds;
 
-		if (dst.a > _Threshold) break;
+		//if (dst.a > _Threshold) break;
 	  }
 
 	  return saturate(dst) * _Color;

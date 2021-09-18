@@ -1,11 +1,16 @@
 #include "UnityShaderVariables.cginc"
 //#include "Noise.cginc"
-#pragma only_renderers d3d12
+//#pragma only_renderers d3d12
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Macros.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Sampling/Sampling.hlsl"
 
 #pragma max_recursion_depth 1
 
 #define M_PI 3.1415926535897932384626433832795
-
+#define M_PHI 1.618033988749895
 
 // Input
 RaytracingAccelerationStructure g_SceneAccelStruct;
@@ -16,6 +21,7 @@ uint	ConeLightCount;
 uint	DirLightCount;
 uint	AreaLightCount;
 uint	AreaLightSamples;
+uint	EnvLightSamples;
 
 struct PointLightData{
 float3	PointLightsWS;
@@ -53,15 +59,32 @@ float3	Size = float3(1,1,1);
 // Output
 RWTexture3D<float4> g_Output;
 
+//Enviorment
+TextureCube  _SkyTexture;
+SamplerState  sampler_SkyTexture;
+
 struct RayPayload
 {
     float4 color;
 };
 
+struct EnvRayPayload
+{
+    float4 color;
+    float3 dir;
+};
+
 [shader("miss")]
 void MainMissShader(inout RayPayload payload : SV_RayPayload)
 {
-    payload.color = float4(1, 1, 1, 1);
+    payload.color = float4(1, 1, 1, 0);
+}
+
+[shader("miss")]
+void zEnvMissShader(inout EnvRayPayload payload : SV_RayPayload)
+{
+    //Enviormental    
+    payload.color = _SkyTexture.SampleLevel(sampler_SkyTexture, payload.dir, 0);
 }
 
 float InverseSquare(float distance){
@@ -88,6 +111,19 @@ float rand(float3 Pixel)
 	return result;
 }
 
+//RTgems 3.11 FIBONACCI SPHERE
+//current index, number of samples
+ float3 sphericalFibonacci(float i, float n) 
+ {
+     const float PHI = sqrt(5.) * 0.5f + 0.5f;
+     float fraction = (i * (PHI - 1)) - floor(i * (PHI - 1));
+     float phi = 2.f * M_PI * fraction;
+     float cosTheta = 1.f - (2.f * i + 1.f) * (1.f / n);
+     float sinTheta = sqrt(saturate(1.f - cosTheta*cosTheta));
+    
+     return float3(cos(phi) * sinTheta , sin(phi) * sinTheta , cosTheta);
+}
+
 ///
 ///Point light
 ///
@@ -103,12 +139,12 @@ float4 PointLightCast(float3 VoxelWS, uint Num){
     ray.TMax      = LightRadius;
 
     RayPayload payload;
-    payload.color = float4(0, 0, 0, 0);
+    payload.color = float4(0, 0, 0, 1);
 
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-	return payload.color * InverseSquare(LightRadius) * PLD[Num].PointLightsColor;
+	return (1-payload.color.a) * InverseSquare(LightRadius) * PLD[Num].PointLightsColor;
 }
 
 ///
@@ -140,12 +176,12 @@ float4 ConeLightCast(float3 VoxelWS, uint Num){
     ray.TMax      = LightRadius;
 
     RayPayload payload;
-    payload.color = float4(0, 0, 0, 0);
+    payload.color = float4(0, 0, 0, 1);
 
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-	return  InverseSquare(LightRadius) * vSpotAtten * payload.color * CLD[Num].ConeLightsColor;
+	return  InverseSquare(LightRadius) * vSpotAtten * (1-payload.color.a) * CLD[Num].ConeLightsColor;
 }
 
 //
@@ -163,12 +199,12 @@ float4 DirLightCast(float3 VoxelWS, uint Num){
     ray.TMax      =  1000.0f;
 
     RayPayload payload;
-    payload.color = float4(0, 0, 0, 0);
+    payload.color = float4(0, 0, 0, 1);
 
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-	return  payload.color * DLD[Num].DirLightsColor;
+	return  (1-payload.color.a) * DLD[Num].DirLightsColor;
 }
 
 //
@@ -203,12 +239,12 @@ float4 AreaLightCast(float3 VoxelWS, uint Num){
     ray.TMax      = LightRadius;
 
     RayPayload payload;
-    payload.color = float4(0, 0, 0, 0);
+    payload.color = float4(0, 0, 0, 1);
 
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-    areaLightAccumulation += saturate(InverseSquare(LightRadius) * payload.color * ALD[Num].AreaLightsColor * attenuation) / AreaLightSamples;
+    areaLightAccumulation += saturate(InverseSquare(LightRadius) * (1-payload.color.a) * ALD[Num].AreaLightsColor * attenuation) / AreaLightSamples;
    }
 	return  areaLightAccumulation;
 }
@@ -256,15 +292,48 @@ float4 DiscLightCast(float3 VoxelWS, uint Num){
     ray.TMax      = LightRadius;
 
     RayPayload payload;
-    payload.color = float4(0, 0, 0, 0);
+    payload.color = float4(0, 0, 0, 1);
 
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-    areaLightAccumulation += saturate(InverseSquare(LightRadius) * payload.color * ALD[Num].AreaLightsColor * attenuation) / AreaLightSamples;
+    areaLightAccumulation += saturate(InverseSquare(LightRadius) * (1-payload.color.a) * ALD[Num].AreaLightsColor * attenuation) / AreaLightSamples;
    }
 	return  areaLightAccumulation;
 }
+
+//Cast Ray from vox to env
+float4 EnvCast(float3 VoxelWS){
+
+    float4 Accumulation = float4(0,0,0,0);
+
+       for (int j = 0; j < EnvLightSamples; j++) 
+        {
+            uint3 id =  DispatchRaysIndex().xyz;
+            float3 rayDirection = sphericalFibonacci(j, EnvLightSamples) + ( normalize(float3(rand(id.xyz+j),rand(id.xyz+j+33) , rand(id.xyz+j+120)) -.5) * 2 * (4*M_PI / EnvLightSamples) )  ;
+
+            RayDesc ray;
+            ray.Origin    = VoxelWS;
+            ray.Direction = rayDirection;
+            ray.TMin      = 0.0f;
+            ray.TMax      = 100000;
+
+            RayPayload payload;
+            payload.color = float4(0, 0, 0, 0);
+
+            uint missShaderIndex = 1;
+            TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+            
+            Accumulation += payload.color / EnvLightSamples ;
+        }
+    return Accumulation;
+}
+
+// [shader("closesthit")]
+// void MyClosestHit(inout RayPayload data,
+// BuiltInTriangleIntersectionAttributes attribs) {
+// data.color = float4( 1, 0, 0, 1 );
+// }
 
 //
 // Main shader
@@ -286,5 +355,6 @@ void MainRayGenShader()
       if (ALD[i].AreaLightsSize.z == 0)  LightAccumulation += AreaLightCast(VoxelWorldPosition, i) ; 
       else  LightAccumulation += DiscLightCast(VoxelWorldPosition, i) ;
     }
+    LightAccumulation += EnvCast(VoxelWorldPosition);
     g_Output[launchIndex] = LightAccumulation;
 }

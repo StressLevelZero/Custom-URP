@@ -27,6 +27,10 @@ public class VolumetricBaking : EditorWindow
     [Range(4, 128), Tooltip("Size of the render buckets.")]
     public int BucketSize = 32;
     public bool DXRAcceletration = true;
+    public bool SkyboxContribution = true;
+    public Cubemap CustomEnvorment;
+    public int EnvLightSamples = 512;
+
 
     //interal
     bool saveWarning = false;
@@ -34,11 +38,27 @@ public class VolumetricBaking : EditorWindow
     private void OnGUI()
     {
         DisplayProgress();
-
-        AreaLightSamples = EditorGUILayout.IntSlider("Area Samples", AreaLightSamples, 1, 1024);
+        EditorGUILayout.LabelField("System Settings", EditorStyles.boldLabel);
+        GUI.enabled = !DXRAcceletration;
         BucketSize = EditorGUILayout.IntSlider("Bucket Size", BucketSize, 4, 256);
+        GUI.enabled = true;
         DXRAcceletration = EditorGUILayout.Toggle("DXR Acceletration", DXRAcceletration);
- //       EditorGUILayout.IntField(AreaLightSamples, "Area light samples" );
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Light Settings", EditorStyles.boldLabel);
+        AreaLightSamples = EditorGUILayout.IntSlider("Area Samples", AreaLightSamples, 1, 1024);
+
+        EditorGUILayout.Space();
+        GUI.enabled = DXRAcceletration;
+        EditorGUILayout.LabelField("Enviorment Settings", EditorStyles.boldLabel);
+        SkyboxContribution = EditorGUILayout.Toggle("Skybox Contribution", SkyboxContribution);
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Custom Skybox", EditorStyles.label);
+        CustomEnvorment = (Cubemap)EditorGUILayout.ObjectField(CustomEnvorment, typeof(Cubemap), true);
+        EditorGUILayout.EndHorizontal();
+        EnvLightSamples = EditorGUILayout.IntSlider("Environmental Samples", EnvLightSamples, 1, 4096 ); ;
+        GUI.enabled = true;
+        //       EditorGUILayout.IntField(AreaLightSamples, "Area light samples" );
 
 
         if (GUILayout.Button("Bake Volumetrics"))
@@ -191,6 +211,7 @@ public class VolumetricBaking : EditorWindow
                 Debug.Log("Saved " + currentS.name);
             }
         }
+        AssetDatabase.SaveAssets();
         ClearWarning();
     }
 
@@ -414,6 +435,7 @@ public class VolumetricBaking : EditorWindow
 
     ComputeShader BakingShader;
 
+
     void BakeLights()
     {
         System.DateTime startTime = System.DateTime.Now;
@@ -590,7 +612,29 @@ public class VolumetricBaking : EditorWindow
 
         return RT3d;
     }
+    Texture MakeEnvironmentalCubemap()
+    {
+        if (CustomEnvorment == null)
+        {
 
+            RenderTexture cubetex = new RenderTexture(128, 128, 1, RenderTextureFormat.DefaultHDR);
+            cubetex.enableRandomWrite = true;
+            cubetex.dimension = UnityEngine.Rendering.TextureDimension.Cube;
+            cubetex.Create();
+
+            Camera renderCam = new GameObject().AddComponent<Camera>();
+            renderCam.cullingMask = 0;
+            renderCam.backgroundColor = Color.black;
+            renderCam.clearFlags = CameraClearFlags.SolidColor;
+            renderCam.RenderToCubemap(cubetex);
+            DestroyImmediate(renderCam.gameObject);
+            return cubetex;
+        }
+        else
+        {
+            return CustomEnvorment;
+        }
+    }
 
     void BakeDXR()
     {
@@ -600,18 +644,17 @@ public class VolumetricBaking : EditorWindow
         ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
 
         RayTracingShader rtshader = AssetDatabase.LoadAssetAtPath<RayTracingShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/DXR-Volumebaker.raytrace");
-        RayTracingAccelerationStructure accelerationStructure = new RayTracingAccelerationStructure(); ;
+        rtshader.SetShaderPass("BakedRaytrace");
 
+        RayTracingAccelerationStructure accelerationStructure = new RayTracingAccelerationStructure(); ;
         Renderer[] renderers = GatherStaticRenderers();
         for (int i = 0; i < renderers.Length; i++) accelerationStructure.AddInstance(renderers[i]);
         accelerationStructure.Build();
-
         rtshader.SetAccelerationStructure("g_SceneAccelStruct", accelerationStructure);
 
         Running = true;
 
         Vector3Int threads = new Vector3Int();
-
 
         for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
         {
@@ -624,8 +667,6 @@ public class VolumetricBaking : EditorWindow
             /// 
 
             List<Light> PointLights, ConeLights, DirectionalLights, AreaLights;
-
-
 
             Light[] Lights = GatherBakedLights();
 
@@ -665,7 +706,6 @@ public class VolumetricBaking : EditorWindow
             }
 
             Debug.Log(PointLights.Count + "Point Lights, " + ConeLights.Count + " Cone Lights, " + DirectionalLights.Count + " Dir Lights, " + AreaLights.Count + " area lights.");
-
 
             //Set up buffers with data stride. Keeping a min count of 1 to keep buffer valid. Get's skipped in shader.
             ComputeBuffer pointBuffer = new ComputeBuffer(Mathf.Max(PointLights.Count,1), (3 + 4) * 4);
@@ -739,6 +779,10 @@ public class VolumetricBaking : EditorWindow
             rtshader.SetInt("AreaLightSamples", System.Convert.ToInt32(AreaLightSamples));
             rtshader.SetBuffer("ALD", areaBuffer);
 
+            //Env
+            rtshader.SetTexture("_SkyTexture", MakeEnvironmentalCubemap());
+            rtshader.SetInt("EnvLightSamples", System.Convert.ToInt32(EnvLightSamples));
+
             //Dispatching
             rtshader.Dispatch("MainRayGenShader", threads.x, threads.y, threads.z);
 
@@ -763,6 +807,8 @@ public class VolumetricBaking : EditorWindow
         Running = false;
         EditorUtility.ClearProgressBar();
 
+        accelerationStructure.Dispose();
+
         System.DateTime endTime = System.DateTime.Now;
 
         UpdateStatus(" Volumetric bake took " + (endTime.Minute - startTime.Minute) + " Minutes and " +
@@ -772,10 +818,6 @@ public class VolumetricBaking : EditorWindow
 
     }
 
-    void ClearBuffer()
-    {
-
-    }
 
     void DispatchLight(Light light, RenderTexture RT3d, Vector3Int Texels, int AreaID, Vector3Int TextileOffset ) //Used to render each light indavidually. TODO Generalize into pure pathtracing
     {
