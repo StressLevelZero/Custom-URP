@@ -148,6 +148,11 @@ public class VolumetricBaking : EditorWindow
 
     bool VerifySettings()
     {
+        if (DXRAcceletration && SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Direct3D12)
+        {
+            UpdateWarning("DirectX 12 not in use. DXR Acceletration requires it.");
+            return false;
+        }
 
 
         if (VolumetricRegisters.volumetricAreas.Count < 1) //Checking volumes
@@ -636,6 +641,14 @@ public class VolumetricBaking : EditorWindow
         }
     }
 
+    void RefreshDebuggers()
+    {
+        for (int i = 0; i < VolumetricRegisters.volumetricAreas.Count; i++)
+        {
+            if (VolumetricRegisters.volumetricAreas[i].DEBUG) VolumetricRegisters.volumetricAreas[i].RefreshDebugMesh();
+        }
+    }
+
     void BakeDXR()
     {
 
@@ -815,6 +828,7 @@ public class VolumetricBaking : EditorWindow
             (endTime.Second - startTime.Second) + " Seconds. Baked " + VolumetricRegisters.volumetricAreas.Count + " areas."
             );
 
+        RefreshDebuggers();
 
     }
 

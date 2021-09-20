@@ -187,7 +187,7 @@ float3 get_uv(float3 p) {
 		src.rgb *= src.a;
 
 		// blend
-		dst =  src + dst;
+		dst =  0.05 * src + dst;
 		p += ds;
 
 		//if (dst.a > _Threshold) break;
