@@ -49,6 +49,8 @@ float4x4 _AxisRotationMatrix;
 
 uniform float4 _CameraDepthTexture_TexelSize;
 
+float _VolExposure;
+
 
 struct Ray {
   float3 origin;
@@ -187,7 +189,7 @@ float3 get_uv(float3 p) {
 		src.rgb *= src.a;
 
 		// blend
-		dst =  0.05 * src + dst;
+		dst =  _VolExposure * src + dst;
 		p += ds;
 
 		//if (dst.a > _Threshold) break;

@@ -31,6 +31,7 @@ public class VolumetricBaking : EditorWindow
     public Cubemap CustomEnvorment;
     public int EnvLightSamples = 512;
 
+    public float VolExposure = 0.05f;
 
     //interal
     bool saveWarning = false;
@@ -42,6 +43,7 @@ public class VolumetricBaking : EditorWindow
         GUI.enabled = !DXRAcceletration;
         BucketSize = EditorGUILayout.IntSlider("Bucket Size", BucketSize, 4, 256);
         GUI.enabled = true;
+        VolExposure = EditorGUILayout.Slider("Debug Exposure", RefreshExposure(VolExposure), 0, 2);
         DXRAcceletration = EditorGUILayout.Toggle("DXR Acceletration", DXRAcceletration);
 
         EditorGUILayout.Space();
@@ -83,6 +85,12 @@ public class VolumetricBaking : EditorWindow
         if (saveWarning) if (GUILayout.Button("Save scene(s)")) SaveScenes();
 
         //      EditorGUILayout.HelpBox("Some warning text", MessageType.Warning); //Todo: add warning box to window
+    }
+
+    float RefreshExposure(float Exposure)
+    {
+        Shader.SetGlobalFloat("_VolExposure", Exposure);
+        return Exposure;
     }
 
     struct WarningStatus
