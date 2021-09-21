@@ -48,7 +48,7 @@ Vertex InterpolateVertices(Vertex v0, Vertex v1, Vertex v2, float3 barycentrics)
 void BakedClosestHit(inout RayPayload payload,
     AttributeData attributes : SV_IntersectionAttributes) {
   #ifndef _EMISSION
-    payload.color = float4(0,0,0,0);
+    payload.color = float4(0,0,0,1);
   #else
     uint2 launchIdx = DispatchRaysIndex();
     //    ShadingData shade = getShadingData( PrimitiveIndex(), attribs );
