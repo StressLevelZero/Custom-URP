@@ -13,7 +13,7 @@
 
 
 	SubShader {
-		Blend SrcAlpha OneMinusSrcAlpha
+		Blend One One
 		ZTest Always
 		Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Transparent" "Queue" = "Transparent" }
 		Cull front
@@ -48,6 +48,8 @@ half3 _SliceMin, _SliceMax;
 float4x4 _AxisRotationMatrix;
 
 uniform float4 _CameraDepthTexture_TexelSize;
+
+float _VolExposure;
 
 
 struct Ray {
@@ -187,10 +189,10 @@ float3 get_uv(float3 p) {
 		src.rgb *= src.a;
 
 		// blend
-		dst = (1.0 - dst.a) * src + dst;
+		dst =  _VolExposure * src + dst;
 		p += ds;
 
-		if (dst.a > _Threshold) break;
+		//if (dst.a > _Threshold) break;
 	  }
 
 	  return saturate(dst) * _Color;

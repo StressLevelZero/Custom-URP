@@ -412,8 +412,10 @@ public class VolumetricRendering : MonoBehaviour
 
         //Debug.Log(cam.stereoSeparation);
 
-        FroxelIntegrationCompute.SetMatrix("LeftEyeMatrix", LeftProjectionMatrix * CenterProjectionMatrix.inverse);
-        FroxelIntegrationCompute.SetMatrix("RightEyeMatrix", RightProjectionMatrix * CenterProjectionMatrix.inverse);
+        Matrix4x4 CenterProjectionMatrixInverse = CenterProjectionMatrix.inverse;
+
+        FroxelIntegrationCompute.SetMatrix("LeftEyeMatrix", LeftProjectionMatrix * CenterProjectionMatrixInverse);
+        FroxelIntegrationCompute.SetMatrix("RightEyeMatrix", RightProjectionMatrix * CenterProjectionMatrixInverse);
 
 
         //Global Variable setup

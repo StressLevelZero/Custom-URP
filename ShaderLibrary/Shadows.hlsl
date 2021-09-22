@@ -8,6 +8,8 @@
 #define SHADOWS_SCREEN 0
 #define MAX_SHADOW_CASCADES 4
 
+#define  g_vShadow3x3PCFTerms0  float4(0.0749063670411985, 0.1235955056179775, 0.2059925093632959, 0.0f)//float4(20.0f / 267.0f, 33.0f / 267.0f, 55.0f / 267.0f, 0.0f)
+
 #if !defined(_RECEIVE_SHADOWS_OFF)
     #if defined(_MAIN_LIGHT_SHADOWS)
         #define MAIN_LIGHT_CALCULATE_SHADOWS
@@ -149,6 +151,8 @@ real SampleShadowmapFiltered(TEXTURE2D_SHADOW_PARAM(ShadowMap, sampler_ShadowMap
     attenuation4.w = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, shadowCoord.xyz + samplingData.shadowOffset3.xyz);
     attenuation = dot(attenuation4, 0.25);
 #else
+
+ #if (0)
     float fetchesWeights[9];
     float2 fetchesUV[9];
     SampleShadow_ComputeSamples_Tent_5x5(samplingData.shadowmapSize, shadowCoord.xy, fetchesWeights, fetchesUV);
@@ -162,6 +166,38 @@ real SampleShadowmapFiltered(TEXTURE2D_SHADOW_PARAM(ShadowMap, sampler_ShadowMap
     attenuation += fetchesWeights[6] * SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3(fetchesUV[6].xy, shadowCoord.z));
     attenuation += fetchesWeights[7] * SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3(fetchesUV[7].xy, shadowCoord.z));
     attenuation += fetchesWeights[8] * SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3(fetchesUV[8].xy, shadowCoord.z));
+ 
+#else //SLZ SHADOWS
+    
+    float fetchesWeights[9];
+    float2 fetchesUV[9];
+    SampleShadow_ComputeSamples_Tent_5x5(samplingData.shadowmapSize, shadowCoord.xy, fetchesWeights, fetchesUV);
+
+    float3 tmpoff = float3(0.00051,-0.00051,0);
+
+
+    float4 v20Taps;
+    v20Taps.x = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset3.xy + tmpoff.xx), shadowCoord.z)).x; //  1  1
+    v20Taps.y = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset2.xy + tmpoff.yx), shadowCoord.z)).x; // -1  1
+    v20Taps.z = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset1.xy + tmpoff.xy), shadowCoord.z)).x; //  1 -1
+    v20Taps.w = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset0.xy + tmpoff.yy), shadowCoord.z)).x; // -1 -1
+    float flSum = dot(v20Taps.xyzw, float4(0.25, 0.25, 0.25, 0.25));
+    if ((flSum == 0.0) || (flSum == 1.0))
+        return flSum;
+    flSum *= g_vShadow3x3PCFTerms0.x * 4.0;
+
+    float4 v33Taps;
+    v33Taps.x = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset3.xz + tmpoff.xz), shadowCoord.z)).x; //  1  0
+    v33Taps.y = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset0.xz + tmpoff.yz), shadowCoord.z)).x; // -1  0
+    v33Taps.z = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset1.zy + tmpoff.zy), shadowCoord.z)).x; //  0 -1
+    v33Taps.w = SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3((shadowCoord.xy + samplingData.shadowOffset3.zy + tmpoff.zx), shadowCoord.z)).x; //  0  1
+    flSum += dot(v33Taps.xyzw, g_vShadow3x3PCFTerms0.yyyy);
+
+    flSum += SAMPLE_TEXTURE2D_SHADOW(ShadowMap, sampler_ShadowMap, float3(shadowCoord.xy, shadowCoord.z)).x * g_vShadow3x3PCFTerms0.z;
+
+    attenuation = flSum;
+ #endif
+
 #endif
 
     return attenuation;

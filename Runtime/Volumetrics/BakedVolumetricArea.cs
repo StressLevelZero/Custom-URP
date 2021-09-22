@@ -139,5 +139,12 @@ public class BakedVolumetricArea : MonoBehaviour
         DestroyImmediate(DebugCube);
         DestroyImmediate(mat);
     }
+
+    public void RefreshDebugMesh()
+    {
+        DisableDebugMesh();
+        EnableDebugMesh();
+    }
+
 #endif
 }
