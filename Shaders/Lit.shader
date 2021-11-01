@@ -20,8 +20,8 @@ Shader "Universal Render Pipeline/Lit"
         _SpecColor("Specular", Color) = (0.2, 0.2, 0.2)
         _SpecGlossMap("Specular", 2D) = "white" {}
 
-        [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
-        [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
+      //  [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
+      //  [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
 
         _BumpScale("Scale", Float) = 1.0
         _BumpMap("Normal Map", 2D) = "bump" {}
@@ -91,8 +91,8 @@ Shader "Universal Render Pipeline/Lit"
             #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             #pragma shader_feature_local _OCCLUSIONMAP
 
-            #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
-            #pragma shader_feature_local _ENVIRONMENTREFLECTIONS_OFF
+        //    #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
+        //    #pragma shader_feature_local _ENVIRONMENTREFLECTIONS_OFF
             #pragma shader_feature_local _SPECULAR_SETUP
             #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
 

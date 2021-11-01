@@ -78,18 +78,18 @@ Shader "Universal Render Pipeline/Particles/Unlit"
 
             // -------------------------------------
             // Material Keywords
-            #pragma shader_feature _NORMALMAP
-            #pragma shader_feature _EMISSION
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _EMISSION
 
             // -------------------------------------
             // Particle Keywords
-            #pragma shader_feature _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
-            #pragma shader_feature _FLIPBOOKBLENDING_ON
-            #pragma shader_feature _SOFTPARTICLES_ON
-            #pragma shader_feature _FADING_ON
-            #pragma shader_feature _DISTORTION_ON
+            #pragma shader_feature_local _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
+            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+            #pragma shader_feature_local _SOFTPARTICLES_ON
+            #pragma shader_feature_local _FADING_ON
+            #pragma shader_feature_local _DISTORTION_ON
 
             #pragma multi_compile _ _VOLUMETRICS_ENABLED
 

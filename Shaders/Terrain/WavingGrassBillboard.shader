@@ -74,7 +74,7 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWavingDoublePass
             // -------------------------------------
             // Material Keywords
             #define _ALPHATEST_ON
-            #pragma shader_feature _GLOSSINESS_FROM_BASE_ALPHA
+            #pragma shader_feature_local _GLOSSINESS_FROM_BASE_ALPHA
 
             //--------------------------------------
             // GPU Instancing

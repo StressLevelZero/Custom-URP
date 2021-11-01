@@ -174,7 +174,7 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit"
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaSimple
 
-            #pragma shader_feature _SPECGLOSSMAP
+            #pragma shader_feature_local _SPECGLOSSMAP
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitMetaPass.hlsl"

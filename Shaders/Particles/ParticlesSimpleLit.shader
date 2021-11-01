@@ -93,21 +93,21 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 
             // -------------------------------------
             // Material Keywords
-            #pragma shader_feature _NORMALMAP
-            #pragma shader_feature _EMISSION
-            #pragma shader_feature _ _SPECGLOSSMAP _SPECULAR_COLOR
-            #pragma shader_feature _GLOSSINESS_FROM_BASE_ALPHA
-            #pragma shader_feature _RECEIVE_SHADOWS_OFF
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _EMISSION
+            #pragma shader_feature_local _ _SPECGLOSSMAP _SPECULAR_COLOR
+            #pragma shader_feature_local _GLOSSINESS_FROM_BASE_ALPHA
+            #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
 
             // -------------------------------------
             // Particle Keywords
-            #pragma shader_feature _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
-            #pragma shader_feature _FLIPBOOKBLENDING_ON
-            #pragma shader_feature _SOFTPARTICLES_ON
-            #pragma shader_feature _FADING_ON
-            #pragma shader_feature _DISTORTION_ON
+            #pragma shader_feature_local _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
+            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+            #pragma shader_feature_local _SOFTPARTICLES_ON
+            #pragma shader_feature_local _FADING_ON
+            #pragma shader_feature_local _DISTORTION_ON
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -146,8 +146,8 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 
             #pragma vertex vert
             #pragma fragment frag
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _ALPHAPREMULTIPLY_ON
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local _ALPHAPREMULTIPLY_ON
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Universal2D.hlsl"
