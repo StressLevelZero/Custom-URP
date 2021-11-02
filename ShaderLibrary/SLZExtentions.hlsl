@@ -1,8 +1,10 @@
 #ifndef SLZ_LightingExtend
 #define SLZ_LightingExtend
 
-#define M_PI 3.1415926535897932384626433832795		//Standard stored Pi.
+#define M_PI  3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
+#define PI_R  0.31830988618f                        //Reciprocal 
+
 
 //Extention Libary to add into pipeline. Should make future package upgrading simpler.
 
@@ -25,7 +27,7 @@ float GGXTerm (float NdotH, float roughness)
 {
     float a2 = roughness * roughness;
     float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
-    return M_PI * a2 / (d * d + 1e-7f); // This function is not intended to be running on Mobile,
+    return PI_R * a2 / (d * d + 1e-7f); // This function is not intended to be running on Mobile,
                                                 // therefore epsilon is smaller than what can be represented by half
 }
 
