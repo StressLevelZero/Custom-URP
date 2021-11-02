@@ -45,7 +45,7 @@ half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, fl
 half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 viewDir, float smoothness)
 {
     float3 dominantDir = direction.xyz * 2 - 1;
-    half3 halfDir = (normalize(dominantDir) - viewDir);
+    half3 halfDir = normalize(normalize(dominantDir) + viewDir);
     half nh = saturate(dot(normalWorld, halfDir));
     half perceptualRoughness = 1 - smoothness;
     half roughness = perceptualRoughness * perceptualRoughness;
@@ -68,7 +68,7 @@ half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, flo
 //	return interpolated;
 //}
 //Making a copy from the core to avoid sampling the directional map twice
- real3 SampleDirectionalLightmapSLZ(TEXTURE2D_PARAM(lightmapTex, lightmapSampler), TEXTURE2D_PARAM(lightmapDirTex, lightmapDirSampler), float2 uv, float4 transform, float3 normalWS, bool encodedLightmap, real4 decodeInstructions)
+ real4 SampleDirectionalLightmapSLZ(TEXTURE2D_PARAM(lightmapTex, lightmapSampler), TEXTURE2D_PARAM(lightmapDirTex, lightmapDirSampler), float2 uv, float4 transform, float3 normalWS, float smoothness, float3 viewDirWS, bool encodedLightmap, real4 decodeInstructions)
  {
      // In directional mode Enlighten bakes dominant light direction
      // in a way, that using it for half Lambert and then dividing by a "rebalancing coefficient"
@@ -92,10 +92,11 @@ half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, flo
      {
          illuminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgb;
      }
-   //  BakeryDirectionalLightmapSpecular(direction, normalWS, float3 viewDir, float smoothness);
-
      real halfLambert = dot(normalWS, direction.xyz - 0.5) + 0.5;
-     return illuminance * halfLambert / max(1e-4, direction.w);
+     real3 IndirectDiffuse = illuminance * halfLambert / max(1e-4, direction.w);
+     real IndirectSpecular = BakeryDirectionalLightmapSpecular(direction, normalWS, viewDirWS, smoothness) ;
+     return real4(IndirectDiffuse.xyz, IndirectSpecular) ;
+  //   return 0;
  }
 
 ///////////////////////////////////////////////////////////////////////////////

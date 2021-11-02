@@ -442,6 +442,32 @@ half3 SampleLightmap(float2 lightmapUV, half3 normalWS)
 #endif
 }
 
+half4 SampleLightmapDir(float2 lightmapUV, half3 normalWS, half smoothness, float3 viewDirWS)
+{
+#ifdef UNITY_LIGHTMAP_FULL_HDR
+    bool encodedLightmap = false;
+#else
+    bool encodedLightmap = true;
+#endif
+
+    half4 decodeInstructions = half4(LIGHTMAP_HDR_MULTIPLIER, LIGHTMAP_HDR_EXPONENT, 0.0h, 0.0h);
+
+    // The shader library sample lightmap functions transform the lightmap uv coords to apply bias and scale.
+    // However, universal pipeline already transformed those coords in vertex. We pass half4(1, 1, 0, 0) and
+    // the compiler will optimize the transform away.
+    half4 transformCoords = half4(1, 1, 0, 0);
+
+#ifdef DIRLIGHTMAP_COMBINED
+    return SampleDirectionalLightmapSLZ(TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap),
+        TEXTURE2D_ARGS(unity_LightmapInd, samplerunity_Lightmap),
+        lightmapUV, transformCoords, normalWS, smoothness, viewDirWS, encodedLightmap, decodeInstructions);
+#elif defined(LIGHTMAP_ON)
+    return SampleSingleLightmap(TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap), lightmapUV, transformCoords, encodedLightmap, decodeInstructions).rgbb;
+#else
+    return half4(0.0, 0.0, 0.0, 0.0);
+#endif
+}
+
 // We either sample GI from baked lightmap or from probes.
 // If lightmap: sampleData.xy = lightmapUV
 // If probe: sampleData.xyz = L2 SH terms
@@ -449,6 +475,12 @@ half3 SampleLightmap(float2 lightmapUV, half3 normalWS)
 #define SAMPLE_GI(lmName, shName, normalWSName) SampleLightmap(lmName, normalWSName)
 #else
 #define SAMPLE_GI(lmName, shName, normalWSName) SampleSHPixel(shName, normalWSName)
+#endif
+
+#ifdef LIGHTMAP_ON
+#define SAMPLE_GI_DIR(lmName, shName, normalWSName, smoothness, viewDirWS) SampleLightmapDir(lmName, normalWSName, smoothness, viewDirWS)
+#else
+#define SAMPLE_GI_DIR(lmName, shName, normalWSName, smoothness, viewDirWS) SampleSHPixel(shName, normalWSName)
 #endif
 
 half3 GlossyEnvironmentReflection(half3 reflectVector, half perceptualRoughness, half occlusion)

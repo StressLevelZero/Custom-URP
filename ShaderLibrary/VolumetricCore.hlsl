@@ -87,7 +87,7 @@ half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
 //#if defined(REFLECTIONFOG)
   //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
   //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(_SkyTexture, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
-    return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_SkyTexture, viewDirectionWS, mipLevel));
+    return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_SkyTexture, viewDirectionWS, mipLevel)).rgb;
 
 
 
