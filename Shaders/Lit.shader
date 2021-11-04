@@ -3,7 +3,7 @@ Shader "Universal Render Pipeline/Lit"
     Properties
     {
         // Specular vs Metallic workflow
-        [HideInInspector] _WorkflowMode("WorkflowMode", Float) = 1.0
+      //  [HideInInspector] _WorkflowMode("WorkflowMode", Float) = 1.0
 
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
@@ -17,8 +17,8 @@ Shader "Universal Render Pipeline/Lit"
         [Gamma] _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
         _MetallicGlossMap("Metallic", 2D) = "white" {}
 
-        _SpecColor("Specular", Color) = (0.2, 0.2, 0.2)
-        _SpecGlossMap("Specular", 2D) = "white" {}
+     //   _SpecColor("Specular", Color) = (0.2, 0.2, 0.2)
+     //   _SpecGlossMap("Specular", 2D) = "white" {}
 
       //  [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
       //  [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
@@ -41,7 +41,7 @@ Shader "Universal Render Pipeline/Lit"
         [HideInInspector] _ZWrite("__zw", Float) = 1.0
         [HideInInspector] _Cull("__cull", Float) = 2.0
 
-        _ReceiveShadows("Receive Shadows", Float) = 1.0
+        //_ReceiveShadows("Receive Shadows", Float) = 1.0
         // Editmode props
         [HideInInspector] _QueueOffset("Queue offset", Float) = 0.0
 
@@ -88,13 +88,13 @@ Shader "Universal Render Pipeline/Lit"
             #pragma shader_feature_local _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local _EMISSION
             #pragma shader_feature_local _METALLICSPECGLOSSMAP
-            #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+        //    #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             #pragma shader_feature_local _OCCLUSIONMAP
 
         //    #pragma shader_feature_local _SPECULARHIGHLIGHTS_OFF
         //    #pragma shader_feature_local _ENVIRONMENTREFLECTIONS_OFF
-            #pragma shader_feature_local _SPECULAR_SETUP
-            #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
+        //    #pragma shader_feature_local _SPECULAR_SETUP
+        //    #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -147,7 +147,7 @@ Shader "Universal Render Pipeline/Lit"
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+    //        #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
 
             #pragma vertex ShadowPassVertex
             #pragma fragment ShadowPassFragment
@@ -178,7 +178,7 @@ Shader "Universal Render Pipeline/Lit"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local _ALPHATEST_ON
-            #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+        //    #pragma shader_feature_local _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
 
             //--------------------------------------
             // GPU Instancing
@@ -205,13 +205,13 @@ Shader "Universal Render Pipeline/Lit"
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMeta
 
-            #pragma shader_feature_local _SPECULAR_SETUP
+        //    #pragma shader_feature_local _SPECULAR_SETUP
             #pragma shader_feature_local _EMISSION
             #pragma shader_feature_local _METALLICSPECGLOSSMAP
             #pragma shader_feature_local _ALPHATEST_ON
-            #pragma shader_feature_local _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+        //    #pragma shader_feature_local _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
 
-            #pragma shader_feature_local _SPECGLOSSMAP
+        //    #pragma shader_feature_local _SPECGLOSSMAP
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitMetaPass.hlsl"
