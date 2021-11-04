@@ -79,6 +79,48 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
     inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
 }
 
+
+//Directional variation
+void InitializeInputDataDir(Varyings input, half3 normalTS, half3 smoothness, out InputData inputData, out float BakedSpecular)
+{
+    inputData = (InputData)0;
+
+#if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
+    inputData.positionWS = input.positionWS;
+#endif
+
+#ifdef _NORMALMAP
+    half3 viewDirWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
+    inputData.normalWS = TransformTangentToWorld(normalTS,
+        half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz));
+#else
+    half3 viewDirWS = input.viewDirWS;
+    inputData.normalWS = input.normalWS;
+#endif
+
+    inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
+    viewDirWS = SafeNormalize(viewDirWS);
+    inputData.viewDirectionWS = viewDirWS;
+
+#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+    inputData.shadowCoord = input.shadowCoord;
+#elif defined(MAIN_LIGHT_CALCULATE_SHADOWS)
+    inputData.shadowCoord = TransformWorldToShadowCoord(inputData.positionWS);
+#else
+    inputData.shadowCoord = float4(0, 0, 0, 0);
+#endif
+
+    inputData.fogCoord = input.fogFactorAndVertexLight.x;
+    inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
+#ifdef LIGHTMAP_ON
+    float4 encodedGI = SAMPLE_GI_DIR(input.lightmapUV, input.vertexSH, inputData.normalWS, smoothness, viewDirWS);
+    inputData.bakedGI = encodedGI.rgb;
+    BakedSpecular = encodedGI.w;
+#else
+    inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
+#endif
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                  Vertex and Fragment functions                            //
 ///////////////////////////////////////////////////////////////////////////////
@@ -138,10 +180,20 @@ half4 LitPassFragment(Varyings input) : SV_Target
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
 
     InputData inputData;
+    #ifdef LIGHTMAP_ON
+    float BakedSpecular = 0;
+    InitializeInputDataDir(input, surfaceData.normalTS, surfaceData.smoothness, inputData, BakedSpecular);   
+    #else
     InitializeInputData(input, surfaceData.normalTS, inputData);
+    #endif
 
     half4 color = UniversalFragmentPBR(inputData, surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.occlusion, surfaceData.emission, surfaceData.alpha);
     
+    #ifdef LIGHTMAP_ON
+    float3 MetalSpec = lerp(kDieletricSpec.rgb, surfaceData.albedo, surfaceData.metallic);
+    color.rgb += BakedSpecular * surfaceData.occlusion * MetalSpec * inputData.bakedGI.rgb;
+    #endif
+
     #ifdef _NORMALMAP
      color.rgb = MixFog(color.rgb, -real3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w), inputData.fogCoord);
     #else

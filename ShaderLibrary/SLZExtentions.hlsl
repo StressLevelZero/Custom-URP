@@ -35,7 +35,7 @@ float GGXTerm (float NdotH, float roughness)
 half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 viewDir, float smoothness)
 {
 	float3 dominantDir = LOAD_TEXTURE2D(unity_LightmapInd, lightmapUV).xyz * 2 - 1;
-	half3 halfDir = (normalize(dominantDir) - viewDir);
+	half3 halfDir = normalize(normalize(dominantDir) - viewDir);
 	half nh = saturate(dot(normalWorld, halfDir));
 	half perceptualRoughness = 1-smoothness;
 	half roughness = perceptualRoughness * perceptualRoughness;
