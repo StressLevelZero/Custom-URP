@@ -1,3 +1,4 @@
+using System;
 using UnityEngine.Scripting.APIUpdating;
 
 namespace UnityEngine.Rendering.Universal
@@ -8,7 +9,7 @@ namespace UnityEngine.Rendering.Universal
     /// <seealso cref="ScriptableRenderer"/>
     /// <seealso cref="ScriptableRenderPass"/>
     [ExcludeFromPreset]
-    [MovedFrom("UnityEngine.Rendering.LWRP")] public abstract class ScriptableRendererFeature : ScriptableObject
+    public abstract class ScriptableRendererFeature : ScriptableObject, IDisposable
     {
         [SerializeField, HideInInspector] private bool m_Active = true;
         /// <summary>
@@ -22,12 +23,18 @@ namespace UnityEngine.Rendering.Universal
         public abstract void Create();
 
         /// <summary>
+        /// Callback before cull happens in renderer.
+        /// </summary>
+        /// <param name="renderer">Renderer of callback.</param>
+        /// <param name="cameraData">CameraData contains all relevant render target information for the camera.</param>
+        public virtual void OnCameraPreCull(ScriptableRenderer renderer, in CameraData cameraData) {}
+
+        /// <summary>
         /// Injects one or multiple <c>ScriptableRenderPass</c> in the renderer.
         /// </summary>
-        /// <param name="renderPasses">List of render passes to add to.</param>
+        /// <param name="renderer">Renderer used for adding render passes.</param>
         /// <param name="renderingData">Rendering state. Use this to setup render passes.</param>
-        public abstract void AddRenderPasses(ScriptableRenderer renderer,
-            ref RenderingData renderingData);
+        public abstract void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData);
 
         void OnEnable()
         {
@@ -40,6 +47,14 @@ namespace UnityEngine.Rendering.Universal
         }
 
         /// <summary>
+        /// Override this method and return true if the feature should use the Native RenderPass API
+        /// </summary>
+        internal virtual bool SupportsNativeRenderPass()
+        {
+            return false;
+        }
+
+        /// <summary>
         /// Sets the state of ScriptableRenderFeature (true: the feature is active, false: the feature is inactive).
         /// If the feature is active, it is added to the renderer it is attached to, otherwise the feature is skipped while rendering.
         /// </summary>
@@ -47,6 +62,19 @@ namespace UnityEngine.Rendering.Universal
         public void SetActive(bool active)
         {
             m_Active = active;
+        }
+
+        /// <summary>
+        /// Disposable pattern implementation.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
         }
     }
 }

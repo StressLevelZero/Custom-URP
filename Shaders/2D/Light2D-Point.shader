@@ -17,7 +17,6 @@ Shader "Hidden/Light2D-Point"
             Cull Off
 
             HLSLPROGRAM
-            #pragma prefer_hlslcc gles
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_local USE_POINT_LIGHT_COOKIES __
@@ -37,9 +36,8 @@ Shader "Hidden/Light2D-Point"
             struct Varyings
             {
                 float4  positionCS      : SV_POSITION;
-                float2  uv              : TEXCOORD0;
-                float2	lookupUV        : TEXCOORD2;  // This is used for light relative direction
-                float2	lookupNoRotUV   : TEXCOORD3;  // This is used for screen relative direction of a light
+                half2   uv              : TEXCOORD0;
+                half2   lookupUV        : TEXCOORD2;  // This is used for light relative direction
 
                 NORMALS_LIGHTING_COORDS(TEXCOORD4, TEXCOORD5)
                 SHADOW_COORDS(TEXCOORD6)
@@ -52,22 +50,22 @@ Shader "Hidden/Light2D-Point"
 
             TEXTURE2D(_FalloffLookup);
             SAMPLER(sampler_FalloffLookup);
-            float _FalloffIntensity;
+            half _FalloffIntensity;
 
             TEXTURE2D(_LightLookup);
             SAMPLER(sampler_LightLookup);
-            float4 _LightLookup_TexelSize;
+            half4 _LightLookup_TexelSize;
 
             NORMALS_LIGHTING_VARIABLES
             SHADOW_VARIABLES
 
-            half4	    _LightColor;
-            half4x4	    _LightInvMatrix;
-            half4x4	    _LightNoRotInvMatrix;
-            half	    _OuterAngle;			    // 1-0 where 1 is the value at 0 degrees and 1 is the value at 180 degrees
-            half	    _InnerAngleMult;			// 1-0 where 1 is the value at 0 degrees and 1 is the value at 180 degrees
-            half	    _InnerRadiusMult;			// 1-0 where 1 is the value at the center and 0 is the value at the outer radius
-            half	    _InverseHDREmulationScale;
+            half4       _LightColor;
+            float4x4    _LightInvMatrix;
+            float4x4    _LightNoRotInvMatrix;
+            half        _OuterAngle;                // 1-0 where 1 is the value at 0 degrees and 1 is the value at 180 degrees
+            half        _InnerAngleMult;            // 1-0 where 1 is the value at 0 degrees and 1 is the value at 180 degrees
+            half        _InnerRadiusMult;           // 1-0 where 1 is the value at the center and 0 is the value at the outer radius
+            half        _InverseHDREmulationScale;
             half        _IsFullSpotlight;
 
             Varyings vert(Attributes input)
@@ -84,7 +82,6 @@ Shader "Hidden/Light2D-Point"
                 float4 lightSpaceNoRotPos = mul(_LightNoRotInvMatrix, worldSpacePos);
                 float halfTexelOffset = 0.5 * _LightLookup_TexelSize.x;
                 output.lookupUV = 0.5 * (lightSpacePos.xy + 1) + halfTexelOffset;
-                output.lookupNoRotUV = 0.5 * (lightSpaceNoRotPos.xy + 1) + halfTexelOffset;
 
                 TRANSFER_NORMALS_LIGHTING(output, worldSpacePos)
                 TRANSFER_SHADOWS(output)
@@ -94,12 +91,10 @@ Shader "Hidden/Light2D-Point"
 
             half4 frag(Varyings input) : SV_Target
             {
-                half4 lookupValueNoRot = SAMPLE_TEXTURE2D(_LightLookup, sampler_LightLookup, input.lookupNoRotUV);  // r = distance, g = angle, b = x direction, a = y direction
                 half4 lookupValue = SAMPLE_TEXTURE2D(_LightLookup, sampler_LightLookup, input.lookupUV);  // r = distance, g = angle, b = x direction, a = y direction
 
-
                 // Inner Radius
-                half attenuation = saturate(_InnerRadiusMult * lookupValueNoRot.r);   // This is the code to take care of our inner radius
+                half attenuation = saturate(_InnerRadiusMult * lookupValue.r);   // This is the code to take care of our inner radius
 
                 // Spotlight
                 half  spotAttenuation = saturate((_OuterAngle - lookupValue.g + _IsFullSpotlight) * _InnerAngleMult);

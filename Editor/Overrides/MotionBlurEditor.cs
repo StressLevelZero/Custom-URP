@@ -22,19 +22,13 @@ namespace UnityEditor.Rendering.Universal
 
         public override void OnInspectorGUI()
         {
-            if (UniversalRenderPipeline.asset?.postProcessingFeatureSet == PostProcessingFeatureSet.PostProcessingV2)
-            {
-                EditorGUILayout.HelpBox(UniversalRenderPipelineAssetEditor.Styles.postProcessingGlobalWarning, MessageType.Warning);
-                return;
-            }
-
             //PropertyField(m_Mode);
 
             //if (m_Mode.value.intValue == (int)MotionBlurMode.CameraOnly)
             //{
-                PropertyField(m_Quality);
-                PropertyField(m_Intensity);
-                PropertyField(m_Clamp);
+            PropertyField(m_Quality);
+            PropertyField(m_Intensity);
+            PropertyField(m_Clamp);
             //}
             //else
             //{

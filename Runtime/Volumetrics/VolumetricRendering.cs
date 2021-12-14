@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.XR;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -169,7 +170,10 @@ public class VolumetricRendering : MonoBehaviour
 
     Vector2[] m_xySeq = new Vector2[7];
 
-
+    //camera.aspect no longer returns the XR aspect ratio but rather the final viewport's. Rather worthless now.
+    float CamAspectRatio;
+    //camera.fieldOfView is unreliable because the physical camera toggle will return the incorrect fov.
+    // float CamFieldOfView = XRSettings.vi
 
 
     /// Dynamic Light Projection///      
@@ -255,6 +259,7 @@ public class VolumetricRendering : MonoBehaviour
         if (!Application.isPlaying) return;
 #endif
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //Enable volumetrics. Double check to see if works in build
+        if (cam.usePhysicalProperties == true) Debug.LogError("Physical camera is not properlly supportted by Unity and WILL mess up XR calulations like voulmetrics and LoDs");
         //  cam = GetComponent<Camera>();
 
     }
@@ -334,7 +339,8 @@ public class VolumetricRendering : MonoBehaviour
      //   if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
         CheckCookieList();
 
-     //   SetSkyTexture( skytex);
+
+        //   SetSkyTexture( skytex);
 
         //Making prescaled matrix 
         matScaleBias = Matrix4x4.identity;
@@ -406,9 +412,9 @@ public class VolumetricRendering : MonoBehaviour
 
         //Make view projection matricies
 
-        Matrix4x4 CenterProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far);
-        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f, 0, 0)); //temp ipd scaler. Combine factors when confirmed
-        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-cam.stereoSeparation * 0.5f, 0, 0));
+        Matrix4x4 CenterProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far);
+        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f, 0, 0)); //temp ipd scaler. Combine factors when confirmed
+        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-cam.stereoSeparation * 0.5f, 0, 0));
 
         //Debug.Log(cam.stereoSeparation);
 
@@ -661,10 +667,11 @@ public class VolumetricRendering : MonoBehaviour
 
     }
 
-
     void Update()
     {
         CheckOverrideVolumes();
+        //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
+        CamAspectRatio = (float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth;
 
 #if UNITY_EDITOR
         if (!Application.isPlaying)
@@ -673,7 +680,9 @@ public class VolumetricRendering : MonoBehaviour
         }
 #endif
 
-        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, cam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
+
+        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, cam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
+        //Debug.Log(cam.fieldOfView + " " + CamAspectRatio + " " + cam.nearClipPlane);
         projectionMatrix = matScaleBias * projectionMatrix ;
 
         //Previous frame's matrix//!!!!!!!!!
@@ -722,9 +731,6 @@ public class VolumetricRendering : MonoBehaviour
         Shader.SetGlobalVector("SeqOffset", new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex] ) ); //Loop through jitters. 
         FroxelFogCompute.SetFloat("reprojectionAmount", reprojectionAmount );
 
-        //jitters[tempjitter]
-
-
         Shader.SetGlobalMatrix(CameraProjectionMatrixID,  projectionMatrix);
         Shader.SetGlobalMatrix(TransposedCameraProjectionMatrixID,  projectionMatrix.transpose); //Fragment shaders require the transposed version
         Shader.SetGlobalVector(CameraPositionID, cam.transform.position); //Can likely pack this into the 4th row of the projection matrix 
@@ -734,11 +740,11 @@ public class VolumetricRendering : MonoBehaviour
         PreviousFrameMatrix = projectionMatrix;
         PreviousCameraPosition = cam.transform.position;
         ////MATRIX
-        var gpuProj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, true);
+        ///
+        ///camera.projectionMatrix is ALSO broken and returns the final viewport's projection rather than the center XR projection.
+        ///cam.GetStereoProjectionMatrix returns the skewed XR projection matrix per eye. Just doing our own calulation
+        var gpuProj = GL.GetGPUProjectionMatrix( Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, cam.nearClipPlane, 100000f) , true);
         PrevViewProjMatrix = gpuProj * cam.worldToCameraMatrix;
-//
-  //      Debug.Log(PrevViewProjMatrix);
-                  //  PreviousFrameMatrix = cam.transformprojectionMatrix * cam.worldToCameraMatrix;
 
         FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
     //    FroxelStackingCompute.DispatchIndirect
@@ -876,7 +882,7 @@ public class VolumetricRendering : MonoBehaviour
     {
         //   var proj = cam.projectionMatrix; //  GL.GetGPUProjectionMatrix(cameraProj, true); //Use this if we run into platform issues
         //bandaid fix. There's an issue with the far clip plane in the matrix projection. 
-        var proj = Matrix4x4.Perspective(cam.fieldOfView, cam.aspect, cam.nearClipPlane, 100000f); 
+        var proj = Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, cam.nearClipPlane, 100000f); 
         var view = cam.worldToCameraMatrix ;
 
         var invViewProjMatrix = (proj * view).inverse;
@@ -907,7 +913,7 @@ public class VolumetricRendering : MonoBehaviour
         Gizmos.color = Color.black;
 ;
         Gizmos.matrix = Matrix4x4.TRS(cam.transform.position, cam.transform.rotation, Vector3.one);
-        Gizmos.DrawFrustum(Vector3.zero, cam.fieldOfView, volumetricData.near, volumetricData.far, cam.aspect);
+        Gizmos.DrawFrustum(Vector3.zero, cam.fieldOfView, volumetricData.near, volumetricData.far, CamAspectRatio);
 
         Gizmos.color = Color.cyan;
         Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * volumetricData.ClipmapScale);
@@ -916,6 +922,23 @@ public class VolumetricRendering : MonoBehaviour
         Gizmos.color = Color.blue;
         Gizmos.matrix = Matrix4x4.TRS(ClipmapCurrentPos, Quaternion.identity, Vector3.one * volumetricData.ClipmapScale2);
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+
+
+        //Gizmos.color = Color.red;
+        //Gizmos.matrix = cam.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left);
+        //Gizmos.DrawWireCube(Vector3.zero, Vector3.one);        
+
+        //Gizmos.color = Color.yellow;
+        //Gizmos.matrix = cam.GetStereoProjectionMatrix(Camera.StereoscopicEye.Right);
+        //Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+
+        //Gizmos.color = Color.green;
+        //Gizmos.matrix = Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, cam.nearClipPlane, 100000f);
+        //Gizmos.DrawWireCube(Vector3.zero, Vector3.one);        
+        
+        //Gizmos.color = Color.magenta;
+        //Gizmos.matrix = Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f, 0, 0));
+        //Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
 
 
     }

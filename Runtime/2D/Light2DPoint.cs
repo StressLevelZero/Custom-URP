@@ -1,60 +1,61 @@
 using System;
-using UnityEngine.Scripting.APIUpdating;
 
-namespace UnityEngine.Experimental.Rendering.Universal
+namespace UnityEngine.Rendering.Universal
 {
-    sealed public partial class Light2D : MonoBehaviour
+    public sealed partial class Light2D
     {
-        public enum PointLightQuality
-        {
-            Fast = 0,
-            Accurate = 1
-        }
-
         [SerializeField] float m_PointLightInnerAngle = 360.0f;
         [SerializeField] float m_PointLightOuterAngle = 360.0f;
         [SerializeField] float m_PointLightInnerRadius = 0.0f;
         [SerializeField] float m_PointLightOuterRadius = 1.0f;
-        [SerializeField] float m_PointLightDistance = 3.0f;
 
-        [UnityEngine.Animations.NotKeyable]
-        [SerializeField] PointLightQuality m_PointLightQuality = PointLightQuality.Accurate;
-
+        /// <summary>
+        /// The inner angle of the point light shape. The bigger the angle, the wider the gap.
+        /// The gap between the innner and outer angle will determine the size of the light's penumbra.
+        /// </summary>
         public float pointLightInnerAngle
         {
             get => m_PointLightInnerAngle;
             set => m_PointLightInnerAngle = value;
         }
 
+        /// <summary>
+        /// The angle that determins the shape of the inner light area.
+        /// The gap between the innner and outer angle will determine the size of the light's penumbra.
+        /// </summary>
         public float pointLightOuterAngle
         {
             get => m_PointLightOuterAngle;
             set => m_PointLightOuterAngle = value;
         }
 
+        /// <summary>
+        /// The radius of the inner light area that has full brightness.
+        /// The gap between the inner and outer radius will determine the size of the light's penumbra.
+        /// </summary>
         public float pointLightInnerRadius
         {
             get => m_PointLightInnerRadius;
             set => m_PointLightInnerRadius = value;
         }
 
+        /// <summary>
+        /// The outer radius that determines the size of the light.
+        /// The gap between the inner and outer radius will determine the size of the light's penumbra.
+        /// </summary>
         public float pointLightOuterRadius
         {
             get => m_PointLightOuterRadius;
             set => m_PointLightOuterRadius = value;
         }
 
-        public float pointLightDistance => m_PointLightDistance;
-        public PointLightQuality pointLightQuality => m_PointLightQuality;
+        [Obsolete("pointLightDistance has been changed to normalMapDistance", true)]
+        public float pointLightDistance => m_NormalMapDistance;
 
-        private BoundingSphere GetPointLightBoundingSphere()
-        {
-            BoundingSphere boundingSphere;
+        [Obsolete("pointLightQuality has been changed to normalMapQuality", true)]
+        public NormalMapQuality pointLightQuality => m_NormalMapQuality;
 
-            boundingSphere.radius = m_PointLightOuterRadius;
-            boundingSphere.position = transform.position;
 
-            return boundingSphere;
-        }
+        internal bool isPointLight => m_LightType == LightType.Point;
     }
 }

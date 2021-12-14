@@ -52,7 +52,7 @@ half4 Volumetrics(half4 color, half3 positionWS) {
 
     color.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
 
-  //  color.rgb = DoubleUV * ClipUVW;
+//    color.rgb = ls.xyz;
 #endif
     return color;
 }

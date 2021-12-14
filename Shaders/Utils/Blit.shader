@@ -13,48 +13,39 @@ Shader "Hidden/Universal Render Pipeline/Blit"
             Cull Off
 
             HLSLPROGRAM
-            // Required to compile gles 2.0 with standard srp library
-            #pragma prefer_hlslcc gles
-            #pragma exclude_renderers d3d11_9x
-            #pragma vertex Vertex
+            #pragma vertex FullscreenVert
             #pragma fragment Fragment
+            #pragma multi_compile_fragment _ _LINEAR_TO_SRGB_CONVERSION
+            #pragma multi_compile _ _USE_DRAW_PROCEDURAL
+            #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
-            #pragma multi_compile _ _LINEAR_TO_SRGB_CONVERSION
-
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #ifdef _LINEAR_TO_SRGB_CONVERSION
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Fullscreen.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Debug/DebuggingFullscreen.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
-            #endif
 
-            struct Attributes
-            {
-                float4 positionOS   : POSITION;
-                float2 uv           : TEXCOORD0;
-            };
-
-            struct Varyings
-            {
-                half4 positionCS    : SV_POSITION;
-                half2 uv            : TEXCOORD0;
-            };
-
-            TEXTURE2D(_BlitTex);
-            SAMPLER(sampler_BlitTex);
-
-            Varyings Vertex(Attributes input)
-            {
-                Varyings output;
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
-                output.uv = input.uv;
-                return output;
-            }
+            TEXTURE2D_X(_SourceTex);
+            SAMPLER(sampler_SourceTex);
 
             half4 Fragment(Varyings input) : SV_Target
             {
-                half4 col = SAMPLE_TEXTURE2D(_BlitTex, sampler_BlitTex, input.uv);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+                float2 uv = input.uv;
+
+                half4 col = SAMPLE_TEXTURE2D_X(_SourceTex, sampler_SourceTex, uv);
+
                 #ifdef _LINEAR_TO_SRGB_CONVERSION
                 col = LinearToSRGB(col);
                 #endif
+
+                #if defined(DEBUG_DISPLAY)
+                half4 debugColor = 0;
+
+                if(CanDebugOverrideOutputColor(col, uv, debugColor))
+                {
+                    return debugColor;
+                }
+                #endif
+
                 return col;
             }
             ENDHLSL

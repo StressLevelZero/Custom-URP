@@ -1,20 +1,15 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using UnityEngine.Scripting.APIUpdating;
-
-#if POST_PROCESSING_STACK_2_0_0_OR_NEWER
-using UnityEngine.Rendering.PostProcessing;
-#endif
+using UnityEngine.Experimental.Rendering;
 
 namespace UnityEngine.Rendering.Universal
 {
     /// <summary>
     /// Contains properties and helper functions that you can use when rendering.
     /// </summary>
-    [MovedFrom("UnityEngine.Rendering.LWRP")] public static class RenderingUtils
+    public static class RenderingUtils
     {
-        static List<ShaderTagId> m_LegacyShaderPassNames = new List<ShaderTagId>()
+        static List<ShaderTagId> m_LegacyShaderPassNames = new List<ShaderTagId>
         {
             new ShaderTagId("Always"),
             new ShaderTagId("ForwardBase"),
@@ -23,6 +18,16 @@ namespace UnityEngine.Rendering.Universal
             new ShaderTagId("VertexLMRGBM"),
             new ShaderTagId("VertexLM"),
         };
+
+        static AttachmentDescriptor s_EmptyAttachment = new AttachmentDescriptor(GraphicsFormat.None);
+        internal static AttachmentDescriptor emptyAttachment
+        {
+            get
+            {
+                return s_EmptyAttachment;
+            }
+        }
+
 
         static Mesh s_FullscreenMesh = null;
 
@@ -62,17 +67,6 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
-#if POST_PROCESSING_STACK_2_0_0_OR_NEWER
-        static readonly int m_PostProcessingTemporaryTargetId = Shader.PropertyToID("_TemporaryColorTexture");
-        static PostProcessRenderContext m_PostProcessRenderContext;
-
-        [Obsolete("The use of the Post-processing Stack V2 is deprecated in the Universal Render Pipeline. Use the builtin post-processing effects instead.")]
-        public static PostProcessRenderContext postProcessRenderContext
-        {
-            get => m_PostProcessRenderContext ?? (m_PostProcessRenderContext = new PostProcessRenderContext());
-        }
-#endif
-
         internal static bool useStructuredBuffer
         {
             // There are some performance issues with StructuredBuffers in some platforms.
@@ -80,16 +74,21 @@ namespace UnityEngine.Rendering.Universal
             get
             {
                 // TODO: For now disabling SSBO until figure out Vulkan binding issues.
-                // When enabling this also enable it in shader side in Input.hlsl
+                // When enabling this also enable USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA in shader side in Input.hlsl
                 return false;
 
                 // We don't use SSBO in D3D because we can't figure out without adding shader variants if platforms is D3D10.
                 //GraphicsDeviceType deviceType = SystemInfo.graphicsDeviceType;
                 //return !Application.isMobilePlatform &&
                 //    (deviceType == GraphicsDeviceType.Metal || deviceType == GraphicsDeviceType.Vulkan ||
-                //     deviceType == GraphicsDeviceType.PlayStation4 || deviceType == GraphicsDeviceType.XboxOne);
+                //     deviceType == GraphicsDeviceType.PlayStation4 || deviceType == GraphicsDeviceType.PlayStation5 || deviceType == GraphicsDeviceType.XboxOne);
             }
-            
+        }
+
+        internal static bool SupportsLightLayers(GraphicsDeviceType type)
+        {
+            // GLES2 does not support bitwise operations.
+            return type != GraphicsDeviceType.OpenGLES2;
         }
 
         static Material s_ErrorMaterial;
@@ -106,75 +105,136 @@ namespace UnityEngine.Rendering.Universal
                     {
                         s_ErrorMaterial = new Material(Shader.Find("Hidden/Universal Render Pipeline/FallbackError"));
                     }
-                    catch{ }
+                    catch {}
                 }
 
                 return s_ErrorMaterial;
             }
         }
 
-#if POST_PROCESSING_STACK_2_0_0_OR_NEWER
-#pragma warning disable 0618 // Obsolete
-        internal static void RenderPostProcessingCompat(CommandBuffer cmd, ref CameraData cameraData, RenderTextureDescriptor sourceDescriptor,
-                                                        RenderTargetIdentifier source, RenderTargetIdentifier destination, bool opaqueOnly, bool flip)
+        /// <summary>
+        /// Set view and projection matrices.
+        /// This function will set <c>UNITY_MATRIX_V</c>, <c>UNITY_MATRIX_P</c>, <c>UNITY_MATRIX_VP</c> to given view and projection matrices.
+        /// If <c>setInverseMatrices</c> is set to true this function will also set <c>UNITY_MATRIX_I_V</c> and <c>UNITY_MATRIX_I_VP</c>.
+        /// </summary>
+        /// <param name="cmd">CommandBuffer to submit data to GPU.</param>
+        /// <param name="viewMatrix">View matrix to be set.</param>
+        /// <param name="projectionMatrix">Projection matrix to be set.</param>
+        /// <param name="setInverseMatrices">Set this to true if you also need to set inverse camera matrices.</param>
+        public static void SetViewAndProjectionMatrices(CommandBuffer cmd, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix, bool setInverseMatrices)
         {
-            var layer = cameraData.postProcessLayer;
-            int effectsCount;
+            Matrix4x4 viewAndProjectionMatrix = projectionMatrix * viewMatrix;
+            cmd.SetGlobalMatrix(ShaderPropertyId.viewMatrix, viewMatrix);
+            cmd.SetGlobalMatrix(ShaderPropertyId.projectionMatrix, projectionMatrix);
+            cmd.SetGlobalMatrix(ShaderPropertyId.viewAndProjectionMatrix, viewAndProjectionMatrix);
 
-            if (opaqueOnly)
+            if (setInverseMatrices)
             {
-                effectsCount = layer.sortedBundles[PostProcessEvent.BeforeTransparent].Count;
-            }
-            else
-            {
-                effectsCount = layer.sortedBundles[PostProcessEvent.BeforeStack].Count +
-                               layer.sortedBundles[PostProcessEvent.AfterStack].Count;
-            }
-
-            var camera = cameraData.camera;
-            var postProcessRenderContext = RenderingUtils.postProcessRenderContext;
-            postProcessRenderContext.Reset();
-            postProcessRenderContext.camera = camera;
-            postProcessRenderContext.source = source;
-            postProcessRenderContext.sourceFormat = sourceDescriptor.colorFormat;
-            postProcessRenderContext.destination = destination;
-            postProcessRenderContext.command = cmd;
-            postProcessRenderContext.flip = flip;
-
-            // If there's only one effect in the stack and soure is same as dest we	
-            // create an intermediate blit rendertarget to handle it.	
-            // Otherwise, PostProcessing system will create the intermediate blit targets itself.	
-            if (effectsCount == 1 && source == destination)
-            {
-                var rtId = new RenderTargetIdentifier(m_PostProcessingTemporaryTargetId);
-                var descriptor = sourceDescriptor;
-                descriptor.msaaSamples = 1;
-                descriptor.depthBufferBits = 0;
-
-                postProcessRenderContext.destination = rtId;
-                cmd.GetTemporaryRT(m_PostProcessingTemporaryTargetId, descriptor, FilterMode.Point);
-
-                if (opaqueOnly)
-                    cameraData.postProcessLayer.RenderOpaqueOnly(postProcessRenderContext);
-                else
-                    cameraData.postProcessLayer.Render(postProcessRenderContext);
-
-                cmd.Blit(rtId, destination);
-                cmd.ReleaseTemporaryRT(m_PostProcessingTemporaryTargetId);
-            }
-            else if (opaqueOnly)
-            {
-                cameraData.postProcessLayer.RenderOpaqueOnly(postProcessRenderContext);
-            }
-            else
-            {
-                cameraData.postProcessLayer.Render(postProcessRenderContext);
+                Matrix4x4 inverseViewMatrix = Matrix4x4.Inverse(viewMatrix);
+                Matrix4x4 inverseProjectionMatrix = Matrix4x4.Inverse(projectionMatrix);
+                Matrix4x4 inverseViewProjection = inverseViewMatrix * inverseProjectionMatrix;
+                cmd.SetGlobalMatrix(ShaderPropertyId.inverseViewMatrix, inverseViewMatrix);
+                cmd.SetGlobalMatrix(ShaderPropertyId.inverseProjectionMatrix, inverseProjectionMatrix);
+                cmd.SetGlobalMatrix(ShaderPropertyId.inverseViewAndProjectionMatrix, inverseViewProjection);
             }
         }
-#pragma warning restore 0618
+
+#if ENABLE_VR && ENABLE_XR_MODULE
+        internal static readonly int UNITY_STEREO_MATRIX_V = Shader.PropertyToID("unity_StereoMatrixV");
+        internal static readonly int UNITY_STEREO_MATRIX_IV = Shader.PropertyToID("unity_StereoMatrixInvV");
+        internal static readonly int UNITY_STEREO_MATRIX_P = Shader.PropertyToID("unity_StereoMatrixP");
+        internal static readonly int UNITY_STEREO_MATRIX_IP = Shader.PropertyToID("unity_StereoMatrixInvP");
+        internal static readonly int UNITY_STEREO_MATRIX_VP = Shader.PropertyToID("unity_StereoMatrixVP");
+        internal static readonly int UNITY_STEREO_MATRIX_IVP = Shader.PropertyToID("unity_StereoMatrixInvVP");
+        internal static readonly int UNITY_STEREO_CAMERA_PROJECTION = Shader.PropertyToID("unity_StereoCameraProjection");
+        internal static readonly int UNITY_STEREO_CAMERA_INV_PROJECTION = Shader.PropertyToID("unity_StereoCameraInvProjection");
+        internal static readonly int UNITY_STEREO_VECTOR_CAMPOS = Shader.PropertyToID("unity_StereoWorldSpaceCameraPos");
+
+        // Hold the stereo matrices in this class to avoid allocating arrays every frame
+        internal class StereoConstants
+        {
+            public Matrix4x4[] viewProjMatrix = new Matrix4x4[2];
+            public Matrix4x4[] invViewMatrix = new Matrix4x4[2];
+            public Matrix4x4[] invProjMatrix = new Matrix4x4[2];
+            public Matrix4x4[] invViewProjMatrix = new Matrix4x4[2];
+            public Matrix4x4[] invCameraProjMatrix = new Matrix4x4[2];
+            public Vector4[] worldSpaceCameraPos = new Vector4[2];
+        };
+
+        static readonly StereoConstants stereoConstants = new StereoConstants();
+
+        /// <summary>
+        /// Helper function to set all view and projection related matrices
+        /// Should be called before draw call and after cmd.SetRenderTarget
+        /// Internal usage only, function name and signature may be subject to change
+        /// </summary>
+        /// <param name="cmd">CommandBuffer to submit data to GPU.</param>
+        /// <param name="viewMatrix">View matrix to be set. Array size is 2.</param>
+        /// <param name="projectionMatrix">Projection matrix to be set.Array size is 2.</param>
+        /// <param name="cameraProjectionMatrix">Camera projection matrix to be set.Array size is 2. Does not include platform specific transformations such as depth-reverse, depth range in post-projective space and y-flip. </param>
+        /// <param name="setInverseMatrices">Set this to true if you also need to set inverse camera matrices.</param>
+        /// <returns>Void</c></returns>
+        internal static void SetStereoViewAndProjectionMatrices(CommandBuffer cmd, Matrix4x4[] viewMatrix, Matrix4x4[] projMatrix, Matrix4x4[] cameraProjMatrix, bool setInverseMatrices)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                stereoConstants.viewProjMatrix[i] = projMatrix[i] * viewMatrix[i];
+                stereoConstants.invViewMatrix[i] = Matrix4x4.Inverse(viewMatrix[i]);
+                stereoConstants.invProjMatrix[i] = Matrix4x4.Inverse(projMatrix[i]);
+                stereoConstants.invViewProjMatrix[i] = Matrix4x4.Inverse(stereoConstants.viewProjMatrix[i]);
+                stereoConstants.invCameraProjMatrix[i] = Matrix4x4.Inverse(cameraProjMatrix[i]);
+                stereoConstants.worldSpaceCameraPos[i] = stereoConstants.invViewMatrix[i].GetColumn(3);
+            }
+
+            cmd.SetGlobalMatrixArray(UNITY_STEREO_MATRIX_V, viewMatrix);
+            cmd.SetGlobalMatrixArray(UNITY_STEREO_MATRIX_P, projMatrix);
+            cmd.SetGlobalMatrixArray(UNITY_STEREO_MATRIX_VP, stereoConstants.viewProjMatrix);
+
+            cmd.SetGlobalMatrixArray(UNITY_STEREO_CAMERA_PROJECTION, cameraProjMatrix);
+
+            if (setInverseMatrices)
+            {
+                cmd.SetGlobalMatrixArray(UNITY_STEREO_MATRIX_IV, stereoConstants.invViewMatrix);
+                cmd.SetGlobalMatrixArray(UNITY_STEREO_MATRIX_IP, stereoConstants.invProjMatrix);
+                cmd.SetGlobalMatrixArray(UNITY_STEREO_MATRIX_IVP, stereoConstants.invViewProjMatrix);
+
+                cmd.SetGlobalMatrixArray(UNITY_STEREO_CAMERA_INV_PROJECTION, stereoConstants.invCameraProjMatrix);
+            }
+            cmd.SetGlobalVectorArray(UNITY_STEREO_VECTOR_CAMPOS, stereoConstants.worldSpaceCameraPos);
+        }
+
 #endif
 
-        // This is used to render materials that contain built-in shader passes not compatible with URP. 
+        internal static void Blit(CommandBuffer cmd,
+            RenderTargetIdentifier source,
+            RenderTargetIdentifier destination,
+            Material material,
+            int passIndex = 0,
+            bool useDrawProcedural = false,
+            RenderBufferLoadAction colorLoadAction = RenderBufferLoadAction.Load,
+            RenderBufferStoreAction colorStoreAction = RenderBufferStoreAction.Store,
+            RenderBufferLoadAction depthLoadAction = RenderBufferLoadAction.Load,
+            RenderBufferStoreAction depthStoreAction = RenderBufferStoreAction.Store)
+        {
+            cmd.SetGlobalTexture(ShaderPropertyId.sourceTex, source);
+            if (useDrawProcedural)
+            {
+                Vector4 scaleBias = new Vector4(1, 1, 0, 0);
+                Vector4 scaleBiasRt = new Vector4(1, 1, 0, 0);
+                cmd.SetGlobalVector(ShaderPropertyId.scaleBias, scaleBias);
+                cmd.SetGlobalVector(ShaderPropertyId.scaleBiasRt, scaleBiasRt);
+                cmd.SetRenderTarget(new RenderTargetIdentifier(destination, 0, CubemapFace.Unknown, -1),
+                    colorLoadAction, colorStoreAction, depthLoadAction, depthStoreAction);
+                cmd.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Quads, 4, 1, null);
+            }
+            else
+            {
+                cmd.SetRenderTarget(destination, colorLoadAction, colorStoreAction, depthLoadAction, depthStoreAction);
+                cmd.Blit(source, BuiltinRenderTextureType.CurrentActive, material, passIndex);
+            }
+        }
+
+        // This is used to render materials that contain built-in shader passes not compatible with URP.
         // It will render those legacy passes with error/pink shader.
         [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
         internal static void RenderObjectsWithError(ScriptableRenderContext context, ref CullingResults cullResults, Camera camera, FilteringSettings filterSettings, SortingCriteria sortFlags)
@@ -198,12 +258,14 @@ namespace UnityEngine.Rendering.Universal
             context.DrawRenderers(cullResults, ref errorSettings, ref filterSettings);
         }
 
-        // Caches render texture format support. SystemInfo.SupportsRenderTextureFormat allocates memory due to boxing.
+        // Caches render texture format support. SystemInfo.SupportsRenderTextureFormat and IsFormatSupported allocate memory due to boxing.
         static Dictionary<RenderTextureFormat, bool> m_RenderTextureFormatSupport = new Dictionary<RenderTextureFormat, bool>();
+        static Dictionary<GraphicsFormat, Dictionary<FormatUsage, bool>> m_GraphicsFormatSupport = new Dictionary<GraphicsFormat, Dictionary<FormatUsage, bool>>();
 
         internal static void ClearSystemInfoCache()
         {
             m_RenderTextureFormatSupport.Clear();
+            m_GraphicsFormatSupport.Clear();
         }
 
         /// <summary>
@@ -224,6 +286,35 @@ namespace UnityEngine.Rendering.Universal
         }
 
         /// <summary>
+        /// Checks if a texture format is supported by the run-time system.
+        /// Similar to <see cref="SystemInfo.IsFormatSupported"/>, but doesn't allocate memory.
+        /// </summary>
+        /// <param name="format">The format to look up.</param>
+        /// <param name="usage">The format usage to look up.</param>
+        /// <returns>Returns true if the graphics card supports the given <c>GraphicsFormat</c></returns>
+        public static bool SupportsGraphicsFormat(GraphicsFormat format, FormatUsage usage)
+        {
+            bool support = false;
+            if (!m_GraphicsFormatSupport.TryGetValue(format, out var uses))
+            {
+                uses = new Dictionary<FormatUsage, bool>();
+                support = SystemInfo.IsFormatSupported(format, usage);
+                uses.Add(usage, support);
+                m_GraphicsFormatSupport.Add(format, uses);
+            }
+            else
+            {
+                if (!uses.TryGetValue(usage, out support))
+                {
+                    support = SystemInfo.IsFormatSupported(format, usage);
+                    uses.Add(usage, support);
+                }
+            }
+
+            return support;
+        }
+
+        /// <summary>
         /// Return the last colorBuffer index actually referring to an existing RenderTarget
         /// </summary>
         /// <param name="colorBuffers"></param>
@@ -231,7 +322,7 @@ namespace UnityEngine.Rendering.Universal
         internal static int GetLastValidColorBufferIndex(RenderTargetIdentifier[] colorBuffers)
         {
             int i = colorBuffers.Length - 1;
-            for(; i>=0; --i)
+            for (; i >= 0; --i)
             {
                 if (colorBuffers[i] != 0)
                     break;
@@ -324,7 +415,7 @@ namespace UnityEngine.Rendering.Universal
         /// <returns></returns>
         internal static int LastValid(RenderTargetIdentifier[] source)
         {
-            for (int i = source.Length-1; i >= 0; --i)
+            for (int i = source.Length - 1; i >= 0; --i)
             {
                 if (source[i] != 0)
                     return i;

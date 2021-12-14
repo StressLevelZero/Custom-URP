@@ -29,7 +29,7 @@ public class VolumetricBaking : EditorWindow
     public bool DXRAcceletration = true;
     public bool SkyboxContribution = true;
     public Cubemap CustomEnvorment;
-    public int EnvLightSamples = 512;
+    public int EnvLightSamples = 2048;
 
     public float VolExposure = 0.05f;
 
@@ -58,7 +58,7 @@ public class VolumetricBaking : EditorWindow
         EditorGUILayout.LabelField("Custom Skybox", EditorStyles.label);
         CustomEnvorment = (Cubemap)EditorGUILayout.ObjectField(CustomEnvorment, typeof(Cubemap), true);
         EditorGUILayout.EndHorizontal();
-        EnvLightSamples = EditorGUILayout.IntSlider("Environmental Samples", EnvLightSamples, 1, 4096 ); ;
+        EnvLightSamples = EditorGUILayout.IntSlider("Environmental Samples", EnvLightSamples, 1, 8192 ); ;
         GUI.enabled = true;
         //       EditorGUILayout.IntField(AreaLightSamples, "Area light samples" );
 

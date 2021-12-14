@@ -2,18 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
-using UnityEngine.Scripting.APIUpdating;
 using UnityEngine.Serialization;
-using UnityEngine.Rendering;
-using System.ComponentModel;
-
-namespace UnityEngine.Rendering.LWRP
-{
-    [Obsolete("LWRP -> Universal (UnityUpgradable) -> UnityEngine.Rendering.Universal.UniversalAdditionalCameraData", true)]
-    public class LWRPAdditionalCameraData
-    {
-    }
-}
+using UnityEngine.Assertions;
 
 namespace UnityEngine.Rendering.Universal
 {
@@ -23,7 +13,7 @@ namespace UnityEngine.Rendering.Universal
     /// When set to <c>On</c> option will be enabled regardless of what is set on the pipeline asset.
     /// When set to <c>UsePipelineSetting</c> value set in the <see cref="UniversalRenderPipelineAsset"/>.
     /// </summary>
-    [MovedFrom("UnityEngine.Rendering.LWRP")] public enum CameraOverrideOption
+    public enum CameraOverrideOption
     {
         Off,
         On,
@@ -31,7 +21,7 @@ namespace UnityEngine.Rendering.Universal
     }
 
     //[Obsolete("Renderer override is no longer used, renderers are referenced by index on the pipeline asset.")]
-    [MovedFrom("UnityEngine.Rendering.LWRP")] public enum RendererOverrideOption
+    public enum RendererOverrideOption
     {
         Custom,
         UsePipelineSettings,
@@ -45,8 +35,11 @@ namespace UnityEngine.Rendering.Universal
     /// </summary>
     public enum AntialiasingMode
     {
+        [InspectorName("No Anti-aliasing")]
         None,
+        [InspectorName("Fast Approximate Anti-aliasing (FXAA)")]
         FastApproximateAntialiasing,
+        [InspectorName("Subpixel Morphological Anti-aliasing (SMAA)")]
         SubpixelMorphologicalAntiAliasing,
         //TemporalAntialiasing
     }
@@ -60,22 +53,6 @@ namespace UnityEngine.Rendering.Universal
     {
         Base,
         Overlay,
-    }
-
-    /// <summary>
-    /// Holds information about the output target for a camera.
-    /// Only used for cameras of render type Base. <seealso cref="CameraRenderType"/>.
-    /// </summary>
-    [Obsolete("This enum is deprecated.")]
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public enum CameraOutput
-    {
-        Screen,
-        Texture,
-
-        [Obsolete("Use CameraOutput.Screen instead.", false)]
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        Camera = Screen,
     }
 
     /// <summary>
@@ -95,10 +72,10 @@ namespace UnityEngine.Rendering.Universal
     {
         /// <summary>
         /// Universal Render Pipeline exposes additional rendering data in a separate component.
-        /// This method returns the additional data component for the given camera or create one if it doesn't exists yet.
+        /// This method returns the additional data component for the given camera or create one if it doesn't exist yet.
         /// </summary>
         /// <param name="camera"></param>
-        /// <returns>The <c>UniversalAdditinalCameraData</c> for this camera.</returns>
+        /// <returns>The <c>UniversalAdditionalCameraData</c> for this camera.</returns>
         /// <see cref="UniversalAdditionalCameraData"/>
         public static UniversalAdditionalCameraData GetUniversalAdditionalCameraData(this Camera camera)
         {
@@ -108,6 +85,113 @@ namespace UnityEngine.Rendering.Universal
                 cameraData = gameObject.AddComponent<UniversalAdditionalCameraData>();
 
             return cameraData;
+        }
+
+        /// <summary>
+        /// Returns the VolumeFrameworkUpdateMode set on the camera.
+        /// </summary>
+        /// <param name="camera"></param>
+        /// <returns></returns>
+        public static VolumeFrameworkUpdateMode GetVolumeFrameworkUpdateMode(this Camera camera)
+        {
+            UniversalAdditionalCameraData cameraData = camera.GetUniversalAdditionalCameraData();
+            return cameraData.volumeFrameworkUpdateMode;
+        }
+
+        /// <summary>
+        /// Sets the VolumeFrameworkUpdateMode for the camera.
+        /// </summary>
+        /// <param name="camera"></param>
+        /// <param name="mode"></param>
+        public static void SetVolumeFrameworkUpdateMode(this Camera camera, VolumeFrameworkUpdateMode mode)
+        {
+            UniversalAdditionalCameraData cameraData = camera.GetUniversalAdditionalCameraData();
+            if (cameraData.volumeFrameworkUpdateMode == mode)
+            {
+                return;
+            }
+
+            cameraData.volumeFrameworkUpdateMode = mode;
+
+            // We only update the local volume stacks for cameras set to ViaScripting.
+            // Otherwise it will be updated in every frame.
+            if (!cameraData.requiresVolumeFrameworkUpdate)
+            {
+                camera.UpdateVolumeStack(cameraData);
+            }
+        }
+
+        /// <summary>
+        /// Updates the volume stack for this camera.
+        /// This function will only update the stack when the camera has VolumeFrameworkUpdateMode set to ViaScripting
+        /// or when it set to UsePipelineSettings and the update mode on the Render Pipeline Asset is set to ViaScripting.
+        /// </summary>
+        /// <param name="camera"></param>
+        public static void UpdateVolumeStack(this Camera camera)
+        {
+            UniversalAdditionalCameraData cameraData = camera.GetUniversalAdditionalCameraData();
+            camera.UpdateVolumeStack(cameraData);
+        }
+
+        /// <summary>
+        /// Updates the volume stack for this camera.
+        /// This function will only update the stack when the camera has ViaScripting selected or if
+        /// the camera is set to UsePipelineSettings and the Render Pipeline Asset is set to ViaScripting.
+        /// </summary>
+        /// <param name="camera"></param>
+        /// <param name="cameraData"></param>
+        public static void UpdateVolumeStack(this Camera camera, UniversalAdditionalCameraData cameraData)
+        {
+            Assert.IsNotNull(cameraData, "cameraData can not be null when updating the volume stack.");
+
+            // We only update the local volume stacks for cameras set to ViaScripting.
+            // Otherwise it will be updated in the frame.
+            if (cameraData.requiresVolumeFrameworkUpdate)
+            {
+                return;
+            }
+
+            // Create stack for camera
+            if (cameraData.volumeStack == null)
+            {
+                cameraData.volumeStack = VolumeManager.instance.CreateStack();
+            }
+
+            camera.GetVolumeLayerMaskAndTrigger(cameraData, out LayerMask layerMask, out Transform trigger);
+            VolumeManager.instance.Update(cameraData.volumeStack, trigger, layerMask);
+        }
+
+        /// <summary>
+        /// Returns the mask and trigger assigned for volumes on the camera.
+        /// </summary>
+        /// <param name="camera"></param>
+        /// <param name="cameraData"></param>
+        /// <param name="layerMask"></param>
+        /// <param name="trigger"></param>
+        internal static void GetVolumeLayerMaskAndTrigger(this Camera camera, UniversalAdditionalCameraData cameraData, out LayerMask layerMask, out Transform trigger)
+        {
+            // Default values when there's no additional camera data available
+            layerMask = 1; // "Default"
+            trigger = camera.transform;
+
+            if (cameraData != null)
+            {
+                layerMask = cameraData.volumeLayerMask;
+                trigger = (cameraData.volumeTrigger != null) ? cameraData.volumeTrigger : trigger;
+            }
+            else if (camera.cameraType == CameraType.SceneView)
+            {
+                // Try to mirror the MainCamera volume layer mask for the scene view - do not mirror the target
+                var mainCamera = Camera.main;
+                UniversalAdditionalCameraData mainAdditionalCameraData = null;
+
+                if (mainCamera != null && mainCamera.TryGetComponent(out mainAdditionalCameraData))
+                {
+                    layerMask = mainAdditionalCameraData.volumeLayerMask;
+                }
+
+                trigger = (mainAdditionalCameraData != null && mainAdditionalCameraData.volumeTrigger != null) ? mainAdditionalCameraData.volumeTrigger : trigger;
+            }
         }
     }
 
@@ -127,35 +211,39 @@ namespace UnityEngine.Rendering.Universal
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Camera))]
     [ImageEffectAllowedInSceneView]
-    [MovedFrom("UnityEngine.Rendering.LWRP")] public class UniversalAdditionalCameraData : MonoBehaviour, ISerializationCallbackReceiver
+    public class UniversalAdditionalCameraData : MonoBehaviour, ISerializationCallbackReceiver
     {
-        [Tooltip("If enabled shadows will render for this camera.")]
+        const string k_GizmoPath = "Packages/com.unity.render-pipelines.universal/Editor/Gizmos/";
+        const string k_BaseCameraGizmoPath = k_GizmoPath + "Camera_Base.png";
+        const string k_OverlayCameraGizmoPath = k_GizmoPath + "Camera_Base.png";
+        const string k_PostProcessingGizmoPath = k_GizmoPath + "Camera_PostProcessing.png";
+
         [FormerlySerializedAs("renderShadows"), SerializeField]
         bool m_RenderShadows = true;
 
-        [Tooltip("If enabled depth texture will render for this camera bound as _CameraDepthTexture.")]
         [SerializeField]
         CameraOverrideOption m_RequiresDepthTextureOption = CameraOverrideOption.UsePipelineSettings;
 
-        [Tooltip("If enabled opaque color texture will render for this camera and bound as _CameraOpaqueTexture.")]
         [SerializeField]
         CameraOverrideOption m_RequiresOpaqueTextureOption = CameraOverrideOption.UsePipelineSettings;
 
         [SerializeField] CameraRenderType m_CameraType = CameraRenderType.Base;
-		[SerializeField] List<Camera> m_Cameras = new List<Camera>();
-		[SerializeField] int m_RendererIndex = -1;
+        [SerializeField] List<Camera> m_Cameras = new List<Camera>();
+        [SerializeField] int m_RendererIndex = -1;
 
         [SerializeField] LayerMask m_VolumeLayerMask = 1; // "Default"
         [SerializeField] Transform m_VolumeTrigger = null;
+        [SerializeField] VolumeFrameworkUpdateMode m_VolumeFrameworkUpdateModeOption = VolumeFrameworkUpdateMode.UsePipelineSettings;
 
         [SerializeField] bool m_RenderPostProcessing = false;
-        [SerializeField] bool m_RenderVolumetrics = false;
         [SerializeField] AntialiasingMode m_Antialiasing = AntialiasingMode.None;
         [SerializeField] AntialiasingQuality m_AntialiasingQuality = AntialiasingQuality.High;
         [SerializeField] bool m_StopNaN = false;
         [SerializeField] bool m_Dithering = false;
         [SerializeField] bool m_ClearDepth = true;
+        [SerializeField] bool m_AllowXRRendering = true;
 
+        [NonSerialized] Camera m_Camera;
         // Deprecated:
         [FormerlySerializedAs("requiresDepthTexture"), SerializeField]
         bool m_RequiresDepthTexture = false;
@@ -163,7 +251,7 @@ namespace UnityEngine.Rendering.Universal
         [FormerlySerializedAs("requiresColorTexture"), SerializeField]
         bool m_RequiresColorTexture = false;
 
-        [HideInInspector] [SerializeField] float m_Version = 2;
+        [HideInInspector][SerializeField] float m_Version = 2;
 
         public float version => m_Version;
 
@@ -178,6 +266,23 @@ namespace UnityEngine.Rendering.Universal
                 return s_DefaultAdditionalCameraData;
             }
         }
+
+#if UNITY_EDITOR
+        internal new Camera camera
+#else
+        internal Camera camera
+#endif
+        {
+            get
+            {
+                if (!m_Camera)
+                {
+                    gameObject.TryGetComponent<Camera>(out m_Camera);
+                }
+                return m_Camera;
+            }
+        }
+
 
         /// <summary>
         /// Controls if this camera should render shadows.
@@ -219,40 +324,6 @@ namespace UnityEngine.Rendering.Universal
             set => m_CameraType = value;
         }
 
-        #region deprecated
-        /// <summary>
-        /// Returns the camera output type. Only valid for Base cameras.
-        /// <see cref="CameraOutput"/>.
-        /// <seealso cref="CameraRenderType"/>.
-        /// <seealso cref="Camera"/>
-        /// </summary>
-        [Obsolete("CameraOutput has been deprecated. Use Camera.targetTexture instead.")]
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public CameraOutput cameraOutput
-        {
-            get
-            {
-                gameObject.TryGetComponent<Camera>(out var camera);
-                if (camera?.targetTexture == null)
-                    return CameraOutput.Screen;
-
-                return CameraOutput.Texture;
-            }
-            set { }
-        }
-
-        [Obsolete("AddCamera has been deprecated. You can add cameras to the stack by calling <c>cameraStack</c> property and modifying the camera stack list.")]
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public void AddCamera(Camera camera)
-        {
-            m_Cameras.Add(camera);
-        }
-
-        [Obsolete("cameras property has been deprecated. Use cameraStack property instead.")]
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public List<Camera> cameras => cameraStack;
-        #endregion
-
         /// <summary>
         /// Returns the camera stack. Only valid for Base cameras.
         /// Overlay cameras have no stack and will return null.
@@ -275,8 +346,22 @@ namespace UnityEngine.Rendering.Universal
                     Debug.LogWarning(string.Format("{0}: This camera has a ScriptableRenderer that doesn't support camera stacking. Camera stack is null.", camera.name));
                     return null;
                 }
-
                 return m_Cameras;
+            }
+        }
+
+        internal void UpdateCameraStack()
+        {
+#if UNITY_EDITOR
+            Undo.RecordObject(this, "Update camera stack");
+#endif
+            int prev = m_Cameras.Count;
+            m_Cameras.RemoveAll(cam => cam == null);
+            int curr = m_Cameras.Count;
+            int removedCamsCount = prev - curr;
+            if (removedCamsCount != 0)
+            {
+                Debug.LogWarning(name + ": " + removedCamsCount + " camera overlay" + (removedCamsCount > 1 ? "s" : "") + " no longer exists and will be removed from the camera stack.");
             }
         }
 
@@ -333,7 +418,20 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         public ScriptableRenderer scriptableRenderer
         {
-            get => UniversalRenderPipeline.asset.GetRenderer(m_RendererIndex);
+            get
+            {
+                if (UniversalRenderPipeline.asset is null)
+                    return null;
+                if (!UniversalRenderPipeline.asset.ValidateRendererData(m_RendererIndex))
+                {
+                    int defaultIndex = UniversalRenderPipeline.asset.m_DefaultRendererIndex;
+                    Debug.LogWarning(
+                        $"Renderer at <b>index {m_RendererIndex.ToString()}</b> is missing for camera <b>{camera.name}</b>, falling back to Default Renderer. <b>{UniversalRenderPipeline.asset.m_RendererDataList[defaultIndex].name}</b>",
+                        UniversalRenderPipeline.asset);
+                    return UniversalRenderPipeline.asset.GetRenderer(defaultIndex);
+                }
+                return UniversalRenderPipeline.asset.GetRenderer(m_RendererIndex);
+            }
         }
 
         /// <summary>
@@ -345,16 +443,57 @@ namespace UnityEngine.Rendering.Universal
             m_RendererIndex = index;
         }
 
+        /// <summary>
+        /// Returns the selected scene-layers affecting this camera.
+        /// </summary>
         public LayerMask volumeLayerMask
         {
             get => m_VolumeLayerMask;
             set => m_VolumeLayerMask = value;
         }
 
+        /// <summary>
+        /// Returns the Transform that acts as a trigger for Volume blending.
+        /// </summary>
         public Transform volumeTrigger
         {
             get => m_VolumeTrigger;
             set => m_VolumeTrigger = value;
+        }
+
+        /// <summary>
+        /// Returns the selected mode for Volume Frame Updates.
+        /// </summary>
+        internal VolumeFrameworkUpdateMode volumeFrameworkUpdateMode
+        {
+            get => m_VolumeFrameworkUpdateModeOption;
+            set => m_VolumeFrameworkUpdateModeOption = value;
+        }
+
+        /// <summary>
+        /// Returns true if this camera requires the volume framework to be updated every frame.
+        /// </summary>
+        public bool requiresVolumeFrameworkUpdate
+        {
+            get
+            {
+                if (m_VolumeFrameworkUpdateModeOption == VolumeFrameworkUpdateMode.UsePipelineSettings)
+                {
+                    return UniversalRenderPipeline.asset.volumeFrameworkUpdateMode != VolumeFrameworkUpdateMode.ViaScripting;
+                }
+
+                return m_VolumeFrameworkUpdateModeOption == VolumeFrameworkUpdateMode.EveryFrame;
+            }
+        }
+
+        /// <summary>
+        /// Returns the current volume stack used by this camera.
+        /// </summary>
+        VolumeStack m_VolumeStack = null;
+        public VolumeStack volumeStack
+        {
+            get => m_VolumeStack;
+            set => m_VolumeStack = value;
         }
 
         /// <summary>
@@ -365,16 +504,6 @@ namespace UnityEngine.Rendering.Universal
             get => m_RenderPostProcessing;
             set => m_RenderPostProcessing = value;
         }
-
-        /// <summary>
-        /// Returns true if this camera should render post-processing.
-        /// </summary>
-        public bool RenderVolumetrics
-        {
-            get => m_RenderVolumetrics;
-            set => m_RenderVolumetrics = value;
-        }
-
 
         /// <summary>
         /// Returns the current anti-aliasing mode used by this camera.
@@ -396,26 +525,31 @@ namespace UnityEngine.Rendering.Universal
             set => m_AntialiasingQuality = value;
         }
 
+        /// <summary>
+        /// Returns true if this camera should automatically replace NaN/Inf in shaders by a black pixel to avoid breaking some effects.
+        /// </summary>
         public bool stopNaN
         {
             get => m_StopNaN;
             set => m_StopNaN = value;
         }
 
+        /// <summary>
+        /// Returns true if this camera applies 8-bit dithering to the final render to reduce color banding
+        /// </summary>
         public bool dithering
         {
             get => m_Dithering;
             set => m_Dithering = value;
         }
 
-        public void Awake()
+        /// <summary>
+        /// Returns true if this camera allows render in XR.
+        /// </summary>
+        public bool allowXRRendering
         {
-            if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom && RenderSettings.customReflection != null)
-            {
-                Shader.SetGlobalVector("_MipFogParameters", new Vector4(0, 1000f, 0.7f, 0.0f));
-                Shader.SetGlobalTexture("_SkyTexture", RenderSettings.customReflection);
-                Shader.SetGlobalInt("_SkyMipCount", RenderSettings.customReflection.mipmapCount);
-            }
+            get => m_AllowXRRendering;
+            set => m_AllowXRRendering = value;
         }
 
         public void OnBeforeSerialize()
@@ -433,17 +567,16 @@ namespace UnityEngine.Rendering.Universal
 
         public void OnDrawGizmos()
         {
-            string path = "Packages/com.unity.render-pipelines.universal/Editor/Gizmos/";
             string gizmoName = "";
             Color tint = Color.white;
 
             if (m_CameraType == CameraRenderType.Base)
             {
-                gizmoName = $"{path}Camera_Base.png";
+                gizmoName = k_BaseCameraGizmoPath;
             }
             else if (m_CameraType == CameraRenderType.Overlay)
             {
-                gizmoName = $"{path}Camera_Overlay.png";
+                gizmoName = k_OverlayCameraGizmoPath;
             }
 
 #if UNITY_2019_2_OR_NEWER
@@ -461,12 +594,12 @@ namespace UnityEngine.Rendering.Universal
 
             if (renderPostProcessing)
             {
-                Gizmos.DrawIcon(transform.position, $"{path}Camera_PostProcessing.png", true, tint);
+                Gizmos.DrawIcon(transform.position, k_PostProcessingGizmoPath, true, tint);
             }
 #else
             if (renderPostProcessing)
             {
-                Gizmos.DrawIcon(transform.position, $"{path}Camera_PostProcessing.png");
+                Gizmos.DrawIcon(transform.position, k_PostProcessingGizmoPath);
             }
             Gizmos.DrawIcon(transform.position, gizmoName);
 #endif

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEditor.Rendering.Universal.Internal;
+using UnityEngine.Experimental.Rendering.Universal;
 using UnityEngine.TestTools;
 
 class EditorTests
@@ -18,7 +19,7 @@ class EditorTests
 
         try
         {
-            ForwardRendererData data = ScriptableObject.CreateInstance<ForwardRendererData>();
+            UniversalRendererData data = ScriptableObject.CreateInstance<UniversalRendererData>();
             UniversalRenderPipelineAsset asset = UniversalRenderPipelineAsset.Create(data);
             LogAssert.NoUnexpectedReceived();
             ScriptableObject.DestroyImmediate(asset);
@@ -31,9 +32,9 @@ class EditorTests
         }
     }
 
-    // When creating a new forward renderer asset it should not log any errors or throw exceptions.
+    // When creating a new Universal Renderer asset it should not log any errors or throw exceptions.
     [Test]
-    public void CreateForwardRendererAssetWithoutErrors()
+    public void CreateUniversalRendererAssetWithoutErrors()
     {
         // Test without any render pipeline assigned to GraphicsSettings.
         var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
@@ -41,9 +42,11 @@ class EditorTests
 
         try
         {
-            var asset = ScriptableObject.CreateInstance<ForwardRendererData>();
+            var asset = ScriptableObject.CreateInstance<UniversalRendererData>();
             ResourceReloader.ReloadAllNullIn(asset, UniversalRenderPipelineAsset.packagePath);
+            var renderer = asset.InternalCreateRenderer();
             LogAssert.NoUnexpectedReceived();
+            renderer.Dispose();
             ScriptableObject.DestroyImmediate(asset);
         }
         // Makes sure the render pipeline is restored in case of a NullReference exception.
@@ -53,19 +56,75 @@ class EditorTests
         }
     }
 
-    // Validate that resources Guids are valid
+    // When creating a new renderer 2d asset it should not log any errors or throw exceptions.
+    [Test]
+    public void CreateRenderer2DAssetWithoutErrors()
+    {
+        // Test without any render pipeline assigned to GraphicsSettings.
+        var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
+        GraphicsSettings.renderPipelineAsset = null;
+
+        try
+        {
+            var asset = ScriptableObject.CreateInstance<Renderer2DData>();
+            ResourceReloader.ReloadAllNullIn(asset, UniversalRenderPipelineAsset.packagePath);
+            var renderer = asset.InternalCreateRenderer();
+            LogAssert.NoUnexpectedReceived();
+            renderer.Dispose();
+            ScriptableObject.DestroyImmediate(asset);
+        }
+        // Makes sure the render pipeline is restored in case of a NullReference exception.
+        finally
+        {
+            GraphicsSettings.renderPipelineAsset = renderPipelineAsset;
+        }
+    }
+
+    // Validate that resource Guids are valid
     [Test]
     public void ValidateBuiltinResourceFiles()
     {
         string templatePath = AssetDatabase.GUIDToAssetPath(ResourceGuid.rendererTemplate);
         Assert.IsFalse(string.IsNullOrEmpty(templatePath));
+
+        string editorResourcesPath = AssetDatabase.GUIDToAssetPath(UniversalRenderPipelineAsset.editorResourcesGUID);
+        Assert.IsFalse(string.IsNullOrEmpty(editorResourcesPath));
     }
 
-    // When creating LWRP all required resources should be initialized.
+    // Validate that ShaderUtils.GetShaderGUID results are valid and that ShaderUtils.GetShaderPath match shader names.
+    [TestCase(ShaderPathID.Lit)]
+    [TestCase(ShaderPathID.SimpleLit)]
+    [TestCase(ShaderPathID.Unlit)]
+    [TestCase(ShaderPathID.TerrainLit)]
+    [TestCase(ShaderPathID.ParticlesLit)]
+    [TestCase(ShaderPathID.ParticlesSimpleLit)]
+    [TestCase(ShaderPathID.ParticlesUnlit)]
+    [TestCase(ShaderPathID.BakedLit)]
+    [TestCase(ShaderPathID.SpeedTree7)]
+    [TestCase(ShaderPathID.SpeedTree7Billboard)]
+    [TestCase(ShaderPathID.SpeedTree8)]
+    public void ValidateShaderResources(ShaderPathID shaderPathID)
+    {
+        string path = AssetDatabase.GUIDToAssetPath(ShaderUtils.GetShaderGUID(shaderPathID));
+        Assert.IsFalse(string.IsNullOrEmpty(path));
+
+        var shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+        Assert.AreEqual(shader.name, ShaderUtils.GetShaderPath(shaderPathID));
+
+        var propertyNames = new System.Collections.Generic.HashSet<string>();
+        for (int j = 0; j < shader.GetPropertyCount(); ++j)
+        {
+            string propertyName = shader.GetPropertyName(j);
+            Assert.IsFalse(propertyNames.Contains(propertyName), $"{shader.name} has duplicated property {propertyName}!");
+            propertyNames.Add(propertyName);
+        }
+    }
+
+    // When creating URP all required resources should be initialized.
     [Test]
     public void ValidateNewAssetResources()
     {
-        ForwardRendererData data = ScriptableObject.CreateInstance<ForwardRendererData>();
+        UniversalRendererData data = ScriptableObject.CreateInstance<UniversalRendererData>();
         UniversalRenderPipelineAsset asset = UniversalRenderPipelineAsset.Create(data);
         Assert.AreNotEqual(null, asset.defaultMaterial);
         Assert.AreNotEqual(null, asset.defaultParticleMaterial);
@@ -73,7 +132,7 @@ class EditorTests
         Assert.AreNotEqual(null, asset.defaultTerrainMaterial);
         Assert.AreNotEqual(null, asset.defaultShader);
 
-        // LWRP doesn't override the following materials
+        // URP doesn't override the following materials
         Assert.AreEqual(null, asset.defaultUIMaterial);
         Assert.AreEqual(null, asset.defaultUIOverdrawMaterial);
         Assert.AreEqual(null, asset.defaultUIETC1SupportedMaterial);
@@ -85,12 +144,12 @@ class EditorTests
         ScriptableObject.DestroyImmediate(data);
     }
 
-    // When changing LWRP settings, all settings should be valid.
+    // When changing URP settings, all settings should be valid.
     [Test]
     public void ValidateAssetSettings()
     {
         // Create a new asset and validate invalid settings
-        ForwardRendererData data = ScriptableObject.CreateInstance<ForwardRendererData>();
+        UniversalRendererData data = ScriptableObject.CreateInstance<UniversalRendererData>();
         UniversalRenderPipelineAsset asset = UniversalRenderPipelineAsset.Create(data);
         if (asset != null)
         {

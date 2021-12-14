@@ -2,6 +2,8 @@
 #define UNIVERSAL_WAVING_GRASS_PASSES_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityGBuffer.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderVariablesFunctions.hlsl"
 
 struct GrassVertexInput
 {
@@ -26,7 +28,7 @@ struct GrassVertexOutput
 
     half4 fogFactorAndVertexLight   : TEXCOORD5; // x: fogFactor, yzw: vertex light
 
-#ifdef _MAIN_LIGHT_SHADOWS
+#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
     float4 shadowCoord              : TEXCOORD6;
 #endif
     half4 color                     : TEXCOORD7;
@@ -38,6 +40,8 @@ struct GrassVertexOutput
 
 void InitializeInputData(GrassVertexOutput input, out InputData inputData)
 {
+    inputData = (InputData)0;
+
     inputData.positionWS = input.posWSShininess.xyz;
 
     half3 viewDirWS = input.viewDir;
@@ -46,16 +50,46 @@ void InitializeInputData(GrassVertexOutput input, out InputData inputData)
 #endif
 
     inputData.normalWS = NormalizeNormalPerPixel(input.normal);
-
     inputData.viewDirectionWS = viewDirWS;
-#ifdef _MAIN_LIGHT_SHADOWS
+
+#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
     inputData.shadowCoord = input.shadowCoord;
+#elif defined(MAIN_LIGHT_CALCULATE_SHADOWS)
+    inputData.shadowCoord = TransformWorldToShadowCoord(inputData.positionWS);
 #else
     inputData.shadowCoord = float4(0, 0, 0, 0);
 #endif
+
+#if defined(_FOG_FRAGMENT)
+    float clipZ = input.clipPos.z;
+    #if !UNITY_REVERSED_Z
+    clipZ = lerp(UNITY_NEAR_CLIP_VALUE, 1, clipZ);    // OpenGL NDC, -1 < z < 1
+    #endif
+    clipZ *= input.clipPos.w;
+    inputData.fogCoord = ComputeFogFactor(clipZ);
+#else
     inputData.fogCoord = input.fogFactorAndVertexLight.x;
+#endif
     inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
+
+#if defined(DYNAMICLIGHTMAP_ON)
+    inputData.bakedGI = SAMPLE_GI(input.lightmapUV, NOT_USED, input.vertexSH, inputData.normalWS);
+#else
     inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
+#endif
+
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.clipPos);
+    inputData.shadowMask = SAMPLE_SHADOWMASK(input.lightmapUV);
+
+    #if defined(DEBUG_DISPLAY)
+    #if defined(DYNAMICLIGHTMAP_ON)
+    inputData.staticLightmapUV = input.lightmapUV;
+    #elif defined(LIGHTMAP_ON)
+    inputData.staticLightmapUV = input.lightmapUV;
+    #else
+    inputData.vertexSH = input.vertexSH;
+    #endif
+    #endif
 }
 
 void InitializeVertData(GrassVertexInput input, inout GrassVertexOutput vertData)
@@ -83,10 +117,14 @@ void InitializeVertData(GrassVertexInput input, inout GrassVertexOutput vertData
     OUTPUT_SH(vertData.normal, vertData.vertexSH);
 
     half3 vertexLight = VertexLighting(vertexInput.positionWS, vertData.normal.xyz);
+#if defined(_FOG_FRAGMENT)
+    half fogFactor = 0;
+#else
     half fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
+#endif
     vertData.fogFactorAndVertexLight = half4(fogFactor, vertexLight);
 
-#ifdef _MAIN_LIGHT_SHADOWS
+#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
     vertData.shadowCoord = GetShadowCoord(vertexInput);
 #endif
 }
@@ -136,67 +174,100 @@ GrassVertexOutput WavingGrassBillboardVert(GrassVertexInput v)
     return o;
 }
 
-// Used for StandardSimpleLighting shader
-half4 LitPassFragmentGrass(GrassVertexOutput input) : SV_Target
+inline void InitializeSimpleLitSurfaceData(GrassVertexOutput input, out SurfaceData outSurfaceData)
 {
-    UNITY_SETUP_INSTANCE_ID(input);
-    UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-
-    float2 uv = input.uv;
-    half4 diffuseAlpha = SampleAlbedoAlpha(uv, TEXTURE2D_ARGS(_MainTex, sampler_MainTex));
+    half4 diffuseAlpha = SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_MainTex, sampler_MainTex));
     half3 diffuse = diffuseAlpha.rgb * input.color.rgb;
 
     half alpha = diffuseAlpha.a;
     AlphaDiscard(alpha, _Cutoff);
     alpha *= input.color.a;
 
-    half3 emission = 0;
-    half4 specularGloss = 0.1;// SampleSpecularSmoothness(uv, diffuseAlpha.a, _SpecColor, TEXTURE2D_ARGS(_SpecGlossMap, sampler_SpecGlossMap));
-    half shininess = input.posWSShininess.w;
+    outSurfaceData = (SurfaceData)0;
+    outSurfaceData.alpha = alpha;
+    outSurfaceData.albedo = diffuse;
+    outSurfaceData.metallic = 0.0; // unused
+    outSurfaceData.specular = 0.1;// SampleSpecularSmoothness(uv, diffuseAlpha.a, _SpecColor, TEXTURE2D_ARGS(_SpecGlossMap, sampler_SpecGlossMap));
+    outSurfaceData.smoothness = input.posWSShininess.w;
+    outSurfaceData.normalTS = 0.0; // unused
+    outSurfaceData.occlusion = 1.0;
+    outSurfaceData.emission = 0.0;
+}
+
+// Used for StandardSimpleLighting shader
+#ifdef TERRAIN_GBUFFER
+FragmentOutput LitPassFragmentGrass(GrassVertexOutput input)
+#else
+half4 LitPassFragmentGrass(GrassVertexOutput input) : SV_Target
+#endif
+{
+    UNITY_SETUP_INSTANCE_ID(input);
+    UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+    SurfaceData surfaceData;
+    InitializeSimpleLitSurfaceData(input, surfaceData);
 
     InputData inputData;
     InitializeInputData(input, inputData);
+    SETUP_DEBUG_TEXTURE_DATA(inputData, input.uv, _MainTex);
 
-    half4 color = UniversalFragmentBlinnPhong(inputData, diffuse, specularGloss, shininess, emission, alpha);
+#ifdef TERRAIN_GBUFFER
+    half4 color = half4(inputData.bakedGI * surfaceData.albedo + surfaceData.emission, surfaceData.alpha);
+    return SurfaceDataToGbuffer(surfaceData, inputData, color.rgb, kLightingSimpleLit);
+#else
+    half4 color = UniversalFragmentBlinnPhong(inputData, surfaceData);
     color.rgb = MixFog(color.rgb, -inputData.viewDirectionWS, inputData.fogCoord);
     color = Volumetrics ( color,  inputData.positionWS);
-
     return color;
+#endif
 };
 
-struct VertexInput
+struct GrassVertexDepthOnlyInput
 {
-    float4 position     : POSITION;
+    float4 vertex       : POSITION;
+    float4 tangent      : TANGENT;
     half4 color         : COLOR;
     float2 texcoord     : TEXCOORD0;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-struct VertexOutput
+struct GrassVertexDepthOnlyOutput
 {
     float2 uv           : TEXCOORD0;
     half4 color         : TEXCOORD1;
     float4 clipPos      : SV_POSITION;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
+    UNITY_VERTEX_OUTPUT_STEREO
 };
 
-VertexOutput DepthOnlyVertex(VertexInput v)
+void InitializeVertData(GrassVertexDepthOnlyInput input, inout GrassVertexDepthOnlyOutput vertData)
 {
-    VertexOutput o = (VertexOutput)0;
-    UNITY_SETUP_INSTANCE_ID(v);
+    VertexPositionInputs vertexInput = GetVertexPositionInputs(input.vertex.xyz);
 
-    o.uv = TRANSFORM_TEX(v.texcoord, _MainTex);
+    vertData.uv = input.texcoord;
+    vertData.clipPos = vertexInput.positionCS;
+}
+
+GrassVertexDepthOnlyOutput DepthOnlyVertex(GrassVertexDepthOnlyInput v)
+{
+    GrassVertexDepthOnlyOutput o = (GrassVertexDepthOnlyOutput)0;
+    UNITY_SETUP_INSTANCE_ID(v);
+    UNITY_TRANSFER_INSTANCE_ID(v, o);
+    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
     // MeshGrass v.color.a: 1 on top vertices, 0 on bottom vertices
     // _WaveAndDistance.z == 0 for MeshLit
     float waveAmount = v.color.a * _WaveAndDistance.z;
-    o.color = TerrainWaveGrass(v.position, waveAmount, v.color);
-    o.clipPos = TransformObjectToHClip(v.position.xyz);
+    o.color = TerrainWaveGrass(v.vertex, waveAmount, v.color);
+
+    InitializeVertData(v, o);
+
     return o;
 }
 
-half4 DepthOnlyFragment(VertexOutput IN) : SV_TARGET
+half4 DepthOnlyFragment(GrassVertexDepthOnlyOutput input) : SV_TARGET
 {
-    Alpha(SampleAlbedoAlpha(IN.uv, TEXTURE2D_ARGS(_MainTex, sampler_MainTex)).a, IN.color, _Cutoff);
-return 0;
+    Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_MainTex, sampler_MainTex)).a, input.color, _Cutoff);
+    return 0;
 }
-
 #endif

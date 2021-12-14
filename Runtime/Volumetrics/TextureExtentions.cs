@@ -5,18 +5,18 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-[System.Serializable]
-public struct int2
-{
-    public int x;
-    public int y;
-}
-[System.Serializable]
-public struct uint2
-{
-    public uint x;
-    public uint y;
-}
+//[System.Serializable]
+//public struct int2
+//{
+//    public int x;
+//    public int y;
+//}
+//[System.Serializable]
+//public struct uint2
+//{
+//    public uint x;
+//    public uint y;
+//}
 [System.Serializable]
 public struct int3
 {
