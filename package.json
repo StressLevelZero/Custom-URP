@@ -1,15 +1,15 @@
 {
   "name": "com.unity.render-pipelines.universal",
   "description": "SLZ's moddified URP",
-  "version": "12.0.0",
+  "version": "12.1.2",
   "unity": "2021.2",
   "unityRelease": "0a19",
   "displayName": "SLZ Universal RP",
   "dependencies": {
     "com.unity.mathematics": "1.2.1",
     "com.unity.burst": "1.5.0",
-    "com.unity.render-pipelines.core": "12.0.0",
-    "com.unity.shadergraph": "12.0.0"
+    "com.unity.render-pipelines.core": "12.1.2",
+    "com.unity.shadergraph": "12.1.2"
   },
   "keywords": [
     "graphics",
@@ -25,9 +25,9 @@
 	},
   "samples": [
     {
-      "displayName": "Teaching Samples",
-      "description": "Collection of scenes showing how to use different features of the Universal Render Pipeline.",
-      "path": "Samples~/TeachingSamples"
+      "displayName": "URP Package Samples",
+      "description": "Collection of scenes showcasing different features of the Universal Render Pipeline.",
+      "path": "Samples~/URPPackageSamples"
     }
   ]
 }
