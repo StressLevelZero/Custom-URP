@@ -6,7 +6,7 @@ Shader "Universal Render Pipeline/Complex Lit"
     Properties
     {
         // Specular vs Metallic workflow
-        _WorkflowMode("WorkflowMode", Float) = 1.0
+        // _WorkflowMode("WorkflowMode", Float) = 1.0
 
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
@@ -14,16 +14,16 @@ Shader "Universal Render Pipeline/Complex Lit"
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
-        _SmoothnessTextureChannel("Smoothness texture channel", Float) = 0
+        // _SmoothnessTextureChannel("Smoothness texture channel", Float) = 0
 
         _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
         _MetallicGlossMap("Metallic", 2D) = "white" {}
 
-        _SpecColor("Specular", Color) = (0.2, 0.2, 0.2)
-        _SpecGlossMap("Specular", 2D) = "white" {}
+        // _SpecColor("Specular", Color) = (0.2, 0.2, 0.2)
+        // _SpecGlossMap("Specular", 2D) = "white" {}
 
-        [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
-        [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
+        // [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
+        // [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
 
         _BumpScale("Scale", Float) = 1.0
         _BumpMap("Normal Map", 2D) = "bump" {}
@@ -104,12 +104,12 @@ Shader "Universal Render Pipeline/Complex Lit"
             #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local_fragment _EMISSION
             #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
-            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+            // #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             #pragma shader_feature_local_fragment _OCCLUSIONMAP
             #pragma shader_feature_local_fragment _ _CLEARCOAT _CLEARCOATMAP
-            #pragma shader_feature_local_fragment _SPECULARHIGHLIGHTS_OFF
-            #pragma shader_feature_local_fragment _ENVIRONMENTREFLECTIONS_OFF
-            #pragma shader_feature_local_fragment _SPECULAR_SETUP
+            // #pragma shader_feature_local_fragment _SPECULARHIGHLIGHTS_OFF
+            // #pragma shader_feature_local_fragment _ENVIRONMENTREFLECTIONS_OFF
+            //#pragma shader_feature_local_fragment _SPECULAR_SETUP
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -269,7 +269,7 @@ Shader "Universal Render Pipeline/Complex Lit"
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaLit
 
-            #pragma shader_feature_local_fragment _SPECULAR_SETUP
+           // #pragma shader_feature_local_fragment _SPECULAR_SETUP
             #pragma shader_feature_local_fragment _EMISSION
             #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
             #pragma shader_feature_local_fragment _ALPHATEST_ON
@@ -343,12 +343,12 @@ Shader "Universal Render Pipeline/Complex Lit"
             #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local_fragment _EMISSION
             #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
-            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+            // #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             #pragma shader_feature_local_fragment _OCCLUSIONMAP
             #pragma shader_feature_local_fragment _ _CLEARCOAT _CLEARCOATMAP
-            #pragma shader_feature_local_fragment _SPECULARHIGHLIGHTS_OFF
-            #pragma shader_feature_local_fragment _ENVIRONMENTREFLECTIONS_OFF
-            #pragma shader_feature_local_fragment _SPECULAR_SETUP
+            // #pragma shader_feature_local_fragment _SPECULARHIGHLIGHTS_OFF
+            // #pragma shader_feature_local_fragment _ENVIRONMENTREFLECTIONS_OFF
+          //  #pragma shader_feature_local_fragment _SPECULAR_SETUP
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -492,11 +492,11 @@ Shader "Universal Render Pipeline/Complex Lit"
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaLit
 
-            #pragma shader_feature_local_fragment _SPECULAR_SETUP
+           // #pragma shader_feature_local_fragment _SPECULAR_SETUP
             #pragma shader_feature_local_fragment _EMISSION
             #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
             #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+            // #pragma shader_feature_local_fragment _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
 
             #pragma shader_feature_local_fragment _SPECGLOSSMAP

@@ -1,10 +1,10 @@
 // Shader targeted for low end devices. Single Pass Forward Rendering.
-Shader "Universal Render Pipeline/Simple Lit"
+Shader "Universal Render Pipeline/Simple Lit (Specular Workflow)"
 {
     // Keep properties of StandardSpecular shader for upgrade reasons.
     Properties
     {
-        [MainTexture] _BaseMap("Base Map (RGB) Smoothness / Alpha (A)", 2D) = "white" {}
+        [MainTexture] _BaseMap("Base Map (RGB) , Alpha (A)", 2D) = "white" {}
         [MainColor]   _BaseColor("Base Color", Color) = (1, 1, 1, 1)
 
         _Cutoff("Alpha Clipping", Range(0.0, 1.0)) = 0.5
@@ -12,8 +12,8 @@ Shader "Universal Render Pipeline/Simple Lit"
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
         _SpecColor("Specular Color", Color) = (0.5, 0.5, 0.5, 0.5)
         _SpecGlossMap("Specular Map", 2D) = "white" {}
-        _SmoothnessSource("Smoothness Source", Float) = 0.0
-        _SpecularHighlights("Specular Highlights", Float) = 1.0
+        //_SmoothnessSource("Smoothness Source", Float) = 0.0
+        //_SpecularHighlights("Specular Highlights", Float) = 1.0
 
         [HideInInspector] _BumpScale("Scale", Float) = 1.0
         [NoScaleOffset] _BumpMap("Normal Map", 2D) = "bump" {}
@@ -74,7 +74,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             #pragma shader_feature_local_fragment _ALPHATEST_ON
             #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local_fragment _ _SPECGLOSSMAP _SPECULAR_COLOR
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+          //  #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -170,10 +170,10 @@ Shader "Universal Render Pipeline/Simple Lit"
             #pragma shader_feature_local_fragment _ALPHATEST_ON
             //#pragma shader_feature _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local_fragment _ _SPECGLOSSMAP _SPECULAR_COLOR
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+            //#pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
             #pragma shader_feature_local _NORMALMAP
             #pragma shader_feature_local_fragment _EMISSION
-            #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
+            //#pragma shader_feature_local _RECEIVE_SHADOWS_OFF
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -228,7 +228,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+            //#pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             //--------------------------------------
             // GPU Instancing
@@ -260,7 +260,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             // Material Keywords
             #pragma shader_feature_local _NORMALMAP
             #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+            //#pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             //--------------------------------------
             // GPU Instancing
@@ -341,12 +341,12 @@ Shader "Universal Render Pipeline/Simple Lit"
             // Material Keywords
             #pragma shader_feature_local _NORMALMAP
             #pragma shader_feature_local_fragment _EMISSION
-            #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
+            //#pragma shader_feature_local _RECEIVE_SHADOWS_OFF
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
             #pragma shader_feature_local_fragment _ALPHATEST_ON
             #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
             #pragma shader_feature_local_fragment _ _SPECGLOSSMAP _SPECULAR_COLOR
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+            //#pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -396,7 +396,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+            //#pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -430,7 +430,7 @@ Shader "Universal Render Pipeline/Simple Lit"
 
             // Material Keywords
             #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+            //#pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
@@ -457,7 +457,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             // Material Keywords
             #pragma shader_feature_local _NORMALMAP
             #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+            //#pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             //--------------------------------------
             // GPU Instancing

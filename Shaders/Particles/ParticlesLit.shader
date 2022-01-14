@@ -1,6 +1,6 @@
 // ------------------------------------------
 // No shadows
-Shader "Universal Render Pipeline/Particles/Lit"
+Shader "Universal Render Pipeline/Particles/Lit (Particles)"
 {
     Properties
     {

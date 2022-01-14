@@ -1,4 +1,4 @@
-Shader "Universal Render Pipeline/Terrain/Lit"
+Shader "Universal Render Pipeline/Terrain/Lit (Terrain)"
 {
     Properties
     {

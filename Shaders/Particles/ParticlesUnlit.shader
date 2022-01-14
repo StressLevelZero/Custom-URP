@@ -1,4 +1,4 @@
-Shader "Universal Render Pipeline/Particles/Unlit"
+Shader "Universal Render Pipeline/Particles/Unlit (Particles)"
 {
     Properties
     {

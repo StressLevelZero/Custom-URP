@@ -146,7 +146,9 @@ half4 fragParticleUnlit(VaryingsParticle input) : SV_Target
         finalColor.rgb *= aoFactor.directAmbientOcclusion;
     #endif
 
-    finalColor.rgb = MixFog(finalColor.rgb, inputData.fogCoord);
+    finalColor.rgb = MixFog(finalColor.rgb, -input.viewDirWS, inputData.fogCoord);
+    finalColor = Volumetrics(finalColor, input.positionWS.xyz);
+
     finalColor.a = OutputAlpha(finalColor.a, _Surface);
 
     return finalColor;

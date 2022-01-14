@@ -26,7 +26,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
                 EditorGUIUtility.TrTextContent("Specular Map", "Designates a Specular Map and specular color determining the apperance of reflections on this Material's surface.");
 
             public static GUIContent metallicMapText =
-                EditorGUIUtility.TrTextContent("Metallic Map", "Sets and configures the map for the Metallic workflow.");
+                EditorGUIUtility.TrTextContent("Mask Map", "Metallic (R), AO (G), Detail Mask (B), Smoothness (A)"); //Using HDRP's packing to free up some texture channels
 
             public static GUIContent smoothnessText = EditorGUIUtility.TrTextContent("Smoothness",
                 "Controls the spread of highlights and reflections on the surface.");
@@ -46,7 +46,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
                 "Defines a Height Map that will drive a parallax effect in the shader making the surface seem displaced.");
 
             public static GUIContent occlusionText = EditorGUIUtility.TrTextContent("Occlusion Map",
-                "Sets an occlusion map to simulate shadowing from ambient lighting.");
+                "Sets an occlusion map to simulate shadowing from ambient lighting (G).");
 
             public static readonly string[] metallicSmoothnessChannelNames = { "Metallic Alpha", "Albedo Alpha" };
             public static readonly string[] specularSmoothnessChannelNames = { "Specular Alpha", "Albedo Alpha" };
@@ -276,14 +276,14 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
 
             CoreUtils.SetKeyword(material, "_METALLICSPECGLOSSMAP", hasGlossMap);
 
-            if (material.HasProperty("_SpecularHighlights"))
-                CoreUtils.SetKeyword(material, "_SPECULARHIGHLIGHTS_OFF",
-                    material.GetFloat("_SpecularHighlights") == 0.0f);
-            if (material.HasProperty("_EnvironmentReflections"))
-                CoreUtils.SetKeyword(material, "_ENVIRONMENTREFLECTIONS_OFF",
-                    material.GetFloat("_EnvironmentReflections") == 0.0f);
-            if (material.HasProperty("_OcclusionMap"))
-                CoreUtils.SetKeyword(material, "_OCCLUSIONMAP", material.GetTexture("_OcclusionMap"));
+            //if (material.HasProperty("_SpecularHighlights"))
+            //    CoreUtils.SetKeyword(material, "_SPECULARHIGHLIGHTS_OFF",
+            //        material.GetFloat("_SpecularHighlights") == 0.0f);
+            //if (material.HasProperty("_EnvironmentReflections"))
+            //    CoreUtils.SetKeyword(material, "_ENVIRONMENTREFLECTIONS_OFF",
+            //        material.GetFloat("_EnvironmentReflections") == 0.0f);
+            //if (material.HasProperty("_OcclusionMap"))
+            //    CoreUtils.SetKeyword(material, "_OCCLUSIONMAP", material.GetTexture("_OcclusionMap"));
 
             if (material.HasProperty("_ParallaxMap"))
                 CoreUtils.SetKeyword(material, "_PARALLAXMAP", material.GetTexture("_ParallaxMap"));
