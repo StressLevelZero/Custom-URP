@@ -76,7 +76,7 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 TEXTURE2D(_ParallaxMap);        SAMPLER(sampler_ParallaxMap);
 //TEXTURE2D(_OcclusionMap);       SAMPLER(sampler_OcclusionMap);
 //TEXTURE2D(_DetailMask);         SAMPLER(sampler_DetailMask);
-TEXTURE2D(_DetailMap);    SAMPLER(sampler_DetailMap);
+TEXTURE2D(_DetailMap);    SAMPLER(sampler_DetailMap); //renamed
 //TEXTURE2D(_DetailNormalMap);    SAMPLER(sampler_DetailNormalMap);
 TEXTURE2D(_MetallicGlossMap);   SAMPLER(sampler_MetallicGlossMap);
 TEXTURE2D(_SpecGlossMap);       SAMPLER(sampler_SpecGlossMap);
@@ -103,7 +103,8 @@ half4 SampleMetallicSpecGloss(float2 uv, half albedoAlpha)
     #if _SPECULAR_SETUP
         specGloss.rgb = _SpecColor.rgb;
     #else
-        specGloss.rgb = _Metallic.rrr;
+        specGloss.r = _Metallic;
+        specGloss.gb = 1;
     #endif
 
     #ifdef _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
