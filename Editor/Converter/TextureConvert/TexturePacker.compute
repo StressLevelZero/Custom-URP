@@ -1,0 +1,56 @@
+#pragma kernel CSMain
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+
+
+RWTexture2D<float4> Result;
+
+texture2D<float4>  InputTextureRed;
+bool invertRed;
+uint inputChannelRed;
+
+texture2D<float4>  InputTextureGreen;
+bool invertGreen;
+uint inputChannelGreen;
+
+texture2D<float4>  InputTextureBlue;
+bool invertBlue;
+uint inputChannelBlue;
+
+texture2D<float4>  InputTextureAlpha;
+bool invertAlpha;
+uint inputChannelAlpha;
+
+SamplerState _LinearClamp;
+
+
+
+float ExtractData(float2 UV, texture2D InputTexture, uint inputChannel) {
+
+    float returnfloat = 0; //To avoid 'use of potentially uninitialized variable' warning
+
+    //if (inputChannel == 0) returnfloat =  InputTexture[id].r;
+    if (inputChannel == 0) returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp,UV,0)).r;
+    else if (inputChannel == 1)  returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)).g;
+    else if (inputChannel == 2)  returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)).b;
+    else if (inputChannel == 3)  returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)).a;
+
+    return returnfloat;
+}
+
+[numthreads(32,32,1)]
+void CSMain (uint2 id : SV_DispatchThreadID)
+{
+    float4 colorBuffer = float4(0, 0, 0, 1);
+
+    float2 wh;
+    Result.GetDimensions(wh.x, wh.y);
+    float2 UV = (id + 0.5) / wh;
+
+    colorBuffer.r = ExtractData(UV.xy, InputTextureRed, inputChannelRed);
+    colorBuffer.g = ExtractData(UV.xy, InputTextureGreen, inputChannelGreen);
+    colorBuffer.b = ExtractData(UV.xy, InputTextureBlue, inputChannelBlue);
+    colorBuffer.a = ExtractData(UV.xy, InputTextureAlpha, inputChannelAlpha);
+
+    Result[id.xy] = colorBuffer;
+}

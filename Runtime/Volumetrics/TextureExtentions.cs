@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.IO;
+using System.Reflection;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -30,6 +32,18 @@ public struct uint3
     public uint x;
     public uint y;
     public uint z;
+}
+
+[System.Serializable]
+public enum RGBA
+{
+    Red, Green, Blue, Alpha
+}
+
+[System.Serializable]
+public enum TextureFileExtension
+{
+    PNG, EXR, JPG, TGA
 }
 public static class TextureExtentions
 {  
@@ -74,7 +88,35 @@ public static class TextureExtentions
         return output;
     }
 
-    
+    public static Texture2D ConvertToTexture2D(this RenderTexture rt)
+    {
+        Texture2D output = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false, false);
+        RenderTexture.active = rt;
+        output.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        output.Apply();
+        return output;
+    }
+
+    public static Vector2Int GetImageSize(this Texture2D asset)
+    {
+        if (asset != null)
+        {
+            string assetPath = AssetDatabase.GetAssetPath(asset);
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+
+            if (importer != null)
+            {
+                object[] args = new object[2] { 0, 0 };
+                MethodInfo mi = typeof(TextureImporter).GetMethod("GetWidthAndHeight", BindingFlags.NonPublic | BindingFlags.Instance);
+                mi.Invoke(importer, args);
+                return new Vector2Int((int)args[0], (int)args[1]);
+            }
+        }
+
+        return   new Vector2Int(0,0);
+    }
+
+
     public static void SaveToTexture3D(this RenderTexture Rtex3d, string NameAtPath)
     {
         //Texture3D export = new Texture3D((int)Rtex3d.width, (int)Rtex3d.height, (int)Rtex3d.depth, TextureFormat.ARGB32, false);
@@ -123,5 +165,25 @@ public static class TextureExtentions
         AssetDatabase.CreateAsset(output, NameAtPath + ".asset"); // Todo: Either disable during build or make a build version
         Debug.Log("Saved " + NameAtPath);
 #endif
+    }
+
+    public static TextureFileExtension GetTextureExtension(this string path)
+    {        
+        return (TextureFileExtension)System.Enum.Parse(typeof(TextureFileExtension), Path.GetExtension(path) );
+    }
+
+    public static byte[] EncodeTexture(this Texture2D tex, TextureFileExtension textureFileExtension)
+    {
+        switch (textureFileExtension) {
+            case TextureFileExtension.PNG:
+        return tex.EncodeToPNG();
+            case TextureFileExtension.JPG:
+        return tex.EncodeToJPG();
+            case TextureFileExtension.EXR:
+        return tex.EncodeToEXR();
+            case TextureFileExtension.TGA:
+        return tex.EncodeToTGA();
+        }
+        return null;
     }
 }

@@ -25,8 +25,8 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
         _BumpScale("Scale", Float) = 1.0
         _BumpMap("Normal Map", 2D) = "bump" {}
 
-        _Parallax("Scale", Range(0.005, 0.08)) = 0.005
-        _ParallaxMap("Height Map", 2D) = "black" {}
+        // _Parallax("Scale", Range(0.005, 0.08)) = 0.005
+        // _ParallaxMap("Height Map", 2D) = "black" {}
 
         //_OcclusionStrength("Strength", Range(0.0, 1.0)) = 1.0 //Meh. Not really needed. Just fix your texture
         //_OcclusionMap("Occlusion", 2D) = "white" {} //Packed together with metallic to match HDRP
@@ -99,7 +99,7 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local _PARALLAXMAP
+            //#pragma shader_feature_local _PARALLAXMAP
             // #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
             #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
@@ -215,7 +215,7 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
             #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
             // #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             //#pragma shader_feature_local_fragment _OCCLUSIONMAP
-            #pragma shader_feature_local _PARALLAXMAP
+            //#pragma shader_feature_local _PARALLAXMAP
             #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
 
             // #pragma shader_feature_local_fragment _SPECULARHIGHLIGHTS_OFF
@@ -308,7 +308,7 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local _PARALLAXMAP
+            //#pragma shader_feature_local _PARALLAXMAP
             #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
             #pragma shader_feature_local_fragment _ALPHATEST_ON
             // #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
@@ -426,7 +426,7 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local _PARALLAXMAP
+            //#pragma shader_feature_local _PARALLAXMAP
             // #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
             #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
@@ -559,7 +559,7 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local _PARALLAXMAP
+            //#pragma shader_feature_local _PARALLAXMAP
             #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
             #pragma shader_feature_local_fragment _ALPHATEST_ON
             // #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
