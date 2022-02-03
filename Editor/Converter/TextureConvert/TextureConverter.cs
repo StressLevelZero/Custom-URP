@@ -201,34 +201,28 @@ public class TextureConverter : ScriptableWizard
                 if (!System.Enum.TryParse(typeof(TextureFileExtension), Path.GetExtension(OverridePath).Substring(1), true, out extractedext)) {
                     Debug.Log("Texture type " + Path.GetExtension(OverridePath).Substring(1) + " is not supported. Making new texture instead.");
                     SaveNewTexture(packedtexture, PackingArray[i]);
-                    return;
+                    break;
                 }
+                else
+                {
+                    TextureFileExtension ext = (TextureFileExtension)extractedext;
 
-                TextureFileExtension ext = (TextureFileExtension)extractedext;
+                    byte[] pixels = packedtexture.EncodeTexture(ext);
 
-                byte[] pixels = packedtexture.EncodeTexture(ext);
-                
-                File.WriteAllBytes(OverridePath, pixels);
-                SavedPath = OverridePath;
+                    File.WriteAllBytes(OverridePath, pixels);
+                    SavedPath = OverridePath;
 
-                AssetDatabase.Refresh();
+                    AssetDatabase.Refresh();
 
-                DeleteOldTextures(PackingArray[i]);
+                    DeleteOldTextures(PackingArray[i]);
 
-                ResetTextureCompressions(PackingArray[i]);
+                    ResetTextureCompressions(PackingArray[i]);
+
+                    AssignProperty(PackingArray[i]);
+                }
 
             }
 
-            //Load new asset and set it to the correct slot
-
-            TextureImporter ti = (TextureImporter)TextureImporter.GetAtPath(SavedPath);
-            if (!PackingArray[i].packingOptions.EnableAlphaChannel) ti.alphaSource = TextureImporterAlphaSource.None;
-            ti.textureCompression = PackingArray[i].packingOptions.textureCompression;
-            ti.sRGBTexture = PackingArray[i].packingOptions.sRGB;
-            ti.SaveAndReimport();
-
-            TargetMaterial.SetTexture(PackingArray[i].PropertyName, AssetDatabase.LoadAssetAtPath<Texture2D>(SavedPath) );
-            AssetDatabase.Refresh();
 
         }
 
@@ -265,6 +259,20 @@ public class TextureConverter : ScriptableWizard
         ti.SaveAndReimport();
         AssetDatabase.Refresh();
         return compression;
+    }
+
+    void AssignProperty(PackingTargetLayout packingTargetLayout)
+    {
+        AssetDatabase.Refresh();
+        //Load new asset and set it to the correct slot
+        TextureImporter ti = (TextureImporter)TextureImporter.GetAtPath(SavedPath);
+        if (!packingTargetLayout.packingOptions.EnableAlphaChannel) ti.alphaSource = TextureImporterAlphaSource.None;
+        ti.textureCompression = packingTargetLayout.packingOptions.textureCompression;
+        ti.sRGBTexture = packingTargetLayout.packingOptions.sRGB;
+        ti.SaveAndReimport();
+
+        TargetMaterial.SetTexture(packingTargetLayout.PropertyName, AssetDatabase.LoadAssetAtPath<Texture2D>(SavedPath));
+        AssetDatabase.Refresh();
     }
 
     void ResetTextureCompressions(PackingTargetLayout targetLayout)
@@ -304,7 +312,9 @@ public class TextureConverter : ScriptableWizard
         var path = AssetDatabase.GetAssetPath(texture);
         if (path == null || path.Length == 0 || SavedPath == path)  return;
         File.Delete(path);
+        File.Delete(path+ ".meta");
         Debug.Log("Deleted " + path);
+        AssetDatabase.Refresh();
     }
 
     public void SaveNewTexture(Texture2D packedtexture, PackingTargetLayout packingTargetLayout)
@@ -325,10 +335,18 @@ public class TextureConverter : ScriptableWizard
         byte[] pixels = packedtexture.EncodeTexture(packingTargetLayout.packingOptions.textureFileExtension);
         //  File.WriteAllBytes(Application.dataPath + "/../" + fullPath, pixels);
         File.WriteAllBytes(UserVerifiedPath, pixels);
-        SavedPath = UserVerifiedPath;
+
+        string relativepath;
+        if (UserVerifiedPath.StartsWith(Application.dataPath)) relativepath = "Assets" + UserVerifiedPath.Substring(Application.dataPath.Length);
+        else relativepath = UserVerifiedPath;
+
+        SavedPath = relativepath;
         Debug.Log("Saved texture at " + UserVerifiedPath);
         AssetDatabase.Refresh();
         DeleteOldTextures(packingTargetLayout);
+        AssignProperty(packingTargetLayout);
+        ResetTextureCompressions(packingTargetLayout);
+
     }
 
     public string GetPathFromInputs(PackingTargetLayout targetLayout)
