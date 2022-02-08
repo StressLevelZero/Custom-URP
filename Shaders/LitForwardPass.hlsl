@@ -270,12 +270,12 @@ half4 LitPassFragment(Varyings input) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
 
 #if defined(_PARALLAXMAP)
 #if defined(REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR)
     half3 viewDirTS = input.viewDirTS;
 #else
-    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
     half3 viewDirTS = GetViewDirectionTangentSpace(input.tangentWS, input.normalWS, viewDirWS);
 #endif
     ApplyPerPixelDisplacement(viewDirTS, input.uv);
@@ -306,7 +306,8 @@ half4 LitPassFragment(Varyings input) : SV_Target
     color.rgb += BakedSpecular * surfaceData.occlusion * MetalSpec * inputData.bakedGI.rgb;
 #endif    
 
-    color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
+
+    color.rgb = MixFog(color.rgb, -viewDirWS, inputData.fogCoord);
     color = Volumetrics ( color,  input.positionWS);
     color.a = OutputAlpha(color.a, _Surface);
 
