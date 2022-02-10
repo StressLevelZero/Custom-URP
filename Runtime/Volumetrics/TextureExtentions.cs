@@ -99,6 +99,8 @@ public static class TextureExtentions
 
     public static Vector2Int GetImageSize(this Texture2D asset)
     {
+#if UNITY_EDITOR
+
         if (asset != null)
         {
             string assetPath = AssetDatabase.GetAssetPath(asset);
@@ -112,7 +114,7 @@ public static class TextureExtentions
                 return new Vector2Int((int)args[0], (int)args[1]);
             }
         }
-
+#endif
         return   new Vector2Int(0,0);
     }
 
@@ -171,6 +173,7 @@ public static class TextureExtentions
     {        
         return (TextureFileExtension)System.Enum.Parse(typeof(TextureFileExtension), Path.GetExtension(path) );
     }
+
 
     public static byte[] EncodeTexture(this Texture2D tex, TextureFileExtension textureFileExtension)
     {
