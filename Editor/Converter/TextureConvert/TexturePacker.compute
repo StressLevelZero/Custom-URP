@@ -23,17 +23,19 @@ uint inputChannelAlpha;
 
 SamplerState _LinearClamp;
 
-
+float4 InvertColors(float4 input, bool invert) {
+    if (!invert)  return input;
+    return 1 - input;
+}
 
 float ExtractData(float2 UV, texture2D InputTexture, uint inputChannel) {
 
     float returnfloat = 0; //To avoid 'use of potentially uninitialized variable' warning
 
-    //if (inputChannel == 0) returnfloat =  InputTexture[id].r;
-    if (inputChannel == 0) returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp,UV,0)).r;
-    else if (inputChannel == 1)  returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)).g;
-    else if (inputChannel == 2)  returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)).b;
-    else if (inputChannel == 3)  returnfloat = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)).a;
+    if (inputChannel == 0) returnfloat = InvertColors(LinearToSRGB( InputTexture.SampleLevel(_LinearClamp,UV,0) ), invertRed).r;
+    else if (inputChannel == 1)  returnfloat = InvertColors(LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)), invertGreen).g;
+    else if (inputChannel == 2)  returnfloat = InvertColors(LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)), invertBlue).b;
+    else if (inputChannel == 3)  returnfloat = InvertColors(LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)), invertAlpha).a;
 
     return returnfloat;
 }
