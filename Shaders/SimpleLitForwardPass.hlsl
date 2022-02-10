@@ -179,11 +179,7 @@ half4 LitPassFragmentSimple(Varyings input) : SV_Target
 #endif
 
     half4 color = UniversalFragmentBlinnPhong(inputData, surfaceData);
-    #ifdef _NORMALMAP
-     color.rgb = MixFog(color.rgb, -viewDirWS, inputData.fogCoord);
-    #else
     color.rgb = MixFog(color.rgb, -inputData.viewDirectionWS, inputData.fogCoord);
-    #endif
     color = Volumetrics(color, input.positionWS);
     color.a = OutputAlpha(color.a, _Surface);
 
