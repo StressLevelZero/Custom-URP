@@ -23,7 +23,7 @@ uint inputChannelAlpha;
 
 SamplerState _LinearClamp;
 
-float4 InvertColors(float4 input, bool invert) {
+float InvertColor(float input, bool invert) {
     if (!invert)  return input;
     return 1 - input;
 }
@@ -32,10 +32,12 @@ float ExtractData(float2 UV, texture2D InputTexture, uint inputChannel) {
 
     float returnfloat = 0; //To avoid 'use of potentially uninitialized variable' warning
 
-    if (inputChannel == 0) returnfloat = InvertColors(LinearToSRGB( InputTexture.SampleLevel(_LinearClamp,UV,0) ), invertRed).r;
-    else if (inputChannel == 1)  returnfloat = InvertColors(LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)), invertGreen).g;
-    else if (inputChannel == 2)  returnfloat = InvertColors(LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)), invertBlue).b;
-    else if (inputChannel == 3)  returnfloat = InvertColors(LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0)), invertAlpha).a;
+    float4 colors = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0));
+
+    if (inputChannel == 0)       returnfloat = colors.r;
+    else if (inputChannel == 1)  returnfloat = colors.g;
+    else if (inputChannel == 2)  returnfloat = colors.b;
+    else if (inputChannel == 3)  returnfloat = colors.a;
 
     return returnfloat;
 }
@@ -49,10 +51,10 @@ void CSMain (uint2 id : SV_DispatchThreadID)
     Result.GetDimensions(wh.x, wh.y);
     float2 UV = (id + 0.5) / wh;
 
-    colorBuffer.r = ExtractData(UV.xy, InputTextureRed, inputChannelRed);
-    colorBuffer.g = ExtractData(UV.xy, InputTextureGreen, inputChannelGreen);
-    colorBuffer.b = ExtractData(UV.xy, InputTextureBlue, inputChannelBlue);
-    colorBuffer.a = ExtractData(UV.xy, InputTextureAlpha, inputChannelAlpha);
+    colorBuffer.r = InvertColor(ExtractData(UV.xy, InputTextureRed, inputChannelRed), invertRed);
+    colorBuffer.g = InvertColor(ExtractData(UV.xy, InputTextureGreen, inputChannelGreen), invertGreen);
+    colorBuffer.b = InvertColor(ExtractData(UV.xy, InputTextureBlue, inputChannelBlue), invertBlue);
+    colorBuffer.a = InvertColor(ExtractData(UV.xy, InputTextureAlpha, inputChannelAlpha), invertAlpha);
 
     Result[id.xy] = colorBuffer;
 }
