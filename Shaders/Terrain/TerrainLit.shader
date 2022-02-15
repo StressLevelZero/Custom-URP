@@ -1,4 +1,4 @@
-Shader "Universal Render Pipeline/Terrain/Lit (Terrain)"
+Shader "Universal Render Pipeline/Terrain/Lit"
 {
     Properties
     {
@@ -78,6 +78,7 @@ Shader "Universal Render Pipeline/Terrain/Lit (Terrain)"
             #pragma multi_compile_fragment _ _LIGHT_COOKIES
             #pragma multi_compile _ _CLUSTERED_RENDERING
             #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
+
             // -------------------------------------
             // Unity defined keywords
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
