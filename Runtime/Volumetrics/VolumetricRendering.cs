@@ -374,6 +374,7 @@ public class VolumetricRendering : MonoBehaviour
         IntegrationBuffer = new RenderTexture(rtdiscrpt);
       //  IntegrationBuffer.format = RenderTextureFormat.ARGB32;
         IntegrationBuffer.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
+        IntegrationBuffer.filterMode = FilterMode.Trilinear;
         IntegrationBuffer.enableRandomWrite = true;
         IntegrationBuffer.Create();
 
@@ -671,7 +672,7 @@ public class VolumetricRendering : MonoBehaviour
     {
         CheckOverrideVolumes();
         //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
-        CamAspectRatio = (float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth;
+        CamAspectRatio = XRSettings.eyeTextureHeight==0? cam.aspect :(float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth ; //bleh
 
 #if UNITY_EDITOR
         if (!Application.isPlaying)
