@@ -12,7 +12,7 @@ float4x4 TransposedCameraProjectionMatrix;
 float4x4 CameraProjectionMatrix;
 float4 _VolumePlaneSettings;
 float3 _VolCameraPos;
-TEXTURE3D(_VolumetricResult); SAMPLER(sampler_trilinear_clamp);
+TEXTURE3D(_VolumetricResult); SAMPLER(sampler_linear_clamp);
 float4 _VBufferDistanceEncodingParams;
 
 half4 Volumetrics(half4 color, half3 positionWS) {
@@ -47,7 +47,7 @@ half4 Volumetrics(half4 color, half3 positionWS) {
     //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
     
 //    float random = GenerateHashedRandomFloat(DoubleUV * 4000) * 0.003;
-    half4 FroxelColor = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_trilinear_clamp, DoubleUV,0) ;// *ClipUVW;
+    half4 FroxelColor = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_linear_clamp, DoubleUV,0) ;// *ClipUVW;
  //   half4 FroxelColor = SAMPLE_TEXTURE3D(_VolumetricResult, sampler_VolumetricResult, float3(positionNDC,W) ) ;// *ClipUVW;
 
     color.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
