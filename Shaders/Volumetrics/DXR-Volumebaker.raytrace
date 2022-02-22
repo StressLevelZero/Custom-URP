@@ -66,6 +66,7 @@ SamplerState  sampler_SkyTexture;
 struct RayPayload
 {
     float4 color;
+    float3 dir;
 };
 
 struct EnvRayPayload

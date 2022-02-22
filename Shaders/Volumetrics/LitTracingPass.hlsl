@@ -10,6 +10,7 @@
 struct RayPayload
 {
     float4 color;
+    float3 dir;
 };
 
 struct AttributeData
@@ -49,6 +50,7 @@ void BakedClosestHit(inout RayPayload payload,
     AttributeData attributes : SV_IntersectionAttributes) {
   #ifndef _EMISSION
     payload.color = float4(0,0,0,1);
+    payload.dir  = float3(1,0,0);
   #else
     uint2 launchIdx = DispatchRaysIndex();
     //    ShadingData shade = getShadingData( PrimitiveIndex(), attribs );
@@ -67,7 +69,9 @@ void BakedClosestHit(inout RayPayload payload,
     vInterpolated.texcoord = v0.texcoord * barycentrics.x + v1.texcoord * barycentrics.y + v2.texcoord * barycentrics.z;
 
     payload.color = float4((_EmissionMap.SampleLevel(sampler_EmissionMap, vInterpolated.texcoord, 0) * _EmissionColor).rgb,1);
+    payload.dir  = float3(1,0,0);
     #endif
 }
+
 
 #endif
