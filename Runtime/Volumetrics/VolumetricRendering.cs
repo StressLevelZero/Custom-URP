@@ -316,12 +316,12 @@ public class VolumetricRendering : MonoBehaviour
     void IntializeBlur(RenderTextureDescriptor rtdiscrpt)
     {
         BlurBuffer = new RenderTexture(rtdiscrpt);
-        BlurBuffer.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
+        BlurBuffer.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBuffer.enableRandomWrite = true;
         BlurBuffer.Create();
 
         BlurBufferB = new RenderTexture(rtdiscrpt);
-        BlurBufferB.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
+        BlurBufferB.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBufferB.enableRandomWrite = true;
         BlurBufferB.Create();
 
@@ -358,7 +358,7 @@ public class VolumetricRendering : MonoBehaviour
         rtdiscrpt.width = volumetricData.FroxelWidthResolution;
         rtdiscrpt.height = volumetricData.FroxelHeightResolution;
         rtdiscrpt.volumeDepth = volumetricData.FroxelDepthResolution;
-        rtdiscrpt.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
+        rtdiscrpt.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         rtdiscrpt.msaaSamples = 1;
 
         FroxelBufferA = new RenderTexture(rtdiscrpt);
@@ -373,7 +373,7 @@ public class VolumetricRendering : MonoBehaviour
         rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
         IntegrationBuffer = new RenderTexture(rtdiscrpt);
       //  IntegrationBuffer.format = RenderTextureFormat.ARGB32;
-        IntegrationBuffer.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
+        IntegrationBuffer.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         IntegrationBuffer.filterMode = FilterMode.Trilinear;
         IntegrationBuffer.enableRandomWrite = true;
         IntegrationBuffer.Create();
@@ -484,7 +484,7 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.width = volumetricData.ClipMapResolution;
         ClipRTdiscrpt.height = volumetricData.ClipMapResolution;    
         ClipRTdiscrpt.volumeDepth = volumetricData.ClipMapResolution;
-        ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+        ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         ClipRTdiscrpt.msaaSamples = 1;
 
         ClipmapBufferA = new RenderTexture(ClipRTdiscrpt);
