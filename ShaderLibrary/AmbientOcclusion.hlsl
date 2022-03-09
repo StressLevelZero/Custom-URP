@@ -57,6 +57,7 @@ AmbientOcclusionFactor CreateAmbientOcclusionFactor(float2 normalizedScreenSpace
     AmbientOcclusionFactor aoFactor = GetScreenSpaceAmbientOcclusion(normalizedScreenSpaceUV);
 
     aoFactor.indirectAmbientOcclusion = min(aoFactor.indirectAmbientOcclusion, occlusion);
+    aoFactor.directAmbientOcclusion = min(aoFactor.directAmbientOcclusion, occlusion);
     return aoFactor;
 }
 

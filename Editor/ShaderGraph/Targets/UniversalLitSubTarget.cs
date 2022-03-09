@@ -809,9 +809,19 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
                 scope = KeywordScope.Global,
             };
 
+            public static readonly KeywordDescriptor Volumetrics = new KeywordDescriptor()
+            {
+                displayName = "Volumetrics",
+                referenceName = "_VOLUMETRICS_ENABLED",
+                type = KeywordType.Boolean,
+                definition = KeywordDefinition.MultiCompile,
+                scope = KeywordScope.Global,
+            };
+
             public static readonly KeywordCollection Forward = new KeywordCollection
             {
                 { ScreenSpaceAmbientOcclusion },
+                { Volumetrics },
                 { CoreKeywordDescriptors.StaticLightmap },
                 { CoreKeywordDescriptors.DynamicLightmap },
                 { CoreKeywordDescriptors.DirectionalLightmapCombined },

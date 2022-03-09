@@ -627,10 +627,10 @@ public class VolumetricBaking : EditorWindow
     }
     Texture MakeEnvironmentalCubemap()
     {
-        if (CustomEnvorment == null)
-        {
+        //Black Background
+        if (SkyboxContribution != true){
 
-            RenderTexture cubetex = new RenderTexture(128, 128, 1, RenderTextureFormat.DefaultHDR);
+            RenderTexture cubetex = new RenderTexture(1, 1, 1, RenderTextureFormat.DefaultHDR);
             cubetex.enableRandomWrite = true;
             cubetex.dimension = UnityEngine.Rendering.TextureDimension.Cube;
             cubetex.Create();
@@ -638,11 +638,29 @@ public class VolumetricBaking : EditorWindow
             Camera renderCam = new GameObject().AddComponent<Camera>();
             renderCam.cullingMask = 0;
             renderCam.backgroundColor = Color.black;
-            renderCam.clearFlags = CameraClearFlags.SolidColor;
+            renderCam.clearFlags = CameraClearFlags.Color;
             renderCam.RenderToCubemap(cubetex);
             DestroyImmediate(renderCam.gameObject);
             return cubetex;
         }
+
+        //Generate Skybox
+        if (CustomEnvorment == null)
+        {
+            RenderTexture cubetex = new RenderTexture(256, 256, 1, RenderTextureFormat.DefaultHDR);
+            cubetex.enableRandomWrite = true;
+            cubetex.dimension = UnityEngine.Rendering.TextureDimension.Cube;
+            cubetex.Create();
+
+            Camera renderCam = new GameObject().AddComponent<Camera>();
+            renderCam.cullingMask = 0;
+            renderCam.backgroundColor = Color.black;
+            renderCam.clearFlags = CameraClearFlags.Skybox;
+            renderCam.RenderToCubemap(cubetex);
+            DestroyImmediate(renderCam.gameObject);
+            return cubetex;
+        }
+        //Provided skybox
         else
         {
             return CustomEnvorment;

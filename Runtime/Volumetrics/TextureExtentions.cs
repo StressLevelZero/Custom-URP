@@ -133,7 +133,7 @@ public static class TextureExtentions
             finalSlices[i] = ConvertFromRenderTexture(layers[i]);
 
 
-        Texture3D output = new Texture3D((int)Rtex3d.width, (int)Rtex3d.height, (int)Rtex3d.volumeDepth, TextureFormat.RGBA32, false);
+        Texture3D output = new Texture3D((int)Rtex3d.width, (int)Rtex3d.height, (int)Rtex3d.volumeDepth, TextureFormat.RGB24, false);
         output.filterMode = FilterMode.Trilinear;
         output.wrapMode = TextureWrapMode.Clamp;
         Color[] outputPixels = output.GetPixels();
