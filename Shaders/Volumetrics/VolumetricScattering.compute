@@ -180,7 +180,8 @@ float4 SpotLightLoop(float4 WS_coordinate) {
 
 
 
-///Main scattering pass. Intergration is done seperately so we can reproject this result for XR rather than do it twice.
+///Main scattering pass. Integration is done separately so we can reproject this result for XR rather than do it twice.
+///We Would have to store a pre integration version anyways for temporal reprojection
 [numthreads(4,4,4)]
 void Scatter(uint3 id : SV_DispatchThreadID)
 {
@@ -314,7 +315,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//				step(reprojection.z, 1) * step(0, reprojection.z);
 	//clamper = saturate(clamper);
 
-	float4 previousResult = PreviousFrameLighting.SampleLevel(s_linear_clamp_sampler, reprojection, 0 ) ;
+	float4 previousResult = max(PreviousFrameLighting.SampleLevel(s_linear_clamp_sampler, reprojection, 0 ),0) ;
 	//float4 previousResult = PreviousFrameLighting[id];
 
 	/////
@@ -359,4 +360,4 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	
 }
 
-///Intially did just matrix calulations. Worked fine, but the light scattering was less accurate on the edges. Implmented HDRP's method of casting rays
+///Initially did just matrix calculations. Worked fine, but the light scattering was less accurate on the edges. Implemented HDRP's method of casting rays
