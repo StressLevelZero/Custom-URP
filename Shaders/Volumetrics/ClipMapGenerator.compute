@@ -29,7 +29,7 @@ void ClipMapClear(uint3 id : SV_DispatchThreadID)
 [numthreads(4,4,4)]
 void ClipMapGen (uint3 id : SV_DispatchThreadID)
 {
-	uint count, stride;
+	//uint count, stride;
 
 	float4 UVW = float4(0,0,0,0);
 	Result.GetDimensions(UVW.x, UVW.y, UVW.z);
@@ -40,7 +40,7 @@ void ClipMapGen (uint3 id : SV_DispatchThreadID)
 	float4 WorldCoord = UVW * ClipmapScale + ClipmapWorldPosition.xyzz;
 	float3 MapUVW = (WorldCoord.xyz - VolumeWorldPosition) / VolumeWorldSize;
 
-	//TODO: Make sampling calulations run or not if they are inside or out of the clipped area
+	//TODO: Make sampling calculations run or not if they are inside or out of the clipped area
 	float ClipUVW  =
 		step(MapUVW.x, 1) * step(0, MapUVW.x) *
 		step(MapUVW.y, 1) * step(0, MapUVW.y) *

@@ -1,8 +1,5 @@
-﻿// Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel BlitBucket
+﻿#pragma kernel BlitBucket
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
 Texture3D<float4> BucketBuffer;
 SamplerState sampler_point_clamp;
 

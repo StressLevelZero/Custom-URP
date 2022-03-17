@@ -16,6 +16,7 @@ public class BakedVolumetricArea : MonoBehaviour
 
     private void OnEnable()
     {
+        if (bakedTexture == null) return;
         VolumetricRegisters.RegisterVolumetricArea(this);
     }
     private void OnDisable()
