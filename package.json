@@ -1,15 +1,14 @@
 {
   "name": "com.unity.render-pipelines.universal",
   "description": "SLZ's moddified URP",
-  "version": "12.1.2",
+  "version": "12.1.6",
   "unity": "2021.2",
-  "unityRelease": "0a19",
   "displayName": "SLZ Universal RP",
   "dependencies": {
     "com.unity.mathematics": "1.2.1",
     "com.unity.burst": "1.5.0",
-    "com.unity.render-pipelines.core": "12.1.2",
-    "com.unity.shadergraph": "12.1.2"
+    "com.unity.render-pipelines.core": "12.1.6",
+    "com.unity.shadergraph": "12.1.6"
   },
   "keywords": [
     "graphics",

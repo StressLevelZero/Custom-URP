@@ -334,6 +334,9 @@ namespace UnityEditor
                 materialEditor.IntSliderShaderProperty(queueOffsetProp, -queueOffsetRange, queueOffsetRange, Styles.queueSlider);
         }
 
+        [Obsolete("DrawAdditionalFoldouts has been deprecated. Use FillAdditionalFoldouts instead, and materialScopesList.RegisterHeaderScope", false)]
+        public virtual void DrawAdditionalFoldouts(Material material) { }
+
         public virtual void FillAdditionalFoldouts(MaterialHeaderScopeList materialScopesList) { }
 
         public virtual void DrawBaseProperties(Material material)
@@ -597,6 +600,9 @@ namespace UnityEditor
                 {
                     BlendMode blendMode = (BlendMode)material.GetFloat(Property.BlendMode);
 
+                    material.DisableKeyword(ShaderKeywordStrings._ALPHAPREMULTIPLY_ON);
+                    material.DisableKeyword(ShaderKeywordStrings._ALPHAMODULATE_ON);
+
                     // Specific Transparent Mode Settings
                     switch (blendMode)
                     {
@@ -604,7 +610,6 @@ namespace UnityEditor
                             SetMaterialSrcDstBlendProperties(material,
                                 UnityEngine.Rendering.BlendMode.SrcAlpha,
                                 UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                            material.DisableKeyword(ShaderKeywordStrings._ALPHAPREMULTIPLY_ON);
                             break;
                         case BlendMode.Premultiply:
                             SetMaterialSrcDstBlendProperties(material,
@@ -616,13 +621,11 @@ namespace UnityEditor
                             SetMaterialSrcDstBlendProperties(material,
                                 UnityEngine.Rendering.BlendMode.SrcAlpha,
                                 UnityEngine.Rendering.BlendMode.One);
-                            material.DisableKeyword(ShaderKeywordStrings._ALPHAPREMULTIPLY_ON);
                             break;
                         case BlendMode.Multiply:
                             SetMaterialSrcDstBlendProperties(material,
                                 UnityEngine.Rendering.BlendMode.DstColor,
                                 UnityEngine.Rendering.BlendMode.Zero);
-                            material.DisableKeyword(ShaderKeywordStrings._ALPHAPREMULTIPLY_ON);
                             material.EnableKeyword(ShaderKeywordStrings._ALPHAMODULATE_ON);
                             break;
                     }
