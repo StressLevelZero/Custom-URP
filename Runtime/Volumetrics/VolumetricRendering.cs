@@ -668,11 +668,18 @@ public class VolumetricRendering : MonoBehaviour
 
     }
 
+    float GetAspectRatio()
+    {
+        if (cam.stereoTargetEye == StereoTargetEyeMask.None) return cam.aspect;
+        return XRSettings.eyeTextureHeight == 0 ? cam.aspect : (float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth;
+    }
+
     void Update()
     {
         CheckOverrideVolumes();
         //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
-        CamAspectRatio = XRSettings.eyeTextureHeight==0? cam.aspect :(float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth ; //bleh
+        //bleh
+        CamAspectRatio = GetAspectRatio();
 
 #if UNITY_EDITOR
         if (!Application.isPlaying)
