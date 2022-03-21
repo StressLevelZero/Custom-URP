@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.Analytics;
@@ -37,7 +37,7 @@ namespace UnityEditor.Rendering.Universal
             if (!EnableAnalytics())
                 return;
 
-            // Needd to check if this isn't null
+            // Need to check if this isn't null
             UniversalRenderPipelineAsset rendererAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
 
             if (rendererAsset != null)
@@ -60,8 +60,11 @@ namespace UnityEditor.Rendering.Universal
                         rendererDatas.Add(rendererData.GetType().ToString());
                         foreach (ScriptableRendererFeature rendererFeature in rendererData.rendererFeatures)
                         {
-                            rendererFeaturesAmount++;
-                            renderFeatures.Add(rendererFeature.GetType().ToString());
+                            if (rendererFeature != null)
+                            {
+                                rendererFeaturesAmount++;
+                                renderFeatures.Add(rendererFeature.GetType().ToString());
+                            }
                         }
                     }
                 }

@@ -1,8 +1,18 @@
-namespace UnityEditor.Rendering.LWRP
+using System;
+using UnityEngine;
+
+namespace UnityEditor.Rendering.Universal
 {
-    // This is to keep the namespace UnityEditor.Rendering.LWRP alive,
-    // so that user scripts that have "using UnityEditor.Rendering.LWRP" in them still compile.
-    internal class Deprecated
+    [Obsolete("ForwardRendererDataEditor has been deprecated. Use UniversalRendererDataEditor instead (UnityUpgradable) -> UniversalRendererDataEditor", true)]
+    public class ForwardRendererDataEditor : ScriptableRendererDataEditor
+    {
+        public override void OnInspectorGUI()
+        {
+            throw new NotSupportedException("ForwardRendererDataEditor has been deprecated. Use UniversalRendererDataEditor instead");
+        }
+    }
+
+    static partial class EditorUtils
     {
     }
 }

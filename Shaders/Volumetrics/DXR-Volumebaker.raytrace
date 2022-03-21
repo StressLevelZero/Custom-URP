@@ -66,6 +66,7 @@ SamplerState  sampler_SkyTexture;
 struct RayPayload
 {
     float4 color;
+    float3 dir;
 };
 
 struct EnvRayPayload
@@ -204,7 +205,7 @@ float4 DirLightCast(float3 VoxelWS, uint Num){
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-	return  (1-payload.color.a) * DLD[Num].DirLightsColor;
+	return  (1-payload.color.a) * DLD[Num].DirLightsColor * DLD[Num].DirLightsColor.a;
 }
 
 //
@@ -356,5 +357,6 @@ void MainRayGenShader()
       else  LightAccumulation += DiscLightCast(VoxelWorldPosition, i) ;
     }
     LightAccumulation += EnvCast(VoxelWorldPosition);
+  //  LightAccumulation.a = 1; //filling alpha
     g_Output[launchIndex] = LightAccumulation;
 }

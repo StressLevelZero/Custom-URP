@@ -16,6 +16,7 @@ public class BakedVolumetricArea : MonoBehaviour
 
     private void OnEnable()
     {
+        if (bakedTexture == null) return;
         VolumetricRegisters.RegisterVolumetricArea(this);
     }
     private void OnDisable()
@@ -110,40 +111,40 @@ public class BakedVolumetricArea : MonoBehaviour
 
     void EnableDebugMesh()
     {
-        if (bakedTexture == null || DebugCube != null || UnityEditor.EditorApplication.isPlaying) return;
+        //if (bakedTexture == null || DebugCube != null || UnityEditor.EditorApplication.isPlaying) return;
 
-        DebugCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        DebugCube.transform.parent = gameObject.transform;
-        DebugCube.transform.localPosition = Vector3.zero;
-        DebugCube.transform.localScale = BoxScale;
-        DebugCube.transform.rotation = Quaternion.identity;
-        DestroyImmediate(DebugCube.GetComponent<Collider>());
+        //DebugCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        //DebugCube.transform.parent = gameObject.transform;
+        //DebugCube.transform.localPosition = Vector3.zero;
+        //DebugCube.transform.localScale = BoxScale;
+        //DebugCube.transform.rotation = Quaternion.identity;
+        //DestroyImmediate(DebugCube.GetComponent<Collider>());
 
-        Renderer rnd = DebugCube.GetComponent<Renderer>();
-        mat = new Material(Shader.Find("hidden/DebugVolumeRendering"));
+        //Renderer rnd = DebugCube.GetComponent<Renderer>();
+        //mat = new Material(Shader.Find("hidden/DebugVolumeRendering"));
 
-        mat.SetTexture("_Volume", bakedTexture);
-        mat.renderQueue = 3000;
+        //mat.SetTexture("_Volume", bakedTexture);
+        //mat.renderQueue = 3000;
 
-        rnd.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
-        rnd.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
-        rnd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        //rnd.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+        //rnd.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+        //rnd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
-        rnd.material = mat;
-        DebugCube.hideFlags = HideFlags.HideAndDontSave;
+        //rnd.material = mat;
+        //DebugCube.hideFlags = HideFlags.HideAndDontSave;
 
     }
     void DisableDebugMesh()
     {
-        if (DebugCube == null) return;
-        DestroyImmediate(DebugCube);
-        DestroyImmediate(mat);
+        //if (DebugCube == null) return;
+        //DestroyImmediate(DebugCube);
+        //DestroyImmediate(mat);
     }
 
     public void RefreshDebugMesh()
     {
-        DisableDebugMesh();
-        EnableDebugMesh();
+        //DisableDebugMesh();
+        //EnableDebugMesh();
     }
 
 #endif

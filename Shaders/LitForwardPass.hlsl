@@ -3,41 +3,59 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+// GLES2 has limited amount of interpolators
+#if defined(_PARALLAXMAP) && !defined(SHADER_API_GLES)
+#define REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR
+#endif
+
+#if (defined(_NORMALMAP) || (defined(_PARALLAXMAP) && !defined(REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR))) || defined(_DETAIL)
+#define REQUIRES_WORLD_SPACE_TANGENT_INTERPOLATOR
+#endif
+
+// keep this file in sync with LitGBufferPass.hlsl
+
 struct Attributes
 {
     float4 positionOS   : POSITION;
     float3 normalOS     : NORMAL;
     float4 tangentOS    : TANGENT;
     float2 texcoord     : TEXCOORD0;
-    float2 lightmapUV   : TEXCOORD1;
+    float2 staticLightmapUV   : TEXCOORD1;
+    float2 dynamicLightmapUV  : TEXCOORD2;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
-
-
 
 struct Varyings
 {
     float2 uv                       : TEXCOORD0;
-    DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 1);
 
 #if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
-    float3 positionWS               : TEXCOORD2;
+    float3 positionWS               : TEXCOORD1;
 #endif
 
-#ifdef _NORMALMAP
-    float4 normalWS                 : TEXCOORD3;    // xyz: normal, w: viewDir.x
-    float4 tangentWS                : TEXCOORD4;    // xyz: tangent, w: viewDir.y
-    float4 bitangentWS              : TEXCOORD5;    // xyz: bitangent, w: viewDir.z
-    
-#else
-    float3 normalWS                 : TEXCOORD3;
+    half3 normalWS                 : TEXCOORD2;
+#if defined(REQUIRES_WORLD_SPACE_TANGENT_INTERPOLATOR)
+    half4 tangentWS                : TEXCOORD3;    // xyz: tangent, w: sign
+#endif
     float3 viewDirWS                : TEXCOORD4;
-#endif
 
-    half4 fogFactorAndVertexLight   : TEXCOORD6; // x: fogFactor, yzw: vertex light
+#ifdef _ADDITIONAL_LIGHTS_VERTEX
+    half4 fogFactorAndVertexLight   : TEXCOORD5; // x: fogFactor, yzw: vertex light
+#else
+    half  fogFactor                 : TEXCOORD5;
+#endif
 
 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
-    float4 shadowCoord              : TEXCOORD7;
+    float4 shadowCoord              : TEXCOORD6;
+#endif
+
+#if defined(REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR)
+    half3 viewDirTS                : TEXCOORD7;
+#endif
+
+    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 8);
+#ifdef DYNAMICLIGHTMAP_ON
+    float2  dynamicLightmapUV : TEXCOORD9; // Dynamic lightmap UVs
 #endif
 
     float4 positionCS               : SV_POSITION;
@@ -53,17 +71,21 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
     inputData.positionWS = input.positionWS;
 #endif
 
-#ifdef _NORMALMAP
-    half3 viewDirWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
-    inputData.normalWS = TransformTangentToWorld(normalTS,
-        half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz));
+    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+#if defined(_NORMALMAP) || defined(_DETAIL)
+    float sgn = input.tangentWS.w;      // should be either +1 or -1
+    float3 bitangent = sgn * cross(input.normalWS.xyz, input.tangentWS.xyz);
+    half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, bitangent.xyz, input.normalWS.xyz);
+
+    #if defined(_NORMALMAP)
+    inputData.tangentToWorld = tangentToWorld;
+    #endif
+    inputData.normalWS = TransformTangentToWorld(normalTS, tangentToWorld);
 #else
-    half3 viewDirWS = input.viewDirWS;
     inputData.normalWS = input.normalWS;
 #endif
 
     inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
-    viewDirWS = SafeNormalize(viewDirWS);
     inputData.viewDirectionWS = viewDirWS;
 
 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
@@ -73,12 +95,33 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
 #else
     inputData.shadowCoord = float4(0, 0, 0, 0);
 #endif
-
-    inputData.fogCoord = input.fogFactorAndVertexLight.x;
+#ifdef _ADDITIONAL_LIGHTS_VERTEX
+    inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactorAndVertexLight.x);
     inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
-    inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
-}
+#else
+    inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactor);
+#endif
 
+#if defined(DYNAMICLIGHTMAP_ON)
+    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.dynamicLightmapUV, input.vertexSH, inputData.normalWS);
+#else
+    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
+#endif
+
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+    inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
+
+    #if defined(DEBUG_DISPLAY)
+    #if defined(DYNAMICLIGHTMAP_ON)
+    inputData.dynamicLightmapUV = input.dynamicLightmapUV;
+    #endif
+    #if defined(LIGHTMAP_ON)
+    inputData.staticLightmapUV = input.staticLightmapUV;
+    #else
+    inputData.vertexSH = input.vertexSH;
+    #endif
+#endif
+}
 
 //Directional variation
 void InitializeInputDataDir(Varyings input, half3 normalTS, half3 smoothness, out InputData inputData, out float BakedSpecular)
@@ -89,17 +132,21 @@ void InitializeInputDataDir(Varyings input, half3 normalTS, half3 smoothness, ou
     inputData.positionWS = input.positionWS;
 #endif
 
-#ifdef _NORMALMAP
-    half3 viewDirWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
-    inputData.normalWS = TransformTangentToWorld(normalTS,
-        half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz));
+    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+#if defined(_NORMALMAP) || defined(_DETAIL)
+    float sgn = input.tangentWS.w;      // should be either +1 or -1
+    float3 bitangent = sgn * cross(input.normalWS.xyz, input.tangentWS.xyz);
+    half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, bitangent.xyz, input.normalWS.xyz);
+
+    #if defined(_NORMALMAP)
+    inputData.tangentToWorld = tangentToWorld;
+    #endif
+    inputData.normalWS = TransformTangentToWorld(normalTS, tangentToWorld);
 #else
-    half3 viewDirWS = input.viewDirWS;
     inputData.normalWS = input.normalWS;
 #endif
 
     inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
-    viewDirWS = SafeNormalize(viewDirWS);
     inputData.viewDirectionWS = viewDirWS;
 
 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
@@ -109,22 +156,49 @@ void InitializeInputDataDir(Varyings input, half3 normalTS, half3 smoothness, ou
 #else
     inputData.shadowCoord = float4(0, 0, 0, 0);
 #endif
-
-    inputData.fogCoord = input.fogFactorAndVertexLight.x;
+#ifdef _ADDITIONAL_LIGHTS_VERTEX
+    inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactorAndVertexLight.x);
     inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
-#ifdef LIGHTMAP_ON
-    float4 encodedGI = SAMPLE_GI_DIR(input.lightmapUV, input.vertexSH, inputData.normalWS, smoothness, viewDirWS);
+#else
+    inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactor);
+#endif
+
+#if defined(DYNAMICLIGHTMAP_ON)
+    #if LIGHTMAP_ON
+    float4 encodedGI = SAMPLE_GI_DIR(input.staticLightmapUV, input.dynamicLightmapUV, input.vertexSH, inputData.normalWS, smoothness, viewDirWS);
     inputData.bakedGI = encodedGI.rgb;
     BakedSpecular = encodedGI.w;
+    #else
+  //  inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
+    #endif
 #else
-    inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
+    #if LIGHTMAP_ON
+    float4 encodedGI = SAMPLE_GI_DIR(input.staticLightmapUV, input.vertexSH, inputData.normalWS, smoothness, viewDirWS);
+    inputData.bakedGI = encodedGI.rgb;
+    BakedSpecular = encodedGI.w;
+    #else
+  //  inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
+    #endif
 #endif
+
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+    inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
+
+    #if defined(DEBUG_DISPLAY)
+    #if defined(DYNAMICLIGHTMAP_ON)
+    inputData.dynamicLightmapUV = input.dynamicLightmapUV;
+    #endif
+    #if defined(LIGHTMAP_ON)
+    inputData.staticLightmapUV = input.staticLightmapUV;
+    #else
+    inputData.vertexSH = input.vertexSH;
+    #endif
+    #endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 //                  Vertex and Fragment functions                            //
 ///////////////////////////////////////////////////////////////////////////////
-
 
 // Used in Standard (Physically Based) shader
 Varyings LitPassVertex(Attributes input)
@@ -136,26 +210,47 @@ Varyings LitPassVertex(Attributes input)
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+
+    // normalWS and tangentWS already normalize.
+    // this is required to avoid skewing the direction during interpolation
+    // also required for per-vertex lighting and SH evaluation
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
-    half3 viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
+
     half3 vertexLight = VertexLighting(vertexInput.positionWS, normalInput.normalWS);
-    half fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
+
+    half fogFactor = 0;
+    #if !defined(_FOG_FRAGMENT)
+        fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
+    #endif
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
 
-#ifdef _NORMALMAP
-    output.normalWS = half4(normalInput.normalWS, viewDirWS.x);
-    output.tangentWS = half4(normalInput.tangentWS, viewDirWS.y);
-    output.bitangentWS = half4(normalInput.bitangentWS, viewDirWS.z);
-#else
-    output.normalWS = NormalizeNormalPerVertex(normalInput.normalWS);
-    output.viewDirWS = viewDirWS;
+    // already normalized from normal transform to WS.
+    output.normalWS = normalInput.normalWS;
+#if defined(REQUIRES_WORLD_SPACE_TANGENT_INTERPOLATOR) || defined(REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR)
+    real sign = input.tangentOS.w * GetOddNegativeScale();
+    half4 tangentWS = half4(normalInput.tangentWS.xyz, sign);
+#endif
+#if defined(REQUIRES_WORLD_SPACE_TANGENT_INTERPOLATOR)
+    output.tangentWS = tangentWS;
 #endif
 
-    OUTPUT_LIGHTMAP_UV(input.lightmapUV, unity_LightmapST, output.lightmapUV);
-    OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
+#if defined(REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR)
+    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(vertexInput.positionWS);
+    half3 viewDirTS = GetViewDirectionTangentSpace(tangentWS, output.normalWS, viewDirWS);
+    output.viewDirTS = viewDirTS;
+#endif
 
+    OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
+#ifdef DYNAMICLIGHTMAP_ON
+    output.dynamicLightmapUV = input.dynamicLightmapUV.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
+#endif
+    OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
+#ifdef _ADDITIONAL_LIGHTS_VERTEX
     output.fogFactorAndVertexLight = half4(fogFactor, vertexLight);
+#else
+    output.fogFactor = fogFactor;
+#endif
 
 #if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
     output.positionWS = vertexInput.positionWS;
@@ -175,33 +270,48 @@ half4 LitPassFragment(Varyings input) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+
+#if defined(_PARALLAXMAP)
+#if defined(REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR)
+    half3 viewDirTS = input.viewDirTS;
+#else
+    half3 viewDirTS = GetViewDirectionTangentSpace(input.tangentWS, input.normalWS, viewDirWS);
+#endif
+    ApplyPerPixelDisplacement(viewDirTS, input.uv);
+#endif
 
     SurfaceData surfaceData;
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
 
     InputData inputData;
-    #ifdef LIGHTMAP_ON
+
+#ifdef LIGHTMAP_ON
     float BakedSpecular = 0;
     InitializeInputDataDir(input, surfaceData.normalTS, surfaceData.smoothness, inputData, BakedSpecular);   
-    #else
+#else
     InitializeInputData(input, surfaceData.normalTS, inputData);
-    #endif
+ #endif   
+    SETUP_DEBUG_TEXTURE_DATA(inputData, input.uv, _BaseMap);
 
-    half4 color = UniversalFragmentPBR(inputData, surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.occlusion, surfaceData.emission, surfaceData.alpha);
-    
-    #ifdef LIGHTMAP_ON
+
+#ifdef _DBUFFER
+    ApplyDecalToSurfaceData(input.positionCS, surfaceData, inputData);
+#endif
+
+    half4 color = UniversalFragmentPBR(inputData, surfaceData);
+
+#ifdef LIGHTMAP_ON
     float3 MetalSpec = lerp(kDieletricSpec.rgb, surfaceData.albedo, surfaceData.metallic);
     color.rgb += BakedSpecular * surfaceData.occlusion * MetalSpec * inputData.bakedGI.rgb;
-    #endif
+#endif    
 
-    #ifdef _NORMALMAP
-     color.rgb = MixFog(color.rgb, -real3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w), inputData.fogCoord);
-    #else
-    color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
-    #endif
 
+    color.rgb = MixFog(color.rgb, -viewDirWS, inputData.fogCoord);
     color = Volumetrics ( color,  input.positionWS);
+    color.a = OutputAlpha(color.a, _Surface);
 
     return color;
 }
+
 #endif

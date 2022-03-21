@@ -1,15 +1,14 @@
 {
   "name": "com.unity.render-pipelines.universal",
-  "description": "The Universal Render Pipeline is a prebuilt Scriptable Render Pipeline, made by Unity. The technology offers graphics that are scalable to mobile platforms, and you can also use it for higher-end consoles and PCs. You\u2019re able to achieve quick rendering at a high quality without needing compute shader technology. The Universal Render Pipeline uses simplified, physically based Lighting and Materials. The Universal Render Pipeline uses single-pass forward rendering. Use this pipeline to get optimized real-time performance on several platforms.",
-  "version": "0.0.2",
-  "description": "Stress Level Zero's moddified Universal Render Pipeline. Keeping same namespace as Unity's to keep compatabitly with external assets and shaders without having to change each one of them to match.",
-  "version": "0.0.5",
-  "unity": "2019.3",
-  "unityRelease": "0f3",
+  "description": "SLZ's moddified URP",
+  "version": "12.1.6",
+  "unity": "2021.2",
   "displayName": "SLZ Universal RP",
   "dependencies": {
-    "com.unity.render-pipelines.core": "7.3.1",
-    "com.unity.shadergraph": "7.3.1"
+    "com.unity.mathematics": "1.2.1",
+    "com.unity.burst": "1.5.0",
+    "com.unity.render-pipelines.core": "12.1.6",
+    "com.unity.shadergraph": "12.1.6"
   },
   "keywords": [
     "graphics",
@@ -19,8 +18,15 @@
     "render",
     "pipeline"
   ],
-  "repository": {
+    "repository": {
     "type": "git",
-    "url": "https://github.com/KevinComerford/com.unity.render-pipelines.universal.git"
-  }
+    "url": "https://github.com/StressLevelZero/Custom-URP.git"
+	},
+  "samples": [
+    {
+      "displayName": "URP Package Samples",
+      "description": "Collection of scenes showcasing different features of the Universal Render Pipeline.",
+      "path": "Samples~/URPPackageSamples"
+    }
+  ]
 }

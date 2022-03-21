@@ -1,0 +1,60 @@
+#pragma kernel CSMain
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+
+
+RWTexture2D<float4> Result;
+
+texture2D<float4>  InputTextureRed;
+bool invertRed;
+uint inputChannelRed;
+
+texture2D<float4>  InputTextureGreen;
+bool invertGreen;
+uint inputChannelGreen;
+
+texture2D<float4>  InputTextureBlue;
+bool invertBlue;
+uint inputChannelBlue;
+
+texture2D<float4>  InputTextureAlpha;
+bool invertAlpha;
+uint inputChannelAlpha;
+
+SamplerState _LinearClamp;
+
+float InvertColor(float input, bool invert) {
+    if (!invert)  return input;
+    return 1 - input;
+}
+
+float ExtractData(float2 UV, texture2D InputTexture, uint inputChannel) {
+
+    float returnfloat = 0; //To avoid 'use of potentially uninitialized variable' warning
+
+    float4 colors = LinearToSRGB(InputTexture.SampleLevel(_LinearClamp, UV, 0));
+
+    if (inputChannel == 0)       returnfloat = colors.r;
+    else if (inputChannel == 1)  returnfloat = colors.g;
+    else if (inputChannel == 2)  returnfloat = colors.b;
+    else if (inputChannel == 3)  returnfloat = colors.a;
+
+    return returnfloat;
+}
+
+[numthreads(32,32,1)]
+void CSMain (uint2 id : SV_DispatchThreadID)
+{
+    float4 colorBuffer = float4(0, 0, 0, 1);
+
+    float2 wh;
+    Result.GetDimensions(wh.x, wh.y);
+    float2 UV = (id + 0.5) / wh;
+
+    colorBuffer.r = InvertColor(ExtractData(UV.xy, InputTextureRed, inputChannelRed), invertRed);
+    colorBuffer.g = InvertColor(ExtractData(UV.xy, InputTextureGreen, inputChannelGreen), invertGreen);
+    colorBuffer.b = InvertColor(ExtractData(UV.xy, InputTextureBlue, inputChannelBlue), invertBlue);
+    colorBuffer.a = InvertColor(ExtractData(UV.xy, InputTextureAlpha, inputChannelAlpha), invertAlpha);
+
+    Result[id.xy] = colorBuffer;
+}

@@ -1,10 +1,11 @@
 using UnityEngine;
 using UnityEditor.AssetImporters;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace UnityEditor.Rendering.Universal
 {
-    public class AutodeskInteractiveMaterialImport : AssetPostprocessor
+    class AutodeskInteractiveMaterialImport : AssetPostprocessor
     {
         static readonly uint k_Version = 1;
         static readonly int k_Order = 3;
@@ -12,6 +13,7 @@ namespace UnityEditor.Rendering.Universal
         {
             return k_Version;
         }
+
         public override int GetPostprocessOrder()
         {
             return k_Order;
@@ -19,14 +21,18 @@ namespace UnityEditor.Rendering.Universal
 
         public void OnPreprocessMaterialDescription(MaterialDescription description, Material material, AnimationClip[] clips)
         {
+            var pipelineAsset = GraphicsSettings.currentRenderPipeline;
+            if (!pipelineAsset || pipelineAsset.GetType() != typeof(UniversalRenderPipelineAsset))
+                return;
+
             if (IsAutodeskInteractiveMaterial(description))
             {
                 float floatProperty;
                 Vector4 vectorProperty;
                 TexturePropertyDescription textureProperty;
 
-                bool isMasked = description.TryGetProperty("mask_threshold",out floatProperty);
-                bool isTransparent = description.TryGetProperty("opacity",out floatProperty);
+                bool isMasked = description.TryGetProperty("mask_threshold", out floatProperty);
+                bool isTransparent = description.TryGetProperty("opacity", out floatProperty);
 
                 Shader shader;
                 if (isMasked)

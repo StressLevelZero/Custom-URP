@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using UnityEngine.Experimental.Rendering.Universal;
+using UnityEngine.Rendering.Universal;
 
 namespace UnityEngine.Rendering.Universal.Tests
 {
@@ -28,6 +28,7 @@ namespace UnityEngine.Rendering.Universal.Tests
             public float unitsPerPixel;
         }
 
+        [UnityEngine.Scripting.Preserve]
         private static object[] GetCalculateCameraPropertiesTestCases()
         {
             object[] testCaseArray = new object[9];

@@ -1,51 +1,44 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEditor.Rendering.Universal;
 
 namespace UnityEditor.Rendering.Universal.ShaderGUI
 {
     internal class LitShader : BaseShaderGUI
     {
-        // Properties
+        static readonly string[] workflowModeNames = Enum.GetNames(typeof(LitGUI.WorkflowMode));
+
         private LitGUI.LitProperties litProperties;
+        private LitDetailGUI.LitProperties litDetailProperties;
+
+        public override void FillAdditionalFoldouts(MaterialHeaderScopeList materialScopesList)
+        {
+            materialScopesList.RegisterHeaderScope(LitDetailGUI.Styles.detailInputs, Expandable.Details, _ => LitDetailGUI.DoDetailArea(litDetailProperties, materialEditor));
+        }
 
         // collect properties from the material properties
         public override void FindProperties(MaterialProperty[] properties)
         {
             base.FindProperties(properties);
             litProperties = new LitGUI.LitProperties(properties);
+            litDetailProperties = new LitDetailGUI.LitProperties(properties);
         }
 
         // material changed check
-        public override void MaterialChanged(Material material)
+        public override void ValidateMaterial(Material material)
         {
-            if (material == null)
-                throw new ArgumentNullException("material");
-
-            SetMaterialKeywords(material, LitGUI.SetMaterialKeywords);
+            SetMaterialKeywords(material, LitGUI.SetMaterialKeywords, LitDetailGUI.SetMaterialKeywords);
         }
 
         // material main surface options
         public override void DrawSurfaceOptions(Material material)
         {
-            if (material == null)
-                throw new ArgumentNullException("material");
-
             // Use default labelWidth
             EditorGUIUtility.labelWidth = 0f;
 
-            // Detect any changes to the material
-            EditorGUI.BeginChangeCheck();
             if (litProperties.workflowMode != null)
-            {
-                DoPopup(LitGUI.Styles.workflowModeText, litProperties.workflowMode, Enum.GetNames(typeof(LitGUI.WorkflowMode)));
-            }
-            if (EditorGUI.EndChangeCheck())
-            {
-                foreach (var obj in blendModeProp.targets)
-                    MaterialChanged((Material)obj);
-            }
+                DoPopup(LitGUI.Styles.workflowModeText, litProperties.workflowMode, workflowModeNames);
+
             base.DrawSurfaceOptions(material);
         }
 
@@ -63,13 +56,8 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
         {
             if (litProperties.reflections != null && litProperties.highlights != null)
             {
-                EditorGUI.BeginChangeCheck();
                 materialEditor.ShaderProperty(litProperties.highlights, LitGUI.Styles.highlightsText);
                 materialEditor.ShaderProperty(litProperties.reflections, LitGUI.Styles.reflectionsText);
-                if(EditorGUI.EndChangeCheck())
-                {
-                    MaterialChanged(material);
-                }
             }
 
             base.DrawAdvancedOptions(material);
@@ -109,8 +97,17 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
                 surfaceType = SurfaceType.Transparent;
                 blendMode = BlendMode.Alpha;
             }
-            material.SetFloat("_Surface", (float)surfaceType);
             material.SetFloat("_Blend", (float)blendMode);
+
+            material.SetFloat("_Surface", (float)surfaceType);
+            if (surfaceType == SurfaceType.Opaque)
+            {
+                material.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            }
+            else
+            {
+                material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            }
 
             if (oldShader.name.Equals("Standard (Specular setup)"))
             {
@@ -126,8 +123,6 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
                 if (texture != null)
                     material.SetTexture("_MetallicSpecGlossMap", texture);
             }
-
-            MaterialChanged(material);
         }
     }
 }
