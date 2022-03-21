@@ -12,11 +12,11 @@ public class BakedVolumetricArea : MonoBehaviour
     [SerializeField] public Vector3Int NormalizedTexelDensity; //exposed to see target resolution
     [HideInInspector,SerializeField] public Vector3 NormalizedScale;
     [HideInInspector,SerializeField] public Vector3 Corner;
+   
 
 
     private void OnEnable()
     {
-        if (bakedTexture == null) return;
         VolumetricRegisters.RegisterVolumetricArea(this);
     }
     private void OnDisable()
@@ -91,9 +91,22 @@ public class BakedVolumetricArea : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        if (DEBUG) EnableDebugMesh();
-        else if (DebugCube != null) DisableDebugMesh();
-        if (!UnityEditor.Selection.Contains(gameObject)) DisableDebugMesh();
+        if (DEBUG)
+        {
+            if (UnityEditor.Selection.Contains(gameObject))
+            {
+                EnableDebugMesh();
+            } 
+            else 
+            {
+                DisableDebugMesh();
+            }
+        }
+        else if (DebugCube != null)
+        {
+            DisableDebugMesh();
+        }
+        
             OnValidate();
     //    Gizmos.DrawWireSphere(transform.position - (NormalizedScale* 0.5f), .5f);
         Gizmos.color = new Color(0.5f,0.5f,0.5f,0.25f);
@@ -108,35 +121,38 @@ public class BakedVolumetricArea : MonoBehaviour
     public bool DEBUG;
     [SerializeField,HideInInspector] GameObject DebugCube;
     [SerializeField,HideInInspector] Material mat;
+    [HideInInspector,SerializeField] public bool MarkDebugCubeForDelete;
 
     void EnableDebugMesh()
     {
-        //if (bakedTexture == null || DebugCube != null || UnityEditor.EditorApplication.isPlaying) return;
+        if (bakedTexture == null || DebugCube != null || UnityEditor.EditorApplication.isPlaying) return;
 
-        //DebugCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        //DebugCube.transform.parent = gameObject.transform;
-        //DebugCube.transform.localPosition = Vector3.zero;
-        //DebugCube.transform.localScale = BoxScale;
-        //DebugCube.transform.rotation = Quaternion.identity;
-        //DestroyImmediate(DebugCube.GetComponent<Collider>());
+        MarkDebugCubeForDelete = false;
+        DebugCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        DebugCube.transform.parent = gameObject.transform;
+        DebugCube.transform.localPosition = Vector3.zero;
+        DebugCube.transform.localScale = BoxScale;
+        DebugCube.transform.rotation = Quaternion.identity;
+        DestroyImmediate(DebugCube.GetComponent<Collider>());
 
-        //Renderer rnd = DebugCube.GetComponent<Renderer>();
-        //mat = new Material(Shader.Find("hidden/DebugVolumeRendering"));
+        Renderer rnd = DebugCube.GetComponent<Renderer>();
+        mat = new Material(Shader.Find("hidden/VolumetricPreview"));
 
-        //mat.SetTexture("_Volume", bakedTexture);
-        //mat.renderQueue = 3000;
+        mat.SetTexture("_Volume", bakedTexture);
+        mat.renderQueue = 3000;
 
-        //rnd.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
-        //rnd.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
-        //rnd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        rnd.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+        rnd.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+        rnd.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
-        //rnd.material = mat;
-        //DebugCube.hideFlags = HideFlags.HideAndDontSave;
+        rnd.material = mat;
+        DebugCube.hideFlags = HideFlags.HideAndDontSave;
 
     }
     void DisableDebugMesh()
     {
-        //if (DebugCube == null) return;
+        if (DebugCube == null) return;
+        MarkDebugCubeForDelete = true;
         //DestroyImmediate(DebugCube);
         //DestroyImmediate(mat);
     }
@@ -145,6 +161,17 @@ public class BakedVolumetricArea : MonoBehaviour
     {
         //DisableDebugMesh();
         //EnableDebugMesh();
+    }
+    [ExecuteInEditMode]    
+    void LateUpdate()
+    {
+        if (MarkDebugCubeForDelete && DebugCube != null)
+        {
+            MarkDebugCubeForDelete = false;
+            DestroyImmediate(DebugCube);
+            DestroyImmediate(mat);
+            
+        }
     }
 
 #endif
