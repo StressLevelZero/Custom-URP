@@ -79,7 +79,7 @@ public class BakedVolumetricArea : MonoBehaviour
     }
     private void OnDrawGizmos()
     {
-        if (!UnityEditor.Selection.Contains(gameObject)) DisableDebugMesh();
+        //if (!UnityEditor.Selection.Contains(gameObject)) DisableDebugMesh();
         Gizmos.color = new Color(0.5f, 0.5f, 0.5f, 0.5f);
         Gizmos.matrix = Matrix4x4.TRS(gameObject.transform.position, Quaternion.identity, NormalizedScale);
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
@@ -91,6 +91,7 @@ public class BakedVolumetricArea : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
+        /*
         if (DEBUG)
         {
             if (UnityEditor.Selection.Contains(gameObject))
@@ -106,7 +107,7 @@ public class BakedVolumetricArea : MonoBehaviour
         {
             DisableDebugMesh();
         }
-        
+        */
             OnValidate();
     //    Gizmos.DrawWireSphere(transform.position - (NormalizedScale* 0.5f), .5f);
         Gizmos.color = new Color(0.5f,0.5f,0.5f,0.25f);
@@ -118,12 +119,14 @@ public class BakedVolumetricArea : MonoBehaviour
      
     }
 
-    public bool DEBUG;
+    [HideInInspector] public bool DEBUG;
+    [HideInInspector] public static bool VisStateGlobal;
     [SerializeField,HideInInspector] GameObject DebugCube;
     [SerializeField,HideInInspector] Material mat;
     [HideInInspector,SerializeField] public bool MarkDebugCubeForDelete;
+    private bool VisStateLocal;
 
-    void EnableDebugMesh()
+    public void EnableDebugMesh()
     {
         if (bakedTexture == null || DebugCube != null || UnityEditor.EditorApplication.isPlaying) return;
 
@@ -149,7 +152,7 @@ public class BakedVolumetricArea : MonoBehaviour
         DebugCube.hideFlags = HideFlags.HideAndDontSave;
 
     }
-    void DisableDebugMesh()
+    public void DisableDebugMesh()
     {
         if (DebugCube == null) return;
         MarkDebugCubeForDelete = true;
@@ -159,12 +162,25 @@ public class BakedVolumetricArea : MonoBehaviour
 
     public void RefreshDebugMesh()
     {
-        //DisableDebugMesh();
-        //EnableDebugMesh();
+        DisableDebugMesh();
+        EnableDebugMesh();
     }
     [ExecuteInEditMode]    
     void LateUpdate()
     {
+        if (VisStateLocal != VisStateGlobal)
+        {
+            VisStateLocal = VisStateGlobal;
+            if (VisStateGlobal)
+            {
+                EnableDebugMesh();
+            }
+            else
+            {
+                DisableDebugMesh();
+            }
+        }
+
         if (MarkDebugCubeForDelete && DebugCube != null)
         {
             MarkDebugCubeForDelete = false;
@@ -172,6 +188,7 @@ public class BakedVolumetricArea : MonoBehaviour
             DestroyImmediate(mat);
             
         }
+        
     }
 
 #endif
