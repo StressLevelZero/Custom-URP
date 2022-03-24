@@ -7,7 +7,7 @@ public class BakedVolumetricArea : MonoBehaviour
 {
     [SerializeField, Tooltip("Texel density per meter. Controls the resolution of the baked texture.")] float TexelDensity = 5;
   //  [SerializeField, Tooltip("Texel density ratio scaler. Multiples Texel density per dimension")] Vector3 TexelRatio = new Vector3(1,1,1);
-    [SerializeField] Vector3 BoxScale = new Vector3(10,5,10);
+    [SerializeField] public Vector3 BoxScale = new Vector3(10,5,10);
     [SerializeField] public Texture3D bakedTexture;
     [SerializeField] public Vector3Int NormalizedTexelDensity; //exposed to see target resolution
     [HideInInspector,SerializeField] public Vector3 NormalizedScale;
