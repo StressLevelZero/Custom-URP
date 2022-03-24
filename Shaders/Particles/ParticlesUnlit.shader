@@ -3,7 +3,7 @@ Shader "Universal Render Pipeline/Particles/Unlit (Particles)"
     Properties
     {
         [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
-        [MainColor]   _BaseColor("Base Color", Color) = (1,1,1,1)
+        [MainColor] [HDR]  _BaseColor("Base Color", Color) = (1,1,1,1)
 
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
