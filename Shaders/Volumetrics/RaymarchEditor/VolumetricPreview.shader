@@ -3,10 +3,12 @@ Shader "hidden/VolumetricPreview"
     Properties
     {
         _Volume ("Volume", 3D) = "" {}
+        //_GlobalExtinction("Extinction", float) = 0.05
+        //_GlobalScattering("Scattering", color) = (0.05, 0.05, 0.05, 0.05)
         _Intensity ("Intensity", Range(0.0, 5.0)) = 1.2
 		_Threshold ("Threshold", Range(0.0, 1.0)) = 0.95
         _StepDist ("Step Distance", float) = 0.5
-        //_VolExposure ("Volume Exposure", float) = 0.05
+        //_VolExposure2 ("Volume Exposure", float) = 0.05
     }
     SubShader
     {
@@ -58,13 +60,14 @@ Shader "hidden/VolumetricPreview"
 
             TEXTURE3D(_Volume);
             SamplerState sampler_Volume;
-
+            float _GlobalExtinction;
+            float4 _GlobalScattering;
 
             CBUFFER_START(UnityPerMaterial)
             float _Threshold;
             float _Intensity;
             float _StepDist;
-            float _VolExposure;
+            float _VolExposure2;
             CBUFFER_END
 
             /** Moves the given ray to the surface of the bounding box via AABB ray intersection
@@ -145,29 +148,34 @@ Shader "hidden/VolumetricPreview"
 
                 float3 rayUVW = (rayPos - boxMin) / (2.0 * boxSize); 
                 float4 totalColor = 0;
-                float4 volumeColor;// = SAMPLE_TEXTURE3D_LOD(_Volume, sampler_Volume, rayUVW, 0);
-                //totalColor.rgb += _Intensity*0.5*volumeColor.rgb*volumeColor.a;
-                //rayPos += rayStepSize * rayDir;
-                float totalDist = length(rayPos - _WorldSpaceCameraPos);
+                float4 volumeColor = float4(0,0,0,1);
                 
-                float exposure = _VolExposure*0.5;
+                float totalDist = length(rayPos - _WorldSpaceCameraPos);
+                float transmittance = exp(-_GlobalExtinction * rayStepSize);
+                float exposure = _VolExposure2*0.01;
                 [branch] if (totalDist < rayMaxDist)
                 {
                     [loop] for (int iter = 0; iter < MAX_ITERATIONS; iter++)
                     {
                         rayUVW = (rayPos - boxMin) / (2.0 * boxSize);
+                        
+                        
+                        volumeColor = SAMPLE_TEXTURE3D_LOD(_Volume, sampler_Volume, rayUVW, 0)  * _Intensity;
+                        float3 stepColor = exposure * volumeColor.rgb * volumeColor.a * ((1-transmittance)/_GlobalExtinction) * _GlobalScattering;
+
                         rayPos += rayStepSize * rayDir;
                         totalDist += rayStepSize;
+                        
                         [branch] if (totalDist > rayMaxDist)
                         {
                             float stepFrac = max(0, (rayStepSize - (totalDist - rayMaxDist)) / rayStepSize);
-                            volumeColor = SAMPLE_TEXTURE3D_LOD(_Volume, sampler_Volume, rayUVW, 0)  * _Intensity;
-                            totalColor.rgb += stepFrac * exposure * volumeColor.rgb * volumeColor.a;
+                            
+                            totalColor.rgb += stepFrac * stepColor;
                             break;
                         }
-
-                        volumeColor = SAMPLE_TEXTURE3D_LOD(_Volume, sampler_Volume, rayUVW, 0) * _Intensity;
-                        totalColor.rgb += exposure * volumeColor.rgb * volumeColor.a;
+                        
+                        totalColor.rgb += stepColor;
+                        totalColor.a *= transmittance;
                     }
                     //totalColor.rgb = float3(0,0,1);
                 }

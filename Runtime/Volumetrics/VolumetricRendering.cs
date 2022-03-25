@@ -53,6 +53,7 @@ public class VolumetricRendering : MonoBehaviour
     Texture3D BlackTex; //Temp texture for 
 
     public Camera cam; //Main camera to base settings on
+    [HideInInspector] public Camera activeCam;
     public VolumetricData volumetricData;
     [Range(0, 1)]
     public float reprojectionAmount = 0.5f;
@@ -64,6 +65,8 @@ public class VolumetricRendering : MonoBehaviour
     public BlurType FroxelBlur = BlurType.None;
     [Range(0, 1)]
     public float SliceDistributionUniformity = 0.5f;
+
+    [HideInInspector] public bool enableEditorPreview = false;
     //public Texture skytex;
     //[Header("Volumetric camera settings")]
     //[Tooltip("Near Clip plane")]
@@ -115,6 +118,7 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture BlurBuffer;    //blur
     RenderTexture BlurBufferB;    //blur
 
+ 
 
     // This is a sequence of 7 equidistant numbers from 1/14 to 13/14.
     // Each of them is the centroid of the interval of length 2/14.
@@ -256,19 +260,35 @@ public class VolumetricRendering : MonoBehaviour
     private void Awake()
     {
 #if UNITY_EDITOR
-        if (!Application.isPlaying) return;
-#endif
-        Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //Enable volumetrics. Double check to see if works in build
-        if (cam.usePhysicalProperties == true) Debug.LogError("Physical camera is not properlly supportted by Unity and WILL mess up XR calulations like voulmetrics and LoDs");
-        //  cam = GetComponent<Camera>();
+        if (Application.isPlaying || activeCam == null)
+        {
+            activeCam = cam;
+        }
+        if (enableEditorPreview || Application.isPlaying)
+        {
+            Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+        }
+        else
+        {
+            Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
+        }
+    #else
+        activeCam = cam;
 
+        Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //Enable volumetrics. Double check to see if works in build
+        if (activeCam.usePhysicalProperties == true) Debug.LogError("Physical camera is not properlly supportted by Unity and WILL mess up XR calulations like voulmetrics and LoDs");
+        //  cam = GetComponent<Camera>();
+        #endif
     }
+
+
     void Start() {
-#if UNITY_EDITOR
-        if (!Application.isPlaying) return;
-#endif
+//#if !UNITY_EDITOR
         Intialize();
+//#endif
     }
+
+
     void CheckCookieList()
     {
         if (LightProjectionTextures != null) return;
@@ -335,6 +355,15 @@ public class VolumetricRendering : MonoBehaviour
 
     void Intialize()
     {
+#if UNITY_EDITOR
+        if (Application.isPlaying || activeCam == null)
+        {
+            activeCam = cam;
+        }
+#else
+    activeCam = cam;
+#endif
+
         CheckOverrideVolumes();
      //   if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
         CheckCookieList();
@@ -398,7 +427,7 @@ public class VolumetricRendering : MonoBehaviour
         SetupClipmap();
 
         FroxelFogCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
-        FroxelFogCompute.SetFloat("_VBufferUnitDepthTexelSpacing", ComputZPlaneTexelSpacing(1, cam.fieldOfView, volumetricData.FroxelHeightResolution) );
+        FroxelFogCompute.SetFloat("_VBufferUnitDepthTexelSpacing", ComputZPlaneTexelSpacing(1, activeCam.fieldOfView, volumetricData.FroxelHeightResolution) );
         UpdateClipmap(Clipmap.Near);
         UpdateClipmap(Clipmap.Far);
         FroxelFogCompute.SetTexture(ScatteringKernel, ClipmapTextureID, ClipmapBufferA);
@@ -413,9 +442,9 @@ public class VolumetricRendering : MonoBehaviour
 
         //Make view projection matricies
 
-        Matrix4x4 CenterProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far);
-        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(cam.stereoSeparation * 0.5f, 0, 0)); //temp ipd scaler. Combine factors when confirmed
-        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-cam.stereoSeparation * 0.5f, 0, 0));
+        Matrix4x4 CenterProjectionMatrix = matScaleBias * Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far);
+        Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(activeCam.stereoSeparation * 0.5f, 0, 0)); //temp ipd scaler. Combine factors when confirmed
+        Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-activeCam.stereoSeparation * 0.5f, 0, 0));
 
         //Debug.Log(cam.stereoSeparation);
 
@@ -505,7 +534,7 @@ public class VolumetricRendering : MonoBehaviour
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
     {
 
-        if (Vector3.Distance(ClipmapCurrentPos, cam.transform.position) > volumetricData.ClipmapResampleThreshold)
+        if (Vector3.Distance(ClipmapCurrentPos, activeCam.transform.position) > volumetricData.ClipmapResampleThreshold)
         {
             //TODO: seperate the frames where this is rendered
             UpdateClipmaps();
@@ -531,7 +560,7 @@ public class VolumetricRendering : MonoBehaviour
         //TODO: chache ids 
         int ClipmapKernal = ClipmapCompute.FindKernel("ClipMapGen");
         int ClearClipmapKernal = ClipmapCompute.FindKernel("ClipMapClear");
-        ClipmapTransform = cam.transform.position;
+        ClipmapTransform = activeCam.transform.position;
 
         float farscale = volumetricData.ClipmapScale2;
 
@@ -658,10 +687,10 @@ public class VolumetricRendering : MonoBehaviour
 
     Matrix4x4 PrevViewProjMatrix = Matrix4x4.identity;
 
-    void SetVariables()
+    public void SetVariables()
     {
         float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
-
+        
         Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
         Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
         Shader.SetGlobalVector("_GlobalScattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
@@ -670,26 +699,42 @@ public class VolumetricRendering : MonoBehaviour
 
     float GetAspectRatio()
     {
-        if (cam.stereoTargetEye == StereoTargetEyeMask.None) return cam.aspect;
-        return XRSettings.eyeTextureHeight == 0 ? cam.aspect : (float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth;
+        if (activeCam.stereoTargetEye == StereoTargetEyeMask.None) return activeCam.aspect;
+        return XRSettings.eyeTextureHeight == 0 ? activeCam.aspect : (float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth;
     }
 
     void Update()
+    {
+        #if UNITY_EDITOR
+        if (Application.isPlaying)
+        {
+            UpdateFunc();
+        }
+        #else
+        UpdateFunc();
+        #endif
+    }
+
+    void UpdatePreRender(ScriptableRenderContext ctxt, Camera cam1)
+    {
+        if (activeCam == cam1) UpdateFunc();
+    }
+    void UpdateFunc()
     {
         CheckOverrideVolumes();
         //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
         //bleh
         CamAspectRatio = GetAspectRatio();
 
-#if UNITY_EDITOR
-        if (!Application.isPlaying)
-        {
-            return;
-        }
-#endif
+//#if UNITY_EDITOR
+//        if (!Application.isPlaying)
+//        {
+//            return;
+//        }
+//#endif
 
 
-        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, cam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(cam.transform.rotation).inverse;
+        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(activeCam.transform.rotation).inverse;
         //Debug.Log(cam.fieldOfView + " " + CamAspectRatio + " " + cam.nearClipPlane);
         projectionMatrix = matScaleBias * projectionMatrix ;
 
@@ -707,9 +752,9 @@ public class VolumetricRendering : MonoBehaviour
         VBufferParameters vbuff =  new VBufferParameters(
                                         new Vector3Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelWidthResolution, volumetricData.FroxelDepthResolution), 
                                         volumetricData.far,
-                                        cam.nearClipPlane,
-                                        cam.farClipPlane,
-                                        cam.fieldOfView,
+                                        activeCam.nearClipPlane,
+                                        activeCam.farClipPlane,
+                                        activeCam.fieldOfView,
                                         SliceDistributionUniformity);
 
    //     Vector2Int sharedBufferSize = new Vector2Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution); //Taking scaler functuion from HDRP for reprojection
@@ -718,7 +763,7 @@ public class VolumetricRendering : MonoBehaviour
         Vector4  vres = new Vector4(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution, 1.0f / volumetricData.FroxelWidthResolution, 1.0f / volumetricData.FroxelHeightResolution);
         //Vector4  vres = new Vector4(cam.pixelWidth, cam.pixelHeight, 1.0f / cam.pixelWidth, cam.pixelHeight);
 
-        Matrix4x4 PixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(cam, vres);
+        Matrix4x4 PixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(activeCam, vres);
 
         GetHexagonalClosePackedSpheres7(m_xySeq);
         int sampleIndex = Time.renderedFrameCount % 7;
@@ -728,11 +773,11 @@ public class VolumetricRendering : MonoBehaviour
         Shader.SetGlobalMatrix("_VBufferCoordToViewDirWS", PixelCoordToViewDirWS);
 
         Shader.SetGlobalMatrix("_PrevViewProjMatrix", PrevViewProjMatrix);
-        Shader.SetGlobalMatrix("_ViewMatrix", cam.worldToCameraMatrix);
+        Shader.SetGlobalMatrix("_ViewMatrix", activeCam.worldToCameraMatrix);
 
 
         FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
-        FroxelFogCompute.SetMatrix(Camera2WorldID, cam.transform.worldToLocalMatrix);
+        FroxelFogCompute.SetMatrix(Camera2WorldID, activeCam.transform.worldToLocalMatrix);
         //FroxelFogCompute.SetMatrix("LightProjectionMatrix", lightMatrix);
         //FroxelFogCompute.SetVector("LightPosition", LightPosition.transform.position);
         //FroxelFogCompute.SetVector("LightColor", LightPosition.color * LightPosition.intensity);
@@ -741,18 +786,18 @@ public class VolumetricRendering : MonoBehaviour
 
         Shader.SetGlobalMatrix(CameraProjectionMatrixID,  projectionMatrix);
         Shader.SetGlobalMatrix(TransposedCameraProjectionMatrixID,  projectionMatrix.transpose); //Fragment shaders require the transposed version
-        Shader.SetGlobalVector(CameraPositionID, cam.transform.position); //Can likely pack this into the 4th row of the projection matrix 
-        Shader.SetGlobalVector(CameraMotionVectorID, cam.transform.position - PreviousCameraPosition); //Extract a motion vector per frame
-        Shader.SetGlobalVector("_VolCameraPos", cam.transform.position ); 
+        Shader.SetGlobalVector(CameraPositionID, activeCam.transform.position); //Can likely pack this into the 4th row of the projection matrix 
+        Shader.SetGlobalVector(CameraMotionVectorID, activeCam.transform.position - PreviousCameraPosition); //Extract a motion vector per frame
+        Shader.SetGlobalVector("_VolCameraPos", activeCam.transform.position ); 
 
         PreviousFrameMatrix = projectionMatrix;
-        PreviousCameraPosition = cam.transform.position;
+        PreviousCameraPosition = activeCam.transform.position;
         ////MATRIX
         ///
         ///camera.projectionMatrix is ALSO broken and returns the final viewport's projection rather than the center XR projection.
         ///cam.GetStereoProjectionMatrix returns the skewed XR projection matrix per eye. Just doing our own calulation
-        var gpuProj = GL.GetGPUProjectionMatrix( Matrix4x4.Perspective(cam.fieldOfView, CamAspectRatio, cam.nearClipPlane, 100000f) , true);
-        PrevViewProjMatrix = gpuProj * cam.worldToCameraMatrix;
+        var gpuProj = GL.GetGPUProjectionMatrix( Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, 100000f) , true);
+        PrevViewProjMatrix = gpuProj * activeCam.worldToCameraMatrix;
 
         FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
     //    FroxelStackingCompute.DispatchIndirect
@@ -866,23 +911,50 @@ public class VolumetricRendering : MonoBehaviour
         return new Vector4(uvScale.x, uvScale.y, uvLimit.x, uvLimit.y);
     }
 
+    public void disable()
+    {
+        #if UNITY_EDITOR
+            RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
+        #endif
+        ReleaseAssets();
+    }
 
+    public void enable()
+    {
+        Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+        #if UNITY_EDITOR
+            if (enableEditorPreview && !Application.isPlaying)
+            {
+                RenderPipelineManager.beginCameraRendering += UpdatePreRender;
+            }
+        #endif
+        Intialize();
+    }
 
     private void OnEnable()
     {
-        Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
-#if UNITY_EDITOR
-        if (!Application.isPlaying) return;
-#endif
-        Intialize();
+        #if UNITY_EDITOR 
+        if (!Application.isPlaying)
+        {
+            // Every time scripts get re-compiled, everything gets reset without calling OnDisable or OnDestroy, and the keyword gets left on 
+            Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
+            enableEditorPreview = false;
+        }
+        else
+        {
+            enable();
+        }
+        #else
+        enable();
+        #endif
     }
     private void OnDisable() //Disable this if we decide to just pause rendering instead of removing. 
     {
-        ReleaseAssets();
+        disable();
     }
     private void OnDestroy()
     {
-        ReleaseAssets();
+        disable();
     }
 
 
@@ -963,6 +1035,7 @@ public class VolumetricRendering : MonoBehaviour
 
     void assignVaris()
     {
+        
         cam = GetComponentInChildren<Camera>();
         //Get shaders and seri
         if (FroxelFogCompute == null)
@@ -976,6 +1049,7 @@ public class VolumetricRendering : MonoBehaviour
     }
 
 
+
     private void Reset()
     {
         assignVaris();
@@ -984,13 +1058,12 @@ public class VolumetricRendering : MonoBehaviour
 
     private void OnValidate()
     {
-#if UNITY_EDITOR
+
         //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
         // TODO: Add proper scene preview feature
          if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
         //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
         assignVaris();
-#endif
         //if (cam == null) cam = GetComponent<Camera>();
         //if (volumetricData.near < cam.nearClipPlane || volumetricData.far > cam.farClipPlane)
         //{
