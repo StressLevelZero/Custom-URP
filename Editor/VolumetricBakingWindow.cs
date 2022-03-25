@@ -675,6 +675,14 @@ public class VolumetricBaking : EditorWindow
         }
     }
 
+    Color ColorExtraction(Light light)
+    {
+        Color colorModulation = light.color;
+        if (light.useColorTemperature) colorModulation *= Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
+        colorModulation *= light.intensity;
+        return colorModulation;
+    }
+
     void BakeDXR()
     {
 
@@ -760,13 +768,13 @@ public class VolumetricBaking : EditorWindow
             for (int i = 0; i < PointLights.Count; i++)
             {
                 PointLDatas[i].PointLightsPos = PointLights[i].transform.position;
-                PointLDatas[i].PointLightsColors = PointLights[i].color * PointLights[i].intensity;
+                PointLDatas[i].PointLightsColors = ColorExtraction(PointLights[i]);
             }
 
             for (int i = 0; i < ConeLights.Count; i++)
             {
                 ConeLDatas[i].ConeLightsWS = ConeLights[i].transform.position;
-                ConeLDatas[i].ConeLightsColors = ConeLights[i].color * ConeLights[i].intensity;
+                ConeLDatas[i].ConeLightsColors = ColorExtraction(ConeLights[i]);
                 ConeLDatas[i].ConeLightsDir = ConeLights[i].transform.forward;
 
                 float flPhiDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].spotAngle * 0.5f * Mathf.Deg2Rad)); // outer cone
@@ -778,7 +786,7 @@ public class VolumetricBaking : EditorWindow
             for (int i = 0; i < DirectionalLights.Count; i++)
             {
                 DirLDatas[i].DirLightsDir = DirectionalLights[i].transform.forward;
-                DirLDatas[i].DirLightsColors = DirectionalLights[i].color * DirectionalLights[i].intensity;
+                DirLDatas[i].DirLightsColors = ColorExtraction(DirectionalLights[i]);
             }
 
             for (int i = 0; i < AreaLights.Count; i++)
@@ -786,7 +794,7 @@ public class VolumetricBaking : EditorWindow
                 AreaLDatas[i].AreaLightsPos = AreaLights[i].transform.position;
                 AreaLDatas[i].AreaLightsMatrix = Matrix4x4.TRS(AreaLights[i].transform.position, AreaLights[i].transform.rotation, Vector3.one);
                 AreaLDatas[i].AreaLightsMatrixInv = AreaLDatas[i].AreaLightsMatrix.inverse;
-                AreaLDatas[i].AreaLightsColors = AreaLights[i].color * AreaLights[i].intensity;
+                AreaLDatas[i].AreaLightsColors = ColorExtraction(AreaLights[i]);
                 AreaLDatas[i].AreaLightsSize = new Vector3(AreaLights[i].areaSize.x, AreaLights[i].areaSize.y, AreaLights[i].type == LightType.Disc ? 1 : 0); //Packing for area or disc logic
             }
 
