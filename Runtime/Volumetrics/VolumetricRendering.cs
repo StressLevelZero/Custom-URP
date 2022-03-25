@@ -53,7 +53,7 @@ public class VolumetricRendering : MonoBehaviour
     Texture3D BlackTex; //Temp texture for 
 
     public Camera cam; //Main camera to base settings on
-    private Camera activeCam;
+    [HideInInspector] public Camera activeCam;
     public VolumetricData volumetricData;
     [Range(0, 1)]
     public float reprojectionAmount = 0.5f;
@@ -65,6 +65,8 @@ public class VolumetricRendering : MonoBehaviour
     public BlurType FroxelBlur = BlurType.None;
     [Range(0, 1)]
     public float SliceDistributionUniformity = 0.5f;
+
+    [HideInInspector] public bool enableEditorPreview = false;
     //public Texture skytex;
     //[Header("Volumetric camera settings")]
     //[Tooltip("Near Clip plane")]
@@ -116,7 +118,7 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture BlurBuffer;    //blur
     RenderTexture BlurBufferB;    //blur
 
-
+ 
 
     // This is a sequence of 7 equidistant numbers from 1/14 to 13/14.
     // Each of them is the centroid of the interval of length 2/14.
@@ -258,32 +260,32 @@ public class VolumetricRendering : MonoBehaviour
     private void Awake()
     {
 #if UNITY_EDITOR
-        if (Application.isPlaying)
+        if (Application.isPlaying || activeCam == null)
         {
             activeCam = cam;
         }
+        if (enableEditorPreview || Application.isPlaying)
+        {
+            Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+        }
         else
         {
-            activeCam = SceneView.lastActiveSceneView.camera;
+            Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
         }
-#else
-    activeCam = cam;
-#endif
+    #else
+        activeCam = cam;
+
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //Enable volumetrics. Double check to see if works in build
         if (activeCam.usePhysicalProperties == true) Debug.LogError("Physical camera is not properlly supportted by Unity and WILL mess up XR calulations like voulmetrics and LoDs");
         //  cam = GetComponent<Camera>();
-
+        #endif
     }
 
 
     void Start() {
-#if UNITY_EDITOR
-        if (!Application.isPlaying)
-        {
-            RenderPipelineManager.beginCameraRendering += UpdatePreRender;
-        }
-#endif
+//#if !UNITY_EDITOR
         Intialize();
+//#endif
     }
 
 
@@ -354,13 +356,9 @@ public class VolumetricRendering : MonoBehaviour
     void Intialize()
     {
 #if UNITY_EDITOR
-        if (Application.isPlaying)
+        if (Application.isPlaying || activeCam == null)
         {
             activeCam = cam;
-        }
-        else
-        {
-            activeCam = SceneView.lastActiveSceneView.camera;
         }
 #else
     activeCam = cam;
@@ -689,10 +687,10 @@ public class VolumetricRendering : MonoBehaviour
 
     Matrix4x4 PrevViewProjMatrix = Matrix4x4.identity;
 
-    void SetVariables()
+    public void SetVariables()
     {
         float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
-
+        
         Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
         Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
         Shader.SetGlobalVector("_GlobalScattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
@@ -708,7 +706,10 @@ public class VolumetricRendering : MonoBehaviour
     void Update()
     {
         #if UNITY_EDITOR
-        if (!Application.isPlaying) return;
+        if (Application.isPlaying)
+        {
+            UpdateFunc();
+        }
         #else
         UpdateFunc();
         #endif
@@ -716,8 +717,7 @@ public class VolumetricRendering : MonoBehaviour
 
     void UpdatePreRender(ScriptableRenderContext ctxt, Camera cam1)
     {
-        //activeCam = cam1;
-        UpdateFunc();
+        if (activeCam == cam1) UpdateFunc();
     }
     void UpdateFunc()
     {
@@ -911,32 +911,50 @@ public class VolumetricRendering : MonoBehaviour
         return new Vector4(uvScale.x, uvScale.y, uvLimit.x, uvLimit.y);
     }
 
+    public void disable()
+    {
+        #if UNITY_EDITOR
+            RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
+        #endif
+        ReleaseAssets();
+    }
 
+    public void enable()
+    {
+        Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+        #if UNITY_EDITOR
+            if (enableEditorPreview && !Application.isPlaying)
+            {
+                RenderPipelineManager.beginCameraRendering += UpdatePreRender;
+            }
+        #endif
+        Intialize();
+    }
 
     private void OnEnable()
     {
-        Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
-    #if UNITY_EDITOR
+        #if UNITY_EDITOR 
         if (!Application.isPlaying)
         {
-        RenderPipelineManager.beginCameraRendering += UpdatePreRender;
+            // Every time scripts get re-compiled, everything gets reset without calling OnDisable or OnDestroy, and the keyword gets left on 
+            Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
+            enableEditorPreview = false;
         }
-    #endif
-        Intialize();
+        else
+        {
+            enable();
+        }
+        #else
+        enable();
+        #endif
     }
     private void OnDisable() //Disable this if we decide to just pause rendering instead of removing. 
     {
-#if UNITY_EDITOR
-        RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
-#endif
-        ReleaseAssets();
+        disable();
     }
     private void OnDestroy()
     {
-#if UNITY_EDITOR
-        RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
-#endif
-        ReleaseAssets();
+        disable();
     }
 
 
@@ -1031,6 +1049,7 @@ public class VolumetricRendering : MonoBehaviour
     }
 
 
+
     private void Reset()
     {
         assignVaris();
@@ -1039,13 +1058,12 @@ public class VolumetricRendering : MonoBehaviour
 
     private void OnValidate()
     {
-#if UNITY_EDITOR
+
         //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
         // TODO: Add proper scene preview feature
          if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
         //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
         assignVaris();
-#endif
         //if (cam == null) cam = GetComponent<Camera>();
         //if (volumetricData.near < cam.nearClipPlane || volumetricData.far > cam.farClipPlane)
         //{
