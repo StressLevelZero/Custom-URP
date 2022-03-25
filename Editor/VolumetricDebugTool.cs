@@ -104,9 +104,9 @@ public class VolumetricDebugTool : EditorTool
 
 
         toolWindow.Add(titleLabel);
-        if (VolumetricScript == null)
+        if (VolumetricScript == null || Application.isPlaying)
         {
-            Label NoCameraWarning = new Label("No volumetric script on main camera");
+            Label NoCameraWarning = Application.isPlaying ? new Label("Preview not available in play mode") : new Label("No volumetric script on main camera");
             NoCameraWarning.style.fontSize = 14;
             NoCameraWarning.style.color = Color.red;
             NoCameraWarning.style.paddingBottom = 8f;

@@ -152,7 +152,7 @@ Shader "hidden/VolumetricPreview"
                 
                 float totalDist = length(rayPos - _WorldSpaceCameraPos);
                 float transmittance = exp(-_GlobalExtinction * rayStepSize);
-                float exposure = _VolExposure2*0.006;
+                float exposure = _VolExposure2*0.01;
                 [branch] if (totalDist < rayMaxDist)
                 {
                     [loop] for (int iter = 0; iter < MAX_ITERATIONS; iter++)
