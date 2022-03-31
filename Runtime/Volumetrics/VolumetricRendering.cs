@@ -1061,7 +1061,9 @@ public class VolumetricRendering : MonoBehaviour
 
         //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
         // TODO: Add proper scene preview feature
+        #if UNITY_EDITOR
          if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
+        #endif
         //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
         assignVaris();
         //if (cam == null) cam = GetComponent<Camera>();
