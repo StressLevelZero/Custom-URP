@@ -43,7 +43,7 @@ public class VolumetricDebugTool : EditorTool
         get { return m_IconContent; }
     }
 
-    public override void OnActivated()
+    public override async void OnActivated()
     {
         //EditorWindow view = EditorWindow.GetWindow<SceneView>();
         //view.Repaint();
@@ -74,7 +74,17 @@ public class VolumetricDebugTool : EditorTool
         titleLabel.style.fontSize = 14;
         titleLabel.style.paddingBottom = 8f;
         titleLabel.style.unityTextAlign = TextAnchor.UpperCenter;
-        VolumetricScript = Camera.main.GetComponent<VolumetricRendering>();
+        VolumetricRendering[] volRenderList = Resources.FindObjectsOfTypeAll<VolumetricRendering>();
+        VolumetricScript = volRenderList.Length > 0 ? volRenderList[0] : null;
+        for (int i = 0; i < volRenderList.Length; i++)
+        {
+            if (volRenderList[i].isActiveAndEnabled)
+            {
+                VolumetricScript = volRenderList[i];
+                break;
+            }
+        }
+        
 
         Toggle activeToggle = new Toggle("Multi-View");
         activeToggle.value = isActive;
@@ -106,7 +116,7 @@ public class VolumetricDebugTool : EditorTool
         toolWindow.Add(titleLabel);
         if (VolumetricScript == null || Application.isPlaying)
         {
-            Label NoCameraWarning = Application.isPlaying ? new Label("Preview not available in play mode") : new Label("No volumetric script on main camera");
+            Label NoCameraWarning = Application.isPlaying ? new Label("Preview not available in play mode") : new Label("No active volumetric script in scene");
             NoCameraWarning.style.fontSize = 14;
             NoCameraWarning.style.color = Color.red;
             NoCameraWarning.style.paddingBottom = 8f;
@@ -117,6 +127,17 @@ public class VolumetricDebugTool : EditorTool
             return;
         }
 
+        if (!VolumetricScript.isActiveAndEnabled)
+        {
+            Label DisabledWarning = new Label("No enabled volumetric rendering script");
+            DisabledWarning.style.fontSize = 13;
+            DisabledWarning.style.color = Color.red;
+            DisabledWarning.style.paddingBottom = 8f;
+            toolWindow.Add(DisabledWarning);
+            ActiveView.rootVisualElement.Add(toolWindow);
+            ActiveView.rootVisualElement.style.flexDirection = FlexDirection.ColumnReverse;
+            return;
+        }
         
 
         toolWindow.Add(activeToggle);

@@ -1036,7 +1036,7 @@ public class VolumetricRendering : MonoBehaviour
     void assignVaris()
     {
         
-        cam = GetComponentInChildren<Camera>();
+        //cam = GetComponentInChildren<Camera>();
         //Get shaders and seri
         if (FroxelFogCompute == null)
             FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
