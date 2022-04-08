@@ -26,7 +26,7 @@ uint GetMeshRenderingLightLayer()
 struct Light
 {
     half3   direction;
-    half3   color;
+    half4   color;
     half    distanceAttenuation;
     half    shadowAttenuation;
     uint    layerMask;
@@ -121,7 +121,7 @@ Light GetMainLight()
     light.distanceAttenuation = unity_LightData.z; // unity_LightData.z is 1 when not culled by the culling mask, otherwise 0.
 #endif
     light.shadowAttenuation = 1.0;
-    light.color = _MainLightColor.rgb;
+    light.color = _MainLightColor.rgba;
 
 #ifdef _LIGHT_LAYERS
     light.layerMask = _MainLightLayerMask;
@@ -183,7 +183,7 @@ Light GetAdditionalPerObjectLight(int perObjectLightIndex, float3 positionWS)
 
 #else
     float4 lightPositionWS = _AdditionalLightsPosition[perObjectLightIndex];
-    half3 color = _AdditionalLightsColor[perObjectLightIndex].rgb;
+    half4 color = _AdditionalLightsColor[perObjectLightIndex].rgba;
     half4 distanceAndSpotAttenuation = _AdditionalLightsAttenuation[perObjectLightIndex];
     half4 spotDirection = _AdditionalLightsSpotDir[perObjectLightIndex];
 #ifdef _LIGHT_LAYERS

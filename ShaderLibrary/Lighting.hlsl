@@ -26,13 +26,13 @@ TEXTURE2D(g_tBRDFMap); SamplerState BRDF_linear_clamp_sampler; //Force sampler s
 ///////////////////////////////////////////////////////////////////////////////
 //                      Lighting Functions                                   //
 ///////////////////////////////////////////////////////////////////////////////
-half3 LightingLambert(half3 lightColor, half3 lightDir, half3 normal)
+half4 LightingLambert(half4 lightColor, half3 lightDir, half3 normal)
 {
     half NdotL = saturate(dot(normal, lightDir));
     return lightColor * NdotL;
 }
 
-half3 LightingSpecular(half3 lightColor, half3 lightDir, half3 normal, half3 viewDir, half4 specular, half smoothness)
+half3 LightingSpecular(half4 lightColor, half3 lightDir, half3 normal, half3 viewDir, half4 specular, half smoothness)
 {
     float3 halfVec = SafeNormalize(float3(lightDir) + float3(viewDir));
     half NdotH = half(saturate(dot(normal, halfVec)));
@@ -42,7 +42,7 @@ half3 LightingSpecular(half3 lightColor, half3 lightDir, half3 normal, half3 vie
 }
 
 half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
-    half3 lightColor, half3 lightDirectionWS, half lightAttenuation,
+    half4 lightColor, half3 lightDirectionWS, half lightAttenuation,
     half3 normalWS, half3 viewDirectionWS,
     half clearCoatMask, bool specularHighlightsOff)
 {
@@ -50,13 +50,15 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     half NormNdotL = ((dot(normalWS, lightDirectionWS))+1) * 0.5 ;
     float flNDotV = saturate(dot(normalWS,viewDirectionWS));
     half3 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(NormNdotL,flNDotV) ,0 );
-    half3 radiance = lightColor * (lightAttenuation * BRDFMap);
+    half4 radiance = lightColor * (lightAttenuation * BRDFMap);
     #else
     half NdotL = saturate(dot(normalWS, lightDirectionWS));
-    half3 radiance = lightColor * (lightAttenuation * NdotL);
+    half4 radiance = lightColor * (lightAttenuation * NdotL);
     #endif
+    //diffuse, albdeo, and brdf are not interchangeable terms. Yet albedo is stored in the diffuse of brdfData and labeled here simply as brdf. Likely because it's being combined, but Confusing AF. 
+    half3 brdf = brdfData.diffuse; 
 
-    half3 brdf = brdfData.diffuse;
+
 #ifndef _SPECULARHIGHLIGHTS_OFF
     [branch] if (!specularHighlightsOff)
     {
@@ -80,12 +82,19 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     }
 #endif // _SPECULARHIGHLIGHTS_OFF
 
-    return brdf * radiance;
+    brdf *= radiance;
+    BlendFluorescence(brdf, radiance, brdfData);
+    return brdf;
+    
 }
 
 half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat, Light light, half3 normalWS, half3 viewDirectionWS, half clearCoatMask, bool specularHighlightsOff)
 {
-    return LightingPhysicallyBased(brdfData, brdfDataClearCoat, light.color, light.direction, light.distanceAttenuation * light.shadowAttenuation, normalWS, viewDirectionWS, clearCoatMask, specularHighlightsOff);
+    return LightingPhysicallyBased(brdfData,
+        brdfDataClearCoat, light.color,
+        light.direction,
+        light.distanceAttenuation * light.shadowAttenuation,
+        normalWS, viewDirectionWS, clearCoatMask, specularHighlightsOff);
 }
 
 // Backwards compatibility
@@ -96,11 +105,10 @@ half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, ha
 #else
     bool specularHighlightsOff = false;
 #endif
-    const BRDFData noClearCoat = (BRDFData)0;
-    return LightingPhysicallyBased(brdfData, noClearCoat, light, normalWS, viewDirectionWS, 0.0, specularHighlightsOff);
+    const BRDFData noClearCoat = (BRDFData)0; 
 }
 
-half3 LightingPhysicallyBased(BRDFData brdfData, half3 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS)
+half3 LightingPhysicallyBased(BRDFData brdfData, half4 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS)
 {
     Light light;
     light.color = lightColor;
@@ -116,7 +124,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, ha
     return LightingPhysicallyBased(brdfData, noClearCoat, light, normalWS, viewDirectionWS, 0.0, specularHighlightsOff);
 }
 
-half3 LightingPhysicallyBased(BRDFData brdfData, half3 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS, bool specularHighlightsOff)
+half3 LightingPhysicallyBased(BRDFData brdfData, half4 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS, bool specularHighlightsOff)
 {
     Light light;
     light.color = lightColor;
@@ -134,7 +142,7 @@ half3 VertexLighting(float3 positionWS, half3 normalWS)
     uint lightsCount = GetAdditionalLightsCount();
     LIGHT_LOOP_BEGIN(lightsCount)
         Light light = GetAdditionalLight(lightIndex, positionWS);
-        half3 lightColor = light.color * light.distanceAttenuation;
+        half4 lightColor = light.color * light.distanceAttenuation;
         vertexLightColor += LightingLambert(lightColor, light.direction, normalWS);
     LIGHT_LOOP_END
 #endif
@@ -231,10 +239,10 @@ LightingData CreateLightingData(InputData inputData, SurfaceData surfaceData)
 
 half3 CalculateBlinnPhong(Light light, InputData inputData, SurfaceData surfaceData)
 {
-    half3 attenuatedLightColor = light.color * (light.distanceAttenuation * light.shadowAttenuation);
-    half3 lightColor = LightingLambert(attenuatedLightColor, light.direction, inputData.normalWS);
+    half4 attenuatedLightColor = light.color * (light.distanceAttenuation * light.shadowAttenuation);
+    half4 lightColor = LightingLambert(attenuatedLightColor, light.direction, inputData.normalWS);
 
-    lightColor *= surfaceData.albedo;
+    lightColor.rgb *= surfaceData.albedo;
 
     #if defined(_SPECGLOSSMAP) || defined(_SPECULAR_COLOR)
     half smoothness = exp2(10 * surfaceData.smoothness + 1);
@@ -329,6 +337,7 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
 
     #if defined(_ADDITIONAL_LIGHTS_VERTEX)
     lightingData.vertexLightingColor += inputData.vertexLighting * brdfData.diffuse;
+    BlendFluorescence(lightingData.vertexLightingColor, inputData.vertexLighting, brdfData);
     #endif
 
     return CalculateFinalColor(lightingData, surfaceData.alpha);

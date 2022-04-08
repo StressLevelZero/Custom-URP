@@ -40,7 +40,12 @@ struct InputData
     half3   viewDirectionWS;
     float4  shadowCoord;
     half    fogCoord;
+    #if defined(_FLUORESCENCE) //Vertex fluorescence
+    half4   vertexLighting;
+    #else
     half3   vertexLighting;
+    #endif
+    
     half3   bakedGI;
     float2  normalizedScreenSpaceUV;
     half4   shadowMask;

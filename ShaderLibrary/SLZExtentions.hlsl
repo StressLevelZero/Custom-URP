@@ -22,6 +22,40 @@
 // 	return spec;
 // }
 
+
+
+//#if defined(_FLUORESCENCE)			
+float3 FluorescenceEmission(float4 lightingTerms, float4 Absorbance, float4 Fluorescence ){
+//Using alpha ch as UV color
+    
+// float3 LitFluorescence =  float3(
+// 					/*RED*/		max(max(lightingTerms.vDiffuse.r + lightingTerms.vIndirectDiffuse.r , max( lightingTerms.vDiffuse.g + lightingTerms.vIndirectDiffuse.g, lightingTerms.vDiffuse.b + lightingTerms.vIndirectDiffuse.b)), lightingTerms.vDiffuse.a),
+// 					/*GREEN*/	max((max(lightingTerms.vDiffuse.g + lightingTerms.vIndirectDiffuse.g, lightingTerms.vDiffuse.b + lightingTerms.vIndirectDiffuse.b)) , lightingTerms.vDiffuse.a),
+// 					/*BLUE*/	max(lightingTerms.vDiffuse.b + lightingTerms.vIndirectDiffuse.b , lightingTerms.vDiffuse.a)
+// 								) 
+// 								* vFluorescence.rgb ;
+// o.vColor.rgb = max(o.vColor.rgb, LitFluorescence.rgb);
+
+float4 FluorescenceAbsorb = lightingTerms * Absorbance;					
+
+//Combine each color from high to low frequency to account for dual-excitation
+float Absorbed_B = FluorescenceAbsorb.b + FluorescenceAbsorb.a;
+float Absorbed_G = Absorbed_B + FluorescenceAbsorb.g;
+float Absorbed_R = Absorbed_G + FluorescenceAbsorb.r;
+
+float3 LitFluorescence =  float3(Absorbed_R, Absorbed_G, Absorbed_B) * Fluorescence.rgb ;
+return LitFluorescence.rgb;					
+}
+//#endif
+
+void BlendFluorescence(inout half3 Diffuse, half4 LightColors, BRDFData brdfData )
+{
+    #if defined(_FLUORESCENCE)
+    Diffuse = max(Diffuse, FluorescenceEmission(LightColors, brdfData.absorbance ,brdfData.fluorescence ));
+    #endif
+}
+
+
 //TEMP port of GGX until SRP replacement is implmented to BakeryDirectionalLightmapSpecular 
 float GGXTerm (float NdotH, float roughness)
 {

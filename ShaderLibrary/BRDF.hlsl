@@ -23,6 +23,11 @@ struct BRDFData
     // them in the light loop. Take a look at DirectBRDF function for detailed explaination.
     half normalizationTerm;     // roughness * 4.0 + 2.0
     half roughness2MinusOne;    // roughness^2 - 1.0
+
+    #if defined(_FLUORESCENCE)
+    half4 absorbance;
+    half4 fluorescence;
+    #endif
 };
 
 half ReflectivitySpecular(half3 specular)
@@ -99,6 +104,10 @@ inline void InitializeBRDFData(half3 albedo, half metallic, half3 specular, half
 inline void InitializeBRDFData(inout SurfaceData surfaceData, out BRDFData brdfData)
 {
     InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.alpha, brdfData);
+    #if defined(_FLUORESCENCE)
+    brdfData.absorbance = surfaceData.absorbance;
+    brdfData.fluorescence = surfaceData.fluorescence;
+    #endif
 }
 
 half3 ConvertF0ForClearCoat15(half3 f0)
