@@ -35,7 +35,7 @@ public class VolumetricDebugTool : EditorTool
             text = "Preview Volumetrics",
             tooltip = "Preview Volumetrics"
         };
-    
+
     }
 
     public override GUIContent toolbarIcon
@@ -43,7 +43,8 @@ public class VolumetricDebugTool : EditorTool
         get { return m_IconContent; }
     }
 
-    public override async void OnActivated()
+
+    public override void OnActivated()
     {
         //EditorWindow view = EditorWindow.GetWindow<SceneView>();
         //view.Repaint();
@@ -269,7 +270,7 @@ public class VolumetricDebugTool : EditorTool
         DestroyImmediate(placeholderGO);
     }
 
-    public async void updateCameraList()
+    public void updateCameraList()
     {
         SceneCameras = new List<Camera>();
         SceneCameras.Add(placeholderCam);
