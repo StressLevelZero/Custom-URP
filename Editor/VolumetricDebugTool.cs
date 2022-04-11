@@ -25,7 +25,8 @@ public class VolumetricDebugTool : EditorTool
     GameObject placeholderGO;
     Camera placeholderCam;
     Camera selectedCamera;
-
+    Toggle activeToggle;
+    Toggle activeToggle2;
 
     void OnEnable()
     {
@@ -35,7 +36,17 @@ public class VolumetricDebugTool : EditorTool
             text = "Preview Volumetrics",
             tooltip = "Preview Volumetrics"
         };
+        Lightmapping.bakeCompleted += disableOnLightmapBake;
+    }
 
+    private void OnDisable()
+    {
+        Lightmapping.bakeCompleted -= disableOnLightmapBake;
+    }
+
+    private void OnDestroy()
+    {
+        Lightmapping.bakeCompleted -= disableOnLightmapBake;
     }
 
     public override GUIContent toolbarIcon
@@ -87,11 +98,11 @@ public class VolumetricDebugTool : EditorTool
         }
         
 
-        Toggle activeToggle = new Toggle("Multi-View");
+        activeToggle = new Toggle("Multi-View");
         activeToggle.value = isActive;
         activeToggle.tooltip = "Simple raymarched volumetrics that works in all views simultaneously, but is not perfectly accurate to how the volumetrics will look in game and will double-add overlapping volumes";
         
-        Toggle activeToggle2 = new Toggle("Game-Accurate");
+        activeToggle2 = new Toggle("Game-Accurate");
         activeToggle2.value = isActive2;
         activeToggle2.tooltip = "Volumetrics rendered exactly how the game will render them. Rendered from the direction of one camera, all other views will see the volumetrics projected flat on to the world";
         
@@ -293,5 +304,14 @@ public class VolumetricDebugTool : EditorTool
         if (Volumetrics != null)
             Volumetrics.PushFogShaderParameters();
     }
-
+    public void disableOnLightmapBake()
+    {
+        if (VolumetricScript != null)
+        {
+            isActive2 = false;
+            activeToggle2.value = false;
+            VolumetricScript.enableEditorPreview = false;
+            VolumetricScript.disable();
+        }
+    }
 }
