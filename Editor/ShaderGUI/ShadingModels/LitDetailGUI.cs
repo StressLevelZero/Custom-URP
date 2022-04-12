@@ -20,14 +20,14 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             public static readonly GUIContent detailNormalMapText = EditorGUIUtility.TrTextContent("Normal Map",
                 "Designates a Normal Map to create the illusion of bumps and dents in the details of this Material's surface.");
 
-            public static readonly GUIContent detailAlbedoMapScaleInfo = EditorGUIUtility.TrTextContent("Setting the scaling factor to a value other than 1 results in a less performant shader variant.");
+            //public static readonly GUIContent detailAlbedoMapScaleInfo = EditorGUIUtility.TrTextContent("Setting the scaling factor to a value other than 1 results in a less performant shader variant.");
         }
 
         public struct LitProperties
         {
             // public MaterialProperty detailMask;
             public MaterialProperty detailMap;
-            public MaterialProperty detailAlbedoMapScale;
+            //public MaterialProperty detailAlbedoMapScale;
             //public MaterialProperty detailAlbedoMap;
             public MaterialProperty detailNormalMapScale;
             public MaterialProperty detailSmoothnessMapScale;
@@ -37,7 +37,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             {
                 //  detailMask = BaseShaderGUI.FindProperty("_DetailMask", properties, false);
                 detailMap = BaseShaderGUI.FindProperty("_DetailMap", properties, false);
-                detailAlbedoMapScale = BaseShaderGUI.FindProperty("_DetailAlbedoMapScale", properties, false);
+                //detailAlbedoMapScale = BaseShaderGUI.FindProperty("_DetailAlbedoMapScale", properties, false);
                // detailAlbedoMap = BaseShaderGUI.FindProperty("_DetailAlbedoMap", properties, false);
                 detailNormalMapScale = BaseShaderGUI.FindProperty("_DetailNormalMapScale", properties, false);
                 detailSmoothnessMapScale = BaseShaderGUI.FindProperty("_DetailSmoothnessMapScale", properties, false);
@@ -48,12 +48,12 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
         public static void DoDetailArea(LitProperties properties, MaterialEditor materialEditor)
         {
            // materialEditor.TexturePropertySingleLine(Styles.detailMaskText, properties.detailMask);
-            materialEditor.TexturePropertySingleLine(Styles.detailAlbedoMapText, properties.detailMap,
-                properties.detailMap.textureValue != null ? properties.detailAlbedoMapScale : null);
-            if (properties.detailAlbedoMapScale.floatValue != 1.0f)
-            {
-                EditorGUILayout.HelpBox(Styles.detailAlbedoMapScaleInfo.text, MessageType.Info, true);
-            }
+            materialEditor.TexturePropertySingleLine(Styles.detailAlbedoMapText, properties.detailMap);
+                //,properties.detailMap.textureValue != null ? properties.detailAlbedoMapScale : null);
+            // if (properties.detailAlbedoMapScale.floatValue != 1.0f)
+            // {
+            //     EditorGUILayout.HelpBox(Styles.detailAlbedoMapScaleInfo.text, MessageType.Info, true);
+            // }
             if (properties.detailMap.textureValue != null)
             {
                 //   materialEditor.TexturePropertySingleLine(Styles.detailNormalMapText, properties.detailNormalMap,
@@ -67,12 +67,12 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
 
         public static void SetMaterialKeywords(Material material)
         {
-            if (material.HasProperty("_DetailMap") && material.HasProperty("_DetailAlbedoMapScale"))
+            if (material.HasProperty("_DetailMap") )//&& material.HasProperty("_DetailAlbedoMapScale"))
             {
-                bool isScaled = material.GetFloat("_DetailAlbedoMapScale") != 1.0f;
+                bool isScaled = false;//material.GetFloat("_DetailAlbedoMapScale") != 1.0f;
                 bool hasDetailMap = material.GetTexture("_DetailMap");
                 CoreUtils.SetKeyword(material, "_DETAIL_MULX2", !isScaled && hasDetailMap);
-                CoreUtils.SetKeyword(material, "_DETAIL_SCALED", isScaled && hasDetailMap);
+              //  CoreUtils.SetKeyword(material, "_DETAIL_SCALED", isScaled && hasDetailMap);
             }
         }
     }
