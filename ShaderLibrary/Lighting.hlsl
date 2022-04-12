@@ -32,12 +32,12 @@ half4 LightingLambert(half4 lightColor, half3 lightDir, half3 normal)
     return lightColor * NdotL;
 }
 
-half3 LightingSpecular(half4 lightColor, half3 lightDir, half3 normal, half3 viewDir, half4 specular, half smoothness)
+half4 LightingSpecular(half4 lightColor, half3 lightDir, half3 normal, half3 viewDir, half4 specular, half smoothness)
 {
     float3 halfVec = SafeNormalize(float3(lightDir) + float3(viewDir));
     half NdotH = half(saturate(dot(normal, halfVec)));
     half modifier = pow(NdotH, smoothness);
-    half3 specularReflection = specular.rgb * modifier;
+    half4 specularReflection = specular.rgba * modifier;
     return lightColor * specularReflection;
 }
 
