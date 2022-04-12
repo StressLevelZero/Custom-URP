@@ -49,7 +49,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     #if defined(_BRDFMAP)
     half NormNdotL = ((dot(normalWS, lightDirectionWS))+1) * 0.5 ;
     float flNDotV = saturate(dot(normalWS,viewDirectionWS));
-    half3 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(NormNdotL,flNDotV) ,0 );
+    half4 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(NormNdotL,flNDotV) ,0 );
     half4 radiance = lightColor * (lightAttenuation * BRDFMap);
     #else
     half NdotL = saturate(dot(normalWS, lightDirectionWS));
