@@ -272,14 +272,17 @@ public class VolumetricRendering : MonoBehaviour
         {
             Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
         }
+        Debug.Log("Awake On Volumetrics Called");
+
     #else
         activeCam = cam;
 
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //Enable volumetrics. Double check to see if works in build
         if (activeCam.usePhysicalProperties == true) Debug.LogError("Physical camera is not properlly supportted by Unity and WILL mess up XR calulations like voulmetrics and LoDs");
         //  cam = GetComponent<Camera>();
-        #endif
+#endif
     }
+
 
 
     void Start() {
@@ -474,7 +477,7 @@ public class VolumetricRendering : MonoBehaviour
         float zBfP2 = volumetricData.far / volumetricData.near;
         Shader.SetGlobalVector("_ZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
 
-        Debug.Log("Dispatching " + ThreadsToDispatch);
+        //Debug.Log("Dispatching " + ThreadsToDispatch);
 
         SetVariables();
     }
@@ -931,6 +934,18 @@ public class VolumetricRendering : MonoBehaviour
         Intialize();
     }
 
+    public void UpdateStateAfterReload()
+    {
+        if (enableEditorPreview)
+        {
+            enable();
+        }
+        else
+        {
+            disable();
+        }
+    }
+
     private void OnEnable()
     {
         #if UNITY_EDITOR 
@@ -939,6 +954,7 @@ public class VolumetricRendering : MonoBehaviour
             // Every time scripts get re-compiled, everything gets reset without calling OnDisable or OnDestroy, and the keyword gets left on 
             Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
             enableEditorPreview = false;
+            AssemblyReloadEvents.afterAssemblyReload += UpdateStateAfterReload;
         }
         else
         {
@@ -951,10 +967,22 @@ public class VolumetricRendering : MonoBehaviour
     private void OnDisable() //Disable this if we decide to just pause rendering instead of removing. 
     {
         disable();
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            AssemblyReloadEvents.afterAssemblyReload += UpdateStateAfterReload;
+        }
+#endif
     }
     private void OnDestroy()
     {
         disable();
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            AssemblyReloadEvents.afterAssemblyReload += UpdateStateAfterReload;
+        }
+#endif
     }
 
 
@@ -1036,7 +1064,7 @@ public class VolumetricRendering : MonoBehaviour
     void assignVaris()
     {
         
-        cam = GetComponentInChildren<Camera>();
+        //cam = GetComponentInChildren<Camera>();
         //Get shaders and seri
         if (FroxelFogCompute == null)
             FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
@@ -1054,7 +1082,7 @@ public class VolumetricRendering : MonoBehaviour
     {
         assignVaris();
     }
-#endif
+
 
     private void OnValidate()
     {
@@ -1062,6 +1090,7 @@ public class VolumetricRendering : MonoBehaviour
         //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
         // TODO: Add proper scene preview feature
          if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
+        
         //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
         assignVaris();
         //if (cam == null) cam = GetComponent<Camera>();
@@ -1074,6 +1103,7 @@ public class VolumetricRendering : MonoBehaviour
 
         Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //enabling here so the editor knows that it exists
     }
+#endif
 
     Texture MakeBlack3DTex()
     {

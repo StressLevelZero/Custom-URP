@@ -25,7 +25,8 @@ public class VolumetricDebugTool : EditorTool
     GameObject placeholderGO;
     Camera placeholderCam;
     Camera selectedCamera;
-
+    Toggle activeToggle;
+    Toggle activeToggle2;
 
     void OnEnable()
     {
@@ -35,13 +36,24 @@ public class VolumetricDebugTool : EditorTool
             text = "Preview Volumetrics",
             tooltip = "Preview Volumetrics"
         };
-    
+        Lightmapping.bakeCompleted += disableOnLightmapBake;
+    }
+
+    private void OnDisable()
+    {
+        Lightmapping.bakeCompleted -= disableOnLightmapBake;
+    }
+
+    private void OnDestroy()
+    {
+        Lightmapping.bakeCompleted -= disableOnLightmapBake;
     }
 
     public override GUIContent toolbarIcon
     {
         get { return m_IconContent; }
     }
+
 
     public override void OnActivated()
     {
@@ -74,13 +86,23 @@ public class VolumetricDebugTool : EditorTool
         titleLabel.style.fontSize = 14;
         titleLabel.style.paddingBottom = 8f;
         titleLabel.style.unityTextAlign = TextAnchor.UpperCenter;
-        VolumetricScript = Camera.main.GetComponent<VolumetricRendering>();
+        VolumetricRendering[] volRenderList = Resources.FindObjectsOfTypeAll<VolumetricRendering>();
+        VolumetricScript = volRenderList.Length > 0 ? volRenderList[0] : null;
+        for (int i = 0; i < volRenderList.Length; i++)
+        {
+            if (volRenderList[i].isActiveAndEnabled)
+            {
+                VolumetricScript = volRenderList[i];
+                break;
+            }
+        }
+        
 
-        Toggle activeToggle = new Toggle("Multi-View");
+        activeToggle = new Toggle("Multi-View");
         activeToggle.value = isActive;
         activeToggle.tooltip = "Simple raymarched volumetrics that works in all views simultaneously, but is not perfectly accurate to how the volumetrics will look in game and will double-add overlapping volumes";
         
-        Toggle activeToggle2 = new Toggle("Game-Accurate");
+        activeToggle2 = new Toggle("Game-Accurate");
         activeToggle2.value = isActive2;
         activeToggle2.tooltip = "Volumetrics rendered exactly how the game will render them. Rendered from the direction of one camera, all other views will see the volumetrics projected flat on to the world";
         
@@ -106,7 +128,7 @@ public class VolumetricDebugTool : EditorTool
         toolWindow.Add(titleLabel);
         if (VolumetricScript == null || Application.isPlaying)
         {
-            Label NoCameraWarning = Application.isPlaying ? new Label("Preview not available in play mode") : new Label("No volumetric script on main camera");
+            Label NoCameraWarning = Application.isPlaying ? new Label("Preview not available in play mode") : new Label("No active volumetric script in scene");
             NoCameraWarning.style.fontSize = 14;
             NoCameraWarning.style.color = Color.red;
             NoCameraWarning.style.paddingBottom = 8f;
@@ -117,6 +139,17 @@ public class VolumetricDebugTool : EditorTool
             return;
         }
 
+        if (!VolumetricScript.isActiveAndEnabled)
+        {
+            Label DisabledWarning = new Label("No enabled volumetric rendering script");
+            DisabledWarning.style.fontSize = 13;
+            DisabledWarning.style.color = Color.red;
+            DisabledWarning.style.paddingBottom = 8f;
+            toolWindow.Add(DisabledWarning);
+            ActiveView.rootVisualElement.Add(toolWindow);
+            ActiveView.rootVisualElement.style.flexDirection = FlexDirection.ColumnReverse;
+            return;
+        }
         
 
         toolWindow.Add(activeToggle);
@@ -248,7 +281,7 @@ public class VolumetricDebugTool : EditorTool
         DestroyImmediate(placeholderGO);
     }
 
-    public async void updateCameraList()
+    public void updateCameraList()
     {
         SceneCameras = new List<Camera>();
         SceneCameras.Add(placeholderCam);
@@ -271,5 +304,14 @@ public class VolumetricDebugTool : EditorTool
         if (Volumetrics != null)
             Volumetrics.PushFogShaderParameters();
     }
-
+    public void disableOnLightmapBake()
+    {
+        if (VolumetricScript != null)
+        {
+            isActive2 = false;
+            activeToggle2.value = false;
+            VolumetricScript.enableEditorPreview = false;
+            VolumetricScript.disable();
+        }
+    }
 }
