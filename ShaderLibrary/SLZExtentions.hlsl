@@ -48,6 +48,13 @@ return LitFluorescence.rgb;
 }
 //#endif
 
+void BlendFluorescence(inout half3 Diffuse, half3 LightColors, BRDFData brdfData )
+{
+    //Mainly used to shush an implicit casting complier error
+    #if defined(_FLUORESCENCE)
+    BlendFluorescence(Diffuse,half4(LightColors,0),brdfData);
+    #endif
+}
 void BlendFluorescence(inout half3 Diffuse, half4 LightColors, BRDFData brdfData )
 {
     #if defined(_FLUORESCENCE)
