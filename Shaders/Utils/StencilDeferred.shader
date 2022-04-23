@@ -189,7 +189,7 @@ Shader "Hidden/Universal Render Pipeline/StencilDeferred"
                 unityLight.direction = _LightDirection;
                 unityLight.distanceAttenuation = 1.0;
                 unityLight.shadowAttenuation = 1.0;
-                unityLight.color = _LightColor.rgb;
+                unityLight.color.rgb = _LightColor;
                 unityLight.layerMask = lightLayerMask;
 
                 if (!materialReceiveShadowsOff)
@@ -317,7 +317,7 @@ Shader "Hidden/Universal Render Pipeline/StencilDeferred"
             color = LightingPhysicallyBased(brdfData, unityLight, inputData.normalWS, inputData.viewDirectionWS, materialSpecularHighlightsOff);
         #elif defined(_SIMPLELIT)
             SurfaceData surfaceData = SurfaceDataFromGbuffer(gbuffer0, gbuffer1, gbuffer2, kLightingSimpleLit);
-            half3 attenuatedLightColor = unityLight.color * (unityLight.distanceAttenuation * unityLight.shadowAttenuation);
+            half4 attenuatedLightColor = unityLight.color * (unityLight.distanceAttenuation * unityLight.shadowAttenuation);
             half3 diffuseColor = LightingLambert(attenuatedLightColor, unityLight.direction, inputData.normalWS);
             half smoothness = exp2(10 * surfaceData.smoothness + 1);
             half3 specularColor = LightingSpecular(attenuatedLightColor, unityLight.direction, inputData.normalWS, inputData.viewDirectionWS, half4(surfaceData.specular, 1), smoothness);

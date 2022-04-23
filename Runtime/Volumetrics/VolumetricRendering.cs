@@ -970,7 +970,7 @@ public class VolumetricRendering : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
-            AssemblyReloadEvents.afterAssemblyReload += UpdateStateAfterReload;
+            AssemblyReloadEvents.afterAssemblyReload -= UpdateStateAfterReload;
         }
 #endif
     }
@@ -980,7 +980,7 @@ public class VolumetricRendering : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
-            AssemblyReloadEvents.afterAssemblyReload += UpdateStateAfterReload;
+            AssemblyReloadEvents.afterAssemblyReload -= UpdateStateAfterReload;
         }
 #endif
     }

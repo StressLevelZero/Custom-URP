@@ -64,7 +64,7 @@ Light UnityLightFromPunctualLightDataAndWorldSpacePosition(PunctualLightData pun
     half attenuation = DistanceAttenuation(distanceSqr, punctualLightData.attenuation.xy) * AngleAttenuation(punctualLightData.spotDirection.xyz, lightDirection, punctualLightData.attenuation.zw);
 
     light.direction = lightDirection;
-    light.color = punctualLightData.color.rgb;
+    light.color.rgb = punctualLightData.color.rgb;
 
     light.distanceAttenuation = attenuation;
 

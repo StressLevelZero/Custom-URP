@@ -133,7 +133,7 @@ Varyings TerrainLitVertex(Attributes input)
     half3 NormalWS = input.NormalOS;
     OUTPUT_SH(NormalWS, output.vertexSH);
     Light mainLight = GetMainLight();
-    half3 attenuatedLightColor = mainLight.color * mainLight.distanceAttenuation;
+    half4 attenuatedLightColor = mainLight.color * mainLight.distanceAttenuation;
     half3 diffuseColor = half3(0, 0, 0);
 
     if (IsLightingFeatureEnabled(DEBUGLIGHTINGFEATUREFLAGS_MAIN_LIGHT))
@@ -148,7 +148,7 @@ Varyings TerrainLitVertex(Attributes input)
         for (int i = 0; i < pixelLightCount; ++i)
         {
             Light light = GetAdditionalLight(i, vertexInput.positionWS);
-            half3 attenuatedLightColor = light.color * light.distanceAttenuation;
+            half4 attenuatedLightColor = light.color * light.distanceAttenuation;
             diffuseColor += LightingLambert(attenuatedLightColor, light.direction, NormalWS);
         }
     }

@@ -125,7 +125,7 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit"
                 OUTPUT_SH(output.NormalWS, output.vertexSH);
 
                 Light mainLight = GetMainLight();
-                half3 attenuatedLightColor = mainLight.color * mainLight.distanceAttenuation;
+                half4 attenuatedLightColor = mainLight.color * mainLight.distanceAttenuation;
                 half3 diffuseColor = LightingLambert(attenuatedLightColor, mainLight.direction, output.NormalWS);
             #ifdef _ADDITIONAL_LIGHTS
                 int pixelLightCount = GetAdditionalLightsCount();

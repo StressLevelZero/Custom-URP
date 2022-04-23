@@ -210,7 +210,10 @@ half DirectBRDFSpecular(BRDFData brdfData, half3 normalWS, half3 lightDirectionW
     // Final BRDFspec = roughness^2 / ( NoH^2 * (roughness^2 - 1) + 1 )^2 * (LoH^2 * (roughness + 0.5) * 4.0)
     // We further optimize a few light invariant terms
     // brdfData.normalizationTerm = (roughness + 0.5) * 4.0 rewritten as roughness * 4.0 + 2.0 to a fit a MAD.
-    float d = NoH * NoH * brdfData.roughness2MinusOne + 1.00001f;
+	half3 NxH = cross(normalWS, half3(halfDir));
+	float a = NoH * brdfData.roughness;
+	float d = a*a + dot(NxH, NxH);
+    //float d = NoH * NoH * brdfData.roughness2MinusOne + 1.00001f;
     half d2 = half(d * d);
 
     half LoH2 = LoH * LoH;
