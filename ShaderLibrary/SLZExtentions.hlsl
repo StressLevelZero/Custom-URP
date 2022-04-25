@@ -64,13 +64,17 @@ void BlendFluorescence(inout half3 Diffuse, half4 LightColors, BRDFData brdfData
 
 
 //TEMP port of GGX until SRP replacement is implmented to BakeryDirectionalLightmapSpecular 
-float GGXTerm (float NdotH, float roughness)
+float GGXTerm (half3 N, half3 H, half NdotH, half roughness)
 {
-    float a2 = roughness * roughness;
-    float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
-    return PI_R * a2 / (d * d + 1e-7f); // This function is not intended to be running on Mobile,
+    half a2 = roughness * roughness;
+     //float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
+    half3 NxH = cross(N,H);
+    half a = NdotH * roughness;
+    half d = a2 + dot(NxH, NxH);
+    return PI_R * a2 / (d * d + REAL_MIN); // This function is not intended to be running on Mobile,
                                                 // therefore epsilon is smaller than what can be represented by half
 }
+
 
 ////Baked Specular using directional baked maps
 half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 viewDir, float smoothness)
@@ -80,7 +84,7 @@ half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, fl
 	half nh = saturate(dot(normalWorld, halfDir));
 	half perceptualRoughness = 1-smoothness;
 	half roughness = perceptualRoughness * perceptualRoughness;
-	half spec = GGXTerm(nh, roughness);
+	half spec = GGXTerm(normalWorld, halfDir, nh, roughness);
 	return spec;
  //   return 1;
 }
@@ -92,7 +96,7 @@ half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, flo
     half nh = saturate(dot(normalWorld, halfDir));
     half perceptualRoughness = 1 - smoothness;
     half roughness = perceptualRoughness * perceptualRoughness;
-    half spec = GGXTerm(nh, roughness);
+    half spec = GGXTerm(normalWorld, halfDir, nh, roughness);
     return spec;
     //   return 1;
 }
