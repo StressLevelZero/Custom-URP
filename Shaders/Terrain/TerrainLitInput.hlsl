@@ -85,7 +85,7 @@ SAMPLER(sampler_TerrainHolesTexture);
 void ClipHoles(float2 uv)
 {
     float hole = SAMPLE_TEXTURE2D(_TerrainHolesTexture, sampler_TerrainHolesTexture, uv).r;
-    clip(hole == 0.0f ? -1 : 1);
+    clip(hole - 0.01);
 }
 #endif
 
