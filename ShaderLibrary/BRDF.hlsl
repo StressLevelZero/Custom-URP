@@ -190,25 +190,7 @@ half3 EnvironmentBRDFClearCoat(BRDFData brdfData, half clearCoatMask, half3 indi
     return indirectSpecular * EnvironmentBRDFSpecular(brdfData, fresnelTerm) * clearCoatMask;
 }
 
-float V_SmithGGXCorrelatedFast(float NoV, float NoL, float roughness) {
-    float a = roughness;
-    float GGXV = NoL * (NoV * (1.0 - a) + a);
-    float GGXL = NoV * (NoL * (1.0 - a) + a);
-    return 0.5 / (GGXV + GGXL);
-}
 
-float F_Schlick(float u, float f0) {
-    float f = pow(1.0 - u, 5.0);
-    return f + f0 * (1.0 - f);
-}
-
-half D_GGX(half roughness, half NoH, half3 n, const half3 h) {
-    half3 NxH = cross(n, h);
-    half a = NoH * roughness;
-    half k = roughness / (dot(NxH, NxH) + a * a);
-    half d = k * k * (1.0 / PI);
-    return d;
-}
 
 // Computes the scalar specular term for Minimalist CookTorrance BRDF
 // NOTE: needs to be multiplied with reflectance f0, i.e. specular color to complete
@@ -232,7 +214,7 @@ half DirectBRDFSpecular(BRDFData brdfData, half3 normalWS, half3 lightDirectionW
 	half3 NxH = cross(normalWS, halfDir);
 	half a = NoH * brdfData.roughness;
 	half d = brdfData.roughness / (a*a + dot(NxH, NxH));
-    half d2 = (d * d / half(PI));
+    half d2 = (d * d * half(INV_PI));
     half LoH2 = LoH * LoH;
 
     //half LoH2 = 1 - dot(LxH,LxH);
