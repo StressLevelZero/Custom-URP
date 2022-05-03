@@ -65,7 +65,7 @@ inline void InitializeBRDFDataDirect(half3 albedo, half3 diffuse, half3 specular
     outBRDFData.reflectivity = reflectivity;
 
     outBRDFData.perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(smoothness);
-    outBRDFData.roughness           = max(PerceptualRoughnessToRoughness(outBRDFData.perceptualRoughness), HALF_MIN_SQRT);
+    outBRDFData.roughness           = max(PerceptualRoughnessToRoughness(outBRDFData.perceptualRoughness), HALF_MIN);
     outBRDFData.roughness2          = max(outBRDFData.roughness * outBRDFData.roughness, HALF_MIN);
     outBRDFData.grazingTerm         = saturate(smoothness + reflectivity);
     outBRDFData.normalizationTerm   = outBRDFData.roughness * half(4.0) + half(2.0);
@@ -190,15 +190,34 @@ half3 EnvironmentBRDFClearCoat(BRDFData brdfData, half clearCoatMask, half3 indi
     return indirectSpecular * EnvironmentBRDFSpecular(brdfData, fresnelTerm) * clearCoatMask;
 }
 
+float V_SmithGGXCorrelatedFast(float NoV, float NoL, float roughness) {
+    float a = roughness;
+    float GGXV = NoL * (NoV * (1.0 - a) + a);
+    float GGXL = NoV * (NoL * (1.0 - a) + a);
+    return 0.5 / (GGXV + GGXL);
+}
+
+float F_Schlick(float u, float f0) {
+    float f = pow(1.0 - u, 5.0);
+    return f + f0 * (1.0 - f);
+}
+
+half D_GGX(half roughness, half NoH, half3 n, const half3 h) {
+    half3 NxH = cross(n, h);
+    half a = NoH * roughness;
+    half k = roughness / (dot(NxH, NxH) + a * a);
+    half d = k * k * (1.0 / PI);
+    return d;
+}
+
 // Computes the scalar specular term for Minimalist CookTorrance BRDF
 // NOTE: needs to be multiplied with reflectance f0, i.e. specular color to complete
 half DirectBRDFSpecular(BRDFData brdfData, half3 normalWS, half3 lightDirectionWS, half3 viewDirectionWS)
 {
-    float3 lightDirectionWSFloat3 = float3(lightDirectionWS);
-    float3 halfDir = SafeNormalize(lightDirectionWSFloat3 + float3(viewDirectionWS));
-
-    float NoH = saturate(dot(float3(normalWS), halfDir));
-    half LoH = half(saturate(dot(lightDirectionWSFloat3, halfDir)));
+    //float3 lightDirectionWSFloat3 = float3(lightDirectionWS);
+    half3 halfDir = SafeNormalize(lightDirectionWS + float3(viewDirectionWS));
+    half NoH = saturate(dot(normalWS, halfDir));
+    half LoH =saturate(dot(lightDirectionWS, halfDir));
 
     // GGX Distribution multiplied by combined approximation of Visibility and Fresnel
     // BRDFspec = (D * V * F) / 4.0
@@ -210,14 +229,14 @@ half DirectBRDFSpecular(BRDFData brdfData, half3 normalWS, half3 lightDirectionW
     // Final BRDFspec = roughness^2 / ( NoH^2 * (roughness^2 - 1) + 1 )^2 * (LoH^2 * (roughness + 0.5) * 4.0)
     // We further optimize a few light invariant terms
     // brdfData.normalizationTerm = (roughness + 0.5) * 4.0 rewritten as roughness * 4.0 + 2.0 to a fit a MAD.
-	half3 NxH = cross(normalWS, half3(halfDir));
-	float a = NoH * brdfData.roughness;
-	float d = a*a + dot(NxH, NxH);
-    //float d = NoH * NoH * brdfData.roughness2MinusOne + 1.00001f;
-    half d2 = half(d * d);
-
+	half3 NxH = cross(normalWS, halfDir);
+	half a = NoH * brdfData.roughness;
+	half d = brdfData.roughness / (a*a + dot(NxH, NxH));
+    half d2 = (d * d / half(PI));
     half LoH2 = LoH * LoH;
-    half specularTerm = brdfData.roughness2 / (d2 * max(half(0.1), LoH2) * brdfData.normalizationTerm);
+
+    //half LoH2 = 1 - dot(LxH,LxH);
+    half specularTerm = d2 / ((max(half(0.1), LoH2) * brdfData.normalizationTerm));
 
     // On platforms where half actually means something, the denominator has a risk of overflow
     // clamp below was added specifically to "fix" that, but dx compiler (we convert bytecode to metal/gles)
