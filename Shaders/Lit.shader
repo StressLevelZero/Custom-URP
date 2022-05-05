@@ -120,7 +120,8 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
             #if (SHADER_API_MOBILE)
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX
             #else            
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHTS
+			#pragma shader_feature_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             //_MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma shader_feature_fragment  _REFLECTION_PROBE_BLENDING
