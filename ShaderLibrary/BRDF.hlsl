@@ -214,7 +214,7 @@ half DirectBRDFSpecular(BRDFData brdfData, half3 normalWS, half3 lightDirectionW
 	half3 NxH = cross(normalWS, halfDir);
 	half a = NoH * brdfData.roughness;
 	half d = brdfData.roughness / (a*a + dot(NxH, NxH));
-    half d2 = (d * d * half(INV_PI));
+    half d2 = d * d * half(INV_PI) * NoH;
     half LoH2 = LoH * LoH;
 
     //half LoH2 = 1 - dot(LxH,LxH);
