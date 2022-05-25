@@ -613,6 +613,6 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
 
     //specular *= 1.0 + surfData.specular * ((1.0 / max(dfg.y, REAL_MIN)) - 1.0);
     
-    return surfData.occlusion * (surfData.albedo * diffuse + specular);
+    return surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
 }
 #endif
