@@ -60,8 +60,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
 
 
 #ifndef _SPECULARHIGHLIGHTS_OFF
-    [branch] if (!specularHighlightsOff)
-    {
+    
         brdf += brdfData.specular * DirectBRDFSpecular(brdfData, normalWS, lightDirectionWS, viewDirectionWS);
 
 #if defined(_CLEARCOAT) || defined(_CLEARCOATMAP)
@@ -79,7 +78,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
 
         brdf = brdf * (1.0 - clearCoatMask * coatFresnel) + brdfCoat * clearCoatMask;
 #endif // _CLEARCOAT
-    }
+    
 #endif // _SPECULARHIGHLIGHTS_OFF
 
     brdf *= radiance;
@@ -258,9 +257,27 @@ half3 CalculateBlinnPhong(Light light, InputData inputData, SurfaceData surfaceD
 //       Used by ShaderGraph and others builtin renderers                    //
 ///////////////////////////////////////////////////////////////////////////////
 
+
+half3 SLZSHSpecular(BRDFData brdfData, half3 normalWS, half3 viewDirectionWS, half3 shL1Color)
+{
+	#if !defined(LIGHTMAP_ON) && !defined(DYNAMICLIGHTMAP_ON) && !defined(_SH_HIGHLIGHTS_OFF) && !defined(_SPECULARHIGHLIGHTS_OFF)
+		half3 shL1sum = unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz;
+		float shL1Len2 = max(float(dot(shL1sum, shL1sum)), FLT_MIN);
+		half3 shL1Dir = float3(shL1sum) * rsqrt(shL1Len2);
+		half NoL = saturate(dot(normalWS, shL1Dir));
+		half falloff = SLZFakeSpecularFalloff(NoL);
+		half shL1Spec = DirectBRDFSpecular(brdfData, normalWS, shL1Dir, viewDirectionWS);
+		return falloff * shL1Spec * brdfData.specular * max(0, shL1Color);
+	#else
+        return half3(0, 0, 0);
+	#endif
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// PBR lighting...
 ////////////////////////////////////////////////////////////////////////////////
+
+
 half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
 {
     #if defined(_SPECULARHIGHLIGHTS_OFF)
@@ -293,11 +310,15 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
     MixRealtimeAndBakedGI(mainLight, inputData.normalWS, inputData.bakedGI);
 
     LightingData lightingData = CreateLightingData(inputData, surfaceData);
-
+	
     lightingData.giColor = GlobalIllumination(brdfData, brdfDataClearCoat, surfaceData.clearCoatMask,
                                               inputData.bakedGI, aoFactor.indirectAmbientOcclusion, inputData.positionWS,
                                               inputData.normalWS, inputData.viewDirectionWS);
-
+					
+	#if !defined(LIGHTMAP_ON)
+	lightingData.giColor +=  SLZSHSpecular(brdfData, inputData.normalWS, inputData.viewDirectionWS, inputData.bakedGI);
+	#endif
+	
     if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
     {
         lightingData.mainLightColor = LightingPhysicallyBased(brdfData, brdfDataClearCoat,
@@ -342,6 +363,9 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
 
     return CalculateFinalColor(lightingData, surfaceData.alpha);
 }
+
+
+
 
 // Deprecated: Use the version which takes "SurfaceData" instead of passing all of these arguments...
 half4 UniversalFragmentPBR(InputData inputData, half3 albedo, half metallic, half3 specular,

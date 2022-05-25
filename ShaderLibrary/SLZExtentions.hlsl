@@ -1,5 +1,9 @@
+
 #ifndef SLZ_LightingExtend
 #define SLZ_LightingExtend
+
+
+
 
 #define M_PI  3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
@@ -130,15 +134,15 @@ half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, flo
      real4 direction = SAMPLE_TEXTURE2D(lightmapDirTex, lightmapDirSampler, uv);
      // Remark: baked lightmap is RGBM for now, dynamic lightmap is RGB9E5
      real3 illuminance = real3(0.0, 0.0, 0.0);
-     if (encodedLightmap)
-     {
+     //if (encodedLightmap)
+     //{
          real4 encodedIlluminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgba;
-         illuminance = DecodeLightmap(encodedIlluminance, decodeInstructions);
-     }
-     else
-     {
-         illuminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgb;
-     }
+         illuminance = encodedLightmap ? DecodeLightmap(encodedIlluminance, decodeInstructions) : encodedIlluminance.rgb;
+     //}
+     //else
+     //{
+     //    illuminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgb;
+     //}
      real halfLambert = dot(normalWS, direction.xyz - 0.5) + 0.5;
      real3 IndirectDiffuse = illuminance * halfLambert / max(1e-4, direction.w);
      real IndirectSpecular = BakeryDirectionalLightmapSpecular(direction, normalWS, viewDirWS, smoothness) ;
