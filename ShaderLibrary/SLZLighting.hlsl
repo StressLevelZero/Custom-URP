@@ -527,12 +527,17 @@ void SLZImageBasedSpecular(inout real3 specular, const SLZFragData fragData, con
  * @param[in,out] specular  Running total of the specular color
  * @param         fragData  Struct containing all relevant fragment data (normal, position, etc)
  * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
+ * @param         directSSAO Direct screen-space ambient occlusion factor       
  */
-void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData)
+void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData, half directSSAO)
 {
     Light mainLight = GetMainLight(fragData.shadowCoord, fragData.position, fragData.shadowMask);
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, mainLight);
+    #if defined(_SCREEN_SPACE_OCCLUSION)
+        diffuseBRDF *= directSSAO;
+    #endif
     diffuse += diffuseBRDF;
+    
    
     //Do specular highlight for EITHER the directional light, if it exists, or the spherical harmonics L1 band
     #if !defined(LIGHTMAP_ON) && !defined(_SH_HIGHLIGHTS_OFF)
@@ -559,10 +564,14 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
  * @param         fragData  Struct containing all relevant fragment data (normal, position, etc)
  * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
  * @param         addLight  Struct containing the information about a given light (color, attenuation, shadowing, etc)
+ * @param         directSSAO Direct screen-space ambient occlusion factor    
  */
-void SLZAddLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData, Light addLight)
+void SLZAddLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData, Light addLight, half directSSAO)
 {
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, addLight);
+    #if defined(_SCREEN_SPACE_OCCLUSION)
+        diffuseBRDF *= directSSAO;
+    #endif
     diffuse += diffuseBRDF;
     SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData.normal, fragData.viewDir, fragData.NoV, addLight.direction);
     specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData);
@@ -580,7 +589,14 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-    
+    #if defined(_SCREEN_SPACE_OCCLUSION)
+        AmbientOcclusionFactor ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
+        surfData.occlusion = 1.0h; // we are already multiplying by the AO in the intermediate steps, don't do it at the end like normal
+    #else
+        AmbientOcclusionFactor ao;
+        ao.indirectAmbientOcclusion = 1.0h;
+        ao.directAmbientOcclusion = 1.0h;
+    #endif
     
     #if defined(LIGHTMAP_ON) 
     //-------------------------------------------------------------------------------------------------
@@ -598,14 +614,19 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     #endif
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
     
-    SLZMainLight(diffuse, specular, fragData, surfData);
+    #if defined(_SCREEN_SPACE_OCCLUSION)
+        diffuse *= ao.indirectAmbientOcclusion;
+        specular *= ao.directAmbientOcclusion;
+    #endif
+    
+    SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion);
     
     #if defined(_ADDITIONAL_LIGHTS)
     uint pixelLightCount = GetAdditionalLightsCount();
     
     LIGHT_LOOP_BEGIN(pixelLightCount)
         Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
-        SLZAddLight(diffuse, specular, fragData, surfData, light);
+        SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
     LIGHT_LOOP_END
     #endif
     
