@@ -316,7 +316,7 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
                                               inputData.normalWS, inputData.viewDirectionWS);
 					
 	#if !defined(LIGHTMAP_ON)
-	lightingData.giColor +=  SLZSHSpecular(brdfData, inputData.normalWS, inputData.viewDirectionWS, inputData.bakedGI);
+	lightingData.giColor +=  SLZSHSpecular(brdfData, inputData.normalWS, inputData.viewDirectionWS, inputData.bakedGI) * aoFactor.directAmbientOcclusion;
 	#endif
 	
     if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
