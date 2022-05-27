@@ -425,9 +425,11 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
             real3 lmDirection = real(2.0) * directionalMap.xyz - real(1.0);
             diffuse = SLZApplyLightmapDirectionality(diffuse,lmDirection, frag.normal, directionalMap.w);
             lmDirection = SLZSafeHalf3Normalize(lmDirection); //length not 1
-            SLZDirectSpecLightInfo lightInfo = SLZGetDirectLightInfo(frag.normal, frag.viewDir, frag.NoV, lmDirection);
-            real3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf);
-            specular += lmDiffuse * lmSpecular * lightInfo.NoL;
+            #if !defined(_SLZ_DISABLE_BAKED_SPEC)
+                SLZDirectSpecLightInfo lightInfo = SLZGetDirectLightInfo(frag.normal, frag.viewDir, frag.NoV, lmDirection);
+                real3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf);
+                specular += lmDiffuse * lmSpecular * lightInfo.NoL;
+            #endif
     #endif
     
     #if defined(DYNAMICLIGHTMAP_ON)
@@ -436,10 +438,11 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
             real4 dynDirectionalMap = SAMPLE_TEXTURE2D(unity_DynamicDirectionality, samplerunity_DynamicLightmap, frag.dynLightmapUV);
             real3 dynLmDirection = real(2.0) * dynDirectionalMap - real(1.0);
             dynDiffuse = SLZApplyLightmapDirectionality(dynDiffuse,dynLmDirection, frag.normal, dynDirectionalMap.w);
-            
-            real3 dynNormLmDir = SLZSafeHalf3Normalize(dynLmDirection);
-            SLZDirectSpecLightInfo dynLightInfo = SLZGetDirectLightInfo(frag.normal, frag.viewDir, frag.NoV, dynNormLmDir);
-            specular += dynDiffuse * SLZDirectBRDFSpecular(dynLightInfo, surf);
+            #if !defined(_SLZ_DISABLE_BAKED_SPEC)
+                real3 dynNormLmDir = SLZSafeHalf3Normalize(dynLmDirection);
+                SLZDirectSpecLightInfo dynLightInfo = SLZGetDirectLightInfo(frag.normal, frag.viewDir, frag.NoV, dynNormLmDir);
+                specular += dynDiffuse * SLZDirectBRDFSpecular(dynLightInfo, surf);
+            #endif
         #endif
     
         diffuse += dynDiffuse;
@@ -493,16 +496,15 @@ real3 SLZSHSpecularDirection()
 
 /**
  * Specular from reflection probes. Mostly copying unity's code here, but without their data structures.
- * One small addition is the horizon occlusion factor copied from Filament, which fades out the specular
- * as the reflected ray dips below the surface, which is possible because of normal maps.
+ * 
  *
  * @param[in,out] specular  Running total of the specular color
  * @param         fragData  Struct containing all relevant fragment data (normal, position, etc)
  * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
+ * @param         indSSAO   Indirect screenspace ambient occlusion, not used if SSAO isn't enabled
  */
-void SLZImageBasedSpecular(inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData)
+void SLZImageBasedSpecular(inout real3 specular, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, half indSSAO)
 {
-    real3 reflectionDir = reflect(-fragData.viewDir, fragData.normal);
     real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, 1.0h);
     real surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
     real3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
@@ -510,8 +512,31 @@ void SLZImageBasedSpecular(inout real3 specular, const SLZFragData fragData, con
     fresnelTerm *= fresnelTerm;
     fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
     real3 IBSpec = real3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
+    
+    #if defined(_SCREEN_SPACE_OCCLUSION)
+        reflectionProbe *= indSSAO;
+    #endif
+    
     specular += IBSpec * reflectionProbe;
-    real horizonOcclusion = min(1.0h + dot(reflectionDir, fragData.normal), 1.0h);
+}
+
+
+/**
+ * Specular horizon occlusion factor copied from Filament, which fades out the specular
+ * as the reflected ray dips below the surface. This is possible because the normal from
+ * normal maps and even smooth interpolated mesh normals aren't geometrically sane.
+ * The camera can be below the plane defined by the pixel's normal but still be above 
+ * the triangle's true normal plane, meaning that we're still rendering the geometry from
+ * the front but the shader thinks were looking at the back. This leads to a reflection
+ * vector pointing into the surface.
+ *
+ * @param[in,out] specular  Running total of the specular color
+ * @param         normal    Worldspace normal vector
+ * 
+ */
+void SLZSpecularHorizonOcclusion(inout real3 specular, half3 normal, half3 reflectionDir)
+{
+    real horizonOcclusion = min(1.0h + dot(reflectionDir, normal), 1.0h);
     specular *= horizonOcclusion * horizonOcclusion;
 }
 
@@ -529,7 +554,7 @@ void SLZImageBasedSpecular(inout real3 specular, const SLZFragData fragData, con
  * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
  * @param         directSSAO Direct screen-space ambient occlusion factor       
  */
-void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData, half directSSAO)
+void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData, real directSSAO)
 {
     Light mainLight = GetMainLight(fragData.shadowCoord, fragData.position, fragData.shadowMask);
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, mainLight);
@@ -538,9 +563,8 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
     #endif
     diffuse += diffuseBRDF;
     
-   
-    //Do specular highlight for EITHER the directional light, if it exists, or the spherical harmonics L1 band
-    #if !defined(LIGHTMAP_ON) && !defined(_SH_HIGHLIGHTS_OFF)
+    //If the object doesn't have a lightmap, do a specular highlight for EITHER the directional light, if it exists, or the spherical harmonics L1 band
+    #if !defined(LIGHTMAP_ON) && !defined(SLZ_DISABLE_BAKED_SPEC)
         bool isMainLight = max(diffuseBRDF.x, max(diffuseBRDF.y, diffuseBRDF.z)) > HALF_MIN ? true : false;
         real3 shL1Dir = SLZSHSpecularDirection();
         real3 dominantDir = isMainLight ? mainLight.direction : shL1Dir;
@@ -550,7 +574,7 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
         NoLMul = -NoLMul * NoLMul + 1.0;
         NoLMul = isMainLight ? 1.0 : NoLMul;
         specular += dominantColor * SLZDirectBRDFSpecular(specInfo, surfData) * NoLMul;
-    #elif !defined(DIRLIGHTMAP_COMBINED)
+    #elif !defined(DIRLIGHTMAP_COMBINED) || defined(SLZ_DISABLE_BAKED_SPEC)
         SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData.normal, fragData.viewDir, fragData.NoV, mainLight.direction);
         specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData);
     #endif
@@ -604,6 +628,7 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     //-------------------------------------------------------------------------------------------------
         
         SLZGetLightmapLighting(diffuse, specular, fragData, surfData);
+    
     #else 
     //-------------------------------------------------------------------------------------------------
     // Spherical harmonic diffuse calculations
@@ -612,14 +637,22 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
         SLZSHDiffuse(diffuse, fragData.normal);
         
     #endif
+    
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
     
+    //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting) 
     #if defined(_SCREEN_SPACE_OCCLUSION)
         diffuse *= ao.indirectAmbientOcclusion;
-        specular *= ao.directAmbientOcclusion;
+        specular *= ao.indirectAmbientOcclusion;
     #endif
     
-    SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion);
+    //-------------------------------------------------------------------------------------------------
+    // Realtime light calculations
+    //-------------------------------------------------------------------------------------------------
+    
+    // For dynamic objects, this also does specular for probes if there is no main light, assuming the
+    // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
+    SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion); 
     
     #if defined(_ADDITIONAL_LIGHTS)
     uint pixelLightCount = GetAdditionalLightsCount();
@@ -630,9 +663,16 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     LIGHT_LOOP_END
     #endif
     
-    SLZImageBasedSpecular(specular, fragData, surfData);
-
-    //specular *= 1.0 + surfData.specular * ((1.0 / max(dfg.y, REAL_MIN)) - 1.0);
+    //-------------------------------------------------------------------------------------------------
+    // Image-based specular
+    //-------------------------------------------------------------------------------------------------
+    real3 reflectionDir = reflect(-fragData.viewDir, fragData.normal);
+    SLZImageBasedSpecular(specular, reflectionDir, fragData, surfData, ao.indirectAmbientOcclusion);
+    SLZSpecularHorizonOcclusion(specular, fragData.normal, reflectionDir);
+    
+    //-------------------------------------------------------------------------------------------------
+    // Combine the final lighting information
+    //-------------------------------------------------------------------------------------------------
     
     return surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
 }
