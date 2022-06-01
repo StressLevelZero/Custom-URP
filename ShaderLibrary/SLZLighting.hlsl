@@ -158,7 +158,7 @@ SLZSurfData SLZGetSurfDataMetallicGloss(float3 albedo, real metallic, real smoot
     return data;
 }
 
-SLZDirectSpecLightInfo SLZGetDirectLightInfo(real3 normal, real3 viewDir, real3 NoV, real3 lightDir)
+SLZDirectSpecLightInfo SLZGetDirectLightInfo(real3 normal, real3 viewDir, real NoV, real3 lightDir)
 {
 
     SLZDirectSpecLightInfo data;
@@ -433,10 +433,10 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
     #endif
     
     #if defined(DYNAMICLIGHTMAP_ON)
-        real3 dynDiffuse = SAMPLE_TEXTURE2D(unity_DynamicLightmap, samplerunity_DynamicLightmap, frag.dynLightmapUV);
+        real3 dynDiffuse = SAMPLE_TEXTURE2D(unity_DynamicLightmap, samplerunity_DynamicLightmap, frag.dynLightmapUV).rgb;
         #if defined(DIRLIGHTMAP_COMBINED) && !defined(SHADER_API_MOBILE)
             real4 dynDirectionalMap = SAMPLE_TEXTURE2D(unity_DynamicDirectionality, samplerunity_DynamicLightmap, frag.dynLightmapUV);
-            real3 dynLmDirection = real(2.0) * dynDirectionalMap - real(1.0);
+            real3 dynLmDirection = real(2.0) * dynDirectionalMap.rgb - real(1.0);
             dynDiffuse = SLZApplyLightmapDirectionality(dynDiffuse,dynLmDirection, frag.normal, dynDirectionalMap.w);
             #if !defined(_SLZ_DISABLE_BAKED_SPEC)
                 real3 dynNormLmDir = SLZSafeHalf3Normalize(dynLmDirection);
@@ -489,7 +489,7 @@ void SLZSHDiffuse(inout real3 diffuse, half3 normal)
 real3 SLZSHSpecularDirection()
 {
     real3 direction = (unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz);
-    float length = max(float(dot(direction, direction)), FLT_MIN);
+    float length = max(float(dot(direction, direction)), REAL_MIN);
     direction = direction * rsqrt(length);
     return direction;
 }
