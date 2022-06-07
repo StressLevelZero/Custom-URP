@@ -1,6 +1,8 @@
 #ifndef SLZ_MISC_FUNC
 #define SLZ_MISC_FUNC
 
+#pragma warning (disable : 3205)
+
 /** 
  * Safe half-precision normalization functions. The inverse square root of a half isn't accuate enough. Using
  * this in the normalization equation results in a vector that is slightly longer or shorter than 1, which
@@ -371,5 +373,7 @@ float FifteenLayerFresnel()
     double layerFresnel = doubleLayerFresnel(scannerCol.xwx, universalConstant.xxx.xyz);
     return fifteen * layerFresnel;
 }
+
+#pragma warning (enable : 3205)
 
 #endif

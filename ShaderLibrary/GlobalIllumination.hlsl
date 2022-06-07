@@ -370,7 +370,7 @@ half3 SubtractDirectMainLightFromLightmap(Light mainLight, half3 normalWS, half3
     // We only subtract the main direction light. This is accounted in the contribution term below.
     half shadowStrength = GetMainLightShadowStrength();
     half contributionTerm = saturate(dot(mainLight.direction, normalWS));
-    half3 lambert = mainLight.color * contributionTerm;
+    half3 lambert = mainLight.color.rgb * contributionTerm;
     half3 estimatedLightContributionMaskedByInverseOfShadow = lambert * (1.0 - mainLight.shadowAttenuation);
     half3 subtractedLightmap = bakedGI - estimatedLightContributionMaskedByInverseOfShadow;
 

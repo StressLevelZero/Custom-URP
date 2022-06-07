@@ -81,7 +81,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     
 #endif // _SPECULARHIGHLIGHTS_OFF
 
-    brdf *= radiance;
+    brdf *= radiance.rgb;
     BlendFluorescence(brdf, radiance, brdfData);
     return brdf;
     
@@ -249,7 +249,7 @@ half3 CalculateBlinnPhong(Light light, InputData inputData, SurfaceData surfaceD
     lightColor += LightingSpecular(attenuatedLightColor, light.direction, inputData.normalWS, inputData.viewDirectionWS, half4(surfaceData.specular, 1), smoothness);
     #endif
 
-    return lightColor;
+    return lightColor.rgb;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -262,7 +262,7 @@ half3 SLZSHSpecular(BRDFData brdfData, half3 normalWS, half3 viewDirectionWS, ha
 {
 	#if !defined(LIGHTMAP_ON) && !defined(DYNAMICLIGHTMAP_ON) && !defined(_SH_HIGHLIGHTS_OFF) && !defined(_SPECULARHIGHLIGHTS_OFF)
 		half3 shL1sum = unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz;
-		float shL1Len2 = max(float(dot(shL1sum, shL1sum)), FLT_MIN);
+        float shL1Len2 = max(float(dot(shL1sum, shL1sum)), REAL_MIN);
 		half3 shL1Dir = float3(shL1sum) * rsqrt(shL1Len2);
 		half NoL = saturate(dot(normalWS, shL1Dir));
 		half falloff = SLZFakeSpecularFalloff(NoL);
