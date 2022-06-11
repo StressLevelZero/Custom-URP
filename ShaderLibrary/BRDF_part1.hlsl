@@ -8,6 +8,12 @@
 
 #define kDielectricSpec half4(0.04, 0.04, 0.04, 1.0 - 0.04) // standard dielectric reflectivity coef at incident angle (= 4%)
 
+#if defined(_BRDFMAP)
+#define realor4 real4
+#else
+#define realor4 real
+#endif
+
 struct BRDFData
 {
     half3 albedo;

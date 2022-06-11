@@ -9,9 +9,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
-#if defined(_BRDFMAP)
-TEXTURE2D(g_tBRDFMap); SamplerState BRDF_linear_clamp_sampler; //Force sampler state to avoid wrapping issues 
-#endif
+
 
 #if defined(LIGHTMAP_ON)
     #define DECLARE_LIGHTMAP_OR_SH(lmName, shName, index) float2 lmName : TEXCOORD##index
@@ -28,6 +26,17 @@ TEXTURE2D(g_tBRDFMap); SamplerState BRDF_linear_clamp_sampler; //Force sampler s
 ///////////////////////////////////////////////////////////////////////////////
 half4 LightingLambert(half4 lightColor, half3 lightDir, half3 normal)
 {
+    #if defined(_BRDFMAP)
+    half NormNdotL = ((dot(normal, lightDir))+1) * 0.5 ;
+    // float flNDotV = saturate(dot(normalWS,viewDirectionWS));
+    half4 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(NormNdotL,1) ,0 );//*(lightAttenuation+.5),
+    return lightColor * ( BRDFMap);
+    
+    half NdotL2 = saturate(dot(normal, lightDir));
+    return half4(0,0,1,0);//lightColor * NdotL2 > 0.25 ? 1:0;
+    
+    #endif
+    
     half NdotL = saturate(dot(normal, lightDir));
     return lightColor * NdotL;
 }
@@ -49,8 +58,8 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     #if defined(_BRDFMAP)
     half NormNdotL = ((dot(normalWS, lightDirectionWS))+1) * 0.5 ;
     float flNDotV = saturate(dot(normalWS,viewDirectionWS));
-    half4 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(NormNdotL,flNDotV) ,0 );
-    half4 radiance = lightColor * (lightAttenuation * BRDFMap);
+    half4 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(min(NormNdotL,log(lightAttenuation)/2.7182818*1+1),flNDotV) ,0 );//*(lightAttenuation+.5),
+    half4 radiance = lightColor * ( BRDFMap);
     #else
     half NdotL = saturate(dot(normalWS, lightDirectionWS));
     half4 radiance = lightColor * (lightAttenuation * NdotL);
@@ -266,7 +275,7 @@ half3 SLZSHSpecular(BRDFData brdfData, half3 normalWS, half3 viewDirectionWS, ha
 		half3 shL1Dir = float3(shL1sum) * rsqrt(shL1Len2);
 		half NoL = saturate(dot(normalWS, shL1Dir));
 		half falloff = SLZFakeSpecularFalloff(NoL);
-		half shL1Spec = DirectBRDFSpecular(brdfData, normalWS, shL1Dir, viewDirectionWS);
+		realor4 shL1Spec = DirectBRDFSpecular(brdfData, normalWS, shL1Dir, viewDirectionWS);
 		return falloff * shL1Spec * brdfData.specular * max(0, shL1Color);
 	#else
         return half3(0, 0, 0);

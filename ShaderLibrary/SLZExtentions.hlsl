@@ -2,13 +2,13 @@
 #ifndef SLZ_LightingExtend
 #define SLZ_LightingExtend
 
-
-
-
 #define M_PI  3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
-#define PI_R  0.31830988618f                        //Reciprocal 
+#define PI_R  0.31830988618f                        //Reciprocal
 
+#if defined(_BRDFMAP)
+TEXTURE2D(g_tBRDFMap); SamplerState BRDF_linear_clamp_sampler; //Force sampler state to avoid wrapping issues 
+#endif
 
 //Extention Libary to add into pipeline. Should make future package upgrading simpler.
 
@@ -79,6 +79,14 @@ float GGXTerm (half3 N, half3 H, half NdotH, half roughness)
                                                 // therefore epsilon is smaller than what can be represented by half
 }
 
+float2 GetShadowOffsets( float3 N, float3 L )
+{
+    // From: Ignacio Casta�o http://the-witness.net/news/2013/09/shadow-mapping-summary-part-1/
+    float cos_alpha = saturate( dot( N, L ) );
+    float offset_scale_N = sqrt( 1 - ( cos_alpha * cos_alpha ) ); // sin( acos( L�N ) )
+    float offset_scale_L = offset_scale_N / cos_alpha; // tan( acos( L�N ) )
+    return float2( offset_scale_N, min( 2.0, offset_scale_L ) );
+}
 
 ////Baked Specular using directional baked maps
 half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 viewDir, float smoothness)

@@ -72,6 +72,31 @@ half3 SampleSHPixel(half3 L2Term, half3 normalWS)
 #endif
     return max(half3(0, 0, 0), res);
 #endif
+    // Default: Evaluate SH fully per-pixel
+    return SampleSH(normalWS);
+}
+
+// SH Pixel Evaluation. Depending on target SH sampling might be done
+// mixed or fully in pixel. See SampleSHVertex
+half3 SampleSHPixelDir(half3 L2Term, half3 normalWS, half3 viewDir)
+{
+    #if defined(ANIME)
+    half3 shL1sum = unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz;
+    float shL1Len2 = max(float(dot(shL1sum, shL1sum)), REAL_MIN);
+    half3 shL1Dir = float3(shL1sum) * rsqrt(shL1Len2);
+    half NoL = dot(normalWS, shL1Dir);
+    normalWS =  NoL > -0.75 ? shL1Dir : -shL1Dir;
+    #endif
+    
+    #if defined(EVALUATE_SH_VERTEX)
+    return L2Term;
+    #elif defined(EVALUATE_SH_MIXED)
+    half3 res = SHEvalLinearL0L1(normalWS, unity_SHAr, unity_SHAg, unity_SHAb) + L2Term;
+    #ifdef UNITY_COLORSPACE_GAMMA
+    res = LinearToSRGB(res);
+    #endif
+    return max(half3(0, 0, 0), res);
+    #endif
 
     // Default: Evaluate SH fully per-pixel
     return SampleSH(normalWS);
@@ -184,7 +209,7 @@ half3 SampleLightmap(float2 staticLightmapUV, half3 normalWS)
 #elif defined(LIGHTMAP_ON)
 #define SAMPLE_GI_DIR(staticLmName, shName, normalWSName, smoothness, viewDirWS) SampleLightmapDir(staticLmName, 0, normalWSName, smoothness, viewDirWS)
 #else
-#define SAMPLE_GI_DIR(staticLmName, shName, normalWSName, smoothness, viewDirWS) SampleSHPixel(shName, normalWSName)
+#define SAMPLE_GI_DIR(staticLmName, shName, normalWSName, smoothness, viewDirWS) SampleSHPixelDir(shName, normalWSName,viewDirWS)
 #endif
 
 // #if defined(LIGHTMAP_ON) && defined(DYNAMICLIGHTMAP_ON)
@@ -383,7 +408,7 @@ half3 SubtractDirectMainLightFromLightmap(Light mainLight, half3 normalWS, half3
 }
 
 half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float clearCoatMask,
-    half3 bakedGI, half occlusion, float3 positionWS,
+    half3 bakedGI, half4 occlusion, float3 positionWS,
     half3 normalWS, half3 viewDirectionWS)
 {
     half3 reflectVector = reflect(-viewDirectionWS, normalWS);

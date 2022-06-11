@@ -7,11 +7,11 @@
 
 // Computes the scalar specular term for Minimalist CookTorrance BRDF
 // NOTE: needs to be multiplied with reflectance f0, i.e. specular color to complete
-half DirectBRDFSpecular(BRDFData brdfData, half3 normalWS, half3 lightDirectionWS, half3 viewDirectionWS)
+realor4 DirectBRDFSpecular(BRDFData brdfData, half3 normalWS, half3 lightDirectionWS, half3 viewDirectionWS)
 {
     half3 halfDir = SafeNormalize(lightDirectionWS + float3(viewDirectionWS));
-    half NoH = saturate(dot(normalWS, halfDir));
-    half LoH = saturate(dot(lightDirectionWS, halfDir));
+    half NoH = (dot(normalWS, halfDir)); //not clamped
+    half LoH = (dot(lightDirectionWS, halfDir));
     half3 NxH = cross(normalWS, halfDir);
     half NxH2 = dot(NxH, NxH);
     return SLZDirectBRDFSpecularMobile(NoH, LoH, NxH2, brdfData.roughness);
