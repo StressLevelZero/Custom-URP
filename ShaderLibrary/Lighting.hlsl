@@ -108,13 +108,15 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat, Lig
 // Backwards compatibility
 half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, half3 viewDirectionWS)
 {
-    #ifdef _SPECULARHIGHLIGHTS_OFF
+#ifdef _SPECULARHIGHLIGHTS_OFF
     bool specularHighlightsOff = true;
 #else
     bool specularHighlightsOff = false;
 #endif
-    const BRDFData noClearCoat = (BRDFData)0; 
+    const BRDFData noClearCoat = (BRDFData) 0;
+    return LightingPhysicallyBased(brdfData, noClearCoat, light, normalWS, viewDirectionWS, 0.0, specularHighlightsOff);
 }
+
 
 half3 LightingPhysicallyBased(BRDFData brdfData, half4 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS)
 {
@@ -131,6 +133,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, ha
     const BRDFData noClearCoat = (BRDFData)0;
     return LightingPhysicallyBased(brdfData, noClearCoat, light, normalWS, viewDirectionWS, 0.0, specularHighlightsOff);
 }
+
 
 half3 LightingPhysicallyBased(BRDFData brdfData, half4 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS, bool specularHighlightsOff)
 {

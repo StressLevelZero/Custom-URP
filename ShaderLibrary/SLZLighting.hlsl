@@ -99,7 +99,7 @@ struct SLZDirectSpecLightInfo
  */
 real3 SLZSafeHalf3Normalize(real3 value)
 {
-    float lenSqr = dot(value, value);
+    float lenSqr = max(dot(value, value), REAL_MIN);
     return value * rsqrt(lenSqr); 
 }
 
@@ -119,6 +119,21 @@ void SLZAlbedoSpecularFromMetallic(inout real3 albedo, out real3 specular, out r
     albedo = albedo * oneMinusReflectivity;
 }
 
+/**
+ * Specular antialiasing using normal derivatives to calculate a roughness value to hide sparkles.
+ * Taken from the ever-relevant Valve 2015 GDC VR Rendering talk.
+ * 
+ * @param normal Worldspace normal
+ * @return Smoothness value to reduce sparkling, calculate the final smoothness by min'ing with the real smoothness value
+ */
+half SLZGeometricSpecularAA(half3 normal)
+{
+    half3 normalDdx = ddx(normal);
+    half3 normalDdy = ddy(normal);
+    half AARoughness = saturate(max(dot(normalDdx, normalDdx), dot(normalDdy, normalDdy)));
+    AARoughness = sqrt(AARoughness); // Valve used pow of 0.3333, I find that is a little too strong. Also sqrt should be cheaper
+    return 1.0h - AARoughness;
+}
 
 //------------------------------------------------------------------------
 //------------------------------------------------------------------------
@@ -496,8 +511,9 @@ void SLZSHDiffuse(inout real3 diffuse, half3 normal)
 real3 SLZSHSpecularDirection()
 {
     real3 direction = (unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz);
-    float length = max(float(dot(direction, direction)), REAL_MIN);
-    direction = direction * rsqrt(length);
+    float lengthSq = max(float(dot(direction, direction)), REAL_MIN);
+    float invLength = rsqrt(lengthSq);
+    direction = direction * invLength;
     return direction;
 }
 
@@ -577,8 +593,7 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
         real3 dominantDir = isMainLight ? mainLight.direction : shL1Dir;
         real3 dominantColor = isMainLight ? diffuseBRDF : max(real(0.0), diffuse);
         SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData.normal, fragData.viewDir, fragData.NoV, dominantDir);
-        real NoLMul =  1.0 - specInfo.NoL;
-        NoLMul = -NoLMul * NoLMul + 1.0;
+        real NoLMul = SLZFakeSpecularFalloff(specInfo.NoL);
         NoLMul = isMainLight ? 1.0 : NoLMul;
         specular += dominantColor * SLZDirectBRDFSpecular(specInfo, surfData) * NoLMul;
     #elif !defined(DIRLIGHTMAP_COMBINED) || defined(SLZ_DISABLE_BAKED_SPEC)
