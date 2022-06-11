@@ -726,7 +726,7 @@ namespace UnityEngine.Rendering.Universal
         public int mainLightShadowmapResolution
         {
             get { return (int)m_MainLightShadowmapResolution; }
-            internal set { m_MainLightShadowmapResolution = (ShadowResolution)value; }
+            set { m_MainLightShadowmapResolution = (ShadowResolution)value; }
         }
 
         public LightRenderingMode additionalLightsRenderingMode
@@ -750,7 +750,7 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowmapResolution
         {
             get { return (int)m_AdditionalLightsShadowmapResolution; }
-            internal set { m_AdditionalLightsShadowmapResolution = (ShadowResolution)value; }
+            set { m_AdditionalLightsShadowmapResolution = (ShadowResolution)value; }
         }
 
         /// <summary>
@@ -759,7 +759,7 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowResolutionTierLow
         {
             get { return (int)m_AdditionalLightsShadowResolutionTierLow; }
-            internal set { additionalLightsShadowResolutionTierLow = value; }
+            set { additionalLightsShadowResolutionTierLow = value; }
         }
 
         /// <summary>
@@ -768,7 +768,7 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowResolutionTierMedium
         {
             get { return (int)m_AdditionalLightsShadowResolutionTierMedium; }
-            internal set { m_AdditionalLightsShadowResolutionTierMedium = value; }
+            set { m_AdditionalLightsShadowResolutionTierMedium = value; }
         }
 
         /// <summary>
@@ -777,7 +777,7 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowResolutionTierHigh
         {
             get { return (int)m_AdditionalLightsShadowResolutionTierHigh; }
-            internal set { additionalLightsShadowResolutionTierHigh = value; }
+            set { additionalLightsShadowResolutionTierHigh = value; }
         }
 
         internal int GetAdditionalLightsShadowResolution(int additionalLightsShadowResolutionTier)
@@ -838,7 +838,7 @@ namespace UnityEngine.Rendering.Universal
         public float cascade2Split
         {
             get { return m_Cascade2Split; }
-            internal set { m_Cascade2Split = value; }
+            set { m_Cascade2Split = value; }
         }
 
         /// <summary>
@@ -848,7 +848,7 @@ namespace UnityEngine.Rendering.Universal
         public Vector2 cascade3Split
         {
             get { return m_Cascade3Split; }
-            internal set { m_Cascade3Split = value; }
+            set { m_Cascade3Split = value; }
         }
 
         /// <summary>
@@ -858,7 +858,7 @@ namespace UnityEngine.Rendering.Universal
         public Vector3 cascade4Split
         {
             get { return m_Cascade4Split; }
-            internal set { m_Cascade4Split = value; }
+            set { m_Cascade4Split = value; }
         }
 
         /// <summary>
