@@ -12,6 +12,8 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Misc.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/BRDF_part1.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/GlobalIllumination.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
+
 
 #if !defined(UNITY_COMMON_INCLUDED) //Get my IDE to recognize real, this won't ever get compiled since I just included Common.hlsl 
     #define real half
@@ -326,7 +328,8 @@ real3 SLZSchlickFresnel(real LoH, real3 specColor)
  * @param roughness Surface roughness (not perceptual)
  * @return Specular highlight intensity
  */
-real SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughness)
+
+realor4 SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughness)
 {
     // GGX Distribution multiplied by combined approximation of Visibility and Fresnel
     // BRDFspec = (D * V * F) / 4.0
@@ -339,7 +342,11 @@ real SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughness)
    
     real NDF = SLZGGXSpecularDMobile(NoH, NxH2, roughness);
     real VF  = SLZFusedVFMobile(LoH, roughness);
-    real specularTerm = NDF * VF;
+    realor4 specularTerm = (NDF * VF);
+
+    #if defined(_BRDFMAP)
+    specularTerm +=  SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(specularTerm.r ,NoH) ,0 )  ;
+    #endif
     
     #if defined(SHADER_API_MOBILE)
         // On platforms where half actually means something, the denominator has a risk of overflow
@@ -348,7 +355,7 @@ real SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughness)
         specularTerm = specularTerm - HALF_MIN;
         specularTerm = clamp(specularTerm, 0.0, 100.0); // Prevent FP16 overflow on mobiles
     #endif    
-    return specularTerm;
+    return max(specularTerm,0);
 }
 
 /**
