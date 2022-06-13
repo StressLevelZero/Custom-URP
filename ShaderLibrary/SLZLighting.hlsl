@@ -329,7 +329,7 @@ real3 SLZSchlickFresnel(real LoH, real3 specColor)
  * @return Specular highlight intensity
  */
 
-realor4 SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughness)
+real SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughness)
 {
     // GGX Distribution multiplied by combined approximation of Visibility and Fresnel
     // BRDFspec = (D * V * F) / 4.0
@@ -342,11 +342,8 @@ realor4 SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughnes
    
     real NDF = SLZGGXSpecularDMobile(NoH, NxH2, roughness);
     real VF  = SLZFusedVFMobile(LoH, roughness);
-    realor4 specularTerm = (NDF * VF);
+    real specularTerm = (NDF * VF);
 
-    #if defined(_BRDFMAP)
-    specularTerm +=  SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(specularTerm.r ,NoH) ,0 )  ;
-    #endif
     
     #if defined(SHADER_API_MOBILE)
         // On platforms where half actually means something, the denominator has a risk of overflow
@@ -354,19 +351,22 @@ realor4 SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughnes
         // sees that specularTerm have only non-negative terms, so it skips max(0,..) in clamp (leaving only min(100,...))
         specularTerm = specularTerm - HALF_MIN;
         specularTerm = clamp(specularTerm, 0.0, 100.0); // Prevent FP16 overflow on mobiles
+    #else
+        specularTerm = max(0, specularTerm)
     #endif    
-    return max(specularTerm,0);
+
+    return specularTerm;
 }
 
 /**
- * High quality specular BDRF, for use on PC. Not currently used
+ * High quality specular BDRF, for use on PC. Uses the same GGX N, D, and F as google filament
  */
 real3 SLZDirectBRDFSpecularHighQ(real NoH, real NoV, real NoL, real LoH, real roughness, real3 specColor)
 {
-    real NDF = SLZGGXSpecularD(NoH, roughness);
-    real GS  = SLZSmithVisibility(NoV, NoL, roughness);
+    real N = SLZGGXSpecularD(NoH, roughness);
+    real D  = SLZSmithVisibility(NoV, NoL, roughness);
     real3 F   = SLZSchlickFresnel(LoH, specColor);
-    return NDF* GS * F;
+    return N * D * F;
 }
 
 /**
@@ -378,11 +378,19 @@ real3 SLZDirectBRDFSpecularHighQ(real NoH, real NoV, real NoL, real LoH, real ro
  */
 real3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfData)
 {
+    real3 specular;
+
     #if defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF)
-        return surfData.specular * SLZDirectBRDFSpecularMobile(specInfo.NoH, specInfo.LoH, specInfo.NxH2, surfData.roughness);
+        specular = surfData.specular * SLZDirectBRDFSpecularMobile(specInfo.NoH, specInfo.LoH, specInfo.NxH2, surfData.roughness);
     #else
-        return SLZDirectBRDFSpecularHighQ(specInfo.NoH, specInfo.NoV, specInfo.NoL, specInfo.LoH, surfData.roughness, surfData.specular);
+        specular = SLZDirectBRDFSpecularHighQ(specInfo.NoH, specInfo.NoV, specInfo.NoL, specInfo.LoH, surfData.roughness, surfData.specular);
     #endif
+    #if defined(_BRDFMAP)
+        real3 bdrfTerm = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(specular.r, specInfo.NoH), 0).rgb;
+        specular += bdrfTerm;
+    #endif
+
+    return specular;
 }
 
 
