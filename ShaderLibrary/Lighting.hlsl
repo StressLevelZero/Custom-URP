@@ -51,18 +51,21 @@ half4 LightingSpecular(half4 lightColor, half3 lightDir, half3 normal, half3 vie
 }
 
 half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
-    half4 lightColor, half3 lightDirectionWS, half lightAttenuation,
-    half3 normalWS, half3 viewDirectionWS,
+    Light light, half3 normalWS, half3 viewDirectionWS,
     half clearCoatMask, bool specularHighlightsOff)
 {
+
+    half4 lightColor = light.color;
+    half3 lightDirectionWS = light.direction;
+    
     #if defined(_BRDFMAP)
-    half NormNdotL = ((dot(normalWS, lightDirectionWS))+1) * 0.5 ;
+    half NormNdotL = saturate(((dot(normalWS, lightDirectionWS))+1) * 0.5) ;
     float flNDotV = saturate(dot(normalWS,viewDirectionWS));
-    half4 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(min(NormNdotL,log(lightAttenuation)/2.7182818*1+1),flNDotV) ,0 );//*(lightAttenuation+.5),
-    half4 radiance = lightColor * ( BRDFMap);
+    half4 BRDFMap = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(min(NormNdotL,light.shadowAttenuation),flNDotV) ,0 );//*(lightAttenuation+.5),
+    half4 radiance = lightColor * BRDFMap * light.distanceAttenuation;
     #else
     half NdotL = saturate(dot(normalWS, lightDirectionWS));
-    half4 radiance = lightColor * (lightAttenuation * NdotL);
+    half4 radiance = lightColor * light.shadowAttenuation * light.distanceAttenuation * NdotL;
     #endif
     //diffuse, albdeo, and brdf are not interchangeable terms. Yet albedo is stored in the diffuse of brdfData and labeled here simply as brdf. Likely because it's being combined, but Confusing AF. 
     half3 brdf = brdfData.diffuse; 
@@ -96,14 +99,15 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     
 }
 
-half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat, Light light, half3 normalWS, half3 viewDirectionWS, half clearCoatMask, bool specularHighlightsOff)
-{
-    return LightingPhysicallyBased(brdfData,
-        brdfDataClearCoat, light.color,
-        light.direction,
-        light.distanceAttenuation * light.shadowAttenuation,
-        normalWS, viewDirectionWS, clearCoatMask, specularHighlightsOff);
-}
+//This is insane. Why combine the attenuation with shadows here and send it to another function? Just do it in the function and stop conflating things!
+// half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat, Light light, half3 normalWS, half3 viewDirectionWS, half clearCoatMask, bool specularHighlightsOff)
+// {
+//     return LightingPhysicallyBased(brdfData,
+//         brdfDataClearCoat, light.color,
+//         light.direction,
+//         light.distanceAttenuation * light.shadowAttenuation, //UGH WHY
+//         normalWS, viewDirectionWS, clearCoatMask, specularHighlightsOff);
+// }
 
 // Backwards compatibility
 half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, half3 viewDirectionWS)
