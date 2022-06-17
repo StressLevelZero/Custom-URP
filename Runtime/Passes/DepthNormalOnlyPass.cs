@@ -51,7 +51,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             this.depthHandle = depthHandle;
 
             m_RendererMSAASamples = baseDescriptor.msaaSamples;
-
+            //baseDescriptor.useMipMap = true;
+            //baseDescriptor.mipCount = 3;
             baseDescriptor.colorFormat = RenderTextureFormat.Depth;
             baseDescriptor.depthBufferBits = k_DepthBufferBits;
 

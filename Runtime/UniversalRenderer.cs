@@ -61,6 +61,7 @@ namespace UnityEngine.Rendering.Universal
         DepthOnlyPass m_DepthPrepass;
         DepthNormalOnlyPass m_DepthNormalPrepass;
         CopyDepthPass m_PrimedDepthCopyPass;
+        CopyDepthToHiZPass m_CopyDepthToHiZPass;
         MotionVectorRenderPass m_MotionVectorPass;
         MainLightShadowCasterPass m_MainLightShadowCasterPass;
         AdditionalLightsShadowCasterPass m_AdditionalLightsShadowCasterPass;
@@ -95,6 +96,7 @@ namespace UnityEngine.Rendering.Universal
         RenderTargetHandle m_CameraDepthAttachment;
         RenderTargetHandle m_DepthTexture;
         RenderTargetHandle m_NormalsTexture;
+        RenderTargetHandle m_DepthHiZTexture;
         RenderTargetHandle m_OpaqueColor;
         // For tiled-deferred shading.
         RenderTargetHandle m_DepthInfoTexture;
@@ -112,6 +114,7 @@ namespace UnityEngine.Rendering.Universal
         // Materials used in URP Scriptable Render Passes
         Material m_BlitMaterial = null;
         Material m_CopyDepthMaterial = null;
+        Material m_CopyDepthToColorMat = null;
         Material m_SamplingMaterial = null;
         Material m_TileDepthInfoMaterial = null;
         Material m_TileDeferredMaterial = null;
@@ -137,6 +140,7 @@ namespace UnityEngine.Rendering.Universal
 
             m_BlitMaterial = CoreUtils.CreateEngineMaterial(data.shaders.blitPS);
             m_CopyDepthMaterial = CoreUtils.CreateEngineMaterial(data.shaders.copyDepthPS);
+            m_CopyDepthToColorMat = CoreUtils.CreateEngineMaterial(data.shaders.copyDepthToColorPS);
             m_SamplingMaterial = CoreUtils.CreateEngineMaterial(data.shaders.samplingPS);
             //m_TileDepthInfoMaterial = CoreUtils.CreateEngineMaterial(data.shaders.tileDepthInfoPS);
             //m_TileDeferredMaterial = CoreUtils.CreateEngineMaterial(data.shaders.tileDeferredPS);
@@ -202,6 +206,8 @@ namespace UnityEngine.Rendering.Universal
             if (this.renderingMode == RenderingMode.Forward)
             {
                 m_PrimedDepthCopyPass = new CopyDepthPass(RenderPassEvent.AfterRenderingPrePasses, m_CopyDepthMaterial);
+                m_CopyDepthToHiZPass = new CopyDepthToHiZPass(RenderPassEvent.AfterRenderingPrePasses + 10, m_CopyDepthToColorMat);
+                m_CopyDepthToHiZPass.m_HiZMipCompute = data.shaders.computeMipMin;
             }
 
             if (this.renderingMode == RenderingMode.Deferred)
@@ -270,6 +276,7 @@ namespace UnityEngine.Rendering.Universal
             m_CameraDepthAttachment.Init("_CameraDepthAttachment");
             m_DepthTexture.Init("_CameraDepthTexture");
             m_NormalsTexture.Init("_CameraNormalsTexture");
+            m_DepthHiZTexture.Init("_CameraHiZDepthTexture");
             m_OpaqueColor.Init("_CameraOpaqueTexture");
             m_DepthInfoTexture.Init("_DepthInfoTexture");
             m_TileDepthInfoTexture.Init("_TileDepthInfoTexture");
@@ -613,6 +620,8 @@ namespace UnityEngine.Rendering.Universal
             if (additionalLightShadows)
                 EnqueuePass(m_AdditionalLightsShadowCasterPass);
 
+            int msaaSamplesTemp = cameraTargetDescriptor.msaaSamples;
+
             if (requiresDepthPrepass)
             {
                 if (renderPassInputs.requiresNormalsTexture)
@@ -662,6 +671,12 @@ namespace UnityEngine.Rendering.Universal
                 m_PrimedDepthCopyPass.AllocateRT = false;
 
                 EnqueuePass(m_PrimedDepthCopyPass);
+            }
+
+            if (requiresDepthPrepass)
+            {
+                m_CopyDepthToHiZPass.Setup(m_DepthTexture, m_DepthHiZTexture);
+                EnqueuePass(m_CopyDepthToHiZPass);
             }
 
             if (generateColorGradingLUT)
@@ -727,6 +742,7 @@ namespace UnityEngine.Rendering.Universal
             if (cameraData.renderType == CameraRenderType.Base && !requiresDepthPrepass && !requiresDepthCopyPass)
             {
                 Shader.SetGlobalTexture(m_DepthTexture.id, SystemInfo.usesReversedZBuffer ? Texture2D.blackTexture : Texture2D.whiteTexture);
+                Shader.SetGlobalTexture(m_DepthHiZTexture.id, SystemInfo.usesReversedZBuffer ? Texture2D.blackTexture : Texture2D.whiteTexture);
             }
 
             if (copyColorPass)

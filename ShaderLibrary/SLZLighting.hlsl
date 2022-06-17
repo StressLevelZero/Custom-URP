@@ -352,7 +352,7 @@ real SLZDirectBRDFSpecularMobile(real NoH, real LoH, real NxH2, real roughness)
         specularTerm = specularTerm - HALF_MIN;
         specularTerm = clamp(specularTerm, 0.0, 100.0); // Prevent FP16 overflow on mobiles
     #else
-        specularTerm = max(0, specularTerm)
+        specularTerm = max(0, specularTerm);
     #endif    
 
     return specularTerm;

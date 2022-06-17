@@ -1,0 +1,148 @@
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel MipMin KERNEL_SIZE=8 
+#pragma kernel MipMin2 KERNEL_SIZE=8
+#pragma kernel MipMinOdd KERNEL_SIZE=8
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+
+#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+    RWTexture2DArray<float> _MipSource;
+    RWTexture2DArray<float> _MipDest;
+    RWTexture2DArray<float> _MipDest2;
+    #define COORD_DEPTH(uv) (uv).xyz
+#else
+    RWTexture2D<float> _MipSource;
+    RWTexture2D<float> _MipDest;
+    RWTexture2D<float> _MipDest2;
+    #define COORD_DEPTH(uv) (uv).xy
+#endif
+
+//CBUFFER_START(cb)
+int4 data1; //current mip width, current mip height, lower mip width, lower mip height 
+int4 data2; // number of mips to process at once, is U odd, is V odd, are both odd 
+//CBUFFER_END
+
+#if UNITY_REVERSED_Z
+    #define MIN_DEPTH(l, r) max(l, r)
+    #define INIT_DEPTH 0u
+    #define INTERLOCKED_MIN(a, b) InterlockedMax(a, b)
+#else
+    #define MIN_DEPTH(l, r) min(l, r)
+    #define INIT_DEPTH 4294967295u
+    #define INTERLOCKED_MIN(a, b) InterlockedMin(a, b)
+#endif
+
+[numthreads(KERNEL_SIZE, KERNEL_SIZE,1)]
+void MipMin(uint3 id : SV_DispatchThreadID)
+{
+    //if (id.x < data1.x && id.y < data1.y)
+    //{
+        uint2 srcPixelUV = id.xy << 1;
+        uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
+        float p00 = _MipSource[COORD_DEPTH(uv00)];
+        uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
+        float p10 = _MipSource[COORD_DEPTH(uv10)];
+        uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
+        float p01 = _MipSource[COORD_DEPTH(uv01)];
+        uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
+        float p11 = _MipSource[COORD_DEPTH(uv11)];
+        _MipDest[COORD_DEPTH(id)] = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
+    //}
+}
+
+
+groupshared uint minLevel1[4][4];
+[numthreads(KERNEL_SIZE, KERNEL_SIZE, 1)]
+void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, uint groupIndex : SV_GroupIndex)
+{
+    //uint2 id2D = id.xy + uint2((groupID.z & 1u) ? 4u : 0u, groupID.z > 1 ? 4u : 0u);
+
+    if (groupID.x < 4 && groupID.y < 4)
+    {
+        minLevel1[groupID.x][groupID.y] = INIT_DEPTH;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    //if (id.x < data1.x && id.y < data1.y)
+    //{
+    uint2 srcPixelUV = id.xy << 1;
+    uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
+    float p00 = _MipSource[COORD_DEPTH(uv00)];
+    uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
+    float p10 = _MipSource[COORD_DEPTH(uv10)];
+    uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
+    float p01 = _MipSource[COORD_DEPTH(uv01)];
+    uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
+    float p11 = _MipSource[COORD_DEPTH(uv11)];
+    float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
+    _MipDest[COORD_DEPTH(id)] = minLevel0;
+    
+    uint2 miniGroupId = uint2(0u,0u);
+
+    [branch] if (data2.x > 1)
+    {
+        uint minLevel0U = asuint(minLevel0);
+        miniGroupId = groupID.xy >> 1;
+        INTERLOCKED_MIN(minLevel1[miniGroupId.x][miniGroupId.y], minLevel0U);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    [branch] if (data2.x > 1)
+    {
+        uint3 uv2 = uint3(id.xy >> 1u, id.z);
+        [branch] if (((groupID.x & 1u) == 0u) && ((groupID.y & 1u) == 0u))
+        {
+            _MipDest2[COORD_DEPTH(uv2)] = asfloat(minLevel1[miniGroupId.x][miniGroupId.y]);
+        }
+    }
+    
+}
+
+
+[numthreads(KERNEL_SIZE, KERNEL_SIZE, 1)]
+void MipMinOdd(uint3 id : SV_DispatchThreadID)
+{
+    //if (id.x < data1.x && id.y < data1.y)
+    uint2 srcPixelUV = id.xy << 1;
+    uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
+    float p00 = _MipSource[COORD_DEPTH(uv00)];
+    uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
+    float p10 = _MipSource[COORD_DEPTH(uv10)];
+    uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
+    float p01 = _MipSource[COORD_DEPTH(uv01)];
+    uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
+    float p11 = _MipSource[COORD_DEPTH(uv11)];
+    float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
+    
+    if (data2.x)
+    {
+        uint3 uv20 = uint3(min(srcPixelUV + uint2(2u, 0u), data1.zw), id.z);
+        float p20 = _MipSource[COORD_DEPTH(uv20)];
+        uint3 uv21 = uint3(min(srcPixelUV + uint2(2u, 1u), data1.zw), id.z);
+        float p21 = _MipSource[COORD_DEPTH(uv21)];
+        minLevel0 = MIN_DEPTH(MIN_DEPTH(p20, p21), minLevel0);
+    }
+
+    if (data2.y)
+    {
+        uint3 uv02 = uint3(min(srcPixelUV + uint2(0u, 2u), data1.zw), id.z);
+        float p02 = _MipSource[COORD_DEPTH(uv02)];
+        uint3 uv12 = uint3(min(srcPixelUV + uint2(1u, 2u), data1.zw), id.z);
+        float p12 = _MipSource[COORD_DEPTH(uv12)];
+        minLevel0 = MIN_DEPTH(MIN_DEPTH(p02, p12), minLevel0);
+    }
+
+    if (data2.z)
+    {
+        uint3 uv22 = uint3(min(srcPixelUV + uint2(2u, 2u), data1.zw), id.z);
+        float p22 = _MipSource[COORD_DEPTH(uv22)];
+        minLevel0 = MIN_DEPTH(p22, minLevel0);
+    }
+
+    _MipDest[COORD_DEPTH(id)] = minLevel0;
+    //}
+}

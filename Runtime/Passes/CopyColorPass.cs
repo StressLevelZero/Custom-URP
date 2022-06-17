@@ -61,8 +61,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                 descriptor.width /= 4;
                 descriptor.height /= 4;
             }
-
+            descriptor.autoGenerateMips = true;
+            descriptor.useMipMap = true;
             cmd.GetTemporaryRT(destination.id, descriptor, m_DownsamplingMethod == Downsampling.None ? FilterMode.Point : FilterMode.Bilinear);
+            //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Bilinear,);
         }
 
         /// <inheritdoc/>
@@ -107,7 +109,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                         break;
                 }
             }
-
+            
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }
