@@ -385,9 +385,11 @@ real3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfDat
     #else
         specular = SLZDirectBRDFSpecularHighQ(specInfo.NoH, specInfo.NoV, specInfo.NoL, specInfo.LoH, surfData.roughness, surfData.specular);
     #endif
+    #if defined(ANIME)
     #if defined(_BRDFMAP)
         real3 bdrfTerm = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(specular.r, specInfo.NoH), 0).rgb;
         specular += bdrfTerm;
+    #endif
     #endif
 
     return specular;

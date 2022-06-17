@@ -1,10 +1,9 @@
-#include <UnityShaderUtilities.cginc>
 #ifndef UNIVERSAL_SHADOW_CASTER_PASS_INCLUDED
 #define UNIVERSAL_SHADOW_CASTER_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
+//#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
 // Shadow Casting Light geometric parameters. These variables are used when applying the shadow Normal Bias and are set by UnityEngine.Rendering.Universal.ShadowUtils.SetupShadowCasterConstantBuffer in com.unity.render-pipelines.universal/Runtime/ShadowUtils.cs
 // For Directional lights, _LightDirection is used when applying shadow Normal Bias.
@@ -38,9 +37,9 @@ float4 GetShadowPositionHClip(Attributes input)
     float3 lightDirectionWS = _LightDirection;
 #endif
     float2 vShadowOffsets = GetShadowOffsets( normalWS, lightDirectionWS );
-    //positionWS.xyz -= vShadowOffsets.x * normalWS.xyz / 100;
-    positionWS.xyz += vShadowOffsets.y * lightDirectionWS.xyz / 1000;    
-    float4 positionCS = UnityObjectToClipPos( float4( mul( unity_WorldToObject, float4( positionWS.xyz, 1.0 ) ).xyz, 1.0 ) );
+    //positionWS.xyz -= vShadowOffsets.x * normalWS.xyz * .01;
+    positionWS.xyz += vShadowOffsets.y * lightDirectionWS.xyz * .001;    
+    float4 positionCS = TransformObjectToHClip( float4( mul( unity_WorldToObject, float4( positionWS.xyz, 1.0 ) ).xyz, 1.0 ) );
     //float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
 
 #if UNITY_REVERSED_Z
