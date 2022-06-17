@@ -219,7 +219,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 }
             } while (i < highestMip);
 
-            Debug.Log("Last Mip: " + i);
+            //Debug.Log("Last Mip: " + i);
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }
