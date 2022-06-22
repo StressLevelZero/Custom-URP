@@ -672,13 +672,13 @@ namespace UnityEngine.Rendering.Universal
 
                 EnqueuePass(m_PrimedDepthCopyPass);
             }
-
+            
             if (requiresDepthPrepass)
             {
                 m_CopyDepthToHiZPass.Setup(m_DepthTexture, m_DepthHiZTexture);
                 EnqueuePass(m_CopyDepthToHiZPass);
             }
-
+            
             if (generateColorGradingLUT)
             {
                 colorGradingLutPass.Setup(colorGradingLut);
@@ -750,7 +750,8 @@ namespace UnityEngine.Rendering.Universal
                 // TODO: Downsampling method should be store in the renderer instead of in the asset.
                 // We need to migrate this data to renderer. For now, we query the method in the active asset.
                 Downsampling downsamplingMethod = UniversalRenderPipeline.asset.opaqueDownsampling;
-                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod);
+                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod, true);
+                
                 EnqueuePass(m_CopyColorPass);
             }
 

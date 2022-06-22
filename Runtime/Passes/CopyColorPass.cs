@@ -15,7 +15,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         Material m_SamplingMaterial;
         Downsampling m_DownsamplingMethod;
         Material m_CopyColorMaterial;
-
+        public bool m_RequiresMips;
         private RenderTargetIdentifier source { get; set; }
         private RenderTargetHandle destination { get; set; }
 
@@ -39,11 +39,12 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// </summary>
         /// <param name="source">Source Render Target</param>
         /// <param name="destination">Destination Render Target</param>
-        public void Setup(RenderTargetIdentifier source, RenderTargetHandle destination, Downsampling downsampling)
+        public void Setup(RenderTargetIdentifier source, RenderTargetHandle destination, Downsampling downsampling, bool RequiresMips)
         {
             this.source = source;
             this.destination = destination;
             m_DownsamplingMethod = downsampling;
+            m_RequiresMips = RequiresMips;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
@@ -61,8 +62,8 @@ namespace UnityEngine.Rendering.Universal.Internal
                 descriptor.width /= 4;
                 descriptor.height /= 4;
             }
-            descriptor.autoGenerateMips = true;
-            descriptor.useMipMap = true;
+            descriptor.autoGenerateMips = m_RequiresMips;
+            descriptor.useMipMap = m_RequiresMips;
             cmd.GetTemporaryRT(destination.id, descriptor, m_DownsamplingMethod == Downsampling.None ? FilterMode.Point : FilterMode.Bilinear);
             //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Bilinear,);
         }

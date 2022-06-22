@@ -19,13 +19,16 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static int computeMipSourceID = Shader.PropertyToID("_MipSource");
         private static int computeMipDestID = Shader.PropertyToID("_MipDest");
         private static int computeMipDest2ID = Shader.PropertyToID("_MipDest2");
+        
         private RenderTargetHandle source { get; set; }
         private RenderTargetHandle destination { get; set; }
         internal bool AllocateRT { get; set; }
         internal int MssaSamples { get; set; }
         private int mipLevels;
+        private bool isArray;
         Material m_CopyDepthToColorMaterial;
         public ComputeShader m_HiZMipCompute;
+        private LocalKeyword m_StereoArrayKW;
         public CopyDepthToHiZPass(RenderPassEvent evt, Material copyDepthToColorMaterial)
         {
             base.profilingSampler = new ProfilingSampler(nameof(CopyDepthPass));
@@ -63,6 +66,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                     Mathf.Log(descriptor.height, 2)
                     )
                 ) + 1;
+            isArray = descriptor.dimension == TextureDimension.Tex2DArray;
             if (this.AllocateRT)
                 cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
 
@@ -80,7 +84,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 return;
             }
             CommandBuffer cmd = CommandBufferPool.Get();
-            using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.CopyDepth)))
+            using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.HiZPrepass)))
             {
                 int cameraSamples = 0;
                 if (MssaSamples == -1)
@@ -170,85 +174,105 @@ namespace UnityEngine.Rendering.Universal.Internal
 
                     cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, m_CopyDepthToColorMaterial);
                 }
-            }
-            int width = renderingData.cameraData.cameraTargetDescriptor.width;
-            int height = renderingData.cameraData.cameraTargetDescriptor.height;
-            int[] widthHeight = new int[4];
-            int[] data2 = new int[4];
-            widthHeight[0] = width;
-            widthHeight[1] = height;
-            int highestMip = mipLevels - 1;
-            int i = 0;
-            do
-            {
-               
-                widthHeight[2] = width >> (i);
-                widthHeight[3] = height >> (i);
 
-                widthHeight[0] = width >> (i+1);
-                widthHeight[0] = widthHeight[0] == 0 ? 1 : widthHeight[0];
+                int width = renderingData.cameraData.cameraTargetDescriptor.width;
+                int height = renderingData.cameraData.cameraTargetDescriptor.height;
+                int[] widthHeight = new int[4];
+                int[] data2 = new int[4];
+                widthHeight[0] = width;
+                widthHeight[1] = height;
+                int highestMip = mipLevels - 1;
+                int i = 0;
+                int slices = 1;
+#if ENABLE_VR && ENABLE_XR_MODULE
 
-                widthHeight[1] = height >> (i+1);
-                widthHeight[1] = widthHeight[1] == 0 ? 1 : widthHeight[1];
-
-                int UOdd = (widthHeight[2] & 1) != 0 ? 1 : 0;
-                int VOdd = (widthHeight[3] & 1) != 0 ? 1 : 0;
-
-                int UOdd2 = (widthHeight[0] & 1) != 0 ? 1 : 0;
-                int VOdd2 = (widthHeight[1] & 1) != 0 ? 1 : 0;
-
-                if (UOdd == 1 || VOdd == 1)
+                if (m_StereoArrayKW == null)
                 {
-                    data2[1] = UOdd;
-                    data2[2] = VOdd;
-                    data2[3] = UOdd & VOdd;
-                    DispatchOdd(ref cmd, widthHeight, data2, i);
-                    i++;
+                    m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
                 }
-                else if (UOdd2 == 1 || VOdd2 == 1)
+
+                if (renderingData.cameraData.xr.enabled)
                 {
-                    DispatchEvenSingle(ref cmd, widthHeight, data2, i);
-                    i++;
+                    //m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
+                    cmd.EnableKeyword(m_HiZMipCompute, m_StereoArrayKW);
+                    slices = 2;
                 }
                 else
                 {
-                    int processLevels = Mathf.Min(mipLevels - i, 2);
-                    data2[0] = processLevels;
-                    DispatchEvenMultiLevel(ref cmd, widthHeight, data2, i);
-                    i += 2;
+                    //m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
+                    cmd.DisableKeyword(m_HiZMipCompute, m_StereoArrayKW);
                 }
-            } while (i < highestMip);
+#endif
+                do
+                {
 
+                    widthHeight[2] = width >> (i);
+                    widthHeight[3] = height >> (i);
+
+                    widthHeight[0] = width >> (i + 1);
+                    widthHeight[0] = widthHeight[0] == 0 ? 1 : widthHeight[0];
+
+                    widthHeight[1] = height >> (i + 1);
+                    widthHeight[1] = widthHeight[1] == 0 ? 1 : widthHeight[1];
+
+                    int UOdd = (widthHeight[2] & 1) != 0 ? 1 : 0;
+                    int VOdd = (widthHeight[3] & 1) != 0 ? 1 : 0;
+
+                    int UOdd2 = (widthHeight[0] & 1) != 0 ? 1 : 0;
+                    int VOdd2 = (widthHeight[1] & 1) != 0 ? 1 : 0;
+
+                    if (UOdd == 1 || VOdd == 1)
+                    {
+                        data2[1] = UOdd;
+                        data2[2] = VOdd;
+                        data2[3] = UOdd & VOdd;
+                        DispatchOdd(ref cmd, widthHeight, data2, i, slices);
+                        i++;
+                    }
+                    else if (UOdd2 == 1 || VOdd2 == 1)
+                    {
+                        DispatchEvenSingle(ref cmd, widthHeight, data2, i, slices);
+                        i++;
+                    }
+                    else
+                    {
+                        int processLevels = Mathf.Min(mipLevels - i, 2);
+                        data2[0] = processLevels;
+                        DispatchEvenMultiLevel(ref cmd, widthHeight, data2, i, slices);
+                        i += 2;
+                    }
+                } while (i < highestMip);
+            }
             //Debug.Log("Last Mip: " + i);
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }
 
-        void DispatchEvenSingle(ref CommandBuffer cmd, int[] widthHeight, int[] data2, int currMipLevel)
+        void DispatchEvenSingle(ref CommandBuffer cmd, int[] widthHeight, int[] data2, int currMipLevel, int slices)
         {
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParamID, widthHeight);
             //cmd.SetComputeIntParams(m_HiZMipCompute, computeParam2ID, data2);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 0, computeMipSourceID, destination.Identifier(), currMipLevel);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 0, computeMipDestID, destination.Identifier(), currMipLevel + 1);
-            cmd.DispatchCompute(m_HiZMipCompute, 0, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), 1);
+            cmd.DispatchCompute(m_HiZMipCompute, 0, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
         }
-        void DispatchEvenMultiLevel(ref CommandBuffer cmd, int[] widthHeight, int[] data2, int currMipLevel)
+        void DispatchEvenMultiLevel(ref CommandBuffer cmd, int[] widthHeight, int[] data2, int currMipLevel, int slices)
         {
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParamID, widthHeight);
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParam2ID, data2);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 1, computeMipSourceID, destination.Identifier(), currMipLevel);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 1, computeMipDestID, destination.Identifier(), currMipLevel + 1);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 1, computeMipDest2ID, destination.Identifier(), data2[0] > 1 ? currMipLevel + 2 : currMipLevel + 1);
-            cmd.DispatchCompute(m_HiZMipCompute, 1, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), 1);
+            cmd.DispatchCompute(m_HiZMipCompute, 1, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
         }
 
-        void DispatchOdd(ref CommandBuffer cmd, int[] widthHeight, int[] data2, int currMipLevel)
+        void DispatchOdd(ref CommandBuffer cmd, int[] widthHeight, int[] data2, int currMipLevel, int slices)
         {
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParamID, widthHeight);
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParam2ID, data2);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 2, computeMipSourceID, destination.Identifier(), currMipLevel);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 2, computeMipDestID, destination.Identifier(), currMipLevel + 1);
-            cmd.DispatchCompute(m_HiZMipCompute, 2, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), 1);
+            cmd.DispatchCompute(m_HiZMipCompute, 2, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
         }
 
         /// <inheritdoc/>

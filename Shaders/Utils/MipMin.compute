@@ -5,14 +5,16 @@
 #pragma kernel MipMin2 KERNEL_SIZE=8
 #pragma kernel MipMinOdd KERNEL_SIZE=8
 
+#pragma multi_compile_local _ STEREO_ARRAY
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 
-#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+#if defined(STEREO_ARRAY)
     RWTexture2DArray<float> _MipSource;
     RWTexture2DArray<float> _MipDest;
     RWTexture2DArray<float> _MipDest2;
     #define COORD_DEPTH(uv) (uv).xyz
+
 #else
     RWTexture2D<float> _MipSource;
     RWTexture2D<float> _MipDest;

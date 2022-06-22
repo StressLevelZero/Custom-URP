@@ -876,7 +876,7 @@ namespace UnityEngine.Rendering.Universal
         CopyDepth,
         DepthNormalPrepass,
         DepthPrepass,
-
+        HiZPrepass,
         // DrawObjectsPass
         DrawOpaqueObjects,
         DrawTransparentObjects,
