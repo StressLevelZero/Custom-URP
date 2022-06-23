@@ -184,8 +184,9 @@ namespace UnityEngine.Rendering.Universal.Internal
                 int highestMip = mipLevels - 1;
                 int i = 0;
                 int slices = 1;
-#if ENABLE_VR && ENABLE_XR_MODULE
 
+#if ENABLE_VR && ENABLE_XR_MODULE
+               
                 if (m_StereoArrayKW == null)
                 {
                     m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
@@ -196,6 +197,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                     //m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
                     cmd.EnableKeyword(m_HiZMipCompute, m_StereoArrayKW);
                     slices = 2;
+                    //Debug.Log("XR Enabled 2");
                 }
                 else
                 {

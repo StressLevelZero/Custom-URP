@@ -349,6 +349,11 @@ namespace UnityEngine.Rendering.Universal
         public static readonly int worldToCameraMatrix = Shader.PropertyToID("unity_WorldToCamera");
         public static readonly int cameraToWorldMatrix = Shader.PropertyToID("unity_CameraToWorld");
 
+        public static readonly int prevViewMatProp = Shader.PropertyToID("SLZ_PreviousView");
+        public static readonly int prevViewMatStereoProp = Shader.PropertyToID("SLZ_PreviousViewStereo");
+        public static readonly int viewToPProjStereoProp = Shader.PropertyToID("SLZ_CurrViewToPrevProjStereo");
+        public static readonly int viewToPProjProp = Shader.PropertyToID("SLZ_CurrViewToPrevProj");
+
         public static readonly int cameraWorldClipPlanes = Shader.PropertyToID("unity_CameraWorldClipPlanes");
 
         public static readonly int billboardNormal = Shader.PropertyToID("unity_BillboardNormal");

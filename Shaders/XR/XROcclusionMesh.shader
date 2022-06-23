@@ -51,7 +51,7 @@ Shader "Hidden/Universal Render Pipeline/XR/XROcclusionMesh"
         Pass
         {
             ZWrite On ZTest Always Blend Off Cull Off
-            ColorMask 0
+            ColorMask RGBA // Switched from 0 so that the camera clear color doesn't show up on the occlusion mesh
 
             HLSLPROGRAM
                 #pragma vertex Vert

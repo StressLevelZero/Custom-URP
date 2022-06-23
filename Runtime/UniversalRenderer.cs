@@ -381,8 +381,12 @@ namespace UnityEngine.Rendering.Universal
 
             DebugHandler?.Setup(context, ref cameraData);
 
+
+
             if (cameraData.cameraType != CameraType.Game)
                 useRenderPassEnabled = false;
+
+            PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
 
             // Special path for depth only offscreen cameras. Only write opaques + transparents.
             bool isOffscreenDepthTexture = cameraData.targetTexture != null && cameraData.targetTexture.format == RenderTextureFormat.Depth;

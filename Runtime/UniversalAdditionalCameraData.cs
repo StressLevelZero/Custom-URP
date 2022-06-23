@@ -269,6 +269,7 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] bool m_AllowXRRendering = true;
 
         [NonSerialized] Camera m_Camera;
+
         // Deprecated:
         [FormerlySerializedAs("requiresDepthTexture"), SerializeField]
         bool m_RequiresDepthTexture = false;
@@ -291,6 +292,8 @@ namespace UnityEngine.Rendering.Universal
                 return s_DefaultAdditionalCameraData;
             }
         }
+
+        
 
 #if UNITY_EDITOR
         internal new Camera camera
