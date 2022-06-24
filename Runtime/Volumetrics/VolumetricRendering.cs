@@ -260,24 +260,17 @@ public class VolumetricRendering : MonoBehaviour
     private void Awake()
     {
 #if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            enableEditorPreview = false;
+            Shader.DisableKeyword("_ENABLE_VOLUMETRICS");
+        }
         if (Application.isPlaying || activeCam == null)
         {
             activeCam = cam;
         }
-        if (enableEditorPreview || Application.isPlaying)
-        {
-            Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
-        }
-        else
-        {
-            Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
-        }
-        Debug.Log("Awake On Volumetrics Called");
-
-    #else
+#else
         activeCam = cam;
-
-        Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //Enable volumetrics. Double check to see if works in build
         if (activeCam.usePhysicalProperties == true) Debug.LogError("Physical camera is not properlly supportted by Unity and WILL mess up XR calulations like voulmetrics and LoDs");
         //  cam = GetComponent<Camera>();
 #endif
@@ -363,10 +356,16 @@ public class VolumetricRendering : MonoBehaviour
         {
             activeCam = cam;
         }
+        if (!Application.isPlaying && !enableEditorPreview)
+        {
+            Debug.Log("Intialize disabled volumetrics");
+            disable();
+            return;
+        }
 #else
     activeCam = cam;
 #endif
-
+        Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
         CheckOverrideVolumes();
      //   if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
         CheckCookieList();
@@ -919,24 +918,26 @@ public class VolumetricRendering : MonoBehaviour
         #if UNITY_EDITOR
             RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
         #endif
+        Shader.DisableKeyword("_ENABLE_VOLUMETRICS");
         ReleaseAssets();
     }
 
     public void enable()
     {
-        Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+       
         #if UNITY_EDITOR
-            if (enableEditorPreview && !Application.isPlaying)
-            {
-                RenderPipelineManager.beginCameraRendering += UpdatePreRender;
-            }
-        #endif
+        if (enableEditorPreview && !Application.isPlaying)
+        {
+            
+            RenderPipelineManager.beginCameraRendering += UpdatePreRender;
+        }
+#endif
         Intialize();
     }
 
     public void UpdateStateAfterReload()
     {
-        if (enableEditorPreview)
+        if (enableEditorPreview && this.isActiveAndEnabled)
         {
             enable();
         }
@@ -948,7 +949,7 @@ public class VolumetricRendering : MonoBehaviour
 
     private void OnEnable()
     {
-        #if UNITY_EDITOR 
+#if UNITY_EDITOR
         if (!Application.isPlaying)
         {
             // Every time scripts get re-compiled, everything gets reset without calling OnDisable or OnDestroy, and the keyword gets left on 
@@ -960,9 +961,9 @@ public class VolumetricRendering : MonoBehaviour
         {
             enable();
         }
-        #else
+#else
         enable();
-        #endif
+#endif
     }
     private void OnDisable() //Disable this if we decide to just pause rendering instead of removing. 
     {
@@ -1125,6 +1126,7 @@ public class VolumetricRendering : MonoBehaviour
                     c.r = 0;
                     c.g = 0;
                     c.b = 0;
+                    c.a = 1;
                     cols[idx] = c;
                 }
             }

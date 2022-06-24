@@ -1,7 +1,9 @@
 #ifndef SLZ_MISC_FUNC
 #define SLZ_MISC_FUNC
 
+#if !defined(SHADER_API_PSSL) && !defined(UNITY_COMPILER_DXC)
 #pragma warning (disable : 3205)
+#endif
 
 /** 
  * Safe half-precision normalization functions. The inverse square root of a half isn't accuate enough. Using
@@ -374,6 +376,8 @@ float FifteenLayerFresnel()
     return fifteen * layerFresnel;
 }
 
+#if !defined(SHADER_API_PSSL) && !defined(UNITY_COMPILER_DXC)
 #pragma warning (enable : 3205)
+#endif
 
 #endif

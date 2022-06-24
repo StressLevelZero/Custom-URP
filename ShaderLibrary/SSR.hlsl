@@ -182,8 +182,8 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float largeRadius, float 
 	
 	float dynStepSize = clamp(distScale * reflectedRay.z, stepSize, 30*stepSize);
 	*/
-	int minMipLevel = 1;
-	int mipLevel = 1;
+	int minMipLevel = 0;
+	int mipLevel = 0;
 	float stepMultiplier = 2.0f;
 
 	float dynStepSize = perspectiveScaledStep(rayDir.xyz, reflectedRay.xyz, maxIterations, stepSize);
@@ -482,9 +482,9 @@ float4 getSSRColor(SSRData data)
 #else
 		data.GrabTextureSSR.GetDimensions(0, dummy1, dummy2, mipLevels);
 #endif
-		float roughRadius = totalDistance * tan(0.5 * PI * data.perceptualRoughness);
+		float roughRadius = totalDistance * tan(0.4 * PI * data.perceptualRoughness);
 
-		float blur = (float)mipLevels * roughRadius * abs(UNITY_MATRIX_P._m11) / abs(finalPos.z);
+		float blur = (float)mipLevels * min(roughRadius * abs(UNITY_MATRIX_P._m11) / abs(finalPos.z), 0.5);
 		float4 reflection = SAMPLE_TEXTURE2D_X_LOD(data.GrabTextureSSR, data.samplerGrabTextureSSR, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 		//reflection *= _ProjectionParams.z;
 		//reflection.a *= smoothness*reflStr*fade;
@@ -503,6 +503,6 @@ float4 getSSRColor(SSRData data)
 		
 		reflection.a = lerp(0, reflection.a, fade);
 			
-		return float4(reflection.rgb, totalDistance); //sqrt(1 - saturate(uvs.y)));
+		return float4(reflection.rgb, reflection.a); //sqrt(1 - saturate(uvs.y)));
 }
 

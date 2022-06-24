@@ -46,7 +46,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             {
                 motionData = new PreviousFrameData();
                 m_CameraFrameData.Add(camera, motionData);
-                Debug.Log("New Camera");
+                //Debug.Log("New Camera");
             }
 
             // Calculate motion data
