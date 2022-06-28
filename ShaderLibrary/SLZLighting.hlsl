@@ -15,6 +15,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
 
+
 #if !defined(UNITY_COMMON_INCLUDED) //Get my IDE to recognize real, this won't ever get compiled since I just included Common.hlsl 
     #define real half
     #define real2 half2
@@ -539,6 +540,9 @@ real3 SLZSHSpecularDirection()
 void SLZImageBasedSpecular(inout real3 specular, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, half indSSAO)
 {
     real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, 1.0h);
+#if defined(SLZ_SSR)
+
+#endif
     real surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
     real3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
     real fresnelTerm = (1.0h - saturate(fragData.NoV));
@@ -695,6 +699,8 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     LIGHT_LOOP_END
     #endif
     
+
+
     //-------------------------------------------------------------------------------------------------
     // Image-based specular
     //-------------------------------------------------------------------------------------------------

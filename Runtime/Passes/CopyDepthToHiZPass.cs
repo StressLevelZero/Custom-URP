@@ -17,7 +17,6 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static int computeParamID = Shader.PropertyToID("data1");
         private static int computeParam2ID = Shader.PropertyToID("data2");
         private static int computeMipSourceID = Shader.PropertyToID("_MipSource");
-        private static int computeMipSourceSRVID = Shader.PropertyToID("_MipSourceSRV");
         private static int computeMipDestID = Shader.PropertyToID("_MipDest");
         private static int computeMipDest2ID = Shader.PropertyToID("_MipDest2");
         
@@ -28,8 +27,8 @@ namespace UnityEngine.Rendering.Universal.Internal
         private int mipLevels;
         private bool isArray;
         Material m_CopyDepthToColorMaterial;
-        public ComputeShader m_HiZMipCompute;
-        private LocalKeyword m_StereoArrayKW;
+        public static ComputeShader m_HiZMipCompute;
+        private GlobalKeyword m_StereoArrayKW;
         private LocalKeyword m_SRVSourceKW;
         public CopyDepthToHiZPass(RenderPassEvent evt, Material copyDepthToColorMaterial)
         {
@@ -194,24 +193,14 @@ namespace UnityEngine.Rendering.Universal.Internal
                 {
                     m_SRVSourceKW = new LocalKeyword(m_HiZMipCompute, "SRV_SOURCE");
                 }
-                if (m_StereoArrayKW == null)
-                {
-                    m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
-                }
-
+                //if (m_StereoArrayKW == null)
+                //{
+                    //m_StereoArrayKW = new GlobalKeyword("STEREO_INSTANCING_ON");
+                //}
 #if ENABLE_VR && ENABLE_XR_MODULE
-
                 if (renderingData.cameraData.xr.enabled)
                 {
-                    //m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
-                    cmd.EnableKeyword(m_HiZMipCompute, m_StereoArrayKW);
                     slices = 2;
-                    //Debug.Log("XR Enabled 2");
-                }
-                else
-                {
-                    //m_StereoArrayKW = new LocalKeyword(m_HiZMipCompute, "STEREO_ARRAY");
-                    cmd.DisableKeyword(m_HiZMipCompute, m_StereoArrayKW);
                 }
 #else
                 cmd.DisableKeyword(m_HiZMipCompute, m_StereoArrayKW);
@@ -239,47 +228,44 @@ namespace UnityEngine.Rendering.Universal.Internal
                     bool inputSRV = false;
                     if (i == 0)
                     {
-                        //cmd.EnableKeyword(m_HiZMipCompute, m_SRVSourceKW);
+                        cmd.EnableKeyword(m_HiZMipCompute, m_SRVSourceKW);
                         src = source.Identifier();
                         dst = destination.Identifier();
                         inputSRV = true;
-                        DispatchEvenSingle(ref cmd, src, dst, widthHeight, data2, i - 1, slices, true);
-                        //Debug.Log("SRV pass");
-                        i++;
                     }
                     else
                     {
                         if (i == 1)
                         {
-                            // cmd.DisableKeyword(m_HiZMipCompute, m_SRVSourceKW);
+                            cmd.DisableKeyword(m_HiZMipCompute, m_SRVSourceKW);
                         }
                         src = destination.Identifier();
                         dst = destination.Identifier();
                         inputSRV = false;
-
-
-
-                        if (UOdd == 1 || VOdd == 1)
-                        {
-                            data2[1] = UOdd;
-                            data2[2] = VOdd;
-                            data2[3] = UOdd & VOdd;
-                            DispatchOdd(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
-                            i++;
-                        }
-                        else if (UOdd2 == 1 || VOdd2 == 1)
-                        {
-                            DispatchEvenSingle(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
-                            i++;
-                        }
-                        else
-                        {
-                            int processLevels = Mathf.Min(mipLevels - i - 1, 2);
-                            data2[0] = processLevels;
-                            DispatchEvenMultiLevel(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
-                            i += 2;
-                        }
                     }
+
+
+                    if (UOdd == 1 || VOdd == 1)
+                    {
+                        data2[1] = UOdd;
+                        data2[2] = VOdd;
+                        data2[3] = UOdd & VOdd;
+                        DispatchOdd(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
+                        i++;
+                    }
+                    else if (UOdd2 == 1 || VOdd2 == 1)
+                    {
+                        DispatchEvenSingle(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
+                        i++;
+                    }
+                    else
+                    {
+                        int processLevels = Mathf.Min(mipLevels - i - 1, 2);
+                        data2[0] = processLevels;
+                        DispatchEvenMultiLevel(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
+                        i += 2;
+                    }
+                
                 } while (i <= highestMip);
             }
             //Debug.Log("Last Mip: " + i);
@@ -290,29 +276,17 @@ namespace UnityEngine.Rendering.Universal.Internal
         void DispatchEvenSingle(ref CommandBuffer cmd, RenderTargetIdentifier source1, RenderTargetIdentifier dest1,
             int[] widthHeight, int[] data2, int currMipLevel, int slices, bool inputSRV)
         {
-            int kernel = inputSRV ? 3 : 0;
+            int kernel = 0;
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParamID, widthHeight);
             //cmd.SetComputeIntParams(m_HiZMipCompute, computeParam2ID, data2);
             if (inputSRV)
             {
-                cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipSourceSRVID, source1);
+                cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipSourceID, source1);
             }
             else
             {
-                cmd.SetComputeTextureParam(m_HiZMipCompute, 0, computeMipSourceID, source1, currMipLevel);
+                cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipSourceID, source1, currMipLevel);
             }
-            cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipDestID, dest1, currMipLevel + 1);
-            cmd.DispatchCompute(m_HiZMipCompute, kernel, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
-        }
-
-        void DispatchSRV(ref CommandBuffer cmd, RenderTargetIdentifier source1, RenderTargetIdentifier dest1,
-    int[] widthHeight, int[] data2, int currMipLevel, int slices)
-        {
-            int kernel = 3;
-            cmd.SetComputeIntParams(m_HiZMipCompute, computeParamID, widthHeight);
-            //cmd.SetComputeIntParams(m_HiZMipCompute, computeParam2ID, data2);
-
-            cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipSourceSRVID, source1);
             cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipDestID, dest1, currMipLevel + 1);
             cmd.DispatchCompute(m_HiZMipCompute, kernel, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
         }
@@ -323,7 +297,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParam2ID, data2);
             if (inputSRV)
             {
-                cmd.SetComputeTextureParam(m_HiZMipCompute, 1, computeMipSourceSRVID, source1);
+                cmd.SetComputeTextureParam(m_HiZMipCompute, 1, computeMipSourceID, source1);
             }
             else
             {
@@ -341,7 +315,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             cmd.SetComputeIntParams(m_HiZMipCompute, computeParam2ID, data2);
             if (inputSRV)
             {
-                cmd.SetComputeTextureParam(m_HiZMipCompute, 2, computeMipSourceSRVID, source1);
+                cmd.SetComputeTextureParam(m_HiZMipCompute, 2, computeMipSourceID, source1);
             }
             else
             {

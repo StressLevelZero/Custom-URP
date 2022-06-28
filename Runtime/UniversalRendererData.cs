@@ -75,6 +75,15 @@ namespace UnityEngine.Rendering.Universal
             public Shader objectMotionVector;
         }
 
+        [Serializable, ReloadGroup]
+        public sealed class TextureResources
+        {
+            [Reload("Textures/BlueNoiseRGBA.asset")]
+            public Texture2DArray blueNoiseRGBA;
+            [Reload("Textures/BlueNoiseR.asset")]
+            public Texture2DArray blueNoiseR;
+        }
+
         public PostProcessData postProcessData = null;
 
 #if ENABLE_VR && ENABLE_XR_MODULE
@@ -83,6 +92,7 @@ namespace UnityEngine.Rendering.Universal
 #endif
 
         public ShaderResources shaders = null;
+        public TextureResources textures = null;
 
         const int k_LatestAssetVersion = 1;
         [SerializeField] int m_AssetVersion = 0;

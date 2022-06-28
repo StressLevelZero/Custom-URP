@@ -1,36 +1,42 @@
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+
 #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel MipMin KERNEL_SIZE=8 
 #pragma kernel MipMin2 KERNEL_SIZE=8
 #pragma kernel MipMinOdd KERNEL_SIZE=8
-#pragma kernel MipMinSRV KERNEL_SIZE=8
 
-#pragma multi_compile_local _ STEREO_ARRAY
+#pragma multi_compile _ STEREO_INSTANCING_ON STEREO_MULTIVIEW_ON
 #pragma multi_compile_local _ SRV_SOURCE
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.Universal/ShaderLibrary/Core.hlsl"
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 
-#if defined(STEREO_ARRAY)
-    Texture2DArray<float> _MipSourceSRV;
-    RWTexture2DArray<float> _MipSource;
-    RWTexture2DArray<float> _MipDest;
-    RWTexture2DArray<float> _MipDest2;
-    #define COORD_DEPTH(uv) (uv).xyz
 
+#if defined(SRV_SOURCE)
+    TEXTURE2D_X_FLOAT(_MipSource);
 #else
-    Texture2D<float> _MipSourceSRV;
-    RWTexture2D<float> _MipSource;
-    RWTexture2D<float> _MipDest;
-    RWTexture2D<float> _MipDest2;
+    RW_TEXTURE2D_X(float, _MipSource);
+#endif
+    RW_TEXTURE2D_X(float, _MipDest);
+    RW_TEXTURE2D_X(float, _MipDest2);
+
+#if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON)
+    #define COORD_DEPTH(uv) (uv).xyz
+#else
     #define COORD_DEPTH(uv) (uv).xy
 #endif
 
+#define MIPSOURCE(uv) _MipSource[uv].r
+    /*
 #if defined(SRV_SOURCE)
-    #define MIPSOURCE(uv) _MipSourceSRV[uv]
+    #define MIPSOURCE(uv) _MipSourceSRV[uv].r
 #else
-    #define MIPSOURCE(uv) _MipSource[uv]
+    #define MIPSOURCE(uv) _MipSource[uv].r
 #endif
+*/
 //CBUFFER_START(cb)
 int4 data1; //current mip width, current mip height, lower mip width, lower mip height 
 int4 data2; // number of mips to process at once, is U odd, is V odd, are both odd 
@@ -82,13 +88,13 @@ void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, u
     //{
     uint2 srcPixelUV = id.xy << 1;
     uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
-    float p00 = _MipSource[COORD_DEPTH(uv00)];
+    float p00 = _MipSource[COORD_DEPTH(uv00)].r;
     uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
-    float p10 = _MipSource[COORD_DEPTH(uv10)];
+    float p10 = _MipSource[COORD_DEPTH(uv10)].r;
     uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
-    float p01 = _MipSource[COORD_DEPTH(uv01)];
+    float p01 = _MipSource[COORD_DEPTH(uv01)].r;
     uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
-    float p11 = _MipSource[COORD_DEPTH(uv11)];
+    float p11 = _MipSource[COORD_DEPTH(uv11)].r;
     float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
     _MipDest[COORD_DEPTH(id)] = minLevel0;
     
@@ -121,59 +127,40 @@ void MipMinOdd(uint3 id : SV_DispatchThreadID)
     //if (id.x < data1.x && id.y < data1.y)
     uint2 srcPixelUV = id.xy << 1;
     uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
-    float p00 = _MipSource[COORD_DEPTH(uv00)];
+    float p00 = _MipSource[COORD_DEPTH(uv00)].r;
     uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
-    float p10 = _MipSource[COORD_DEPTH(uv10)];
+    float p10 = _MipSource[COORD_DEPTH(uv10)].r;
     uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
-    float p01 = _MipSource[COORD_DEPTH(uv01)];
+    float p01 = _MipSource[COORD_DEPTH(uv01)].r;
     uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
-    float p11 = _MipSource[COORD_DEPTH(uv11)];
+    float p11 = _MipSource[COORD_DEPTH(uv11)].r;
     float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
     
     if (data2.x)
     {
         uint3 uv20 = uint3(min(srcPixelUV + uint2(2u, 0u), data1.zw), id.z);
-        float p20 = _MipSource[COORD_DEPTH(uv20)];
+        float p20 = _MipSource[COORD_DEPTH(uv20)].r;
         uint3 uv21 = uint3(min(srcPixelUV + uint2(2u, 1u), data1.zw), id.z);
-        float p21 = _MipSource[COORD_DEPTH(uv21)];
+        float p21 = _MipSource[COORD_DEPTH(uv21)].r;
         minLevel0 = MIN_DEPTH(MIN_DEPTH(p20, p21), minLevel0);
     }
 
     if (data2.y)
     {
         uint3 uv02 = uint3(min(srcPixelUV + uint2(0u, 2u), data1.zw), id.z);
-        float p02 = _MipSource[COORD_DEPTH(uv02)];
+        float p02 = _MipSource[COORD_DEPTH(uv02)].r;
         uint3 uv12 = uint3(min(srcPixelUV + uint2(1u, 2u), data1.zw), id.z);
-        float p12 = _MipSource[COORD_DEPTH(uv12)];
+        float p12 = _MipSource[COORD_DEPTH(uv12)].r;
         minLevel0 = MIN_DEPTH(MIN_DEPTH(p02, p12), minLevel0);
     }
 
     if (data2.z)
     {
         uint3 uv22 = uint3(min(srcPixelUV + uint2(2u, 2u), data1.zw), id.z);
-        float p22 = _MipSource[COORD_DEPTH(uv22)];
+        float p22 = _MipSource[COORD_DEPTH(uv22)].r;
         minLevel0 = MIN_DEPTH(p22, minLevel0);
     }
 
     _MipDest[COORD_DEPTH(id)] = minLevel0;
-    //}
-}
-
-
-[numthreads(KERNEL_SIZE, KERNEL_SIZE, 1)]
-void MipMinSRV(uint3 id : SV_DispatchThreadID)
-{
-    //if (id.x < data1.x && id.y < data1.y)
-    //{
-    uint2 srcPixelUV = id.xy << 1;
-    uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
-    float p00 = _MipSourceSRV[COORD_DEPTH(uv00)];
-    uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
-    float p10 = _MipSourceSRV[COORD_DEPTH(uv10)];
-    uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
-    float p01 = _MipSourceSRV[COORD_DEPTH(uv01)];
-    uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
-    float p11 = _MipSourceSRV[COORD_DEPTH(uv11)];
-    _MipDest[COORD_DEPTH(id)] = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
     //}
 }

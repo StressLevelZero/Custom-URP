@@ -52,6 +52,8 @@ namespace UnityEditor.Rendering.Universal
         SerializedProperty m_ShadowTransparentReceiveProp;
         SerializedProperty m_IntermediateTextureMode;
 
+        SerializedProperty m_Textures;
+
 #if URP_ENABLE_CLUSTERED_UI
         static bool s_EnableClusteredUI => true;
 #else
@@ -73,6 +75,7 @@ namespace UnityEditor.Rendering.Universal
             m_DefaultStencilState = serializedObject.FindProperty("m_DefaultStencilState");
             m_PostProcessData = serializedObject.FindProperty("postProcessData");
             m_Shaders = serializedObject.FindProperty("shaders");
+            m_Textures = serializedObject.FindProperty("textures");
             m_ShadowTransparentReceiveProp = serializedObject.FindProperty("m_ShadowTransparentReceive");
             m_IntermediateTextureMode = serializedObject.FindProperty("m_IntermediateTextureMode");
         }
@@ -193,6 +196,19 @@ namespace UnityEditor.Rendering.Universal
                 {
                     var resources = target as UniversalRendererData;
                     resources.shaders = null;
+                    ResourceReloader.ReloadAllNullIn(target, UniversalRenderPipelineAsset.packagePath);
+                }
+            }
+
+            if (EditorPrefs.GetBool("DeveloperMode"))
+            {
+                EditorGUILayout.Space();
+                EditorGUILayout.PropertyField(m_Textures, true);
+
+                if (GUILayout.Button("Reload All"))
+                {
+                    var resources = target as UniversalRendererData;
+                    resources.textures = null;
                     ResourceReloader.ReloadAllNullIn(target, UniversalRenderPipelineAsset.packagePath);
                 }
             }

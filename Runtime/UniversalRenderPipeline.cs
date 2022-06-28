@@ -185,7 +185,7 @@ namespace UnityEngine.Rendering.Universal
             m_DebugDisplaySettingsUI.UnregisterDebug();
 
             base.Dispose(disposing);
-
+            SLZGlobals.Dispose();
             Shader.globalRenderPipeline = "";
             SupportedRenderingFeatures.active = new SupportedRenderingFeatures();
             ShaderData.instance.Dispose();
@@ -1242,6 +1242,7 @@ namespace UnityEngine.Rendering.Universal
 
             // Required for 2D Unlit Shadergraph master node as it doesn't currently support hidden properties.
             Shader.SetGlobalColor(ShaderPropertyId.rendererColor, Color.white);
+
         }
 
         static void CheckAndApplyDebugSettings(ref RenderingData renderingData)

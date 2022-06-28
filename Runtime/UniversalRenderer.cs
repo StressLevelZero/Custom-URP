@@ -207,7 +207,10 @@ namespace UnityEngine.Rendering.Universal
             {
                 m_PrimedDepthCopyPass = new CopyDepthPass(RenderPassEvent.AfterRenderingPrePasses, m_CopyDepthMaterial);
                 m_CopyDepthToHiZPass = new CopyDepthToHiZPass(RenderPassEvent.AfterRenderingPrePasses + 10, m_CopyDepthToColorMat);
-                m_CopyDepthToHiZPass.m_HiZMipCompute = data.shaders.computeMipMin;
+                if (CopyDepthToHiZPass.m_HiZMipCompute == null)
+                {
+                    CopyDepthToHiZPass.m_HiZMipCompute = data.shaders.computeMipMin;
+                }
             }
 
             if (this.renderingMode == RenderingMode.Deferred)
@@ -303,6 +306,9 @@ namespace UnityEngine.Rendering.Universal
             LensFlareCommonSRP.mergeNeeded = 0;
             LensFlareCommonSRP.maxLensFlareWithOcclusionTemporalSample = 1;
             LensFlareCommonSRP.Initialize();
+
+            SLZGlobals.instance.SetBlueNoiseGlobals(data.textures.blueNoiseRGBA, data.textures.blueNoiseR);
+            SLZGlobals.instance.SetSSRGlobals();
         }
 
         /// <inheritdoc />
@@ -321,7 +327,7 @@ namespace UnityEngine.Rendering.Universal
             CoreUtils.Destroy(m_ObjectMotionVecMaterial);
 
             Blitter.Cleanup();
-
+            SLZGlobals.Dispose();
             LensFlareCommonSRP.Dispose();
         }
 
@@ -387,6 +393,7 @@ namespace UnityEngine.Rendering.Universal
                 useRenderPassEnabled = false;
 
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
+            SLZGlobals.instance.UpdateBlueNoiseFrame();
 
             // Special path for depth only offscreen cameras. Only write opaques + transparents.
             bool isOffscreenDepthTexture = cameraData.targetTexture != null && cameraData.targetTexture.format == RenderTextureFormat.Depth;

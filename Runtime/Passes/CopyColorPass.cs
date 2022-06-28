@@ -64,6 +64,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             descriptor.autoGenerateMips = m_RequiresMips;
             descriptor.useMipMap = m_RequiresMips;
+            descriptor.enableRandomWrite = true;
             cmd.GetTemporaryRT(destination.id, descriptor, m_DownsamplingMethod == Downsampling.None ? FilterMode.Point : FilterMode.Bilinear);
             //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Bilinear,);
         }
