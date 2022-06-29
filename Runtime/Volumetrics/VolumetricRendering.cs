@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 //using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -218,9 +219,11 @@ public class VolumetricRendering : MonoBehaviour
     //Stored shader variable name IDs
 
     //Froxel Ids
+    int PerFrameConstBufferID = Shader.PropertyToID("PerFrameCB");
+    int ShaderCBID = Shader.PropertyToID("VolumetricsCB");
     int CameraProjectionMatrixID = Shader.PropertyToID("CameraProjectionMatrix");
     int TransposedCameraProjectionMatrixID = Shader.PropertyToID("TransposedCameraProjectionMatrix");
-    int inverseCameraProjectionMatrixID = Shader.PropertyToID("inverseCameraProjectionMatrix");
+    //int inverseCameraProjectionMatrixID = Shader.PropertyToID("inverseCameraProjectionMatrix");
     int PreviousFrameMatrixID = Shader.PropertyToID("PreviousFrameMatrix");
     int Camera2WorldID = Shader.PropertyToID("Camera2World");
     int CameraPositionID = Shader.PropertyToID("CameraPosition");
@@ -255,10 +258,73 @@ public class VolumetricRendering : MonoBehaviour
     public float meanFreePath = 15.0f;
     public float StaticLightMultiplier = 1.0f;
 
+    private ComputeBuffer ShaderConstantBuffer;
+    private ComputeBuffer ComputePerFrameConstantBuffer;
+    private ComputeBuffer StepAddPerFrameConstantBuffer;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct ShaderConstants
+    {
+        public Matrix4x4 TransposedCameraProjectionMatrix;
+        public Matrix4x4 CameraProjectionMatrix;
+        public Vector4 _VBufferDistanceEncodingParams;
+        public Vector4 _VolumetricResultDim;
+        public Vector3 _VolCameraPos;
+    }
+    private const int ShaderConstantsCount = 43;
+
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct ScatteringPerFrameConstants
+    {
+        public Matrix4x4    _VBufferCoordToViewDirWS;
+        public Matrix4x4    _PrevViewProjMatrix;
+        public Matrix4x4    _ViewMatrix;
+        public Matrix4x4    TransposedCameraProjectionMatrix;
+        public Matrix4x4    CameraProjectionMatrix;
+        public Vector4      _VBufferDistanceEncodingParams;
+        public Vector4      _VBufferDistanceDecodingParams;
+        public Vector4      SeqOffset;
+        public Vector4      CameraPosition;
+        public Vector4      CameraMotionVector;
+    }
+
+    private const int ScatterPerFrameCount = 100;
+
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct StepAddPerFrameConstants
+    {
+        public Vector4 _VBufferDistanceDecodingParams;
+        public Vector3 SeqOffset;
+    }
+
+    private const int StepAddPerFrameCount = 7;
+
+    private static float[] VolStructToArray<T>(T rawData, int count, int size) where T : struct
+    {
+        var pinnedRawData = GCHandle.Alloc(rawData, GCHandleType.Pinned);
+        try
+        {
+            var pinnedRawDataPtr = pinnedRawData.AddrOfPinnedObject();
+            float[] data = new float[size];
+            Marshal.Copy(pinnedRawDataPtr, data, 0, count);
+            return data;
+        }
+        finally
+        {
+            pinnedRawData.Free();
+        }
+    }
+
+
     #endregion
 
     private void Awake()
     {
+        ShaderConstantBuffer = new ComputeBuffer(1, ShaderConstantsCount * sizeof(float), ComputeBufferType.Constant);
+        ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+        StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
@@ -467,14 +533,18 @@ public class VolumetricRendering : MonoBehaviour
              Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f)
             );
 
-    //    ComputZPlaneTexelSpacing(1.0f, vFoV, parameters.resolution.y);
+        //    ComputZPlaneTexelSpacing(1.0f, vFoV, parameters.resolution.y);
 
-
+        // Unused as far as I can tell, declared in the VolumetricCore but not actually used
         Shader.SetGlobalVector("_VolumePlaneSettings", new Vector4(volumetricData.near, volumetricData.far, volumetricData.far - volumetricData.near, volumetricData.near * volumetricData.far));
 
+        // BAD! - _ZBufferParams is a unity default constant! Don't overwrite it with the volumetric information. Directly set on the compute shader instead of
+        // globally setting the value. Name should probably also be unique.
+        
         float zBfP1 = 1.0f - volumetricData.far / volumetricData.near;
         float zBfP2 = volumetricData.far / volumetricData.near;
-        Shader.SetGlobalVector("_ZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
+        FroxelIntegrationCompute.SetVector("_VolZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
+        
 
         //Debug.Log("Dispatching " + ThreadsToDispatch);
 
@@ -517,7 +587,7 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.volumeDepth = volumetricData.ClipMapResolution;
         ClipRTdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         ClipRTdiscrpt.msaaSamples = 1;
-
+        
         ClipmapBufferA = new RenderTexture(ClipRTdiscrpt);
         ClipmapBufferA.Create();
         ClipmapBufferB = new RenderTexture(ClipRTdiscrpt);
@@ -531,6 +601,7 @@ public class VolumetricRendering : MonoBehaviour
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapBufferA); //Set clipmap for
         Shader.SetGlobalFloat("_ClipmapScale", volumetricData.ClipmapScale);
         Shader.SetGlobalFloat("_ClipmapScale2", volumetricData.ClipmapScale2);
+       
     }
     bool ClipFar = false;
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
@@ -639,7 +710,7 @@ public class VolumetricRendering : MonoBehaviour
     {
         Shader.SetGlobalFloat(ClipmapScaleID, ClipmapScale);
         Shader.SetGlobalVector(ClipmapTransformID, ClipmapTransform);
-
+        
         if (clipmap == Clipmap.Far)
         {
             Shader.SetGlobalTexture("_VolumetricClipmapTexture2", ClipmapTexture);
@@ -691,12 +762,12 @@ public class VolumetricRendering : MonoBehaviour
 
     public void SetVariables()
     {
+        ///* Literally none of these are used by any shader. Why set these?
         float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
-        
         Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
         Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
         Shader.SetGlobalVector("_GlobalScattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
-
+       
     }
 
     float GetAspectRatio()
@@ -769,29 +840,100 @@ public class VolumetricRendering : MonoBehaviour
 
         GetHexagonalClosePackedSpheres7(m_xySeq);
         int sampleIndex = Time.renderedFrameCount % 7;
-
-        Shader.SetGlobalVector("_VBufferDistanceEncodingParams", vbuff.depthEncodingParams);
-        Shader.SetGlobalVector("_VBufferDistanceDecodingParams", vbuff.depthDecodingParams);
-        Shader.SetGlobalMatrix("_VBufferCoordToViewDirWS", PixelCoordToViewDirWS);
-
-        Shader.SetGlobalMatrix("_PrevViewProjMatrix", PrevViewProjMatrix);
-        Shader.SetGlobalMatrix("_ViewMatrix", activeCam.worldToCameraMatrix);
+        Vector3 seqOffset = new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex]);
+        //Shader.SetGlobalVector("SeqOffset", new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex])); //Loop through jitters. 
 
 
-        FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
-        FroxelFogCompute.SetMatrix(Camera2WorldID, activeCam.transform.worldToLocalMatrix);
+        //Shader.SetGlobalVector("_VBufferDistanceDecodingParams", vbuff.depthDecodingParams);
+        //Shader.SetGlobalMatrix("_VBufferCoordToViewDirWS", PixelCoordToViewDirWS);
+
+        //Compute.SetGlobalMatrix("_PrevViewProjMatrix", PrevViewProjMatrix);
+        //Shader.SetGlobalMatrix("_ViewMatrix", activeCam.worldToCameraMatrix);
+
+
+
+        //FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
+        //FroxelFogCompute.SetMatrix(Camera2WorldID, activeCam.transform.worldToLocalMatrix);
+
         //FroxelFogCompute.SetMatrix("LightProjectionMatrix", lightMatrix);
         //FroxelFogCompute.SetVector("LightPosition", LightPosition.transform.position);
         //FroxelFogCompute.SetVector("LightColor", LightPosition.color * LightPosition.intensity);
-        Shader.SetGlobalVector("SeqOffset", new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex] ) ); //Loop through jitters. 
-        FroxelFogCompute.SetFloat("reprojectionAmount", reprojectionAmount );
 
-        Shader.SetGlobalMatrix(CameraProjectionMatrixID,  projectionMatrix);
-        Shader.SetGlobalMatrix(TransposedCameraProjectionMatrixID,  projectionMatrix.transpose); //Fragment shaders require the transposed version
-        Shader.SetGlobalVector(CameraPositionID, activeCam.transform.position); //Can likely pack this into the 4th row of the projection matrix 
-        Shader.SetGlobalVector(CameraMotionVectorID, activeCam.transform.position - PreviousCameraPosition); //Extract a motion vector per frame
-        Shader.SetGlobalVector("_VolCameraPos", activeCam.transform.position ); 
+        //FroxelFogCompute.SetFloat("reprojectionAmount", reprojectionAmount );
 
+        /* Replaced with ComputeBuffer*/
+        //Shader.SetGlobalVector("_VBufferDistanceEncodingParams", vbuff.depthEncodingParams);
+        //Shader.SetGlobalMatrix(CameraProjectionMatrixID,  projectionMatrix);
+        //Shader.SetGlobalMatrix(TransposedCameraProjectionMatrixID,  projectionMatrix.transpose); //Fragment shaders require the transposed version
+        //Shader.SetGlobalVector(CameraPositionID, activeCam.transform.position); //Can likely pack this into the 4th row of the projection matrix 
+        //Shader.SetGlobalVector(CameraMotionVectorID, activeCam.transform.position - PreviousCameraPosition); //Extract a motion vector per frame
+        //Shader.SetGlobalVector("_VolCameraPos", activeCam.transform.position );
+
+
+        ShaderConstants[] shaderConsts = new ShaderConstants[1];
+        shaderConsts[0].TransposedCameraProjectionMatrix = projectionMatrix.transpose;
+        shaderConsts[0].CameraProjectionMatrix = projectionMatrix;
+        shaderConsts[0]._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
+        shaderConsts[0]._VolumetricResultDim = new Vector3(FroxelBlur != BlurType.Gaussian ? volumetricData.FroxelWidthResolution * 2 : volumetricData.FroxelWidthResolution, 
+            volumetricData.FroxelHeightResolution, volumetricData.FroxelDepthResolution);
+        shaderConsts[0]._VolCameraPos = activeCam.transform.position;
+        if (ShaderConstantBuffer == null)
+        {
+            ShaderConstantBuffer = new ComputeBuffer(ShaderConstantsCount, sizeof(float), ComputeBufferType.Constant);
+            //Debug.Log("Created New Compute Buffer");
+        }
+        ShaderConstantBuffer.SetData(shaderConsts);
+        Shader.SetGlobalConstantBuffer(ShaderCBID, ShaderConstantBuffer, 0, ShaderConstantsCount * sizeof(float));
+
+        StepAddPerFrameConstants[] stepAddConst = new StepAddPerFrameConstants[1];
+        stepAddConst[0] = new StepAddPerFrameConstants();
+        stepAddConst[0]._VBufferDistanceDecodingParams = vbuff.depthDecodingParams;
+        stepAddConst[0].SeqOffset = seqOffset;
+        if (StepAddPerFrameConstantBuffer == null)
+        {
+            StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+            //Debug.Log("Created New Compute Buffer");
+        }
+        StepAddPerFrameConstantBuffer.SetData(stepAddConst);
+        Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
+
+        ScatteringPerFrameConstants[] VolScatteringCB = new ScatteringPerFrameConstants[1];
+        VolScatteringCB[0] = new ScatteringPerFrameConstants();
+        VolScatteringCB[0]._VBufferCoordToViewDirWS = PixelCoordToViewDirWS;
+        VolScatteringCB[0]._PrevViewProjMatrix = PrevViewProjMatrix;
+        VolScatteringCB[0]._ViewMatrix = activeCam.worldToCameraMatrix;
+        VolScatteringCB[0].TransposedCameraProjectionMatrix = projectionMatrix.transpose;
+        VolScatteringCB[0].CameraProjectionMatrix = projectionMatrix;
+        VolScatteringCB[0]._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
+        VolScatteringCB[0]._VBufferDistanceDecodingParams = vbuff.depthDecodingParams;
+        VolScatteringCB[0].SeqOffset = seqOffset;
+        VolScatteringCB[0].CameraPosition = activeCam.transform.position;
+        VolScatteringCB[0].CameraMotionVector = activeCam.transform.position - PreviousCameraPosition;
+        //float[] VolScatteringCBArray = VolStructToArray(VolScatteringCB, PerFrameConstantsCount, PerFrameConstantsSize);
+        //Debug.Log(VolScatteringCB._VBufferCoordToViewDirWS);
+        //Debug.Log(VolScatteringCBArray[4] + " " + VolScatteringCBArray[5] + " " + VolScatteringCBArray[6] + " " + VolScatteringCBArray[7]);
+        if (ComputePerFrameConstantBuffer == null)
+        {
+            ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+            //Debug.Log("Created New Compute Buffer");
+        }
+        ComputePerFrameConstantBuffer.SetData(VolScatteringCB);
+        FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, ComputePerFrameConstantBuffer, 0, ScatterPerFrameCount * sizeof(float));
+
+
+        /*
+        if (VolumetricConstantBuffer != null && projectionMatrix != null && activeCam != null && vbuff.depthEncodingParams != null)
+        {
+            VolumetricConstants vConst = new VolumetricConstants();
+            vConst.CameraProjectionMatrix = projectionMatrix.transpose;
+            vConst.TransposedCameraProjectionMatrix = projectionMatrix;
+            vConst._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
+            vConst._VolCameraPos = activeCam.transform.position;
+            float[] vConstArray = VolStructToArray(vConst);
+            VolumetricConstantBuffer.SetData(vConstArray);
+            Shader.SetGlobalConstantBuffer("VolumetricCB", VolumetricConstantBuffer, 0, VolCBCount * sizeof(float));
+        }
+        */
         PreviousFrameMatrix = projectionMatrix;
         PreviousCameraPosition = activeCam.transform.position;
         ////MATRIX
@@ -800,6 +942,8 @@ public class VolumetricRendering : MonoBehaviour
         ///cam.GetStereoProjectionMatrix returns the skewed XR projection matrix per eye. Just doing our own calulation
         var gpuProj = GL.GetGPUProjectionMatrix( Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, 100000f) , true);
         PrevViewProjMatrix = gpuProj * activeCam.worldToCameraMatrix;
+
+
 
         FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
     //    FroxelStackingCompute.DispatchIndirect
@@ -984,6 +1128,16 @@ public class VolumetricRendering : MonoBehaviour
             AssemblyReloadEvents.afterAssemblyReload -= UpdateStateAfterReload;
         }
 #endif
+        if (ShaderConstantBuffer != null)
+        {
+            ShaderConstantBuffer.Dispose();
+            ShaderConstantBuffer = null;
+        }
+        if (ComputePerFrameConstantBuffer != null)
+        {
+            ComputePerFrameConstantBuffer.Dispose();
+            ComputePerFrameConstantBuffer = null;
+        }
     }
 
 

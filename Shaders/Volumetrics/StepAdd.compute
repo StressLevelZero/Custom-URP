@@ -19,23 +19,30 @@ Texture3D<float4> InLightingTexture;
 Texture3D<float4> HistoryBuffer;
 SamplerState Custom_trilinear_clamp_sampler;
 
-shared float4 _GlobalScattering;
+
 //shared float4 _GlobalExtinctionTint;
 
-shared float _GlobalExtinction;
+
 #define extinction _GlobalExtinction
 
-shared float3 SeqOffset; //z offseter
+
 
 
 float4x4    LeftEyeMatrix;
 float4x4    RightEyeMatrix;
 
 shared float4 _VolumePlaneSettings;
-shared float4 _ZBufferParams;
-shared float4 _VBufferDistanceEncodingParams;
-shared float4 _VBufferDistanceDecodingParams;
+shared float _GlobalExtinction;
+shared float4 _GlobalScattering;
 
+float4 _VolZBufferParams;
+
+//shared float4 _VBufferDistanceEncodingParams;
+
+CBUFFER_START(PerFrameCB)
+float4 _VBufferDistanceDecodingParams;
+float3 SeqOffset; //z offseter
+CBUFFER_END
 
 //float4 StereoOffset() {
 //

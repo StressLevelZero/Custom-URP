@@ -31,26 +31,37 @@ struct LightObject
 
 StructuredBuffer<LightObject> LightObjects;
 
-shared float4 CameraPosition; //current camera position
-shared float4 CameraMotionVector; //camera's motion per frame
-shared float4 _VolumePlaneSettings; 
-shared float4 _ZBufferParams;
-
 shared float _GlobalExtinction;
+shared float4 _VolumePlaneSettings;
+shared float _ClipmapScale2;
+shared float _StaticLightMultiplier;
 
-shared float4 _VBufferDistanceEncodingParams;
-shared float4 _VBufferDistanceDecodingParams;
+CBUFFER_START(PerFrameCB)
+float4x4 _VBufferCoordToViewDirWS; // >_>
+float4x4 _PrevViewProjMatrix;
+float4x4 _ViewMatrix;
+float4x4 TransposedCameraProjectionMatrix;
+float4x4 CameraProjectionMatrix;
+float4 _VBufferDistanceEncodingParams;
+float4 _VBufferDistanceDecodingParams;
+float4 SeqOffset; //z offseter
+float4 CameraPosition; //current camera position
+float4 CameraMotionVector; //camera's motion per frame
+CBUFFER_END
+
+
+shared float3 _ClipmapPosition;
+shared float _ClipmapScale;
+
+
+//shared float SeqOffsetPrv; //z offseter
+
+float _VBufferUnitDepthTexelSpacing;
 //shared float4 _VBufferSharedUvScaleAndLimit;
+//float4x4 PreviousFrameMatrix;
 
-float4x4 inverseCameraProjectionMatrix;
-shared float4x4 CameraProjectionMatrix;
-shared  float4x4 TransposedCameraProjectionMatrix;
 
-float4x4 PreviousFrameMatrix;
-shared float4x4 _PrevViewProjMatrix;
-shared float4x4 _ViewMatrix;
 
-shared float4x4 _VBufferCoordToViewDirWS; // >_>
 
 SamplerState _LinearClamp;
 SamplerState _point_repeat;
@@ -59,15 +70,10 @@ SamplerState s_linear_clamp_sampler;
 
 shared Texture3D<float4> _VolumetricClipmapTexture;
 shared Texture3D<float4> _VolumetricClipmapTexture2;
-shared float3 _ClipmapPosition;
-shared float _ClipmapScale;
-shared float _ClipmapScale2;
 
-shared float3 SeqOffset; //z offseter
-shared float SeqOffsetPrv; //z offseter
-float reprojectionAmount;
-float _VBufferUnitDepthTexelSpacing;
-shared float _StaticLightMultiplier;
+//float reprojectionAmount;
+
+
 
 // Returns the forward (central) direction of the current view in the world space.
 float3 GetViewForwardDir()

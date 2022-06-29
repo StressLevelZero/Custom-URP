@@ -114,7 +114,7 @@ namespace UnityEngine.Rendering.Universal
                 s_Instance.BlueNoiseCB.Dispose();
                 s_Instance.BlueNoiseCB = null;
             }
-            s_Instance = null;
+            //s_Instance = null;
         }
     }
 }
