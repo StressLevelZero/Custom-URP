@@ -325,6 +325,8 @@ public class VolumetricRendering : MonoBehaviour
         ShaderConstantBuffer = new ComputeBuffer(1, ShaderConstantsCount * sizeof(float), ComputeBufferType.Constant);
         ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+        Shader.SetGlobalConstantBuffer(ShaderCBID, ShaderConstantBuffer, 0, ShaderConstantsCount * sizeof(float));
+        Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
@@ -880,10 +882,11 @@ public class VolumetricRendering : MonoBehaviour
         if (ShaderConstantBuffer == null)
         {
             ShaderConstantBuffer = new ComputeBuffer(ShaderConstantsCount, sizeof(float), ComputeBufferType.Constant);
+            Shader.SetGlobalConstantBuffer(ShaderCBID, ShaderConstantBuffer, 0, ShaderConstantsCount * sizeof(float));
             //Debug.Log("Created New Compute Buffer");
         }
         ShaderConstantBuffer.SetData(shaderConsts);
-        Shader.SetGlobalConstantBuffer(ShaderCBID, ShaderConstantBuffer, 0, ShaderConstantsCount * sizeof(float));
+        
 
         StepAddPerFrameConstants[] stepAddConst = new StepAddPerFrameConstants[1];
         stepAddConst[0] = new StepAddPerFrameConstants();
@@ -892,11 +895,11 @@ public class VolumetricRendering : MonoBehaviour
         if (StepAddPerFrameConstantBuffer == null)
         {
             StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+            Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
             //Debug.Log("Created New Compute Buffer");
         }
         StepAddPerFrameConstantBuffer.SetData(stepAddConst);
-        Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
-
+       
         ScatteringPerFrameConstants[] VolScatteringCB = new ScatteringPerFrameConstants[1];
         VolScatteringCB[0] = new ScatteringPerFrameConstants();
         VolScatteringCB[0]._VBufferCoordToViewDirWS = PixelCoordToViewDirWS;

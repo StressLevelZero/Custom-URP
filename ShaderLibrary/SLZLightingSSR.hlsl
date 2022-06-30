@@ -31,12 +31,12 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
 
 #if !defined(SHADER_API_MOBILE)
     //ssrData.perceptualRoughness = -fresnelTerm * ssrData.perceptualRoughness + ssrData.perceptualRoughness;
-    real SSRLerp = smoothstep(0.4, 0.2, ssrData.perceptualRoughness);
+    real SSRLerp = smoothstep(0.6, 0.4, ssrData.perceptualRoughness);
     real4 SSRColor = real4(0, 0, 0, 0);
-    //UNITY_BRANCH if (SSRLerp > 0.2)
-    //{
+    UNITY_BRANCH if (SSRLerp > REAL_MIN)
+    {
         SSRColor = getSSRColor(ssrData);
-    //}
+    }
 
     reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
 #endif

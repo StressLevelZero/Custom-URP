@@ -27,7 +27,15 @@
 #pragma kernel KColorDownsample                     KERNEL_SIZE=8  MAIN_DOWNSAMPLE=KColorDownsample
 
 #pragma multi_compile _ STEREO_INSTANCING_ON STEREO_MULTIVIEW_ON
-#pragma multi_compile_local _ COPY_MIP_0
+//#pragma multi_compile_local _ COPY_MIP_0
+
+#if defined(STEREO_INSTANCING_ON)
+#define UNITY_STEREO_INSTANCING_ENABLED
+#endif
+
+#if defined(STEREO_MULTIVIEW_ON)
+#define UNITY_STEREO_MULTIVIEW_ENABLED
+#endif
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.Universal/ShaderLibrary/Core.hlsl"
@@ -42,16 +50,18 @@
 RW_TEXTURE2D_X(float4, _Destination);
 
 #if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON) 
-    #define COORD_TEXTURE2D_X(pixelCoord)   uint3(pixelCoord, SLICE_ARRAY_INDEX)
+    #define COORD_TEXTURE2D_X(pixelCoord)   uint3(pixelCoord, stereoEyeIndex)
+    #define UVINT uint3
 #else
     #define COORD_TEXTURE2D_X(pixelCoord)   uint2(pixelCoord)
+    #define UVINT uint2
 #endif
 
 SamplerState sampler_LinearClamp;
 
-CBUFFER_START(cb)
-    float4 _Size;       // x: src width, y: src height, zw: unused
-CBUFFER_END
+//CBUFFER_START(cb)
+    int4 _Size;       // x: src width, y: src height, zw: unused
+//CBUFFER_END
 
 // 16x16 pixels with an 8x8 center that we will be blurring writing out. Each uint is two color
 // channels packed together.
@@ -116,8 +126,9 @@ void BlurHorizontally(uint outIndex, uint leftMostIndex)
     Store1Pixel(outIndex + 1, BlurPixels(s1, s2, s3, s4, s5, s6, s7, s8, s9));
 }
 
-void BlurVertically(uint2 pixelCoord, uint topMostIndex)
+void BlurVertically(UVINT pixelCoord, uint topMostIndex)
 {
+
     float4 s0, s1, s2, s3, s4, s5, s6, s7, s8;
     Load1Pixel(topMostIndex     , s0);
     Load1Pixel(topMostIndex +  8, s1);
@@ -132,19 +143,21 @@ void BlurVertically(uint2 pixelCoord, uint topMostIndex)
     float4 blurred = BlurPixels(s0, s1, s2, s3, s4, s5, s6, s7, s8);
 
     // Write to the final target
-    _Destination[COORD_TEXTURE2D_X(pixelCoord)] = blurred;
+    _Destination[pixelCoord] = blurred;
+    //_Source[COORD_TEXTURE2D_X(pixelCoord)] = blurred;
 }
 
 [numthreads(KERNEL_SIZE, KERNEL_SIZE, 1)]
-void MAIN_GAUSSIAN(uint2 groupId : SV_GroupID, uint2 groupThreadId : SV_GroupThreadID, uint3 dispatchThreadId : SV_DispatchThreadID)
+void MAIN_GAUSSIAN(uint3 groupId : SV_GroupID, uint2 groupThreadId : SV_GroupThreadID, uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     //UNITY_XR_ASSIGN_VIEW_INDEX(dispatchThreadId.z);
+    uint stereoEyeIndex = groupId.z;
 
     // Upper-left pixel coordinate of quad that this thread will read
     int2 threadUL = (groupThreadId << 1) + (groupId << 3) - 4;
     uint2 uthreadUL = uint2(max(0, threadUL));
 
-    uint2 size = uint2(_Size.xy) - 1u;
+    uint2 size = uint2(_Size.xy) - 1u.xx;
     float4 p00 = _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(0u, 0u), size))];
     float4 p10 = _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 0u), size))];
     float4 p11 = _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 1u), size))];
@@ -164,14 +177,14 @@ void MAIN_GAUSSIAN(uint2 groupId : SV_GroupID, uint2 groupThreadId : SV_GroupThr
     GroupMemoryBarrierWithGroupSync();
 
     // Vertically blur the pixels in LDS and write the result to memory
-    BlurVertically(dispatchThreadId.xy, (groupThreadId.y << 3u) + groupThreadId.x);
+    BlurVertically(COORD_TEXTURE2D_X(dispatchThreadId.xy), (groupThreadId.y << 3u) + groupThreadId.x);
 }
 
 [numthreads(KERNEL_SIZE, KERNEL_SIZE, 1)]
-void MAIN_DOWNSAMPLE(uint3 dispatchThreadId : SV_DispatchThreadID)
+void MAIN_DOWNSAMPLE(uint3 dispatchThreadId : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 {
     //UNITY_XR_ASSIGN_VIEW_INDEX(dispatchThreadId.z);
-
+    uint stereoEyeIndex = groupId.z;
     uint2 offset = dispatchThreadId.xy * 2u;
     uint2 size = uint2(_Size.xy) - 1u;
 

@@ -42,8 +42,11 @@ namespace UnityEngine.Rendering.Universal
             [Reload("Shaders/Utils/CopyDepthToColor.shader")]
             public Shader copyDepthToColorPS;
 
-            [Reload("Shaders/Utils/MipMin.compute")]
-            public ComputeShader computeMipMin;
+            [Reload("Shaders/Utils/DepthPyramid.compute")]
+            public ComputeShader computeDepthPyramid;
+
+            [Reload("Shaders/Utils/ColorPyramid.compute")]
+            public ComputeShader computeColorPyramid;
 
             [Obsolete("Obsolete, this feature will be supported by new 'ScreenSpaceShadows' renderer feature")]
             public Shader screenSpaceShadowPS;

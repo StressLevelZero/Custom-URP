@@ -209,7 +209,7 @@ namespace UnityEngine.Rendering.Universal
                 m_CopyDepthToHiZPass = new CopyDepthToHiZPass(RenderPassEvent.AfterRenderingPrePasses + 10, m_CopyDepthToColorMat);
                 if (CopyDepthToHiZPass.m_HiZMipCompute == null)
                 {
-                    CopyDepthToHiZPass.m_HiZMipCompute = data.shaders.computeMipMin;
+                    CopyDepthToHiZPass.m_HiZMipCompute = data.shaders.computeDepthPyramid;
                 }
             }
 
@@ -254,7 +254,7 @@ namespace UnityEngine.Rendering.Universal
 
             m_CopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRenderingSkybox, m_CopyDepthMaterial);
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
-            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, m_BlitMaterial);
+            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial);
 #if ADAPTIVE_PERFORMANCE_2_1_0_OR_NEWER
             if (needTransparencyPass)
 #endif

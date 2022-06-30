@@ -35,6 +35,7 @@ namespace UnityEngine.Rendering.Universal
                 }
                 return s_Instance;
             }
+
         }
 
 
@@ -58,27 +59,34 @@ namespace UnityEngine.Rendering.Universal
 
         public void SetBlueNoiseGlobals(Texture2DArray BlueNoiseRGBA, Texture2DArray BlueNoiseR)
         {
-            BlueNoiseDim[0] = BlueNoiseRGBA.width;
-            BlueNoiseDim[1] = BlueNoiseRGBA.height;
-            BlueNoiseDim[2] = BlueNoiseRGBA.depth;
+            if (BlueNoiseRGBA != null)
+            {
+                BlueNoiseDim = new int[4];
+                BlueNoiseDim[0] = BlueNoiseRGBA.width;
+                BlueNoiseDim[1] = BlueNoiseRGBA.height;
+                BlueNoiseDim[2] = BlueNoiseRGBA.depth;
 #if UNITY_EDITOR
-            if (!EditorApplication.isPlaying)
-            {
-                BlueNoiseDim[3] = (int)((30.0*EditorApplication.timeSinceStartup) % BlueNoiseRGBA.depth);
-                //Debug.Log(BlueNoiseDim[3]);
-            }
-            else
+                if (!EditorApplication.isPlaying)
+                {
+                    BlueNoiseDim[3] = (int)((30.0 * EditorApplication.timeSinceStartup) % BlueNoiseRGBA.depth);
+                    //Debug.Log(BlueNoiseDim[3]);
+                }
+                else
 #endif
-            {
-                BlueNoiseDim[3] = Mathf.Abs((int)(Time.renderedFrameCount % BlueNoiseRGBA.depth));
-            }
-            BlueNoiseCB.SetData(BlueNoiseDim);
-            Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, 16);
-            if (!hasSetBNTextures)
-            {
-                Shader.SetGlobalTexture("_BlueNoiseRGBA", BlueNoiseRGBA);
-                Shader.SetGlobalTexture("_BlueNoiseR", BlueNoiseR);
-                hasSetBNTextures = true;
+                {
+                    BlueNoiseDim[3] = Mathf.Abs((int)(Time.renderedFrameCount % BlueNoiseRGBA.depth));
+                }
+                if (BlueNoiseCB != null)
+                {
+                    BlueNoiseCB.SetData(BlueNoiseDim);
+                    Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, 16);
+                }
+                if (!hasSetBNTextures)
+                {
+                    Shader.SetGlobalTexture("_BlueNoiseRGBA", BlueNoiseRGBA);
+                    Shader.SetGlobalTexture("_BlueNoiseR", BlueNoiseR);
+                    hasSetBNTextures = true;
+                }
             }
         }
 
@@ -90,12 +98,12 @@ namespace UnityEngine.Rendering.Universal
 #if UNITY_EDITOR
                 if (!EditorApplication.isPlaying)
                 {
-                    BlueNoiseDim[3] = (int)((144.0*EditorApplication.timeSinceStartup) % depth);
+                    BlueNoiseDim[3] = (int)((Screen.currentResolution.refreshRate * EditorApplication.timeSinceStartup) % depth);
                 }
                 else
 #endif
                 {
-                    BlueNoiseDim[3] = (int)(Time.renderedFrameCount % depth);
+                    BlueNoiseDim[3] = (int)((Time.timeSinceLevelLoadAsDouble * Screen.currentResolution.refreshRate) % depth);
                 }
                 BlueNoiseCB.SetData(BlueNoiseDim);
                 Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, 16);
@@ -104,17 +112,20 @@ namespace UnityEngine.Rendering.Universal
 
         public static void Dispose()
         {
-            if (s_Instance.SSRGlobalCB != null)
+            if (s_Instance != null)
             {
-                s_Instance.SSRGlobalCB.Dispose();
-                s_Instance.SSRGlobalCB = null;
+                if (s_Instance.SSRGlobalCB != null)
+                {
+                    s_Instance.SSRGlobalCB.Dispose();
+                    s_Instance.SSRGlobalCB = null;
+                }
+                if (s_Instance.BlueNoiseCB != null)
+                {
+                    s_Instance.BlueNoiseCB.Dispose();
+                    s_Instance.BlueNoiseCB = null;
+                }
             }
-            if (s_Instance.BlueNoiseCB != null)
-            {
-                s_Instance.BlueNoiseCB.Dispose();
-                s_Instance.BlueNoiseCB = null;
-            }
-            //s_Instance = null;
+            s_Instance = null;
         }
     }
 }
