@@ -299,7 +299,7 @@ real SLZFusedVFMobile(real LoH, real roughness)
 real SLZSmithVisibility(real NoV, real NoL, real roughness)
 {
     real rough2 = roughness * roughness;
-    NoL = abs(NoL); // We didn't abs NoL in the surface data struct since the specular falloff function needs saturate(NoL) instead
+    NoL = abs(NoL) + 1e-5;  //The baked specular falloff function needs saturate(NoL), so NoL is stored raw and needs to be abs'd here 
     real v = NoL * sqrt(NoV * (-rough2 * NoV + 1.0h) + rough2);
     real l = NoV * sqrt(NoL * (-rough2 * NoL + 1.0h) + rough2);
     return real(0.5) / v + l;
