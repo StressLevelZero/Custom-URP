@@ -302,7 +302,7 @@ real SLZSmithVisibility(real NoV, real NoL, real roughness)
     NoL = abs(NoL) + 1e-5;  //The baked specular falloff function needs saturate(NoL), so NoL is stored raw and needs to be abs'd here 
     real v = NoL * sqrt(NoV * (-rough2 * NoV + 1.0h) + rough2);
     real l = NoV * sqrt(NoL * (-rough2 * NoL + 1.0h) + rough2);
-    return real(0.5) / v + l;
+    return real(0.5) / (v + l);
 }
 
 /** 
