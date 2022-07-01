@@ -91,8 +91,8 @@ struct SLZDirectSpecLightInfo
 //------------------------------------------------------------------------
 
 /** 
- * The default normalize function doesn't perfectly normalize real-precsion vectors. This can result in bizarre banding in some lighting calculations.
- * It seems that taking the rsqrt of a real is the issue, giving a slightly inaccurate result. Thus cast the length squared value to a float before
+ * The default normalize function doesn't perfectly normalize half-precsion vectors. This can result in bizarre banding in some lighting calculations.
+ * It seems that taking the rsqrt of a half is the issue, giving a slightly inaccurate result. Thus cast the length squared value to a float before
  * taking the rsqrt
  *
  * @param value The vector to normalize
@@ -188,8 +188,8 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(real3 normal, real3 viewDir, real N
         data.NxH2 = saturate(dot(NxH, NxH));
         data.NoL = saturate(dot(normal, lightDir));
     #else
-        data.NoV = max(abs(NoV), 1e-7);
-        data.NoL = saturate(dot(normal, lightDir));
+        data.NoV = abs(NoV) + 1e-5;
+        data.NoL = dot(normal, lightDir); // Visibility function needs abs, specular falloff needs saturate
         real3 halfDir = SLZSafeHalf3Normalize(lightDir + viewDir);
         data.NoH = saturate(dot(normal, halfDir));
         data.LoH = saturate(dot(lightDir, halfDir));
@@ -299,10 +299,10 @@ real SLZFusedVFMobile(real LoH, real roughness)
 real SLZSmithVisibility(real NoV, real NoL, real roughness)
 {
     real rough2 = roughness * roughness;
-
-    real v = NoL * sqrt(NoV * NoV * (real(1.0) - rough2) + rough2);
-    real l = NoV * sqrt(NoL * NoL * (real(1.0) - rough2) + rough2);
-    return real(0.5) / max((v + l), 1e-7);
+    NoL = abs(NoL); // We didn't abs NoL in the surface data struct since the specular falloff function needs saturate(NoL) instead
+    real v = NoL * sqrt(NoV * (-rough2 * NoV + 1.0h) + rough2);
+    real l = NoV * sqrt(NoL * (-rough2 * NoL + 1.0h) + rough2);
+    return real(0.5) / v + l;
 }
 
 /** 
@@ -418,7 +418,7 @@ real3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfDat
  */
 real SLZFakeSpecularFalloff(real NoL)
 {
-    real NoLMul = 1.0 - NoL;
+    real NoLMul = 1.0 - saturate(NoL); // On PC, the smith visibility function needs abs(NoL), so NoL is stored raw and needs to be saturated here 
     NoLMul = -NoLMul * NoLMul + 1.0;
     return NoLMul;
 }
