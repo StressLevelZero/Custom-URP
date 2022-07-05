@@ -28,7 +28,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
     fresnelTerm *= fresnelTerm;
     fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
     real3 IBSpec = real3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
-
+   
 #if !defined(SHADER_API_MOBILE)
     //ssrData.perceptualRoughness = -fresnelTerm * ssrData.perceptualRoughness + ssrData.perceptualRoughness;
     real SSRLerp = smoothstep(0.6, 0.4, ssrData.perceptualRoughness);
@@ -37,7 +37,17 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
     {
         SSRColor = getSSRColor(ssrData);
     }
-
+    /**/
+#if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
+    
+    real4 colorX = QuadReadAcrossX(SSRColor);
+    real4 colorY = QuadReadAcrossY(SSRColor);
+    real4 colorD = QuadReadAcrossDiagonal(SSRColor);
+    real alphaAvg = max(colorX.a + colorY.a + colorD.a, 1e-6);
+    real4 colorAvg = real4((colorX.a * colorX + colorY.a * colorY + colorD.a*colorD) / (alphaAvg));//, alphaAvg);
+    SSRColor = lerp(colorAvg, SSRColor,-SSRColor.a * saturate(2 * ssrData.perceptualRoughness) + SSRColor.a);
+    
+#endif
     reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
 #endif
 

@@ -392,6 +392,7 @@ namespace UnityEngine.Rendering.Universal
             if (cameraData.cameraType != CameraType.Game)
                 useRenderPassEnabled = false;
 
+            // SLZ Initialize global variables
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
             SLZGlobals.instance.UpdateBlueNoiseFrame();
 

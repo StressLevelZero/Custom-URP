@@ -255,6 +255,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                     }
                     else if (UOdd2 == 1 || VOdd2 == 1)
                     {
+                        //Debug.Log(string.Format("{0} x {1} is odd?", widthHeight[0], widthHeight[1]));
                         DispatchEvenSingle(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
                         i++;
                     }

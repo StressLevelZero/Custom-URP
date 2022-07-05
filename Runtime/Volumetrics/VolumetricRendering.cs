@@ -55,6 +55,7 @@ public class VolumetricRendering : MonoBehaviour
 
     public Camera cam; //Main camera to base settings on
     [HideInInspector] public Camera activeCam;
+    bool activeCameraState;
     public VolumetricData volumetricData;
     [Range(0, 1)]
     public float reprojectionAmount = 0.5f;
@@ -227,7 +228,6 @@ public class VolumetricRendering : MonoBehaviour
     int PreviousFrameMatrixID = Shader.PropertyToID("PreviousFrameMatrix");
     int Camera2WorldID = Shader.PropertyToID("Camera2World");
     int CameraPositionID = Shader.PropertyToID("CameraPosition");
-
     //Clipmap IDs
     int CameraMotionVectorID = Shader.PropertyToID("CameraMotionVector");
     int ClipmapTextureID = Shader.PropertyToID("_ClipmapTexture");
@@ -242,7 +242,7 @@ public class VolumetricRendering : MonoBehaviour
     [Header("Extra variables"), Range(0, 1)]
     float[] jitters = new float[2] { 0.0f, 0.5f };
 
-
+    GlobalKeyword VolumetricsKW;
     //Previous view matrix data
 
     Matrix4x4 PreviousFrameMatrix = Matrix4x4.identity;
@@ -327,11 +327,16 @@ public class VolumetricRendering : MonoBehaviour
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         Shader.SetGlobalConstantBuffer(ShaderCBID, ShaderConstantBuffer, 0, ShaderConstantsCount * sizeof(float));
         Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
+        VolumetricsKW = new GlobalKeyword("_VOLUMETRICS_ENABLED");
+        if (!this.isActiveAndEnabled || cam == null || !cam.isActiveAndEnabled)
+        {
+            Shader.DisableKeyword(VolumetricsKW);
+        }
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
             enableEditorPreview = false;
-            Shader.DisableKeyword("_ENABLE_VOLUMETRICS");
+            Shader.DisableKeyword(VolumetricsKW);
         }
         if (Application.isPlaying || activeCam == null)
         {
@@ -403,6 +408,7 @@ public class VolumetricRendering : MonoBehaviour
         BlurBuffer.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBuffer.enableRandomWrite = true;
         BlurBuffer.Create();
+        
 
         BlurBufferB = new RenderTexture(rtdiscrpt);
         BlurBufferB.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
@@ -433,7 +439,17 @@ public class VolumetricRendering : MonoBehaviour
 #else
     activeCam = cam;
 #endif
-        Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+        if (activeCam == null)
+        {
+            Shader.DisableKeyword(VolumetricsKW);
+            //Debug.Log("Null active cam on initialize");
+            return;
+        }
+        if (activeCam.isActiveAndEnabled)
+        {
+            Shader.EnableKeyword(VolumetricsKW);
+        }
+        activeCameraState = activeCam.isActiveAndEnabled;
         CheckOverrideVolumes();
      //   if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
         CheckCookieList();
@@ -796,6 +812,24 @@ public class VolumetricRendering : MonoBehaviour
     }
     void UpdateFunc()
     {
+        if (activeCam == null)
+        {
+            return;
+        }
+        if (!activeCam.isActiveAndEnabled)
+        {
+            if (activeCameraState == true)
+            {
+                activeCameraState = false;
+                Shader.DisableKeyword(VolumetricsKW);
+            }
+            return;
+        }
+        else if (activeCameraState == false)
+        {
+            activeCameraState = true;
+            Shader.EnableKeyword(VolumetricsKW);
+        }
         CheckOverrideVolumes();
         //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
         //bleh
@@ -1065,7 +1099,7 @@ public class VolumetricRendering : MonoBehaviour
         #if UNITY_EDITOR
             RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
         #endif
-        Shader.DisableKeyword("_ENABLE_VOLUMETRICS");
+        Shader.DisableKeyword(VolumetricsKW);
         ReleaseAssets();
     }
 
@@ -1100,7 +1134,7 @@ public class VolumetricRendering : MonoBehaviour
         if (!Application.isPlaying)
         {
             // Every time scripts get re-compiled, everything gets reset without calling OnDisable or OnDestroy, and the keyword gets left on 
-            Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
+            Shader.DisableKeyword(VolumetricsKW);
             enableEditorPreview = false;
             AssemblyReloadEvents.afterAssemblyReload += UpdateStateAfterReload;
         }
@@ -1211,7 +1245,7 @@ public class VolumetricRendering : MonoBehaviour
 
     void ReleaseAssets()
     {
-        Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
+        Shader.DisableKeyword(VolumetricsKW);
         if (ClipmapBufferA!= null) ClipmapBufferA.Release();
         if (FroxelBufferA != null) FroxelBufferA.Release();   
         if (IntegrationBuffer != null)IntegrationBuffer.Release();
@@ -1258,8 +1292,8 @@ public class VolumetricRendering : MonoBehaviour
         //    volumetricData.near = Mathf.Max(volumetricData.near, cam.nearClipPlane);
         //    volumetricData.far = Mathf.Min(volumetricData.far, cam.farClipPlane);
         //}
-
-        Shader.EnableKeyword("_VOLUMETRICS_ENABLED"); //enabling here so the editor knows that it exists
+        
+        //Shader.EnableKeyword(VolumetricsKW); //enabling here so the editor knows that it exists
     }
 #endif
 

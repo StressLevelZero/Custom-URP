@@ -79,6 +79,12 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
         Tags{"RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "UniversalMaterialType" = "Lit" "IgnoreProjector" = "True" "ShaderModel"="4.5"}
         LOD 300
 
+
+HLSLINCLUDE
+#if !defined(SHADER_API_MOBILE)
+#pragma use_dxc vulkan
+#endif
+ENDHLSL
         // ------------------------------------------------------------------
         //  Forward pass. Shades all light in a single pass. GI + emission + Fog
         Pass
