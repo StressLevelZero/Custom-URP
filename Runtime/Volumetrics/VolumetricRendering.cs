@@ -824,10 +824,10 @@ public class VolumetricRendering : MonoBehaviour
 #if UNITY_EDITOR
         if (!activeCam.isActiveAndEnabled && Application.isPlaying)
 #else
-        if (activeCam.isActiveAndEnabled)
+        if (!activeCam.isActiveAndEnabled)
 #endif
         {
-            Debug.Log("Active camera disabled");
+            //Debug.Log("Active camera disabled");
             if (activeCameraState == true)
             {
                 activeCameraState = false;
