@@ -327,7 +327,7 @@ public class VolumetricRendering : MonoBehaviour
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         Shader.SetGlobalConstantBuffer(ShaderCBID, ShaderConstantBuffer, 0, ShaderConstantsCount * sizeof(float));
         Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
-        VolumetricsKW = new GlobalKeyword("_VOLUMETRICS_ENABLED");
+        VolumetricsKW = GlobalKeyword.Create("_VOLUMETRICS_ENABLED");
         if (!this.isActiveAndEnabled || cam == null || !cam.isActiveAndEnabled)
         {
             Shader.DisableKeyword(VolumetricsKW);
@@ -442,10 +442,14 @@ public class VolumetricRendering : MonoBehaviour
         if (activeCam == null)
         {
             Shader.DisableKeyword(VolumetricsKW);
-            //Debug.Log("Null active cam on initialize");
+            Debug.Log("Null active cam on initialize");
             return;
         }
+#if UNITY_EDITOR
+        if (activeCam.isActiveAndEnabled || !Application.isPlaying)
+#else
         if (activeCam.isActiveAndEnabled)
+#endif
         {
             Shader.EnableKeyword(VolumetricsKW);
         }
@@ -593,7 +597,7 @@ public class VolumetricRendering : MonoBehaviour
         LightBuffer.SetData(LightObjects);
         FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); // TODO: move to an int
     }
-    #region Clipmap funtions
+#region Clipmap funtions
     void SetupClipmap()
     {
 
@@ -740,7 +744,7 @@ public class VolumetricRendering : MonoBehaviour
             Shader.SetGlobalTexture(ClipmapTextureID, ClipmapTexture); //Set clipmap for
         }
     }
-    #endregion
+#endregion
 
     bool FlopIntegralBuffer = false;
     void FlopIntegralBuffers(){
@@ -796,14 +800,14 @@ public class VolumetricRendering : MonoBehaviour
 
     void Update()
     {
-        #if UNITY_EDITOR
+#if UNITY_EDITOR
         if (Application.isPlaying)
         {
             UpdateFunc();
         }
-        #else
+#else
         UpdateFunc();
-        #endif
+#endif
     }
 
     void UpdatePreRender(ScriptableRenderContext ctxt, Camera cam1)
@@ -814,10 +818,16 @@ public class VolumetricRendering : MonoBehaviour
     {
         if (activeCam == null)
         {
+            Debug.Log("No active camera");
             return;
         }
-        if (!activeCam.isActiveAndEnabled)
+#if UNITY_EDITOR
+        if (!activeCam.isActiveAndEnabled && Application.isPlaying)
+#else
+        if (activeCam.isActiveAndEnabled)
+#endif
         {
+            Debug.Log("Active camera disabled");
             if (activeCameraState == true)
             {
                 activeCameraState = false;
@@ -1096,9 +1106,9 @@ public class VolumetricRendering : MonoBehaviour
 
     public void disable()
     {
-        #if UNITY_EDITOR
+#if UNITY_EDITOR
             RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
-        #endif
+#endif
         Shader.DisableKeyword(VolumetricsKW);
         ReleaseAssets();
     }
@@ -1106,7 +1116,7 @@ public class VolumetricRendering : MonoBehaviour
     public void enable()
     {
        
-        #if UNITY_EDITOR
+#if UNITY_EDITOR
         if (enableEditorPreview && !Application.isPlaying)
         {
             
@@ -1281,7 +1291,7 @@ public class VolumetricRendering : MonoBehaviour
 
         //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
         // TODO: Add proper scene preview feature
-         if (!UnityEditor.EditorApplication.isPlaying && BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
+         if ( BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
         
         //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
         assignVaris();

@@ -207,6 +207,7 @@ public class VolumetricDebugTool : EditorTool
                 VolumetricScript.activeCam = CameraPopup.value == placeholderCam ? SceneView.lastActiveSceneView.camera : CameraPopup.value;
                 VolumetricScript.enableEditorPreview = true;
                 VolumetricScript.enable();
+                Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
             }
             else
             {
@@ -214,6 +215,7 @@ public class VolumetricDebugTool : EditorTool
                 toolWindow.Remove(BlankLabel);
                 toolWindow.Remove(CameraPopup);
                 VolumetricScript.disable();
+                Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
             }
            
             ActiveView.Repaint();

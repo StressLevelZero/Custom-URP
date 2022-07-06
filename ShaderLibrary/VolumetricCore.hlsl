@@ -54,7 +54,7 @@ half4 GetVolumetricColor(float3 positionWS)
 }
 
 
-half4 GetVolumetricColorJittered(float3 positionWS, float3 noise)
+half4 GetVolumetricColorJittered(float3 positionWS, float2 noise)
 {
     //float2 positionNDC = ComputeNormalizedDeviceCoordinates(positionWS, _PrevViewProjMatrix);//viewProjMatrix
 
@@ -77,14 +77,19 @@ half4 GetVolumetricColorJittered(float3 positionWS, float3 noise)
     half3 LUV = half3 (halfU.x, ls.y, W) * (1 - unity_StereoEyeIndex); //Left UV
     half3 RUV = half3(halfU + 0.5, ls.y, W) * (unity_StereoEyeIndex); //Right UV
     half3 DoubleUV = LUV + RUV; // Combined
-    DoubleUV.xyz += 0.5*(noise - 0.5) / _VolumetricResultDim.z;
-    //TODO: Make sampling calulations run or not if they are inside or out of the clipped area
+    DoubleUV.xy += 0.25*(noise - 0.5) / _VolumetricResultDim.z; // don't jitter on Z since 3d textures are accessed like 2d arrays (i.e. only pixels in the same z layer are cached)
+
+                                                                
+                                                                //TODO: Make sampling calulations run or not if they are inside or out of the clipped area
     //float ClipUVW =
     //    step(DoubleUV.x, 1) * step(0, DoubleUV.x) *
     //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
 
 //    float random = GenerateHashedRandomFloat(DoubleUV * 4000) * 0.003;
-    return SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_linear_clamp, DoubleUV, 0);
+
+    half4 volumetricColor = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_linear_clamp, DoubleUV, 0);
+
+    return volumetricColor;
 }
 
 half4 Volumetrics(half4 color, float3 positionWS) {
@@ -98,7 +103,7 @@ half4 Volumetrics(half4 color, float3 positionWS) {
     return color;
 }
 
-half4 VolumetricsJittered(half4 color, float3 positionWS, float3 noise) {
+half4 VolumetricsJittered(half4 color, float3 positionWS, float2 noise) {
 
 #if defined(_VOLUMETRICS_ENABLED)
 
