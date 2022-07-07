@@ -550,9 +550,9 @@ public class VolumetricRendering : MonoBehaviour
      else   Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
 
         ThreadsToDispatch = new Vector3(
-             Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f),
-             Mathf.CeilToInt(volumetricData.FroxelHeightResolution / 4.0f),
-             Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f)
+             Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f), 1.0f),
+              Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelHeightResolution / 4.0f), 1.0f),
+              Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f), 1.0f)
             );
 
         //    ComputZPlaneTexelSpacing(1.0f, vFoV, parameters.resolution.y);
@@ -1185,6 +1185,9 @@ public class VolumetricRendering : MonoBehaviour
             ComputePerFrameConstantBuffer.Dispose();
             ComputePerFrameConstantBuffer = null;
         }
+        if (ClipmapBufferA != null) ClipmapBufferA.Release();
+        if (FroxelBufferA != null) FroxelBufferA.Release();
+        if (IntegrationBuffer != null) IntegrationBuffer.Release();
     }
 
 
