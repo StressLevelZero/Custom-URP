@@ -687,10 +687,11 @@ public class VolumetricRendering : MonoBehaviour
 
         FlipClipBuffer = false;
         //Clear previous capture
+        int clipMapDispatchNum = Mathf.Max(volumetricData.ClipMapResolution / 4, 1);
         ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", BufferA);
-        ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
+        ClipmapCompute.Dispatch(ClearClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
         ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", BufferB);
-        ClipmapCompute.Dispatch(ClearClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
+        ClipmapCompute.Dispatch(ClearClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
 
 
         //Loop through bake texture volumes and put into clipmap //TODO: Add daynamic pass for static unbaked elements
@@ -714,7 +715,7 @@ public class VolumetricRendering : MonoBehaviour
             ClipmapCompute.SetVector("VolumeWorldSize", VolumetricRegisters.volumetricAreas[i].NormalizedScale);
             ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);
 
-            ClipmapCompute.Dispatch(ClipmapKernal, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4, volumetricData.ClipMapResolution / 4);
+            ClipmapCompute.Dispatch(ClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
         }
 
         if (FlipClipBuffer)
