@@ -9,6 +9,7 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
+
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
 Texture3D<float4> PreviousFrameLighting;
@@ -17,8 +18,6 @@ RWTexture3D<float4> Result;
 //Texture2D<float4> BlueNoise;
 
 Texture2DArray<float4> LightProjectionTextureArray;
-
-
 
 //Currently only Supports spot lights
 struct LightObject 
@@ -31,10 +30,14 @@ struct LightObject
 
 StructuredBuffer<LightObject> LightObjects;
 
-shared float _GlobalExtinction;
 shared float4 _VolumePlaneSettings;
-shared float _ClipmapScale2;
+shared float _GlobalExtinction;
+shared float _FogBaseHeight;
+shared float _FogMaxHeight;
 shared float _StaticLightMultiplier;
+shared float _ClipmapScale;
+shared float _ClipmapScale2;
+shared float3 _ClipmapPosition;
 
 CBUFFER_START(PerFrameCB)
 float4x4 _VBufferCoordToViewDirWS; // >_>
@@ -50,18 +53,12 @@ float4 CameraMotionVector; //camera's motion per frame
 CBUFFER_END
 
 
-shared float3 _ClipmapPosition;
-shared float _ClipmapScale;
-
 
 //shared float SeqOffsetPrv; //z offseter
 
 float _VBufferUnitDepthTexelSpacing;
 //shared float4 _VBufferSharedUvScaleAndLimit;
 //float4x4 PreviousFrameMatrix;
-
-
-
 
 SamplerState _LinearClamp;
 SamplerState _point_repeat;
@@ -71,7 +68,12 @@ SamplerState s_linear_clamp_sampler;
 shared Texture3D<float4> _VolumetricClipmapTexture;
 shared Texture3D<float4> _VolumetricClipmapTexture2;
 
+shared TextureCube<float4> _SkyTexture;
+
+
 //float reprojectionAmount;
+shared float4 _MipFogParameters; //near, far, mix
+shared int _SkyMipCount;
 
 
 
@@ -87,6 +89,19 @@ float3 GetViewUpDir()
 {
 	float4x4 viewMat = _ViewMatrix;
 	return viewMat[1].xyz;
+}
+
+float3 GetFogColor(float3 V, float fragDist)
+{
+	float3 color = float3(1,1,1);
+		// Based on Uncharted 4 "Mip Sky Fog" trick: http://advances.realtimerendering.com/other/2016/naughty_dog/NaughtyDog_TechArt_Final.pdf
+		float mipLevel = (1.0 - _MipFogParameters.z * saturate((fragDist - _MipFogParameters.x) / (_MipFogParameters.y - _MipFogParameters.x))) * (_SkyMipCount - 1);
+		// For the atmospheric scattering, we use the GGX convoluted version of the cubemap. That matches the of the idnex 0
+		//color *= SampleSkyTexture(-V, mipLevel, 0).rgb; // '_FogColor' is the tint
+	    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb; // '_FogColor' is the tint
+
+
+	return color;
 }
 
 //Custom trilinear interpolation
@@ -265,6 +280,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float3 centerWS =  CameraPosition.xyz + ( t * jitterDirWS); //Cast ray along direction and add cam pos to get WS pos
 	float3 centWSNJIT = CameraPosition.xyz + pt * centerDirWS ; //non-jittered version for reprojection
 
+	//RGB is total lighting, A is the total extinction
 	float4 accumLighting = float4(0,0,0,0);
 	//	
 	//centerWS *= .99;
@@ -353,10 +369,29 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//{
 	//	accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0);
 	//}
-	accumLighting += float4(_VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0).xyz, 0) * Clipped;
-	accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0) * (1- Clipped);
-
-	accumLighting *= _StaticLightMultiplier * _GlobalExtinction;
+	accumLighting += _VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0) * Clipped;
+	accumLighting += _VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0) * (1- Clipped);
+	accumLighting.rgb *= _StaticLightMultiplier;
+	accumLighting.rgb += GetFogColor(centerDirWS,W)*W; //Base fog color from cubemap;
+	
+	// float3 lerpy = abs(dot(float3(0,0,1),rayDirWS)); //Directional tester
+	// accumLighting.rgb += lerpy*lerpy * float3(1,0.8,0.5)*W;
+	
+	//Take any precomputed extinction stored in the clipmap and add global variables
+	//Height density. Doing this here instead of the clipmap to smoothly interpolate between volumes
+	// float maxheight = 1;
+	// float baseheight = 0;
+		
+	//float heightDensity = lerp(_GlobalExtinction, REAL_EPS,saturate( (WS_coordinate.y / maxheight - baseheight)  ));
+	//float NewValue = (((WS_coordinate.y) * (maxheight - baseheight)) / (1 - 0)) + baseheight;
+	float HeightRemap = (WS_coordinate.y - _FogBaseHeight) / (_FogMaxHeight - _FogBaseHeight);
+	float heightDensity = lerp(_GlobalExtinction, .001,sqrt(saturate( HeightRemap)) ); 
+	//accumLighting.a += _GlobalExtinction;
+	
+	accumLighting.a += heightDensity;
+	//accumLighting.a += distance(WS_coordinate.xyz,0) > 3 ? 0:10 ;
+	
+	accumLighting.rgb *= accumLighting.a;
 
 //	accumLighting.rgb += max((float3(rndVal, frac(rndVal+.2), frac(rndVal+.5)) - 0.5) * 0.03,0);  //dithering
 

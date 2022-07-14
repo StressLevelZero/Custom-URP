@@ -23,7 +23,7 @@ SamplerState Custom_trilinear_clamp_sampler;
 //shared float4 _GlobalExtinctionTint;
 
 
-#define extinction _GlobalExtinction
+//#define extinction _GlobalExtinction
 
 
 
@@ -32,7 +32,7 @@ float4x4    LeftEyeMatrix;
 float4x4    RightEyeMatrix;
 
 shared float4 _VolumePlaneSettings;
-shared float _GlobalExtinction;
+//shared float _GlobalExtinction;
 shared float4 _GlobalScattering;
 
 float4 _VolZBufferParams;
@@ -138,7 +138,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 		float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
 		float travelDis = (zDepth - previousDepth)   ; //Distance between layers. Jittering and do temporal blend
 		//* (.5 + rndVal.z *.5)
-
+		float extinction = scatteringExtinction.a;
 		 float transmittance = exp(-extinction * travelDis );
 
 	//	accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * _GlobalScattering; //Non-energy conserve

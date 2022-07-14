@@ -5,6 +5,7 @@
 
 #pragma kernel ClipMapGen
 #pragma kernel ClipMapClear
+#pragma kernel ClipMapHeight
 
 Texture3D<float4>	PreResult;
 RWTexture3D<float4> Result;
@@ -19,11 +20,16 @@ float3	VolumeWorldPosition;
 
 Texture3D<float4> VolumeMap;
 SamplerState trilinear_clamp_sampler;
+float VolumeDensity;
+
+shared float _GlobalExtinction;
+float4 clearColor;
 
 [numthreads(4, 4, 4)]
 void ClipMapClear(uint3 id : SV_DispatchThreadID)
 {
 	Result[id.xyz] = float4(0, 0, 0, 0);
+	//Result[id.xyz] = clearColor;
 }
 
 [numthreads(4,4,4)]
@@ -46,14 +52,39 @@ void ClipMapGen (uint3 id : SV_DispatchThreadID)
 		step(MapUVW.y, 1) * step(0, MapUVW.y) *
 		step(MapUVW.z, 1) * step(0, MapUVW.z);
 
+	float tempden = distance(WorldCoord.xyz,0) > 3 ? 0:10 ;
+
+	
 	//Sample baked volume and clip it off to its area
 	//Doing max of the two results to account for overlaps
-	Result[id.xyz] = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW);
+	float4 colors = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 0) * ClipUVW);
+	colors.a = 0;
+	Result[id.xyz] = colors;
 }
-
 
 [numthreads(4, 4, 4)]
 void MediapGen(uint3 id : SV_DispatchThreadID)
 {
 
+}
+
+[numthreads(4, 4, 4)]
+void ClipMapHeight(uint3 id : SV_DispatchThreadID)
+{
+	//uint count, stride;
+
+	float4 UVW = float4(0,0,0,0);
+	Result.GetDimensions(UVW.x, UVW.y, UVW.z);
+
+	UVW.xyz = (id + 0.5) / UVW.xyz; //0-1 scaling
+	UVW.w = 1;
+
+	float4 WorldCoord = UVW * ClipmapScale + ClipmapWorldPosition.xyzz;
+
+	float heightDens = WorldCoord.y > 0 ? 0:1;
+
+	heightDens = _GlobalExtinction;
+
+	Result[id.xyz] = max(PreResult[id.xyz].rgba,float4(0,0,0,heightDens));
+;
 }

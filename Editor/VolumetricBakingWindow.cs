@@ -331,7 +331,7 @@ public class VolumetricBaking : EditorWindow
             for (int i = 0; i < mediaPos.Length; i++)
             {
                 mediaPos[i] = VolumetricRegisters.VolumetricMediaEntities[i].transform.position;
-                mediaAbs[i] = new Vector4(VolumetricRegisters.VolumetricMediaEntities[i].Absorption, 0, 0, 0); //Only Absorption for now
+              //  mediaAbs[i] = new Vector4(VolumetricRegisters.VolumetricMediaEntities[i].Absorption, 0, 0, 0); //Only Absorption for now
             }
 
 
