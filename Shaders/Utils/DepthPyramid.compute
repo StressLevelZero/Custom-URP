@@ -51,17 +51,22 @@
 //CBUFFER_START(cb)
 int4 data1; //current mip width, current mip height, lower mip width, lower mip height 
 int4 data2; // number of mips to process at once, is U odd, is V odd, are both odd 
-groupshared uint minLevel1[4][4];
 //CBUFFER_END
+groupshared uint minLevel1[4][4];
+groupshared uint maxLevel1[4][4];
 
 #if UNITY_REVERSED_Z
     #define MIN_DEPTH(l, r) max(l, r)
+    #define MAX_DEPTH(l, r) min(l, r)
     #define INIT_DEPTH 0u
     #define INTERLOCKED_MIN(a, b) InterlockedMax(a, b)
+    #define INTERLOCKED_MAX(a, b) InterlockedMin(a, b)
 #else
     #define MIN_DEPTH(l, r) min(l, r)
+    #define MAX_DEPTH(l, r) max(l, r)
     #define INIT_DEPTH 4294967295u
     #define INTERLOCKED_MIN(a, b) InterlockedMin(a, b)
+    #define INTERLOCKED_MAX(a, b) InterlockedMax(a, b)
 #endif
 
 [numthreads(KERNEL_SIZE, KERNEL_SIZE,1)]

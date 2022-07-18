@@ -151,7 +151,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             // In shader, we need to know how many mip levels to 1x1 and not actually how many mips there are, so re-add mipTruncation to the true number of mips
             Shader.SetGlobalVector(opaqueTextureDimID, 
-                new Vector4( tempDescriptor.width * 2, tempDescriptor.height * 2, tempDescriptor.volumeDepth * 2, m_MipLevels + mipTruncation));
+                new Vector4( tempDescriptor.width * 2, tempDescriptor.height * 2, m_MipLevels - 1, m_MipLevels + mipTruncation));
 
             if (m_MipLevels > 1)
             {

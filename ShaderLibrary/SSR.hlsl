@@ -11,6 +11,7 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSRGlobals.hlsl"
 
 #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
 Texture2DArray<float> _CameraHiZDepthTexture;
@@ -65,6 +66,30 @@ struct SSRData
 };
 
 
+SSRData GetSSRDataWithGlobalSettings(
+	float3	wPos,
+	float3	viewDir,
+	half3	rayDir,
+	half3	faceNormal,
+	half	perceptualRoughness,
+	half4   noise)
+{
+	SSRData ssrData;
+	ssrData.wPos = wPos;
+	ssrData.viewDir = viewDir;
+	ssrData.rayDir = rayDir;
+	ssrData.faceNormal = faceNormal;
+	ssrData.hitRadius = _SSRHitRadius;
+	ssrData.maxSteps = _SSRSteps;
+	ssrData.edgeFade = _SSREdgeFade;
+	ssrData.perceptualRoughness = perceptualRoughness;
+	ssrData.scrnParams = _ScreenParams.xy;
+	ssrData.GrabTextureSSR = _CameraOpaqueTexture;
+	ssrData.samplerGrabTextureSSR = sampler_trilinear_clamp;
+	ssrData.noise = noise;
+	return ssrData;
+}
+
 /** @brief Partially transforms a given camera space point to screenspace in 7 operations for the purposes of computing its screen UV position
  *
  *  Normally, transforming from camera space to projection space involves multiplying a 4x4 matrix
@@ -91,7 +116,7 @@ float3 CameraToScreenPosCheap(const float3 pos)
  *
  *  @return Step size scaled to move the ray 1/maxIterations of the vertical dimension of the screen
  */
-float perspectiveScaledStep(float3 rayDir, float3 rayPos)
+float perspectiveScaledStep(const float3 rayDir, float3 rayPos)
 {
 	// Vector between rayDir and a ray from the camera to the ray's position scaled to have the same z value as raydir.
 	// This is approximately the distance in flat screen coordinates the ray will move
@@ -193,7 +218,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 	//largeRadius *= 4.0f;
 	float oddStep = 1;
 	float totalDistance = 0.0f;
-	reflectedRay += 1.1*(largeRadius * FdotV / (FdotR + 0.0000001)) * rayDir;
+	reflectedRay += 1* defaultLR * (FdotV / (FdotR + 0.0000001)) * rayDir;
 
 	for (float i = 0; i < maxIterations; i++)
 	{
@@ -291,6 +316,107 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 
 
 
+float4 GetRayHit(const float3 wPos, const float3 wRay)
+{
+	/* Raymarching in screenspace requires special handling, as the depth is not 
+	 * simply the z distance from the camera, but rather is a function of 1/z,
+	 * the near clip distance, and the far clip distance. Since the near and
+	 * far clip planes are constant during the rendering of the object, the
+	 * depth value can be reduced to a simple 1st degree polynomial that only
+	 * depends on 1/z
+	 * 
+	 * d = c * (1/z) + b 
+	 * where c = reversed z ? -1 / near clip : 1 / near clip, 
+	 * and b = reversed z ? 1 - (1/near clip) * (1/(far - near)) : (1/near clip) * (1/(far - near))
+	 * 
+	 * "Perspective Correct Interpolation", Kok-Lim Low (2002) shows that given
+	 * two points p1, p2 in projection space, the 1/z value of a third point t
+	 * that is a fraction s from p1 to p2 in flattened xy screen coordinates
+	 * can be found using simple linear interpolation.
+	 * 
+	 * 1/z_t = 1/z_1 + s * ( 1/z_2 - 1/z_1) 
+	 * 
+	 * multiplying both sides of the equation by c and adding b:
+	 *
+	 * c*1/z_t + b	= c * (1/z_1 + s * ( 1/z_2 - 1/z_1)) + b
+	 *			d_t = (c * 1/z_1 + b) + s * (c * 1/z_2 + b - c * 1/z_1 - b) // +b, -b cancels out 
+	 *				= d_1 + s * (d_2 - d_1)
+	 * 
+	 * Therefore, the depth value of a point on the line can also be derived from
+	 * linear interpolation. This also holds true for extrapolating a point beyond
+	 * p1 and p2 as well using s values <0 or >1.
+	 * 
+	 * If we have a known depth value for t and want to find its screen coordinates,
+	 * derive s from the formula of d_t and find the screen x,y by linear
+	 * interpolation
+	 * 
+	 * s = (d_t - d_1) / (d_2 - d_1);
+	 * xy_t = xy_1 + s * (xy_2 - xy_1); 
+	 */
+
+	float3 sOrigin = ComputeNormalizedDeviceCoordinatesWithZ(wPos); // origin of the ray
+	sOrigin.xy *= _ScreenParams.xy; //make xy units pixels rather than 0-1 to make rounding to the closest pixel musch easier
+	float3 sRayEnd = ComputeNormalizedDeviceCoordinatesWithZ(wPos + wRay, UNITY_MATRIX_VP); // second point along the ray
+	sRayEnd.xy *= _ScreenParams.xy;
+	float3 sRay = sRayEnd - sOrigin;
+	float3 rcpSRay = rcp(sRay); // 1/(p_2 - p_1), used to find the interpolation factor
+
+	/* our depth pyramid starts at mip 1. Thus, there is a 1 in 4 chance the ray's depth
+	 * is already behind the depth stored for it in the depth pyramid. To fix this, replace
+	 * the ray origin's depth with the depth sampled from mip 0 of the pyramid
+	 */
+	float2 rcpPixelDim = 2.0 / _ScreenParams.xy; // our depth pyramid starts at mip 1, so the base pixel size is doubled
+	sOrigin.z = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_CameraHiZDepthTexture, rcpPixelDim * sOrigin.xy, 0).r;
+	
+	float3 sCurrPos = sOrigin;	// current position of the ray, starts at the origin
+
+	/* For each step of the raymarching process, we advance the ray to the boundary
+	 * of a screenspace voxel whose walls on the x and y are the bounds of the pixel
+	 * the ray is currently in, and on the z by either the near clip and the camera
+	 * depth if the ray's depth is above the camera depth, or the camera depth and 
+	 * the camera depth plus some epsilon if the ray is between the two.
+	 * 
+	 * We want to move to the farthest wall of the voxel, so the walls opposite
+	 * the ray direction really don't matter. In fact, trying test against them would
+	 * cause issues since the ray should be directly on one of the walls having moved 
+	 * there in the previous step. Thus we only test against the farthest wall on X
+	 * and on Y for the given ray direction
+	 * 
+	 */
+	
+	
+	/* add a tiny delta, and if moving in the +x/+y one pixel, to the ray's coordinate so that when rounded we get the far wall instead of the 
+	* 
+	 */
+	float2 voxelOffset;
+	#define SSR_PIXEL_DELTA 1.0e-9 // lowest bit of 16,384 is 1
+	voxelOffset.x = sRay.x > 0 ? 1.0 + SSR_PIXEL_DELTA : SSR_PIXEL_DELTA;
+	voxelOffset.y = sRay.y > 0 ? 1.0 + SSR_PIXEL_DELTA : SSR_PIXEL_DELTA;
+
+	/* Make an initial step without testing if we've intersected the depth since by
+	 * definition we start on it. find the smallest interpolation factor that will take
+	 * the ray to one of the walls (i.e. the closest wall)
+	 */
+
+	float s_x = (floor(sCurrPos.x + 0.5) + voxelOffset.x  - sOrigin.x) * rcpSRay.x;
+	float s_y = (floor(sCurrPos.y + 0.5) + voxelOffset.y  - sOrigin.y) * rcpSRay.y;
+	float s_min = min(s_x, s_y);
+	int mipLevel = 0;
+	float mipPower = 1;
+	bool hit = false;
+	for (int i = 0; i < _SSRSteps && !hit; i++)
+	{
+		sCurrPos = sOrigin + s_min * sRay; // interpolate/extrapolate the marcher's postion from the origin along the ray using the lerp factor calculated last iteration
+		float depth = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_CameraHiZDepthTexture, rcpPixelDim * sCurrPos.xy, mipLevel).r;
+		float2 s_xy = (floor(mipPower * (sCurrPos.xy + 0.5)) + voxelOffset.xy - sOrigin.xy) * rcpSRay.xy;
+		s_min = min(s_xy.x, s_xy.y);
+		float s_z = (depth - sOrigin.z) * rcpSRay.z;
+		s_min = min(s_min, s_z);
+
+	}
+
+	return float4(0, 0, 0, 0);
+}
 
 
 /** @brief Gets the reflected color for a pixel
@@ -310,7 +436,7 @@ float4 getSSRColor(SSRData data)
 		return float4(0, 0, 0, 0);
 	}
 
-	float FdotV = abs(dot(data.faceNormal, -data.viewDir.xyz));
+	float FdotV = (dot(data.faceNormal, data.viewDir.xyz));
 
 	float3 screenUVs = ComputeGrabScreenPos(mul(UNITY_MATRIX_VP, float4(data.wPos,1)).xyw);
 	screenUVs.xy = screenUVs.xy / screenUVs.z;
@@ -405,7 +531,7 @@ float4 getSSRColor(SSRData data)
 		mipLevels += 3;
 */
 		float roughRadius = 1.33*totalDistance * ( 1.0 / (1.0 - data.perceptualRoughness) - 1); // 1 / (1 - roughness) - 1 is approx. tan(0.5pi * roughness)
-		float blur = _CameraOpaqueTexture_Dim.w * roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
+		float blur = min(_CameraOpaqueTexture_Dim.w * roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos), _CameraOpaqueTexture_Dim.z);
 		float4 reflection = SAMPLE_TEXTURE2D_X_LOD(data.GrabTextureSSR, data.samplerGrabTextureSSR, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 		//reflection *= _ProjectionParams.z;
 		//reflection.a *= smoothness*reflStr*fade;
