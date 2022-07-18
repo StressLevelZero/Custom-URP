@@ -15,9 +15,10 @@ namespace UnityEditor.Rendering.Universal
         //SerializedDataParameter m_Response;
         // SerializedDataParameter m_Texture;
 
-        SerializedDataParameter m_GlobalStaticLightMultiplier;
         SerializedDataParameter m_FogDistance;
+        SerializedDataParameter m_FogBaseHeight, m_FogMaxHeight;
         SerializedDataParameter m_MaxRenderDistance;
+        SerializedDataParameter m_GlobalStaticLightMultiplier;
         SerializedDataParameter m_VolumetricAlbedo;
         //{
         //    var o = new PropertyFetcher<FilmGrain>(serializedObject);

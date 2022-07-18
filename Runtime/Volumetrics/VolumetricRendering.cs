@@ -655,6 +655,7 @@ public class VolumetricRendering : MonoBehaviour
         //TODO: chache ids 
         int ClipmapKernal = ClipmapCompute.FindKernel("ClipMapGen");
         int ClearClipmapKernal = ClipmapCompute.FindKernel("ClipMapClear");
+        int HeightClipmapKernal = ClipmapCompute.FindKernel("ClipMapHeight");
         ClipmapTransform = activeCam.transform.position;
 
         float farscale = volumetricData.ClipmapScale2;
@@ -688,13 +689,17 @@ public class VolumetricRendering : MonoBehaviour
         FlipClipBuffer = false;
         //Clear previous capture
         int clipMapDispatchNum = Mathf.Max(volumetricData.ClipMapResolution / 4, 1);
+     //   ClipmapCompute.SetVector("clearColor", RenderSettings.ambientProbe.Evaluate);
+
+
         ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", BufferA);
         ClipmapCompute.Dispatch(ClearClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
         ClipmapCompute.SetTexture(ClearClipmapKernal, "Result", BufferB);
         ClipmapCompute.Dispatch(ClearClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
 
+        //ClipmapCompute.SetFloat("VolumeDensity", 0); //
 
-        //Loop through bake texture volumes and put into clipmap //TODO: Add daynamic pass for static unbaked elements
+        //Loop through bake texture volumes and put into clipmap //TODO: Add pass for static unbaked elements
         for (int i = 0; i < VolumetricRegisters.volumetricAreas.Count; i++)
         {
             FlipClipBuffer = !FlipClipBuffer;
@@ -713,10 +718,34 @@ public class VolumetricRendering : MonoBehaviour
             //Volumetric variables
             ClipmapCompute.SetTexture(ClipmapKernal, "VolumeMap", VolumetricRegisters.volumetricAreas[i].bakedTexture);
             ClipmapCompute.SetVector("VolumeWorldSize", VolumetricRegisters.volumetricAreas[i].NormalizedScale);
-            ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);
+            ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);         
 
             ClipmapCompute.Dispatch(ClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
         }
+        
+        //Height Densitiy
+
+        //FlipClipBuffer = !FlipClipBuffer;
+
+        //if (FlipClipBuffer)
+        //{
+        //    ClipmapCompute.SetTexture(HeightClipmapKernal, "PreResult", BufferB);
+        //    ClipmapCompute.SetTexture(HeightClipmapKernal, "Result", BufferA);
+        //}
+        //else
+        //{
+        //    ClipmapCompute.SetTexture(HeightClipmapKernal, "PreResult", BufferA);
+        //    ClipmapCompute.SetTexture(HeightClipmapKernal, "Result", BufferB);
+        //}
+
+        ////Volumetric variables
+        ////ClipmapCompute.SetTexture(HeightClipmapKernal, "VolumeMap", VolumetricRegisters.volumetricAreas[i].bakedTexture);
+        ////ClipmapCompute.SetVector("VolumeWorldSize", VolumetricRegisters.volumetricAreas[i].NormalizedScale);
+        ////ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);
+
+        //ClipmapCompute.Dispatch(HeightClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
+
+        //End Height Densitiy
 
         if (FlipClipBuffer)
         {
@@ -729,6 +758,9 @@ public class VolumetricRendering : MonoBehaviour
         
         ClipmapCurrentPos = ClipmapTransform; //Set History
     }
+
+
+
     void SetClipmap(RenderTexture ClipmapTexture, float ClipmapScale, Vector3 ClipmapTransform, Clipmap clipmap)
     {
         Shader.SetGlobalFloat(ClipmapScaleID, ClipmapScale);
@@ -783,9 +815,9 @@ public class VolumetricRendering : MonoBehaviour
 
     Matrix4x4 PrevViewProjMatrix = Matrix4x4.identity;
 
+
     public void SetVariables()
     {
-        ///* Literally none of these are used by any shader. Why set these?
         float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
         Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
         Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
@@ -990,8 +1022,6 @@ public class VolumetricRendering : MonoBehaviour
         ///cam.GetStereoProjectionMatrix returns the skewed XR projection matrix per eye. Just doing our own calulation
         var gpuProj = GL.GetGPUProjectionMatrix( Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, 100000f) , true);
         PrevViewProjMatrix = gpuProj * activeCam.worldToCameraMatrix;
-
-
 
         FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
     //    FroxelStackingCompute.DispatchIndirect

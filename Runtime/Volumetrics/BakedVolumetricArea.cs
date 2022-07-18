@@ -185,10 +185,8 @@ public class BakedVolumetricArea : MonoBehaviour
         {
             MarkDebugCubeForDelete = false;
             DestroyImmediate(DebugCube);
-            DestroyImmediate(mat);
-            
-        }
-        
+            DestroyImmediate(mat);            
+        }        
     }
 
 #endif
