@@ -408,11 +408,13 @@ float4 GetRayHit(const float3 wPos, const float3 wRay)
 	{
 		sCurrPos = sOrigin + s_min * sRay; // interpolate/extrapolate the marcher's postion from the origin along the ray using the lerp factor calculated last iteration
 		float depth = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_CameraHiZDepthTexture, rcpPixelDim * sCurrPos.xy, mipLevel).r;
-		float2 s_xy = (floor(mipPower * (sCurrPos.xy + 0.5)) + voxelOffset.xy - sOrigin.xy) * rcpSRay.xy;
+		float2 s_xy = ((floor(mipPower * (sCurrPos.xy)) + voxelOffset.xy) / mipPower - sOrigin.xy) * rcpSRay.xy;
 		s_min = min(s_xy.x, s_xy.y);
 		float s_z = (depth - sOrigin.z) * rcpSRay.z;
 		s_min = min(s_min, s_z);
-
+		hit = s_z < 1e-8 && mipLevel == 0 ? true : false;
+		mipLevel = s_min > s_z ? mipLevel + 1 : max(mipLevel - 1, 0);
+		mipPower = s_min > s_z ? mipLevel + 1 : max(mipLevel - 1, 0);
 	}
 
 	return float4(0, 0, 0, 0);

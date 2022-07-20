@@ -275,7 +275,7 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const real3
     #elif defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF)
         real3 halfDir = SLZSafeHalf3Normalize(lightDir + frag.viewDir);
         data.NoH = saturate(dot(frag.normal, halfDir));
-        data.LoH = saturate(dot(frag.lightDir, halfDir));
+        data.LoH = saturate(dot(lightDir, halfDir));
         real3 NxH = cross(frag.normal, halfDir);
         data.NxH2 = saturate(dot(NxH, NxH));
         data.NoL = saturate(dot(frag.normal, lightDir));
