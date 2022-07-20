@@ -450,8 +450,8 @@ float SLZGGXSpecularD(float NoH, float roughness)
 real SLZGGXSpecularDAniso(real NoH, real ToH, real BoH, real roughnessT, real roughnessB)
 {
     real roughProduct = roughnessT * roughnessB;
-    real3 aVec = real3(roughnessB * ToH, roughnessT * BoH, roughProduct * NoH);
-    real3 w2 = roughProduct / dot(aVec, aVec);
+    float3 aVec = float3(roughnessB * ToH, roughnessT * BoH, roughProduct * NoH);
+    real w2 = roughProduct / ((real) dot(aVec, aVec));
     return roughProduct * w2 * w2 * SLZ_INV_PI_REAL;
 }
 
