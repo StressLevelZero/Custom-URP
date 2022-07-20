@@ -161,8 +161,8 @@ void SLZAlbedoSpecularFromMetallic(inout real3 albedo, out real3 specular, out r
  */
 half SLZGeometricSpecularAA(half3 normal)
 {
-    half3 normalDdx = ddx(normal);
-    half3 normalDdy = ddy(normal);
+    half3 normalDdx = ddx_fine(normal);
+    half3 normalDdy = ddy_fine(normal);
     half AARoughness = saturate(max(dot(normalDdx, normalDdx), dot(normalDdy, normalDdy)));
     AARoughness = sqrt(AARoughness); // Valve used pow of 0.3333, I find that is a little too strong. Also sqrt should be cheaper
     return 1.0h - AARoughness;
@@ -786,9 +786,11 @@ real3 SLZProbeReflectionDir(SLZFragData fragData, SLZSurfData surfData)
 {
 #if defined(_SLZ_ANISO_SPECULAR)
     real3 anisoDir = surfData.anisoAspect > 0 ? fragData.bitangent : fragData.tangent;
+    real viewSign = surfData.anisoAspect > 0 ? 1 : -1;
     real3 anisoTangent = cross(anisoDir, fragData.viewDir);
     real3 anisoNormal = cross(anisoTangent, anisoDir);
-    real3 bentNormal = normalize(lerp(fragData.normal, anisoNormal, surfData.anisoAspect));
+    real3 bentNormal = normalize(lerp(fragData.normal, anisoNormal, abs(surfData.anisoAspect)));
+    
     return reflect(-fragData.viewDir, bentNormal);
 #else
     return reflect(-fragData.viewDir, fragData.normal);
