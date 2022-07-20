@@ -52,6 +52,7 @@ public class VolumetricRendering : MonoBehaviour
     #region variables
     public float tempOffset = 0;
     Texture3D BlackTex; //Temp texture for 
+    Color clearColor = new Color(0f, 0f, 0f, 0f);
 
     public Camera cam; //Main camera to base settings on
     [HideInInspector] public Camera activeCam;
@@ -408,12 +409,14 @@ public class VolumetricRendering : MonoBehaviour
         BlurBuffer.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBuffer.enableRandomWrite = true;
         BlurBuffer.Create();
-        
+        ClearRenderTexture(BlurBuffer, clearColor);
+
 
         BlurBufferB = new RenderTexture(rtdiscrpt);
         BlurBufferB.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBufferB.enableRandomWrite = true;
         BlurBufferB.Create();
+        ClearRenderTexture(BlurBufferB, clearColor);
 
         BlurKernelX = BlurCompute.FindKernel("VolBlurX");
         BlurKernelY = BlurCompute.FindKernel("VolBlurY");
@@ -421,6 +424,7 @@ public class VolumetricRendering : MonoBehaviour
         BlurCompute.SetTexture(BlurKernelX, "Result", BlurBuffer);
         BlurCompute.SetTexture(BlurKernelY, "InTex", BlurBuffer);
         BlurCompute.SetTexture(BlurKernelY, "Result", BlurBufferB);
+        
     }
 
     void Intialize()
@@ -566,10 +570,16 @@ public class VolumetricRendering : MonoBehaviour
         float zBfP1 = 1.0f - volumetricData.far / volumetricData.near;
         float zBfP2 = volumetricData.far / volumetricData.near;
         FroxelIntegrationCompute.SetVector("_VolZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
-        
+
 
         //Debug.Log("Dispatching " + ThreadsToDispatch);
 
+        // DUMMY SKY TEXTURE, REMOVE THIS WHEN THE SKY TEXTURE IS ACTUALLY PROPELY SET!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        RenderTexture cubemap = new RenderTexture(4,4,1, RenderTextureFormat.ARGBHalf, 0);
+        cubemap.dimension = TextureDimension.Cube;
+        cubemap.Create();
+        ClearRenderTexture(cubemap, Color.black);
+        Shader.SetGlobalTexture("_SkyTexture", cubemap);
         SetVariables();
     }
 
@@ -618,6 +628,11 @@ public class VolumetricRendering : MonoBehaviour
         ClipmapBufferC.Create();        
         ClipmapBufferD = new RenderTexture(ClipRTdiscrpt);
         ClipmapBufferD.Create();
+       
+        ClearRenderTexture(ClipmapBufferA, clearColor);
+        ClearRenderTexture(ClipmapBufferB, clearColor);
+        ClearRenderTexture(ClipmapBufferC, clearColor);
+        ClearRenderTexture(ClipmapBufferD, clearColor);
         //TODO: Loop through and remove one of the buffers
 
         Shader.SetGlobalTexture("_VolumetricClipmapTexture", ClipmapBufferA); //Set clipmap for
@@ -1385,5 +1400,11 @@ public class VolumetricRendering : MonoBehaviour
     //    print("The scene was unloaded!");
     //}
 
-
+    void ClearRenderTexture(RenderTexture rt, Color color)
+    {
+        RenderTexture activeRT = RenderTexture.active;
+        RenderTexture.active = rt;
+        GL.Clear(false, true, color);
+        RenderTexture.active = activeRT;
+    }
 }
