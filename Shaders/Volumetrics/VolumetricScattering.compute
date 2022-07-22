@@ -1,11 +1,11 @@
 ﻿///This is the realtime volumetric shader. It's the first froxel pass.
-
+#pragma use_dxc vulkan
 #pragma kernel Scatter
 
 #define M_PI 3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
@@ -17,7 +17,7 @@ RWTexture3D<float4> Result;
 
 //Texture2D<float4> BlueNoise;
 
-Texture2DArray<float4> LightProjectionTextureArray;
+//Texture2DArray<float4> LightProjectionTextureArray;
 
 //Currently only Supports spot lights
 struct LightObject 
@@ -30,14 +30,14 @@ struct LightObject
 
 StructuredBuffer<LightObject> LightObjects;
 
-shared float4 _VolumePlaneSettings;
+//shared float4 _VolumePlaneSettings;
 shared float _GlobalExtinction;
 shared float _FogBaseHeight;
 shared float _FogMaxHeight;
 shared float _StaticLightMultiplier;
-shared float _ClipmapScale;
-shared float _ClipmapScale2;
-shared float3 _ClipmapPosition;
+float _ClipmapScale;
+float _ClipmapScale2;
+float3 _ClipmapPosition;
 
 CBUFFER_START(PerFrameCB)
 float4x4 _VBufferCoordToViewDirWS; // >_>
@@ -65,10 +65,10 @@ SamplerState _point_repeat;
 SamplerState Custom_trilinear_clamp_sampler;
 SamplerState s_linear_clamp_sampler;
 
-shared Texture3D<float4> _VolumetricClipmapTexture;
-shared Texture3D<float4> _VolumetricClipmapTexture2;
+Texture3D<float4> _VolumetricClipmapTexture;
+Texture3D<float4> _VolumetricClipmapTexture2;
 
-shared TextureCube<float4> _SkyTexture;
+TextureCube<float4> _SkyTexture;
 
 
 //float reprojectionAmount;

@@ -307,7 +307,9 @@ namespace UnityEngine.Rendering.Universal
         public static void RenderSingleCamera(ScriptableRenderContext context, Camera camera)
         {
             UniversalAdditionalCameraData additionalCameraData = null;
+#if !UNITY_EDITOR
             if (IsGameCamera(camera))
+#endif
                 camera.gameObject.TryGetComponent(out additionalCameraData);
 
             if (additionalCameraData != null && additionalCameraData.renderType != CameraRenderType.Base)
@@ -954,6 +956,27 @@ namespace UnityEngine.Rendering.Universal
             cameraData.SetViewAndProjectionMatrix(camera.worldToCameraMatrix, projectionMatrix);
 
             cameraData.worldSpaceCameraPos = camera.transform.position;
+
+
+            ///----------------------------------------------------------------------------------------
+            /// SLZ Volumetrics
+            ///----------------------------------------------------------------------------------------
+            if (additionalCameraData != null)
+            {
+                //Debug.Log("Found Additional Camera Data");
+                cameraData.volumetricsEnabled = additionalCameraData.m_EnableVolumetrics;
+                cameraData.volumetricsClipMap = additionalCameraData.m_VolumetricClipMap;
+                cameraData.volumetricsConstants = additionalCameraData.m_VolumetricShaderGlobals;
+            }
+            else
+            {
+                //Debug.LogError("Null Additional Camera Data");
+
+                cameraData.volumetricsEnabled = false;
+                cameraData.volumetricsClipMap = null;
+                cameraData.volumetricsConstants = null;
+            }
+
         }
 
         static void InitializeRenderingData(UniversalRenderPipelineAsset settings, ref CameraData cameraData, ref CullingResults cullResults,
@@ -997,6 +1020,7 @@ namespace UnityEngine.Rendering.Universal
             InitializeLightData(settings, visibleLights, mainLightIndex, out renderingData.lightData);
             InitializeShadowData(settings, visibleLights, mainLightCastShadows, additionalLightsCastShadows && !renderingData.lightData.shadeAdditionalLightsPerVertex, out renderingData.shadowData);
             InitializePostProcessingData(settings, out renderingData.postProcessingData);
+            SetupVolumetricConstants(cameraData);
             renderingData.supportsDynamicBatching = settings.supportsDynamicBatching;
             renderingData.perObjectData = GetPerObjectLightFlags(renderingData.lightData.additionalLightsCount);
             renderingData.postProcessingEnabled = anyPostProcessingEnabled;
@@ -1243,6 +1267,18 @@ namespace UnityEngine.Rendering.Universal
             // Required for 2D Unlit Shadergraph master node as it doesn't currently support hidden properties.
             Shader.SetGlobalColor(ShaderPropertyId.rendererColor, Color.white);
 
+        }
+
+        static void SetupVolumetricConstants(CameraData cameraData)
+        {
+            if (cameraData.volumetricsEnabled)
+            {
+                VolumetricConstants.instance.EnableVolumetrics(cameraData.volumetricsClipMap, cameraData.volumetricsConstants);
+            }
+            else
+            {
+                VolumetricConstants.instance.DisableVolumetrics();
+            }
         }
 
         static void CheckAndApplyDebugSettings(ref RenderingData renderingData)

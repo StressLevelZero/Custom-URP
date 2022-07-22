@@ -246,6 +246,29 @@ namespace UnityEngine.Rendering.Universal
         /// Camera position in world space.
         /// </summary>
         public Vector3 worldSpaceCameraPos;
+
+
+        ///----------------------------------------------------------------------------------------------------
+        /// SLZ Volumteric Rendering Data
+        ///----------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Toggles rendering of volumetrics
+        /// </summary>
+        public bool volumetricsEnabled;
+
+        /// <summary>
+        /// The 3d volumetric rendertexture that shaders will read from
+        /// </summary>
+        public RenderTexture volumetricsClipMap;
+
+        /// <summary>
+        /// Computebuffer containing all the relevant settings shaders need to
+        /// read from the volumetrics, will be set as a global constant buffer
+        /// named "VolumetricsCB"
+        /// </summary>
+        public ComputeBuffer volumetricsConstants;
+
     }
 
     public struct ShadowData

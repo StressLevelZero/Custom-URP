@@ -270,6 +270,13 @@ namespace UnityEngine.Rendering.Universal
 
         [NonSerialized] Camera m_Camera;
 
+        /* SLZ Volumetrics */
+
+        [NonSerialized] public bool m_EnableVolumetrics = false;
+        [NonSerialized] public RenderTexture m_VolumetricClipMap = null;
+        [NonSerialized] public ComputeBuffer m_VolumetricShaderGlobals = null;
+
+
         // Deprecated:
         [FormerlySerializedAs("requiresDepthTexture"), SerializeField]
         bool m_RequiresDepthTexture = false;

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEditor;
 using UnityEditor.EditorTools;
+using UnityEngine.Rendering.Universal;
 
 [EditorTool("Show Volumetrics")]
 public class VolumetricDebugTool : EditorTool
@@ -19,6 +20,8 @@ public class VolumetricDebugTool : EditorTool
     float extinction;
     Color scattering;
     static List<Camera> SceneCameras;
+    static Dictionary<Camera, GameObject> SceneVolumetricRenderers;
+    static Dictionary<Camera, bool> isActivePerCamera;
 
     SceneView ActiveView;
 
@@ -42,11 +45,21 @@ public class VolumetricDebugTool : EditorTool
     private void OnDisable()
     {
         Lightmapping.bakeCompleted -= disableOnLightmapBake;
+        destroyVolRenderers();
     }
 
     private void OnDestroy()
     {
         Lightmapping.bakeCompleted -= disableOnLightmapBake;
+        destroyVolRenderers();
+    }
+
+    private void destroyVolRenderers()
+    {
+        foreach (GameObject vR in SceneVolumetricRenderers.Values)
+        {
+            DestroyImmediate(vR);
+        }
     }
 
     public override GUIContent toolbarIcon
@@ -59,6 +72,22 @@ public class VolumetricDebugTool : EditorTool
     {
         //EditorWindow view = EditorWindow.GetWindow<SceneView>();
         //view.Repaint();
+        if (SceneVolumetricRenderers == null)
+        {
+            SceneVolumetricRenderers = new Dictionary<Camera, GameObject>();
+        }
+
+        if (isActivePerCamera == null)
+        {
+            isActivePerCamera = new Dictionary<Camera, bool>();
+        }
+
+        ActiveView = SceneView.lastActiveSceneView;
+        if (!isActivePerCamera.ContainsKey(ActiveView.camera))
+        {
+            isActivePerCamera.Add(ActiveView.camera, false);
+        }
+
         toolWindow = new VisualElement();
         toolWindow.style.width = 256;
         toolWindow.style.height = 120;
@@ -70,7 +99,7 @@ public class VolumetricDebugTool : EditorTool
         toolWindow.style.paddingRight = 8f;
         toolWindow.style.paddingLeft = 8f;
         toolWindow.style.paddingBottom = 8f;
-        
+
         if (placeholderGO == null)
         {
             placeholderGO = new GameObject();
@@ -78,9 +107,9 @@ public class VolumetricDebugTool : EditorTool
             placeholderCam = placeholderGO.AddComponent<Camera>();
             placeholderCam.enabled = false;
             placeholderCam.name = "Active Scene View";
-        } 
+        }
 
-        ActiveView = SceneView.lastActiveSceneView;
+
 
         Label titleLabel = new Label("Preview Volumetrics");
         titleLabel.style.fontSize = 14;
@@ -96,16 +125,16 @@ public class VolumetricDebugTool : EditorTool
                 break;
             }
         }
-        
+
 
         activeToggle = new Toggle("Multi-View");
         activeToggle.value = isActive;
         activeToggle.tooltip = "Simple raymarched volumetrics that works in all views simultaneously, but is not perfectly accurate to how the volumetrics will look in game and will double-add overlapping volumes";
-        
+
         activeToggle2 = new Toggle("Game-Accurate");
-        activeToggle2.value = isActive2;
+        activeToggle2.value = isActivePerCamera[ActiveView.camera];
         activeToggle2.tooltip = "Volumetrics rendered exactly how the game will render them. Rendered from the direction of one camera, all other views will see the volumetrics projected flat on to the world";
-        
+
         updateCameraList();
         InitializeFogParams();
 
@@ -150,11 +179,11 @@ public class VolumetricDebugTool : EditorTool
             ActiveView.rootVisualElement.style.flexDirection = FlexDirection.ColumnReverse;
             return;
         }
-        
+
 
         toolWindow.Add(activeToggle);
         toolWindow.Add(activeToggle2);
-        
+
         if (isActive)
         {
             toolWindow.Add(exposureField);
@@ -169,7 +198,7 @@ public class VolumetricDebugTool : EditorTool
         //toolWindow.Add(exposureField);
         //toolWindow.Add(exposureSlider);
 
-        activeToggle.RegisterCallback<ChangeEvent<bool>>(e=>
+        activeToggle.RegisterCallback<ChangeEvent<bool>>(e =>
         {
             isActive = activeToggle.value;
             BakedVolumetricArea.VisStateGlobal = isActive;
@@ -193,38 +222,67 @@ public class VolumetricDebugTool : EditorTool
         }
         );
 
-        activeToggle2.RegisterCallback<ChangeEvent<bool>>(e=>
+        activeToggle2.RegisterCallback<ChangeEvent<bool>>(e =>
         {
-            isActive2 = activeToggle2.value;
-           
-            if (isActive2)
+            Camera ActiveCam = SceneView.lastActiveSceneView.camera;
+            isActivePerCamera[ActiveCam] = activeToggle2.value;
+
+            if (activeToggle2.value)
             {
                 isActive = false;
                 activeToggle.value = false;
                 BakedVolumetricArea.VisStateGlobal = false;
                 toolWindow.Add(BlankLabel);
                 toolWindow.Add(CameraPopup);
-                VolumetricScript.activeCam = CameraPopup.value == placeholderCam ? SceneView.lastActiveSceneView.camera : CameraPopup.value;
-                VolumetricScript.enableEditorPreview = true;
-                VolumetricScript.enable();
-                Shader.EnableKeyword("_VOLUMETRICS_ENABLED");
+                //VolumetricScript.activeCam = CameraPopup.value == placeholderCam ? SceneView.lastActiveSceneView.camera : CameraPopup.value;
+                if (ActiveCam.GetComponent<UniversalAdditionalCameraData>() == null)
+                {
+                    ActiveCam.gameObject.AddComponent<UniversalAdditionalCameraData>();
+                }
+                if (!SceneVolumetricRenderers.ContainsKey(SceneView.lastActiveSceneView.camera))
+                {
+                    GameObject VolumetricRenderer = new GameObject();
+                    VolumetricRenderer.hideFlags = HideFlags.DontSave;
+                    VolumetricRenderer.name = SceneView.lastActiveSceneView.camera.name + "Renderer";
+                    SceneVolumetricRenderers.Add(SceneView.lastActiveSceneView.camera, VolumetricRenderer);
+                    VolumetricRendering vR = VolumetricRenderer.AddComponent<VolumetricRendering>();
+
+                    vR.cam = SceneView.lastActiveSceneView.camera;
+                    vR.tempOffset = VolumetricScript.tempOffset;
+                    vR.volumetricData = VolumetricScript.volumetricData;
+                    vR.reprojectionAmount = VolumetricScript.reprojectionAmount;
+                    vR.FroxelBlur = VolumetricScript.FroxelBlur;
+                    vR.SliceDistributionUniformity = VolumetricScript.SliceDistributionUniformity;
+                    vR.albedo = VolumetricScript.albedo;
+                    vR.meanFreePath = VolumetricScript.meanFreePath;
+                    vR.StaticLightMultiplier = VolumetricScript.StaticLightMultiplier;
+                    vR.enableEditorPreview = true;
+                    vR.StartSceneViewRendering();
+                    Selection.objects = new Object[] { VolumetricRenderer };
+
+                }
+                //VolumetricScript.enableEditorPreview = true;
+                //VolumetricScript.enable();
             }
             else
             {
-                VolumetricScript.enableEditorPreview = false;
+                if (SceneVolumetricRenderers.ContainsKey(SceneView.lastActiveSceneView.camera))
+                {
+                    GameObject VolumetricRenderer = SceneVolumetricRenderers[SceneView.lastActiveSceneView.camera];
+                    SceneVolumetricRenderers.Remove(SceneView.lastActiveSceneView.camera);
+                    DestroyImmediate(VolumetricRenderer);
+                }
                 toolWindow.Remove(BlankLabel);
                 toolWindow.Remove(CameraPopup);
-                VolumetricScript.disable();
-                Shader.DisableKeyword("_VOLUMETRICS_ENABLED");
             }
-           
+
             ActiveView.Repaint();
         }
         );
 
-        CameraPopup.RegisterCallback<ChangeEvent<Camera>>(e=>
+        CameraPopup.RegisterCallback<ChangeEvent<Camera>>(e =>
         {
-            VolumetricScript.activeCam = CameraPopup.value == placeholderCam ? SceneView.lastActiveSceneView.camera : CameraPopup.value;
+            //VolumetricScript.activeCam = CameraPopup.value == placeholderCam ? SceneView.lastActiveSceneView.camera : CameraPopup.value;
             selectedCamera = CameraPopup.value;
             if (isActive2)
             {
@@ -234,17 +292,17 @@ public class VolumetricDebugTool : EditorTool
         }
         );
 
-         exposureField.RegisterCallback<ChangeEvent<float>>(e=>
-        {
-            exposureField.value = Mathf.Clamp(exposureField.value, 0, 2);
-            exposure = exposureField.value;
-            exposureSlider.value = exposure;
-            Shader.SetGlobalFloat("_VolExposure2", exposure);
-            ActiveView.Repaint();
-        }
-        );
+        exposureField.RegisterCallback<ChangeEvent<float>>(e =>
+       {
+           exposureField.value = Mathf.Clamp(exposureField.value, 0, 2);
+           exposure = exposureField.value;
+           exposureSlider.value = exposure;
+           Shader.SetGlobalFloat("_VolExposure2", exposure);
+           ActiveView.Repaint();
+       }
+       );
 
-        exposureSlider.RegisterCallback<ChangeEvent<float>>(e=>
+        exposureSlider.RegisterCallback<ChangeEvent<float>>(e =>
         {
             exposure = exposureSlider.value;
             exposureField.value = exposure;
@@ -252,7 +310,7 @@ public class VolumetricDebugTool : EditorTool
             ActiveView.Repaint();
         }
         );
-        
+
         ActiveView.rootVisualElement.Add(toolWindow);
         ActiveView.rootVisualElement.style.flexDirection = FlexDirection.ColumnReverse;
         SceneView.lastActiveSceneViewChanged += UpdateWindow;
@@ -262,14 +320,14 @@ public class VolumetricDebugTool : EditorTool
     {
         if (New.hasFocus)
         {
-           
+
             ActiveView.rootVisualElement.Remove(toolWindow);
             ActiveView = New;
             ActiveView.rootVisualElement.Add(toolWindow);
             ActiveView.rootVisualElement.style.flexDirection = FlexDirection.ColumnReverse;
             if (selectedCamera == placeholderCam)
             {
-                VolumetricScript.activeCam = ActiveView.camera;
+                //VolumetricScript.activeCam = ActiveView.camera;
                 ActiveView.Repaint();
             }
         }
@@ -316,4 +374,24 @@ public class VolumetricDebugTool : EditorTool
             VolumetricScript.disable();
         }
     }
+    /*
+    public override void OnToolGUI(EditorWindow window)
+    {
+        SceneView activeViewNew = ActiveView;
+        if (EditorWindow.mouseOverWindow.GetType() == typeof(SceneView))
+        {
+            activeViewNew = (SceneView)EditorWindow.mouseOverWindow;
+        }
+        
+        if (activeViewNew != ActiveView)
+        {
+            Debug.Log("New Scene View");
+            if (!isActivePerCamera.ContainsKey(activeViewNew.camera))
+            {
+                isActivePerCamera.Add(activeViewNew.camera, false);
+            }
+            activeToggle2.value = isActivePerCamera[activeViewNew.camera];
+        }
+    }
+    */
 }

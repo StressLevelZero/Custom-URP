@@ -309,6 +309,8 @@ namespace UnityEngine.Rendering.Universal
 
             SLZGlobals.instance.SetBlueNoiseGlobals(data.textures.blueNoiseRGBA, data.textures.blueNoiseR);
             SLZGlobals.instance.SetSSRGlobals();
+
+           
         }
 
         /// <inheritdoc />

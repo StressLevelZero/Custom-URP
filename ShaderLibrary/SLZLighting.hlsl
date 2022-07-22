@@ -85,7 +85,7 @@ struct SLZSurfData
 struct SLZDirectSpecLightInfo
 {
     #if defined(_SLZ_ANISO_SPECULAR)
-    real NoH;
+    real NoH2;
     real NoL;
     real LoH;
     real ToL;
@@ -254,8 +254,9 @@ void SLZSurfDataAddAniso(inout SLZSurfData surf, real anisoAspect)
 {
 #if defined(_SLZ_ANISO_SPECULAR)
     surf.anisoAspect = 2.0 * anisoAspect - 1.0;
-    surf.roughnessT = max(surf.roughness * surf.anisoAspect + surf.roughness, 0.001);
-    surf.roughnessB = max(-surf.roughness * surf.anisoAspect + surf.roughness, 0.001);
+    real clampedRough = surf.roughness;// clamp(surf.roughness, 0.05, 1);
+    surf.roughnessT = max(clampedRough * surf.anisoAspect + clampedRough, 0.001);
+    surf.roughnessB = max(-clampedRough * surf.anisoAspect + clampedRough, 0.001);
 #endif
 }
 
@@ -265,10 +266,13 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const real3
     SLZDirectSpecLightInfo data;
     #if defined(_SLZ_ANISO_SPECULAR)
         real3 halfDir = SLZSafeHalf3Normalize(lightDir + frag.viewDir);
-        data.NoH = saturate(dot(frag.normal, halfDir));
-        data.LoH = saturate(dot(lightDir, halfDir));
+
+        real3 NxH = cross(frag.normal, halfDir);
+        data.NoH2 = 1.0 - dot(NxH, NxH);
         data.ToH = dot(frag.tangent, halfDir);
         data.BoH = dot(frag.bitangent, halfDir);
+
+        data.LoH = saturate(dot(lightDir, halfDir));
         data.ToL = dot(frag.tangent, lightDir);
         data.BoL = dot(frag.bitangent, lightDir);
         data.NoL = saturate(dot(frag.normal, lightDir));
@@ -436,9 +440,7 @@ float SLZGGXSpecularD(float NoH, float roughness)
 }
 
 /**
- * Anisotropic NDF taken from Google Filament, which is an algebraicly
- * optimized for half-precision version of the Burley anisotropic GGX
- * normal distribution function
+ * Burley anisotropic NDF
  * 
  * @param NoH           Dot product of the normal with half view-light vector
  * @param ToH           Dot product of the tangent with half view-light vector
@@ -447,11 +449,13 @@ float SLZGGXSpecularD(float NoH, float roughness)
  * @param roughnessB    Anisotropic roughness value in the direction of the bitangent
  * @return Anisotropic GGX normal distribution value 
  */
-real SLZGGXSpecularDAniso(real NoH, real ToH, real BoH, real roughnessT, real roughnessB)
+real SLZGGXSpecularDAniso(real NoH2, real ToH, real BoH, real roughnessT, real roughnessB)
 {
     real roughProduct = roughnessT * roughnessB;
-    float3 aVec = float3(roughnessB * ToH, roughnessT * BoH, roughProduct * NoH);
-    real w2 = roughProduct / ((real) dot(aVec, aVec));
+    real NoHTerm = (roughProduct * roughProduct * NoH2);
+    real2 aVec = real2(roughnessB * ToH, roughnessT * BoH);
+    float b = dot(aVec, aVec) + NoHTerm;
+    float w2 = roughProduct * max(rcp(b), 1e-5);
     return roughProduct * w2 * w2 * SLZ_INV_PI_REAL;
 }
 
@@ -503,6 +507,7 @@ real SLZSmithVisibility(real NoV, real NoL, real roughness)
  */
 real SLZSmithVisibilityAniso(real NoV, real NoL, real ToL, real BoL, real visLambdaView, real roughnessT, real roughnessB)
 {
+    NoL = abs(NoL) + 1e-5;
     real lambdaV = NoL * visLambdaView;
     real lambdaL = length(real3(roughnessT * ToL, roughnessB * BoL, NoL));
     return 0.5 / (lambdaL + lambdaV);
@@ -576,10 +581,21 @@ real3 SLZDirectBRDFSpecularHighQ(real NoH, real NoV, real NoL, real LoH, real ro
 real3 SLZAnisoDirectBRDFSpecular(SLZDirectSpecLightInfo lightInfo, SLZSurfData surfData, real NoV, real visLambdaView)
 {
 #if defined(_SLZ_ANISO_SPECULAR)
-    real N = SLZGGXSpecularDAniso(lightInfo.NoH, lightInfo.ToH, lightInfo.BoH, surfData.roughnessT, surfData.roughnessB);
+    real N = SLZGGXSpecularDAniso(lightInfo.NoH2, lightInfo.ToH, lightInfo.BoH, surfData.roughnessT, surfData.roughnessB);
     real D = SLZSmithVisibilityAniso(NoV, lightInfo.NoL, lightInfo.ToL, lightInfo.BoL, visLambdaView, surfData.roughnessT, surfData.roughnessB);
     real3 F = SLZSchlickFresnel(lightInfo.LoH, surfData.specular);
-    return N * D * F;
+    real3 specularTerm = N * D * F;
+
+#if defined(SHADER_API_MOBILE)
+    // On platforms where half actually means something, the denominator has a risk of overflow
+    // clamp below was added specifically to "fix" that, but dx compiler (we convert bytecode to metal/gles)
+    // sees that specularTerm have only non-negative terms, so it skips max(0,..) in clamp (leaving only min(100,...))
+    specularTerm = specularTerm - HALF_MIN;
+    specularTerm = clamp(specularTerm, 0.0, 100.0); // Prevent FP16 overflow on mobiles
+#else
+    specularTerm = max(0, specularTerm);
+#endif
+    return specularTerm;
 #else
     return real3(0, 0, 0);
 #endif
