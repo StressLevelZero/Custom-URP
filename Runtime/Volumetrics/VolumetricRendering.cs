@@ -460,8 +460,8 @@ public class VolumetricRendering : MonoBehaviour
         }
         hasInitialized = true;
 
-        Debug.Log("Volumetric Renderer Initialized");
-        DebugPrintTextureIDs();
+        //Debug.Log("Volumetric Renderer Initialized");
+        //DebugPrintTextureIDs();
         ShaderConstantBuffer = new ComputeBuffer(1, ShaderConstantsSize, ComputeBufferType.Constant);
         ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
@@ -937,7 +937,7 @@ public class VolumetricRendering : MonoBehaviour
             Debug.Log("No active camera");
             return;
         }
-
+        /*
         if (VolumetricResult == null)
         {
             Debug.LogError("Volumetric Rendering: VolumetricResult is null" );
@@ -954,7 +954,7 @@ public class VolumetricRendering : MonoBehaviour
         {
             Debug.LogError("Volumetric Rendering: FroxelBufferB is null");
         }
-        /*
+        
         if (BlurBuffer == null)
         {
             Debug.LogError("Volumetric Rendering: BlurBuffer is null");
@@ -963,12 +963,12 @@ public class VolumetricRendering : MonoBehaviour
         {
             Debug.LogError("Volumetric Rendering: BlurBufferB is null");
         }
-        */
+        
         if (LightProjectionTextures == null)
         {
             Debug.LogError("Volumetric Rendering: LightProjectionTextures is null");
         }
-
+        */
         CheckOverrideVolumes();
         //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
         //bleh

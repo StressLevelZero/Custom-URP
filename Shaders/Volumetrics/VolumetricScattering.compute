@@ -17,7 +17,7 @@ RWTexture3D<float4> Result;
 
 //Texture2D<float4> BlueNoise;
 
-//Texture2DArray<float4> LightProjectionTextureArray;
+Texture2DArray<float4> LightProjectionTextureArray;
 
 //Currently only Supports spot lights
 struct LightObject 
@@ -271,10 +271,10 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float3 xDirDerivWS = rightDirWS * (rcpLenRightDir * unitDistFaceSize); // Normalize & rescale
 	float3 yDirDerivWS = cross(xDirDerivWS, centerDirWS); // Will have the length of 'unitDistFaceSize' by construction
 
-	SeqOffset.xy = 0;
+	//SeqOffset.xy = 0;
 
-	float3 jitterDirWS = normalize(centerDirWS + SeqOffset.x * xDirDerivWS
-												+ SeqOffset.y * yDirDerivWS);
+	float3 jitterDirWS = normalize(centerDirWS);// +SeqOffset.x * xDirDerivWS
+												//+ SeqOffset.y * yDirDerivWS);
 
 	//TODO: add the left right jitter too. Helps smooth out rough edges.
 	float3 centerWS =  CameraPosition.xyz + ( t * jitterDirWS); //Cast ray along direction and add cam pos to get WS pos
