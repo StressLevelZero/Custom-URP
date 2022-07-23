@@ -440,23 +440,67 @@ float SLZGGXSpecularD(float NoH, float roughness)
 }
 
 /**
- * Burley anisotropic NDF
+ * Burley anisotropic NDF, optimized for mobile half precision.
  * 
- * @param NoH           Dot product of the normal with half view-light vector
+ * Normal Burley aniso formula:
+ * 
+ * N = 1/(pi) * 1/(rT * rB) * 1/((ToH / rT)^2 + (BoH / rB)^2 + NoH^2)^2
+ * 
+ * There are several major sources of error here. First off NoH^2 is severely
+ * lacking in precision around NoH close to 1, which is right where the 
+ * specular highlight is. This is easy to fix, just use Lagrange's identity
+ * to replace it with 1 - dot(cross(N,H),cross(N,H)), which has much better
+ * precision where we need it. Secondly, we have the dots of the tangent/
+ * bitangent divided by their anisotropic roughnesses. When the roughness is
+ * low, these start aliasing heavily. If we multiply the equation by
+ * (rT * rB) / (rT * rB), 
+ * 
+ * N = 1/pi * (rT * rB) / (rT * rB)^2 * 1/((ToH / rT)^2 + (BoH / rB)^2 + NoH^2)^2
+ *   = 1/pi * (rT * rB) / ( (rT * rB) * ( (ToH^2 / rT^2) + (BoH^2 / rB^2) + NoH^2)^2
+ *   = 1/pi * (rT * rB) / ( ToH^2 * (rB/rT) + BoH^2 * (rT/rB) + (rT * rB) * NoH^2)^2
+ * 
+ * Now instead of dividing the square of the tangent & bitangent dots by their
+ * roughnesses, we are multiplying by the ratio of the two roughnesses. This
+ * ratio can be reduced
+ * 
+ * A = rB / rT = (rI * (1 - a)) / (rI * (1 + a)) = (1 - a) / (1 + a)
+ * 
+ * where rI is the isotropic roughness, and a is the aniso factor. This ratio
+ * no longer depend on roughness and only on the aspect ratio, and this removes
+ * the aliasing issues related to these terms. 
+ *
+ * Finally division by ( A * ToH^2  + (1/A) * BoH^2 + (rT * rB) * NoH^2)^2 
+ * also causes aliasing issues. When roughness is low, this term is exceedingly
+ * tiny, and taking the reciprocal results in a very large number with severe
+ * loss of floating point precision. However, the dividend is rT * rB, a small
+ * number when roughness is low. If instead we use (sqrt(rT * rB))^2, we can
+ * move sqrt(rT * rB) into the square term, then
+ * 
+ * N = 1/pi * ( sqrt(rT*rB) / ( A * ToH^2  + (1/A) * BoH^2 + (rT * rB) * NoH^2) )^2
+ * 
+ * Now the smallness of sqrt(rT*rB) cancels out the smallness of the sum of the dots,
+ * the result is closer to 1, and the square of the number is significantly smaller
+ * and does not get rounded as heavily.
+ * 
+ * @param NoH2          Square of the dot product of the normal with half view-light vector
  * @param ToH           Dot product of the tangent with half view-light vector
  * @param BoH           Dot product of the bitangent with half view-light vector
  * @param roughnessT    Anisotropic roughness value in the direction of the tangent
  * @param roughnessB    Anisotropic roughness value in the direction of the bitangent
+ * @param aspectRatio   The anisotropic roughness aspect ratio, where -1
+ *                      stretches the highlight along the bitangent, 0 is
+ *                      isotropic, and 1 stretches it along the tangent
  * @return Anisotropic GGX normal distribution value 
  */
-real SLZGGXSpecularDAniso(real NoH2, real ToH, real BoH, real roughnessT, real roughnessB)
+real SLZGGXSpecularDAniso(real NoH2, real ToH, real BoH, real roughnessT, real roughnessB, real aspectRatio)
 {
     real roughProduct = roughnessT * roughnessB;
-    real NoHTerm = (roughProduct * roughProduct * NoH2);
-    real2 aVec = real2(roughnessB * ToH, roughnessT * BoH);
-    float b = dot(aVec, aVec) + NoHTerm;
-    float w2 = roughProduct * max(rcp(b), 1e-5);
-    return roughProduct * w2 * w2 * SLZ_INV_PI_REAL;
+    real aspectTerm = (1.0h - aspectRatio) / (1.0h + aspectRatio); // roughnessB/roughnessT = (rough * (1 - aspectRatio))/(rough * (1 + aspectRatio)) 
+    real2 aVec = real2(ToH * aspectTerm, BoH / aspectTerm);
+    real b = dot(aVec, aVec) + NoH2 * roughProduct;
+    real w2 = rcp(b * rsqrt(roughProduct));
+    w2 *= w2;
+    return min(w2 * SLZ_INV_PI_REAL, 100);
 }
 
 /**
@@ -581,7 +625,7 @@ real3 SLZDirectBRDFSpecularHighQ(real NoH, real NoV, real NoL, real LoH, real ro
 real3 SLZAnisoDirectBRDFSpecular(SLZDirectSpecLightInfo lightInfo, SLZSurfData surfData, real NoV, real visLambdaView)
 {
 #if defined(_SLZ_ANISO_SPECULAR)
-    real N = SLZGGXSpecularDAniso(lightInfo.NoH2, lightInfo.ToH, lightInfo.BoH, surfData.roughnessT, surfData.roughnessB);
+    real N = SLZGGXSpecularDAniso(lightInfo.NoH2, lightInfo.ToH, lightInfo.BoH, surfData.roughnessT, surfData.roughnessB, surfData.anisoAspect);
     real D = SLZSmithVisibilityAniso(NoV, lightInfo.NoL, lightInfo.ToL, lightInfo.BoL, visLambdaView, surfData.roughnessT, surfData.roughnessB);
     real3 F = SLZSchlickFresnel(lightInfo.LoH, surfData.specular);
     real3 specularTerm = N * D * F;
@@ -945,6 +989,7 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
         ao.directAmbientOcclusion = 1.0h;
     #endif
     
+       
     #if defined(LIGHTMAP_ON) 
     //-------------------------------------------------------------------------------------------------
     // Lightmapping diffuse and specular calculations
