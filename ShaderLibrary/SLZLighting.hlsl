@@ -741,6 +741,11 @@ real3 SLZApplyLightmapDirectionalityBRDFLUT(const real3 lightmapColor, const rea
 #endif
 }
 
+#define SLZ_LM_R_MIN  0.4
+#define SLZ_LM_R_MAX  0.75
+#define SLZ_LM_D_MIN  0.4
+#define SLZ_LM_D_MAX  0.5
+
 /**
  * Reads the lightmap, directional lightmap, and dynamic lightmap, and calculates the total diffuse lighting from them as well
  * as calculating a specular highlight using the directional map if present  
@@ -750,9 +755,10 @@ real3 SLZApplyLightmapDirectionalityBRDFLUT(const real3 lightmapColor, const rea
  * @param         frag     Struct containing all relevant fragment data (lightmap uvs, normal and view vectors, etc)
  * @param         surf     struct containing PBR surface information for the specular calculations
  */
-void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZFragData frag, const SLZSurfData surf)
+void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZFragData frag, inout SLZSurfData surf)
 {
-    
+
+
     real3 lmDiffuse = SAMPLE_TEXTURE2D(unity_Lightmap, samplerunity_Lightmap, frag.lightmapUV).rgb;
     //
     #if defined(DIRLIGHTMAP_COMBINED)
@@ -769,10 +775,24 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
             #if !defined(_SLZ_DISABLE_BAKED_SPEC)
                 lmDirection = SLZSafeHalf3Normalize(lmDirection); //length not 1
                 SLZDirectSpecLightInfo lightInfo = SLZGetDirectLightInfo(frag, lmDirection);
+
+                /* 
+                 * Try to attenuate out specular highlight when light isn't strongly directional,
+                 * baked specular has awful issues with warping as the dominant lighting direction
+                 * gets pushed around by reflected light/shadows/other lights. This doesn't work
+                 * well, but is better than nothing
+                 */
+                real oldRoughness = surf.roughness;
+                real dirStrength = directionalMap.w * directionalMap.w;
+                real dirFactor = smoothstep(SLZ_LM_R_MIN, SLZ_LM_R_MAX, dirStrength);
+                surf.roughness = lerp(1, surf.roughness, dirFactor);
+
                 real3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf, frag);
-                real dirFactor = (1.0 - directionalMap.w);
-                dirFactor = saturate(8 * (dirFactor - 0.15));
-                specular += lmDiffuse * lmSpecular * lightInfo.NoL * dirFactor;
+
+                surf.roughness = oldRoughness;
+                real dirFactor2 = smoothstep(SLZ_LM_D_MIN, SLZ_LM_D_MAX, dirStrength);
+
+                specular += lmDiffuse * lmSpecular * lightInfo.NoL * dirFactor2;
             #endif
     #endif
     
@@ -787,8 +807,18 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
             #if !defined(_SLZ_DISABLE_BAKED_SPEC)
                 dynLmDirection = SLZSafeHalf3Normalize(dynLmDirection); //length not 1
                 SLZDirectSpecLightInfo dynLightInfo = SLZGetDirectLightInfo(frag, dynLmDirection);
+
+                real dynOldRoughness = surf.roughness;
+                real dynDirStrength = dynDirectionalMap.w * dynDirectionalMap.w;
+                real dynDirFactor = smoothstep(SLZ_LM_R_MIN, SLZ_LM_R_MAX, dynDirStrength);
+                surf.roughness = lerp(1, surf.roughness, dirFactor);
+
                 real3 dynLmSpecular = SLZDirectBRDFSpecular(dynLightInfo, surf, frag);
-                specular += dynLmDiffuse * dynLmSpecular * dynLightInfo.NoL;
+
+                surf.roughness = dynOldRoughness;
+                dynDirFactor = smoothstep(SLZ_LM_D_MIN, SLZ_LM_D_MAX, dynDirStrength);
+
+                specular += dynLmDiffuse * dynLmSpecular * dynLightInfo.NoL * dynDirFactor;
             #endif
         #endif
     
