@@ -23,6 +23,14 @@ half GetScreenNoiseRSlice(float2 screenUV, int slice)
 	return _BlueNoiseR.Load(int4(noiseUvs.xy, slice, 0)).r;
 }
 
+half GetScreenNoiseROffset(float2 screenUV, float offset)
+{
+	float frame = fmod((float)_BlueNoise_Frame + offset, (float)_BlueNoise_Dim.z);
+	float2 noiseUvs = screenUV * _ScreenParams.xy;
+	noiseUvs.xy = fmod(noiseUvs.xy, _BlueNoise_Dim.xy);
+	return _BlueNoiseR.Load(int4(noiseUvs.xy, frame, 0)).r;
+}
+
 half4 GetScreenNoiseRGBA(float2 screenUV)
 {
 	float2 noiseUvs = screenUV * _ScreenParams.xy;
@@ -35,6 +43,14 @@ half4 GetScreenNoiseRGBASlice(float2 screenUV, int slice)
 	float2 noiseUvs = screenUV * _ScreenParams.xy;
 	noiseUvs.xy = fmod(noiseUvs.xy, _BlueNoise_Dim.xy);
 	return _BlueNoiseRGBA.Load(int4(noiseUvs.xy, slice, 0));
+}
+
+half4 GetScreenNoiseRGBAOffset(float2 screenUV, float offset)
+{
+	float frame = fmod((float)_BlueNoise_Frame + offset, (float)_BlueNoise_Dim.z);
+	float2 noiseUvs = screenUV * _ScreenParams.xy;
+	noiseUvs.xy = fmod(noiseUvs.xy, _BlueNoise_Dim.xy);
+	return _BlueNoiseRGBA.Load(int4(noiseUvs.xy, frame, 0));
 }
 
 #endif
