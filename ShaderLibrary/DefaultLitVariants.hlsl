@@ -12,7 +12,9 @@
 	#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
 	#pragma multi_compile_fragment _ _SHADOWS_SOFT
 	#pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
-	#pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+	#if !defined(_DISABLE_SSAO)
+		#pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+	#endif
 	#define _REFLECTION_PROBE_BOX_PROJECTION
 #endif
 
