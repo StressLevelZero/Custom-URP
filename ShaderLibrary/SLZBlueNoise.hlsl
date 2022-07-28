@@ -5,7 +5,7 @@ Texture2DArray<float4> _BlueNoiseRGBA;
 Texture2DArray<float> _BlueNoiseR;
 
 CBUFFER_START(BlueNoiseDim)
-int3 _BlueNoise_Dim;
+int3 _BlueNoise_Dim;  //_BlueNoise_Dim.z MUST BE A POWER OF TWO!!!! ONLY ASSIGN POWER OF TWO TEXTURE ARRAYS!!!
 int _BlueNoise_Frame;
 CBUFFER_END
 
@@ -25,7 +25,7 @@ half GetScreenNoiseRSlice(float2 screenUV, int slice)
 
 half GetScreenNoiseROffset(float2 screenUV, float offset)
 {
-	float frame = fmod((float)_BlueNoise_Frame + offset, (float)_BlueNoise_Dim.z);
+	float frame = fmod((float)_BlueNoise_Frame + offset, _BlueNoise_Dim.z);
 	float2 noiseUvs = screenUV * _ScreenParams.xy;
 	noiseUvs.xy = fmod(noiseUvs.xy, _BlueNoise_Dim.xy);
 	return _BlueNoiseR.Load(int4(noiseUvs.xy, frame, 0)).r;
@@ -47,7 +47,7 @@ half4 GetScreenNoiseRGBASlice(float2 screenUV, int slice)
 
 half4 GetScreenNoiseRGBAOffset(float2 screenUV, float offset)
 {
-	float frame = fmod((float)_BlueNoise_Frame + offset, (float)_BlueNoise_Dim.z);
+	float frame = fmod((float)_BlueNoise_Frame + offset, _BlueNoise_Dim.z);
 	float2 noiseUvs = screenUV * _ScreenParams.xy;
 	noiseUvs.xy = fmod(noiseUvs.xy, _BlueNoise_Dim.xy);
 	return _BlueNoiseRGBA.Load(int4(noiseUvs.xy, frame, 0));
