@@ -73,36 +73,19 @@ Shader "Universal Render Pipeline/Simple Lit (Specular Workflow)"
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
             #pragma shader_feature_local_fragment _ALPHATEST_ON
             #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
-            //#pragma shader_feature_local_fragment _ _SPECGLOSSMAP _SPECULAR_COLOR
+            #pragma shader_feature_local_fragment _ _SPECGLOSSMAP _SPECULAR_COLOR
             #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
 
             // -------------------------------------
             // Universal Pipeline keywords
-#if defined(SHADER_API_MOBILE)
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX
-#else
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS
-            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
-#endif
-
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-          
-            #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
-            #pragma multi_compile _ SHADOWS_SHADOWMASK
-            
-           
-            #pragma multi_compile_fragment _ _LIGHT_COOKIES
+            #pragma multi_compile_fog
+            #define _DISABLE_REFLECTIONPROBES
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
             #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
 
             // -------------------------------------
             // Unity defined keywords
-            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
-            #pragma multi_compile _ LIGHTMAP_ON
-            #pragma multi_compile _ DYNAMICLIGHTMAP_ON
-            #pragma multi_compile_fog
-            #pragma skip_variants FOG_LINEAR FOG_EXP
+          
             //#pragma multi_compile_fragment _ DEBUG_DISPLAY
 
             //--------------------------------------
@@ -242,26 +225,6 @@ Shader "Universal Render Pipeline/Simple Lit (Specular Workflow)"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitMetaPass.hlsl"
 
-            ENDHLSL
-        }
-
-        Pass
-        {
-            Name "Universal2D"
-            Tags{ "LightMode" = "Universal2D" }
-            Tags{ "RenderType" = "Transparent" "Queue" = "Transparent" }
-
-            HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
-
-            #pragma vertex vert
-            #pragma fragment frag
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
-
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Universal2D.hlsl"
             ENDHLSL
         }
     }
