@@ -28,9 +28,9 @@
 
 #if !defined(_DISABLE_LIGHTMAPS)
 	//#pragma multi_compile_fragment _ _MIXED_LIGHTING_SUBTRACTIVE
-	#pragma multi_compile_fragment _ LIGHTMAP_SHADOW_MIXING
-	#pragma multi_compile_fragment _ SHADOWS_SHADOWMASK
-	#pragma multi_compile_fragment _ DIRLIGHTMAP_COMBINED
+	#pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
+	#pragma multi_compile _ SHADOWS_SHADOWMASK
+	#pragma multi_compile _ DIRLIGHTMAP_COMBINED
 	#pragma multi_compile _ LIGHTMAP_ON
 	#pragma multi_compile _ DYNAMICLIGHTMAP_ON
 #endif
