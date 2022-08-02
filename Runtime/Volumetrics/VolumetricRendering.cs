@@ -244,7 +244,6 @@ public class VolumetricRendering : MonoBehaviour
     int ID_InLightingTexture = Shader.PropertyToID("InLightingTexture");
     int ID_InTex = Shader.PropertyToID("InTex");
     int ID_LightProjectionTextureArray = Shader.PropertyToID("LightProjectionTextureArray");
-    int ID_SkyTexture = Shader.PropertyToID("_SkyTexture");
     int ID_VolumetricClipmapTexture = Shader.PropertyToID("_VolumetricClipmapTexture");
     int ID_VolumetricClipmapTexture2 = Shader.PropertyToID("_VolumetricClipmapTexture2");
     int ID_PreResult = Shader.PropertyToID("PreResult");
@@ -615,22 +614,19 @@ public class VolumetricRendering : MonoBehaviour
 
         // BAD! - _ZBufferParams is a unity default constant! Don't overwrite it with the volumetric information. Directly set on the compute shader instead of
         // globally setting the value. Name should probably also be unique.
-        
+        //_ZBufferParams used to not exsit in URP and we had to set it :P
+
         float zBfP1 = 1.0f - volumetricData.far / volumetricData.near;
         float zBfP2 = volumetricData.far / volumetricData.near;
         FroxelIntegrationCompute.SetVector("_VolZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
 
-
         //Debug.Log("Dispatching " + ThreadsToDispatch);
 
-        // DUMMY SKY TEXTURE, REMOVE THIS WHEN THE SKY TEXTURE IS ACTUALLY PROPELY SET!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        RenderTexture cubemap = new RenderTexture(4,4,1, RenderTextureFormat.ARGBHalf, 0);
-        cubemap.dimension = TextureDimension.Cube;
-        cubemap.Create();
-        ClearRenderTexture(cubemap, clearColor);
-        FroxelFogCompute.SetTexture(ScatteringKernel, ID_SkyTexture, cubemap);
+        SkyManager.CheckSky();
         SetVariables();
     }
+
+
 
     void UpdateLights()
     {
@@ -654,7 +650,7 @@ public class VolumetricRendering : MonoBehaviour
         }
         LightBuffer = new ComputeBuffer(LightObjects.Count, LightObjectStride);
         LightBuffer.SetData(LightObjects);
-        FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); // TODO: move to an int
+        FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); 
     }
 #region Clipmap funtions
     void SetupClipmap()
@@ -901,6 +897,7 @@ public class VolumetricRendering : MonoBehaviour
 
     public void SetVariables()
     {
+        
         float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
         Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
         Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
@@ -1470,7 +1467,7 @@ public class VolumetricRendering : MonoBehaviour
 
         //Black Texture in editor to not get in the way. Isolated h ere because shaders should skip volumetric tex in precompute otherwise. 
         // TODO: Add proper scene preview feature
-         if ( BlackTex == null ) BlackTex = (Texture3D)MakeBlack3DTex();
+        if (BlackTex == null) BlackTex = CoreUtils.blackVolumeTexture; //(Texture3D)MakeBlack3DTex();
         
         //        UnityEditor.SceneManagement.EditorSceneManager.sceneUnloaded += UnloadKeyword; //adding function when scene is unloaded 
         assignVaris();
@@ -1486,41 +1483,42 @@ public class VolumetricRendering : MonoBehaviour
     }
 #endif
 
-    Texture MakeBlack3DTex()
-    {
-        Debug.Log("Made blank texture");
+    //Using core blackVolumeTexture instead
+    //Texture MakeBlack3DTex()
+    //{
+    //    Debug.Log("Made blank texture");
 
-        int size = 1;
+    //    int size = 1;
 
-        Texture3D BlackTex = new Texture3D(1, 1, 1, TextureFormat.ARGB32, false);
-        var cols = new Color[size * size * size];
-        float mul = 1.0f / (size - 1);
-        int idx = 0;
-        Color c = Color.white;
-        for (int z = 0; z < size; ++z)
-        {
-            for (int y = 0; y < size; ++y)
-            {
-                for (int x = 0; x < size; ++x, ++idx)
-                {
-                    c.r = 0;
-                    c.g = 0;
-                    c.b = 0;
-                    c.a = 1;
-                    cols[idx] = c;
-                }
-            }
-        }
+    //    Texture3D BlackTex = new Texture3D(1, 1, 1, TextureFormat.ARGB32, false);
+    //    var cols = new Color[size * size * size];
+    //    float mul = 1.0f / (size - 1);
+    //    int idx = 0;
+    //    Color c = Color.white;
+    //    for (int z = 0; z < size; ++z)
+    //    {
+    //        for (int y = 0; y < size; ++y)
+    //        {
+    //            for (int x = 0; x < size; ++x, ++idx)
+    //            {
+    //                c.r = 0;
+    //                c.g = 0;
+    //                c.b = 0;
+    //                c.a = 1;
+    //                cols[idx] = c;
+    //            }
+    //        }
+    //    }
 
-        BlackTex.SetPixels(cols);
-        BlackTex.Apply();
-        // SetClipmap(BlackTex, 50, Vector3.zero);
+    //    BlackTex.SetPixels(cols);
+    //    BlackTex.Apply();
+    //    // SetClipmap(BlackTex, 50, Vector3.zero);
 
-        Shader.SetGlobalTexture(ID_VolumetricResult, BlackTex);
+    //    Shader.SetGlobalTexture(ID_VolumetricResult, BlackTex);
 
-        //    Shader.SetGlobalTexture("_VolumetricClipmapTexture", BlackTex); //Set clipmap for
-        return BlackTex;
-    }
+    //    //    Shader.SetGlobalTexture("_VolumetricClipmapTexture", BlackTex); //Set clipmap for
+    //    return BlackTex;
+    //}
 
 
     //public void UnloadKeyword<Scene>(Scene scene)
@@ -1597,7 +1595,7 @@ public class VolumetricRendering : MonoBehaviour
         message += "InLightingTexture " + ID_InLightingTexture + "\n";
         message += "InTex " + ID_InTex + "\n";
         message += "LightProjectionTextureArray" + ID_LightProjectionTextureArray + "\n";
-        message += "_SkyTexture" + ID_SkyTexture + "\n";
+        //message += "_SkyTexture" + ID_SkyTexture + "\n";
         message += "_VolumetricClipmapTexture" + ID_VolumetricClipmapTexture + "\n";
         message += "PreResult " + ID_PreResult + "\n";
         message += "VolumeMap " + ID_VolumeMap + "\n";

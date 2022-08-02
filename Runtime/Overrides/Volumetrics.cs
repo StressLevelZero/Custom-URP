@@ -8,13 +8,15 @@ namespace UnityEngine.Rendering.Universal
     [Serializable, VolumeComponentMenu("Atmospherics/Volumetrics")]
     public sealed class Volumetrics : VolumeComponent
     {
-        static readonly int m_MipFogParam = Shader.PropertyToID("_MipFogParameters");
+        //static readonly int m_MipFogParam = Shader.PropertyToID("_MipFogParameters");
         static readonly int m_GlobalExtinction = Shader.PropertyToID("_GlobalExtinction");
         static readonly int m_FogBaseHeight = Shader.PropertyToID("_FogBaseHeight");
         static readonly int m_FogMaxHeight = Shader.PropertyToID("_FogMaxHeight");
         static readonly int m_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
         static readonly int m_VolumetricAlbedo = Shader.PropertyToID("_GlobalScattering");
-        static readonly int m_SkyTexture = Shader.PropertyToID("_SkyTexture");
+        //static readonly int m_SkyTexture = Shader.PropertyToID("_SkyTexture");
+        //static readonly int m_SkyMipCount = Shader.PropertyToID("_SkyMipCount");
+
         [Header("Fog Mipmap controls")]
         [Tooltip("How close the mipfog starts")]
         public MinFloatParameter mipFogNear = new MinFloatParameter( 0.0f , 0 );
@@ -39,46 +41,26 @@ namespace UnityEngine.Rendering.Universal
         public MinFloatParameter GlobalStaticLightMultiplier = new MinFloatParameter(1f, .1f);
         public ColorParameter VolumetricAlbedo = new ColorParameter(Color.white,false);
         //       public bool IsActive() => intensity.value > 0f && (type.value != FilmGrainLookup.Custom || texture.value != null);
-
         //       public bool IsTileCompatible() => true;
 
         internal void PushFogShaderParameters()
         {
-            // TODO Handle user override
-            //var fogSettings = hdCamera.volumeStack.GetComponent<Fog>();
 
-            //if (!hdCamera.frameSettings.IsEnabled(FrameSettingsField.AtmosphericScattering) || !fogSettings.enabled.value)
-            //{
-            //    PushNeutralShaderParameters(cmd);
-            //    return;
-            //}
-
-            //fogSettings.PushShaderParameters(hdCamera, cmd);
-
-            //cmd.SetGlobalInt(HDShaderIDs._PBRFogEnabled, IsPBRFogEnabled(hdCamera) ? 1 : 0);
-
-            Shader.SetGlobalVector(m_MipFogParam, new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
             Shader.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value) ); //ExtinctionFromMeanFreePath
             Shader.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
             Shader.SetGlobalFloat(m_FogBaseHeight, FogBaseHeight.value);
             Shader.SetGlobalFloat(m_FogMaxHeight, FogMaxHeight.value);
             Shader.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
-            if (SkyTexture.value != null && SkyTexture.overrideState)
-            {
-                Shader.SetGlobalTexture(m_SkyTexture, SkyTexture.value);
-                Shader.SetGlobalInt("_SkyMipCount", SkyTexture.value.mipmapCount);
-            }
+
+            SkyManager.SetSkyMips(new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
+            if (SkyTexture.value != null && SkyTexture.overrideState) SkyManager.SetSkyTexture(SkyTexture.value);
+            else SkyManager.CheckSky();
         }
 
-        private void OnValidate()
-        {
-            PushFogShaderParameters();
-        }
+        //private void OnValidate()
+        //{
+        //    PushFogShaderParameters();
+        //}
 
     }
-
-    
-
-    //[Serializable]
-    //public sealed class VolumetricLookupParameter : VolumeParameter<FilmGrainLookup> { public VolumetricLookupParameter(FilmGrainLookup value, bool overrideState = false) : base(value, overrideState) { } }
 }

@@ -70,10 +70,10 @@ struct SLZSurfData
     real    reflectivity;
     real3   emission;
     real    occlusion;
-#if defined(_SLZ_BRDF_LUT)
-    TEXTURE2D(brdfLUT);
-    SAMPLER(sampler_brdfLUT);
-#endif
+// #if defined(_SLZ_BRDF_LUT)
+//     TEXTURE2D(brdfLUT);
+//     SAMPLER(sampler_brdfLUT);
+// #endif
 #if defined(_SLZ_ANISO_SPECULAR)
     real anisoAspect;
     real roughnessT;
@@ -332,7 +332,13 @@ real3 SLZLambertDiffuse(const real3 attenLightColor, const real3 normal, const r
     return attenLightColor * saturate(dot(normal, lightDir));
 }
 
-
+real4 BDRFLUTSAMPLER(real2 UV){
+    #if defined(_BRDFMAP)
+        return SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, UV, 0);
+    #else
+        return 0;
+    #endif
+}
 
 /**
  * Samples a 2D BRDF lookup table with normal dot light on the horizontal axis
@@ -344,11 +350,11 @@ real3 SLZLambertDiffuse(const real3 attenLightColor, const real3 normal, const r
  * @param NoL               dot of the normal and light, should not be saturated or abs'd
  * @return BRDF color for the given dot products of the light, normal, and view direction
  */
-real SLZSampleBDRFLUT(TEXTURE2D(bdrfLUT), SAMPLER(sampler_brdfLUT), real NoV, real NoL)
+real4 SLZSampleBDRFLUT(real NoV, real NoL)
 {
     NoL = saturate((NoL + 1) * 0.5);
     NoV = saturate(NoV);
-    return SAMPLE_TEXTURE2D_LOD(bdrfLUT, sampler_brdfLUT, float2(NoL, NoV), 0);
+    return BDRFLUTSAMPLER(float2(NoL, NoV));
 }
 
 /**
@@ -362,10 +368,10 @@ real SLZSampleBDRFLUT(TEXTURE2D(bdrfLUT), SAMPLER(sampler_brdfLUT), real NoV, re
  * @param NoL               dot of the normal and light, should not be saturated or abs'd
  * @return BRDF color for the given dot products of the light, normal, and view direction
  */
-real SLZSampleBDRFLUTHalfLambert(TEXTURE2D(bdrfLUT), SAMPLER(sampler_brdfLUT), real NoV, real halfLambert)
+real4 SLZSampleBDRFLUTHalfLambert( real NoV, real halfLambert)
 {
     NoV = saturate(NoV);
-    return SAMPLE_TEXTURE2D_LOD(bdrfLUT, sampler_brdfLUT, float2(halfLambert, NoV), 0);
+    return BDRFLUTSAMPLER(float2(halfLambert, NoV));
 }
 
 /**
@@ -380,11 +386,15 @@ real SLZSampleBDRFLUTHalfLambert(TEXTURE2D(bdrfLUT), SAMPLER(sampler_brdfLUT), r
  * @param shadowAttenuation shadow attenuation value associated with the light
  * @return BRDF color for the given dot products of the light, normal, and view direction
  */
-real SLZSampleBDRFLUTShadow(TEXTURE2D(bdrfLUT), SAMPLER(sampler_brdfLUT), real NoV, real NoL, real shadowAttenuation)
+real4 SLZSampleBDRFLUTShadow( real NoV, real NoL, real shadowAttenuation)
 {
     real NoL2 = saturate((NoL + 1) * 0.5);
-    real NoV2 = saturate(NoV);
-    return SAMPLE_TEXTURE2D_LOD(bdrfLUT, sampler_brdfLUT, float2(min(NoL2, shadowAttenuation), NoV2), 0);
+    //real NoV2 = saturate(NoV);
+    real lineartocir = sqrt(shadowAttenuation); //replace with an s curve
+    // if t < d / 2 then return outSine(t * 2, b, c / 2, d) end
+    // return inSine((t * 2) -d, b + c / 2, c / 2, d)
+   // \sqrt{-\left(x-1\right)^{2}+1}
+    return BDRFLUTSAMPLER(float2(min(NoL2, lineartocir  ), saturate(NoV)));
 }
 
 /**
@@ -397,8 +407,8 @@ real SLZSampleBDRFLUTShadow(TEXTURE2D(bdrfLUT), SAMPLER(sampler_brdfLUT), real N
  */
 real3 SLZDiffuseBDRF(const SLZFragData fragData, const SLZSurfData surfData, const Light light)
 {
-    #if defined(_SLZ_BRDF_LUT)
-    return SLZSampleBDRFLUTShadow(surfData.brdfLUT, surfData.sampler_brdfLUT, fragData.NoV, dot(fragData.normal, light.direction), light.shadowAttenuation) * light.distanceAttenuation;
+    #if defined(_BRDFMAP)
+    return SLZSampleBDRFLUTShadow( fragData.NoV, dot(fragData.normal, light.direction), light.shadowAttenuation) * light.distanceAttenuation*light.color.rgb;
     #else
     real3 attenuatedLight = light.color.rgb * (light.distanceAttenuation * light.shadowAttenuation);
     return SLZLambertDiffuse(attenuatedLight, fragData.normal, light.direction);
@@ -732,9 +742,9 @@ real3 SLZApplyLightmapDirectionality(real3 lightmapColor, real3 lmDirection, rea
 real3 SLZApplyLightmapDirectionalityBRDFLUT(const real3 lightmapColor, const real3 lmDirection, const real3 normal, const real directionalityFactor,
     const SLZFragData fragData, const SLZSurfData surfData)
 {
-#if defined(_SLZ_BRDF_LUT)
+#if defined(_BRDFMAP)
     real halfLambert = (dot(normal, 0.5h * lmDirection) + real(0.5)) / max(real(1e-4), directionalityFactor);
-    real3 brdfLUT = SLZSampleBDRFLUTHalfLambert(surfData.brdfLUT, surfData.sampler_brdfLUT, fragData.NoV, halfLambert);
+    real3 brdfLUT = SLZSampleBDRFLUTHalfLambert( fragData.NoV, halfLambert);
     return lightmapColor * brdfLUT;
 #else
     return real3(0, 0, 0);
@@ -766,7 +776,7 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
             real3 lmDirection = real(2.0) * directionalMap.xyz - real(1.0);
 
 
-            #if defined(_SLZ_BRDF_LUT)
+            #if defined(_BRDFMAP)
             lmDiffuse = SLZApplyLightmapDirectionalityBRDFLUT(lmDiffuse, lmDirection, frag.normal, directionalMap.w, frag, surf);
             #else
             lmDiffuse = SLZApplyLightmapDirectionality(lmDiffuse,lmDirection, frag.normal, directionalMap.w);
