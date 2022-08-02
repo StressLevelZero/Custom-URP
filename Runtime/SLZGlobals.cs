@@ -14,14 +14,14 @@ namespace UnityEngine.Rendering.Universal
         static SLZGlobals s_Instance;
         // Blue Noise
         private ComputeBuffer BlueNoiseCB;
-        private int[] BlueNoiseDim; // width, height, depth, current slice index 
+        private float[] BlueNoiseDim; // width, height, depth, current slice index 
         private bool hasSetBNTextures;
 
         private ComputeBuffer SSRGlobalCB;
         private SLZGlobals()
         {
             BlueNoiseCB = new ComputeBuffer(4, sizeof(uint), ComputeBufferType.Constant);
-            BlueNoiseDim = new int[4];
+            BlueNoiseDim = new float[4];
             hasSetBNTextures = false;
             SSRGlobalCB = new ComputeBuffer(4, sizeof(float), ComputeBufferType.Constant);
         }
@@ -61,7 +61,7 @@ namespace UnityEngine.Rendering.Universal
         {
             if (BlueNoiseRGBA != null)
             {
-                BlueNoiseDim = new int[4];
+                BlueNoiseDim = new float[4];
                 BlueNoiseDim[0] = BlueNoiseRGBA.width;
                 BlueNoiseDim[1] = BlueNoiseRGBA.height;
                 BlueNoiseDim[2] = BlueNoiseRGBA.depth;
