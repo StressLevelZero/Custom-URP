@@ -775,24 +775,8 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
             #if !defined(_SLZ_DISABLE_BAKED_SPEC)
                 lmDirection = SLZSafeHalf3Normalize(lmDirection); //length not 1
                 SLZDirectSpecLightInfo lightInfo = SLZGetDirectLightInfo(frag, lmDirection);
-
-                /* 
-                 * Try to attenuate out specular highlight when light isn't strongly directional,
-                 * baked specular has awful issues with warping as the dominant lighting direction
-                 * gets pushed around by reflected light/shadows/other lights. This doesn't work
-                 * well, but is better than nothing
-                 */
-                real oldRoughness = surf.roughness;
-                real dirStrength = directionalMap.w * directionalMap.w;
-                real dirFactor = smoothstep(SLZ_LM_R_MIN, SLZ_LM_R_MAX, dirStrength);
-                surf.roughness = lerp(1, surf.roughness, dirFactor);
-
                 real3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf, frag);
-
-                surf.roughness = oldRoughness;
-                real dirFactor2 = smoothstep(SLZ_LM_D_MIN, SLZ_LM_D_MAX, dirStrength);
-
-                specular += lmDiffuse * lmSpecular * lightInfo.NoL * dirFactor2;
+                specular += lmDiffuse * lmSpecular * lightInfo.NoL;
             #endif
     #endif
     
@@ -807,18 +791,8 @@ void SLZGetLightmapLighting(inout real3 diffuse, inout real3 specular, const SLZ
             #if !defined(_SLZ_DISABLE_BAKED_SPEC)
                 dynLmDirection = SLZSafeHalf3Normalize(dynLmDirection); //length not 1
                 SLZDirectSpecLightInfo dynLightInfo = SLZGetDirectLightInfo(frag, dynLmDirection);
-
-                real dynOldRoughness = surf.roughness;
-                real dynDirStrength = dynDirectionalMap.w * dynDirectionalMap.w;
-                real dynDirFactor = smoothstep(SLZ_LM_R_MIN, SLZ_LM_R_MAX, dynDirStrength);
-                surf.roughness = lerp(1, surf.roughness, dirFactor);
-
                 real3 dynLmSpecular = SLZDirectBRDFSpecular(dynLightInfo, surf, frag);
-
-                surf.roughness = dynOldRoughness;
-                dynDirFactor = smoothstep(SLZ_LM_D_MIN, SLZ_LM_D_MAX, dynDirStrength);
-
-                specular += dynLmDiffuse * dynLmSpecular * dynLightInfo.NoL * dynDirFactor;
+                specular += dynLmDiffuse * dynLmSpecular * dynLightInfo.NoL;
             #endif
         #endif
     
