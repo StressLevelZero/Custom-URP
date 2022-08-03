@@ -272,9 +272,9 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float3 yDirDerivWS = cross(xDirDerivWS, centerDirWS); // Will have the length of 'unitDistFaceSize' by construction
 
 	//SeqOffset.xy = 0;
+	//float3 jitterDirWS = normalize(centerDirWS + (SeqOffset.x * xDirDerivWS) + (SeqOffset.y * yDirDerivWS));
+	float3 jitterDirWS = normalize(centerDirWS);
 
-	float3 jitterDirWS = normalize(centerDirWS + (SeqOffset.x * xDirDerivWS)
-												+ (SeqOffset.y * yDirDerivWS));
 
 	//TODO: add the left right jitter too. Helps smooth out rough edges.
 	float3 centerWS =  CameraPosition.xyz + ( t * jitterDirWS); //Cast ray along direction and add cam pos to get WS pos
