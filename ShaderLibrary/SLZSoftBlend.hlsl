@@ -1,3 +1,7 @@
+#if !defined(SLZ_SOFT_BLEND)
+#define SLZ_SOFT_BLEND
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
 /**
  *	Soft blending for particles/other transparent effects by writing an offset
@@ -36,20 +40,18 @@ float SLZSoftBlendZTest(float clipPosZ, float noise, float blendDist)
  * fragment. Requires the depth-prepass
  *
  *
- * @param screenUVs Normalized 0-1 UV screen position of the fragment
- * @param wPos		World-space postion of the fragment
+ * @param cameraDepth	Depth value read from _CameraDepthTexture at the fragment
+ * @param viewPosZ		View-space Z postion of the fragment
  * @param blendDist Distance behind the fragment in view-space to start
  *					blending at
  * @return float between 1 and 0 indicating how visible the fragment is
  */
-float SLZSoftBlendDepth(float2 screenUVs, float3 wPos, float blendDist)
+float SLZSoftBlendDepth(float cameraDepth, float viewPosZ, float blendDist)
 {
-	float rawDepth = SampleSceneDepth(screenUVs);
-	float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(rawDepth, _ZBufferParams) : LinearDepthToEyeDepth(rawDepth);
-	float thisZ = LinearEyeDepth(wPos, GetWorldToViewMatrix());
-	float fade = saturate((1 / blendDist) * (sceneZ - thisZ));
+	float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(cameraDepth, _ZBufferParams) : LinearDepthToEyeDepth(cameraDepth);
+	float fade = saturate((1 / blendDist) * (sceneZ - abs(viewPosZ)));
 	fade *= fade;
 	return fade;
 }
 
-
+#endif
