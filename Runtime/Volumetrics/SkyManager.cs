@@ -26,6 +26,8 @@ public class SkyManager
         //    cubetex.Create();
 
         Camera renderCam = new GameObject().AddComponent<Camera>();
+        renderCam.gameObject.hideFlags = HideFlags.DontSave;
+        renderCam.enabled = false;
         renderCam.cullingMask = 0;
         renderCam.backgroundColor = Color.black;
         renderCam.clearFlags = CameraClearFlags.Skybox;
