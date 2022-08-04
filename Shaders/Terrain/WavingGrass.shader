@@ -26,6 +26,7 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/WavingDoublePass"
             #pragma multi_compile_fog
             #pragma multi_compile_fragment _ DEBUG_DISPLAY
             #define _DISABLE_REFLECTIONPROBES
+            #define _DISABLE_LIGHTMAPS
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
             #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
             // -------------------------------------

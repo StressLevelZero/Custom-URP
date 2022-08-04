@@ -58,7 +58,7 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Add Pass)"
             #pragma fragment SplatmapFragment
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
-            #pragma instancing_options norenderinglayer assumeuniformscaling nomatrices nolightprobe nolightmap
+            #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
             // -------------------------------------
             // Universal Pipeline keywords
             #define _DISABLE_REFLECTIONPROBES
@@ -111,7 +111,7 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Add Pass)"
 
             //#pragma multi_compile_fog
             #pragma multi_compile_instancing
-            #pragma instancing_options norenderinglayer assumeuniformscaling nomatrices nolightprobe nolightmap
+            #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
             #pragma shader_feature_local _TERRAIN_BLEND_HEIGHT
             #pragma shader_feature_local _NORMALMAP
@@ -126,6 +126,8 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Add Pass)"
 #endif
             ENDHLSL
         }
+        
     }
+    
     Fallback "Hidden/Universal Render Pipeline/FallbackError"
 }

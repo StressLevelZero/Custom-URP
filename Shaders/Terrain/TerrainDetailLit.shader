@@ -27,6 +27,7 @@ Shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit"
             // -------------------------------------
             // Universal Pipeline keywords
             #define _DISABLE_REFLECTIONPROBES
+            #define _DISABLE_LIGHTMAPS
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
 

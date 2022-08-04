@@ -49,7 +49,7 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)"
             // Unity defined keywords
  
             #pragma multi_compile_instancing
-            #pragma instancing_options norenderinglayer assumeuniformscaling nomatrices nolightprobe nolightmap
+            #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
             #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
             #pragma vertex SplatmapVert
