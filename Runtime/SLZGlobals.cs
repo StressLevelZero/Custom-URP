@@ -77,8 +77,8 @@ namespace UnityEngine.Rendering.Universal
                 BlueNoiseDim[0] = BlueNoiseRGBA.width;
                 BlueNoiseDim[1] = BlueNoiseRGBA.height;
                 BlueNoiseDim[2] = BlueNoiseRGBA.depth;
-                BlueNoiseDim[3] = (float) Random.Range(0, BlueNoiseRGBA.width / 2);
-                BlueNoiseDim[4] = (float) Random.Range(0, BlueNoiseRGBA.height / 2);
+                BlueNoiseDim[3] = (float) Random.Range(0, BlueNoiseRGBA.width);
+                BlueNoiseDim[4] = (float) Random.Range(0, BlueNoiseRGBA.height);
 #if UNITY_EDITOR
                 if (!EditorApplication.isPlaying)
                 {
