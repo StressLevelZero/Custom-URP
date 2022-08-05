@@ -14,16 +14,23 @@ namespace UnityEngine.Rendering.Universal
         static SLZGlobals s_Instance;
         // Blue Noise
         private ComputeBuffer BlueNoiseCB;
+        private ComputeBuffer HiZDimBuffer;
         private float[] BlueNoiseDim; // width, height, depth, current slice index 
         private bool hasSetBNTextures;
+#if UNITY_EDITOR
+        private static long framecount = 0;
+        private static double timeSinceStartup = 0.0;
+#endif
+        private int HiZDimBufferID = Shader.PropertyToID("HiZDimBuffer");
 
         private ComputeBuffer SSRGlobalCB;
         private SLZGlobals()
         {
-            BlueNoiseCB = new ComputeBuffer(4, sizeof(uint), ComputeBufferType.Constant);
+            BlueNoiseCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
             BlueNoiseDim = new float[4];
             hasSetBNTextures = false;
             SSRGlobalCB = new ComputeBuffer(4, sizeof(float), ComputeBufferType.Constant);
+            HiZDimBuffer = new ComputeBuffer(32, sizeof(float), ComputeBufferType.Constant);
         }
         public static SLZGlobals instance
         {
@@ -38,6 +45,11 @@ namespace UnityEngine.Rendering.Universal
 
         }
 
+        public void SetHiZGlobal(float[] data)
+        {
+            HiZDimBuffer.SetData(data);
+            Shader.SetGlobalConstantBuffer(HiZDimBufferID, HiZDimBuffer, 0, 32 * sizeof(float));
+        }
 
         public void SetSSRGlobals()
         {
@@ -61,14 +73,21 @@ namespace UnityEngine.Rendering.Universal
         {
             if (BlueNoiseRGBA != null)
             {
-                BlueNoiseDim = new float[4];
+                BlueNoiseDim = new float[8];
                 BlueNoiseDim[0] = BlueNoiseRGBA.width;
                 BlueNoiseDim[1] = BlueNoiseRGBA.height;
                 BlueNoiseDim[2] = BlueNoiseRGBA.depth;
+                BlueNoiseDim[3] = (float) Random.Range(0, BlueNoiseRGBA.width / 2);
+                BlueNoiseDim[4] = (float) Random.Range(0, BlueNoiseRGBA.height / 2);
 #if UNITY_EDITOR
                 if (!EditorApplication.isPlaying)
                 {
-                    BlueNoiseDim[3] = (int)((30.0 * EditorApplication.timeSinceStartup) % BlueNoiseRGBA.depth);
+                    if (timeSinceStartup != EditorApplication.timeSinceStartup)
+                    {
+                        timeSinceStartup = EditorApplication.timeSinceStartup;
+                        framecount++;
+                    }
+                    BlueNoiseDim[3] = (int)(framecount % BlueNoiseRGBA.depth);
                     //Debug.Log(BlueNoiseDim[3]);
                 }
                 else
@@ -123,6 +142,11 @@ namespace UnityEngine.Rendering.Universal
                 {
                     s_Instance.BlueNoiseCB.Dispose();
                     s_Instance.BlueNoiseCB = null;
+                }
+                if (s_Instance.HiZDimBuffer != null)
+                {
+                    s_Instance.HiZDimBuffer.Dispose();
+                    s_Instance.HiZDimBuffer = null;
                 }
             }
             s_Instance = null;
