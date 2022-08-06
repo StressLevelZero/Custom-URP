@@ -33,7 +33,7 @@ float4x4    RightEyeMatrix;
 
 //shared float4 _VolumePlaneSettings;
 //shared float _GlobalExtinction;
-shared float4 _GlobalScattering;
+float4 _GlobalScattering;
 
 float4 _VolZBufferParams;
 

@@ -31,10 +31,10 @@ struct LightObject
 StructuredBuffer<LightObject> LightObjects;
 
 //shared float4 _VolumePlaneSettings;
-shared float _GlobalExtinction;
+float _GlobalExtinction;
 shared float _FogBaseHeight;
 shared float _FogMaxHeight;
-shared float _StaticLightMultiplier;
+float _StaticLightMultiplier;
 float _ClipmapScale;
 float _ClipmapScale2;
 float3 _ClipmapPosition;

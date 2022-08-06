@@ -22,7 +22,7 @@ Texture3D<float4> VolumeMap;
 SamplerState trilinear_clamp_sampler;
 float VolumeDensity;
 
-shared float _GlobalExtinction;
+float _GlobalExtinction;
 float4 clearColor;
 
 [numthreads(4, 4, 4)]
