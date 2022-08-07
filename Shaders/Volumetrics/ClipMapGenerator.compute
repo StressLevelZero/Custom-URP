@@ -21,9 +21,10 @@ float3	VolumeWorldPosition;
 Texture3D<float4> VolumeMap;
 SamplerState trilinear_clamp_sampler;
 float VolumeDensity;
-
-shared float _GlobalExtinction;
 float4 clearColor;
+
+//THESE ARE GLOBAL VARIABLES. THEY NEED TO STAY GLOBAL
+shared float _GlobalExtinction;
 
 [numthreads(4, 4, 4)]
 void ClipMapClear(uint3 id : SV_DispatchThreadID)

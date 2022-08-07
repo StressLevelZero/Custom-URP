@@ -33,7 +33,11 @@ public class SkyManager
         renderCam.clearFlags = CameraClearFlags.Skybox;
         renderCam.RenderToCubemap(cubetex);
         //cubetex.GenerateMips();
+#if UNITY_EDITOR
+        Object.DestroyImmediate(renderCam.gameObject);
+#else
         Object.Destroy(renderCam.gameObject);
+#endif
         skytexture = cubetex;
     }
     static public void CheckSky()

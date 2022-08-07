@@ -31,10 +31,7 @@ struct LightObject
 StructuredBuffer<LightObject> LightObjects;
 
 //shared float4 _VolumePlaneSettings;
-shared float _GlobalExtinction;
-shared float _FogBaseHeight;
-shared float _FogMaxHeight;
-shared float _StaticLightMultiplier;
+
 float _ClipmapScale;
 float _ClipmapScale2;
 float3 _ClipmapPosition;
@@ -68,13 +65,15 @@ SamplerState s_linear_clamp_sampler;
 Texture3D<float4> _VolumetricClipmapTexture;
 Texture3D<float4> _VolumetricClipmapTexture2;
 
+//THESE ARE GLOBAL VARIABLES. THEY NEED TO STAY GLOBAL
 shared TextureCube<float4> _SkyTexture;
-
-
-//float reprojectionAmount;
 shared float4 _MipFogParameters; //near, far, mix
 shared int _SkyMipCount;
-
+shared float _GlobalExtinction;
+shared float _FogBaseHeight;
+shared float _FogMaxHeight;
+shared float _StaticLightMultiplier;
+//float reprojectionAmount;
 
 
 // Returns the forward (central) direction of the current view in the world space.

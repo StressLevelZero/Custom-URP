@@ -33,6 +33,7 @@ float4x4    RightEyeMatrix;
 
 //shared float4 _VolumePlaneSettings;
 //shared float _GlobalExtinction;
+//THESE ARE GLOBAL VARIABLES. THEY NEED TO STAY GLOBAL
 shared float4 _GlobalScattering;
 
 float4 _VolZBufferParams;

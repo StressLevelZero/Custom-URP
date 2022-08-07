@@ -897,7 +897,7 @@ public class VolumetricRendering : MonoBehaviour
 
     public void SetVariables()
     {
-        
+        //THESE ARE GLOBAL VARIABLES. THEY NEED TO STAY GLOBAL
         float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
         Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
         Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
