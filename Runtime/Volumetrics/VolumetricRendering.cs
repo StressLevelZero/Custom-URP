@@ -67,6 +67,12 @@ public class VolumetricRendering : MonoBehaviour
     // Prevent script from trying to initialize itself twice
     bool hasInitialized;
 
+    // Sometimes, the volumetric register gets filled after the volumetric script initializes.
+    // This means that the clipmaps will be empty until the player moves far enough to trigger
+    // a clipmap update. Instead, set a bool that triggers the clipmaps to try to update every
+    // frame until the volumtric registry contains >0 volumes
+    bool VolumetricRegisterEmpty;
+
     // Debug counter to print a message every x frames
     int debugHeartBeatCount = 30;
     int debugHeartBeat = 0;
@@ -124,7 +130,7 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture ClipmapBufferB;  //Sampling and combining baked maps asynchronously
     RenderTexture ClipmapBufferC;  //Sampling and combining baked maps asynchronously
     RenderTexture ClipmapBufferD;  //Sampling and combining baked maps asynchronously //TODO: get rid of this extra buffer and bool
-    bool FlipClipBuffer = true;
+    bool FlipClipBufferNear = true;
     bool FlipClipBufferFar = true;
 
 
@@ -262,25 +268,32 @@ public class VolumetricRendering : MonoBehaviour
     int ID_ClipmapScale0 = Shader.PropertyToID("ClipmapScale");
     int ID_ClipmapScale1 = Shader.PropertyToID("_ClipmapScale");
     int ID_ClipmapScale2 = Shader.PropertyToID("_ClipmapScale2");
+    int ID_ClipmapWorldPosition = Shader.PropertyToID("ClipmapWorldPosition");
     int ID_VBufferUnitDepthTexelSpacing = Shader.PropertyToID("_VBufferUnitDepthTexelSpacing");
     int ID_VolZBufferParams = Shader.PropertyToID("_VolZBufferParams");
     int ID_GlobalExtinction = Shader.PropertyToID("_GlobalExtinction");
     int ID_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
     int ID_GlobalScattering = Shader.PropertyToID("_GlobalScattering");
+    int ID_VolumeWorldSize = Shader.PropertyToID("VolumeWorldSize");
+    int ID_VolumeWorldPosition = Shader.PropertyToID("VolumeWorldPosition");
+
+    int ID_ClipMapGenKern;
+    int ID_ClipMapClearKern;
+    int ID_ClipMapHeightKern;
 
     //Froxel Ids
     int PerFrameConstBufferID = Shader.PropertyToID("PerFrameCB");
 
-    int CameraProjectionMatrixID = Shader.PropertyToID("CameraProjectionMatrix");
-    int TransposedCameraProjectionMatrixID = Shader.PropertyToID("TransposedCameraProjectionMatrix");
+    //int CameraProjectionMatrixID = Shader.PropertyToID("CameraProjectionMatrix");
+    //int TransposedCameraProjectionMatrixID = Shader.PropertyToID("TransposedCameraProjectionMatrix");
     //int inverseCameraProjectionMatrixID = Shader.PropertyToID("inverseCameraProjectionMatrix");
     int PreviousFrameMatrixID = Shader.PropertyToID("PreviousFrameMatrix");
-    int Camera2WorldID = Shader.PropertyToID("Camera2World");
-    int CameraPositionID = Shader.PropertyToID("CameraPosition");
+    //int Camera2WorldID = Shader.PropertyToID("Camera2World");
+    //int CameraPositionID = Shader.PropertyToID("CameraPosition");
     //Clipmap IDs
-    int CameraMotionVectorID = Shader.PropertyToID("CameraMotionVector");
-    int ClipmapTextureID = Shader.PropertyToID("_ClipmapTexture");
-    int ClipmapTextureID2 = Shader.PropertyToID("_VolumetricClipmapTexture"); //TODO: Make these two the same name
+    //int CameraMotionVectorID = Shader.PropertyToID("CameraMotionVector");
+    //int ClipmapTextureID = Shader.PropertyToID("_ClipmapTexture");
+    //int ClipmapTextureID2 = Shader.PropertyToID("_VolumetricClipmapTexture"); //TODO: Make these two the same name
     
     int ClipmapScaleID = Shader.PropertyToID("_ClipmapScale");
     int ClipmapTransformID = Shader.PropertyToID("_ClipmapPosition");
@@ -388,7 +401,7 @@ public class VolumetricRendering : MonoBehaviour
         }
         else
         {
-            Debug.Log("Volumetric Editor On Awake");
+            //Debug.Log("Volumetric Editor On Awake");
             activeCam = SceneView.lastActiveSceneView.camera;
         }
 #else
@@ -412,7 +425,7 @@ public class VolumetricRendering : MonoBehaviour
     {
         if (LightProjectionTextures != null) return;
         LightProjectionTextures = new Texture2DArray(1, 1, 1, TextureFormat.RGBA32, false);
-        Debug.Log("Made blank cookie sheet");
+        //Debug.Log("Made blank cookie sheet");
     }
 
     //void dedbugRTC()
@@ -477,7 +490,7 @@ public class VolumetricRendering : MonoBehaviour
         {
             return;
         }
-        hasInitialized = true;
+      
 
         //Debug.Log("Volumetric Renderer Initialized");
         //DebugPrintTextureIDs();
@@ -504,6 +517,12 @@ public class VolumetricRendering : MonoBehaviour
             disable();
             return;
         }
+        if (activeCamData == null)
+        {
+            disable();
+            return;
+        }
+
 #else
     activeCam = cam;
     activeCamData = activeCam?.GetComponent<UniversalAdditionalCameraData>();
@@ -576,8 +595,7 @@ public class VolumetricRendering : MonoBehaviour
 
         ZPlaneTexelSpacing = ComputZPlaneTexelSpacing(1, activeCam.fieldOfView, volumetricData.FroxelHeightResolution);
 
-        SetupClipmap();
-        UpdateClipmaps();
+
         //UpdateClipmap(Clipmap.Far);
        // FroxelFogCompute.SetTexture(ScatteringKernel, ClipmapTextureID, ClipmapBufferA);
        // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
@@ -594,7 +612,6 @@ public class VolumetricRendering : MonoBehaviour
         Matrix4x4 LeftProjectionMatrix = matScaleBias * Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(activeCam.stereoSeparation * 0.5f, 0, 0)); //temp ipd scaler. Combine factors when confirmed
         Matrix4x4 RightProjectionMatrix = matScaleBias * Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, volumetricData.near, volumetricData.far) * Matrix4x4.Translate(new Vector3(-activeCam.stereoSeparation * 0.5f, 0, 0));
 
-        //Debug.Log(cam.stereoSeparation);
 
         Matrix4x4 CenterProjectionMatrixInverse = CenterProjectionMatrix.inverse;
         LeftEyeMatrix = LeftProjectionMatrix * CenterProjectionMatrixInverse;
@@ -635,16 +652,24 @@ public class VolumetricRendering : MonoBehaviour
         VolZBufferParams.y = volumetricData.far / volumetricData.near;
         VolZBufferParams.z = VolZBufferParams.x / volumetricData.far;
         VolZBufferParams.w = VolZBufferParams.y / volumetricData.far;
-        
+
+
+        ID_ClipMapGenKern = ClipmapCompute.FindKernel("ClipMapGen");
+        ID_ClipMapClearKern = ClipmapCompute.FindKernel("ClipMapClear");
+        ID_ClipMapHeightKern = ClipmapCompute.FindKernel("ClipMapHeight");
 
         //Debug.Log("Dispatching " + ThreadsToDispatch);
 
         SkyManager.CheckSky();
 
-        Debug.Log("Flip: " + FlipClipBuffer);
+
+        SetupClipmap();
+        UpdateClipmaps();
         SetFroxelFogUniforms(true);
         SetFroxelIntegrationUniforms(true);
         SetBlurUniforms(true);
+
+        hasInitialized = true;
     }
 
     void SetFroxelFogUniforms(bool forceUpdate = false)
@@ -665,14 +690,20 @@ public class VolumetricRendering : MonoBehaviour
         {
             FroxelFogCompute.SetFloat(ClipmapScaleID, volumetricData.ClipmapScale);
             FroxelFogCompute.SetVector(ClipmapTransformID, ClipmapTransform);
-            if (FlipClipBuffer)
+            if (FlipClipBufferNear)
             {
                 FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricClipmapTexture, ClipmapBufferB);
-                FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricClipmapTexture2, ClipmapBufferC);
             }
             else
             {
                 FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricClipmapTexture, ClipmapBufferA);
+            }
+            if (FlipClipBufferFar)
+            {
+                FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricClipmapTexture2, ClipmapBufferC);
+            }
+            else
+            {
                 FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricClipmapTexture2, ClipmapBufferD);
             }
         }
@@ -764,7 +795,7 @@ public class VolumetricRendering : MonoBehaviour
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
     {
 
-        if (Vector3.Distance(ClipmapCurrentPos, activeCam.transform.position) > volumetricData.ClipmapResampleThreshold)
+        if (Vector3.Distance(ClipmapCurrentPos, activeCam.transform.position) > volumetricData.ClipmapResampleThreshold || VolumetricRegisterEmpty)
         {
             //TODO: seperate the frames where this is rendered
             UpdateClipmaps();
@@ -778,6 +809,16 @@ public class VolumetricRendering : MonoBehaviour
 
     public void UpdateClipmaps()
     {
+        //Debug.Log("Clipmap Update: " + activeCam.transform.position);
+        if (VolumetricRegisters.volumetricAreas.Count == 0)
+        {
+            VolumetricRegisterEmpty = true;
+            return;
+        }
+        else if (VolumetricRegisterEmpty)
+        {
+            VolumetricRegisterEmpty = false;
+        }
         UpdateClipmap(Clipmap.Near);
         UpdateClipmap(Clipmap.Far);
     }
@@ -787,10 +828,6 @@ public class VolumetricRendering : MonoBehaviour
 
     public void UpdateClipmap(Clipmap clipmap)
     {
-        //TODO: chache ids 
-        int ClipmapKernal = ClipmapCompute.FindKernel("ClipMapGen");
-        int ClearClipmapKernal = ClipmapCompute.FindKernel("ClipMapClear");
-        int HeightClipmapKernal = ClipmapCompute.FindKernel("ClipMapHeight");
         ClipmapTransform = activeCam.transform.position;
 
         float farscale = volumetricData.ClipmapScale2;
@@ -805,17 +842,16 @@ public class VolumetricRendering : MonoBehaviour
         {
             BufferA = ClipmapBufferB;
             BufferB = ClipmapBufferA;
-            ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
-            ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * Vector3.one));
-
+            ClipmapCompute.SetFloat(ID_ClipmapScale0, volumetricData.ClipmapScale);
+            ClipmapCompute.SetVector(ID_ClipmapWorldPosition, ClipmapTransform - (0.5f * volumetricData.ClipmapScale * Vector3.one));
         }
         else
         {
             BufferA = ClipmapBufferC;
             BufferB = ClipmapBufferD;
 
-            ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale2);
-            ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale2 * Vector3.one));
+            ClipmapCompute.SetFloat(ID_ClipmapScale0, volumetricData.ClipmapScale2);
+            ClipmapCompute.SetVector(ID_ClipmapWorldPosition, ClipmapTransform - (0.5f * volumetricData.ClipmapScale2 * Vector3.one));
 
         }
 
@@ -823,43 +859,44 @@ public class VolumetricRendering : MonoBehaviour
         //ClipmapCompute.SetVector("ClipmapWorldPosition", ClipmapTransform - (0.5f * volumetricData.ClipmapScale * Vector3.one));
     //    ClipmapCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
 
-        FlipClipBuffer = false;
+        bool FlipClipBuffer = false;
         //Clear previous capture
         int clipMapDispatchNum = Mathf.Max(volumetricData.ClipMapResolution / 4, 1);
      //   ClipmapCompute.SetVector("clearColor", RenderSettings.ambientProbe.Evaluate);
 
 
-        ClipmapCompute.SetTexture(ClearClipmapKernal, ID_Result, BufferA);
+        ClipmapCompute.SetTexture(ID_ClipMapClearKern, ID_Result, BufferA);
         //Debug.Log("Dispatching 0");
-        ClipmapCompute.Dispatch(ClearClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
-        ClipmapCompute.SetTexture(ClearClipmapKernal, ID_Result, BufferB);
+        ClipmapCompute.Dispatch(ID_ClipMapClearKern, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
+        ClipmapCompute.SetTexture(ID_ClipMapClearKern, ID_Result, BufferB);
         //Debug.Log("Dispatching 1");
-        ClipmapCompute.Dispatch(ClearClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
+        ClipmapCompute.Dispatch(ID_ClipMapClearKern, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
 
         //ClipmapCompute.SetFloat("VolumeDensity", 0); //
 
         //Loop through bake texture volumes and put into clipmap //TODO: Add pass for static unbaked elements
+        //Debug.Log("VolumetricRegisters.volumetricAreas.Count: " + VolumetricRegisters.volumetricAreas.Count);
         for (int i = 0; i < VolumetricRegisters.volumetricAreas.Count; i++)
         {
             FlipClipBuffer = !FlipClipBuffer;
 
             if (FlipClipBuffer)
             {
-                ClipmapCompute.SetTexture(ClipmapKernal, ID_PreResult, BufferB);
-                ClipmapCompute.SetTexture(ClipmapKernal, ID_Result, BufferA);
+                ClipmapCompute.SetTexture(ID_ClipMapGenKern, ID_PreResult, BufferB);
+                ClipmapCompute.SetTexture(ID_ClipMapGenKern, ID_Result, BufferA);
             }
             else
             {
-                ClipmapCompute.SetTexture(ClipmapKernal, ID_PreResult, BufferA);
-                ClipmapCompute.SetTexture(ClipmapKernal, ID_Result, BufferB);
+                ClipmapCompute.SetTexture(ID_ClipMapGenKern, ID_PreResult, BufferA);
+                ClipmapCompute.SetTexture(ID_ClipMapGenKern, ID_Result, BufferB);
             }
 
             //Volumetric variables
-            ClipmapCompute.SetTexture(ClipmapKernal, ID_VolumeMap, VolumetricRegisters.volumetricAreas[i].bakedTexture);
-            ClipmapCompute.SetVector("VolumeWorldSize", VolumetricRegisters.volumetricAreas[i].NormalizedScale);
-            ClipmapCompute.SetVector("VolumeWorldPosition", VolumetricRegisters.volumetricAreas[i].Corner);
+            ClipmapCompute.SetTexture(ID_ClipMapGenKern, ID_VolumeMap, VolumetricRegisters.volumetricAreas[i].bakedTexture);
+            ClipmapCompute.SetVector(ID_VolumeWorldSize, VolumetricRegisters.volumetricAreas[i].NormalizedScale);
+            ClipmapCompute.SetVector(ID_VolumeWorldPosition, VolumetricRegisters.volumetricAreas[i].Corner);
             //Debug.Log("Dispatching 2");
-            ClipmapCompute.Dispatch(ClipmapKernal, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
+            ClipmapCompute.Dispatch(ID_ClipMapGenKern, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
         }
         
         //Height Densitiy
@@ -895,6 +932,18 @@ public class VolumetricRendering : MonoBehaviour
             SetClipmap(BufferB, volumetricData.ClipmapScale, ClipmapTransform, clipmap);
         }
         
+        switch (clipmap)
+        {
+            case Clipmap.Near:
+                FlipClipBufferNear = FlipClipBuffer;
+                break;
+            case Clipmap.Far:
+                FlipClipBufferFar = FlipClipBuffer;
+                break;
+            default:
+                break;
+        }
+
         ClipmapCurrentPos = ClipmapTransform; //Set History
         lastClipmapUpdate = this;
     }
@@ -913,7 +962,7 @@ public class VolumetricRendering : MonoBehaviour
         }
         else
         {        //TODO COMBINE THESE
-            FroxelFogCompute.SetTexture(ScatteringKernel, ClipmapTextureID2, ClipmapTexture); //Set clipmap for
+            FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricClipmapTexture, ClipmapTexture); //Set clipmap for
             //FroxelFogCompute.SetTexture(ScatteringKernel, ClipmapTextureID, ClipmapTexture); //Set clipmap for
         }
     }
@@ -975,6 +1024,17 @@ public class VolumetricRendering : MonoBehaviour
     }
     void UpdateFunc()
     {
+        if (!hasInitialized)
+        {
+            return;
+        }
+#if UNITY_EDITOR
+        if (activeCamData == null)
+        {
+            disable();
+            return;
+        }
+#endif
         if (activeCam == null)
         {
             Debug.Log("No active camera");
@@ -1133,16 +1193,16 @@ public class VolumetricRendering : MonoBehaviour
         //Debug.Log("Dispatching 4");
         FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
 
-//        BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
-//        BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
-        
+        if (FroxelBlur == BlurType.Gaussian)
+        {
+            BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+            BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+        }
         /* Give the shader constant buffer and volumetric render texture to the
          * additional camera data so that on render the camera can set them as
          * globals
          */
-
         SetCameraData();
-        //DebugHeartBeat();
     }
 
 
@@ -1248,7 +1308,7 @@ public class VolumetricRendering : MonoBehaviour
 
     public void disable()
     {
-        Debug.Log("Volumetric Rendering: Disable Called");
+        //Debug.Log("Volumetric Rendering: Disable Called");
         hasInitialized = false;
 #if UNITY_EDITOR
             RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
@@ -1443,7 +1503,7 @@ public class VolumetricRendering : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Volumetric Rendering: Null extra camera data, volumetric result, or constant buffer!");
+            Debug.LogWarning("Volumetric Rendering: Null extra camera data, volumetric result, or constant buffer!");
             activeCamData.m_EnableVolumetrics = false;
         }
     }
@@ -1599,8 +1659,8 @@ public class VolumetricRendering : MonoBehaviour
         string message = "";
         
         
-        message += "ClipmapTextureID " + ClipmapTextureID + "\n";
-        message += "ClipmapTextureID2 " + ClipmapTextureID2 + "\n";
+        //message += "ClipmapTextureID " + ClipmapTextureID + "\n";
+        //message += "ClipmapTextureID2 " + ClipmapTextureID2 + "\n";
         message += "_VolumetricTexture " + ID_VolumetricResult + "\n";
         message += "Result " + ID_Result + "\n";
         message += "InLightingTexture " + ID_InLightingTexture + "\n";
