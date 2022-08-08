@@ -490,7 +490,12 @@ public class VolumetricRendering : MonoBehaviour
         {
             return;
         }
-      
+        if (cam == null)
+        {
+            Debug.LogWarning("Volumetric Rendering Script with no camera assigned, disabling");
+            disable();
+            return;
+        }
 
         //Debug.Log("Volumetric Renderer Initialized");
         //DebugPrintTextureIDs();
@@ -644,9 +649,6 @@ public class VolumetricRendering : MonoBehaviour
         // Unused as far as I can tell, declared in the VolumetricCore but not actually used
         //Shader.SetGlobalVector("_VolumePlaneSettings", new Vector4(volumetricData.near, volumetricData.far, volumetricData.far - volumetricData.near, volumetricData.near * volumetricData.far));
 
-        // BAD! - _ZBufferParams is a unity default constant! Don't overwrite it with the volumetric information. Directly set on the compute shader instead of
-        // globally setting the value. Name should probably also be unique.
-        //_ZBufferParams used to not exsit in URP and we had to set it :P
         VolZBufferParams = new Vector4();
         VolZBufferParams.x = 1.0f - volumetricData.far / volumetricData.near;
         VolZBufferParams.y = volumetricData.far / volumetricData.near;
@@ -998,10 +1000,18 @@ public class VolumetricRendering : MonoBehaviour
         //Global multiplier for static lights
         //ScatteringFromExtinctionAndAlbedo
         //THESE ARE GLOBAL VARIABLES. THEY NEED TO STAY GLOBAL
-        float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
-        Shader.SetGlobalFloat(ID_GlobalExtinction, extinction); //ExtinctionFromMeanFreePath
-        Shader.SetGlobalFloat(ID_StaticLightMultiplier, StaticLightMultiplier); //Global multiplier for static lights
 
+        // The volumetrics script should be in charge of setting these,
+        // if there's no volume component then all volumetric
+        // scripts will use the last camera to be enabled's values
+        // Not ideal, but for now it should be fine
+
+        if (!Volumetrics.hasSetGlobals) // Added check so volumetric rendering scripts don't overwrite the volumetrics scripts values
+        {
+            float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
+            Shader.SetGlobalFloat(ID_GlobalExtinction, extinction); //ExtinctionFromMeanFreePath
+            Shader.SetGlobalFloat(ID_StaticLightMultiplier, StaticLightMultiplier); //Global multiplier for static lights
+        }
     }
 
     float GetAspectRatio()
@@ -1028,20 +1038,18 @@ public class VolumetricRendering : MonoBehaviour
     }
     void UpdateFunc()
     {
-        if (!hasInitialized)
-        {
-            return;
-        }
 #if UNITY_EDITOR
-        if (activeCamData == null)
+        if (!hasInitialized || (Application.isPlaying && !activeCam.isActiveAndEnabled && !enableEditorPreview))
+#else
+        if (!hasInitialized || !activeCam.isActiveAndEnabled)
+#endif
         {
-            disable();
             return;
         }
-#endif
         if (activeCam == null)
         {
-            Debug.Log("No active camera");
+            Debug.LogWarning("Volumetric Rendering: Active camera destroyed or de-assigned, disabling");
+            disable();
             return;
         }
 
@@ -1088,34 +1096,6 @@ public class VolumetricRendering : MonoBehaviour
         GetHexagonalClosePackedSpheres7(m_xySeq);
         int sampleIndex = Time.renderedFrameCount % 7;
         Vector3 seqOffset = new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex]);
-        //Shader.SetGlobalVector("SeqOffset", new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex])); //Loop through jitters. 
-
-
-        //Shader.SetGlobalVector("_VBufferDistanceDecodingParams", vbuff.depthDecodingParams);
-        //Shader.SetGlobalMatrix("_VBufferCoordToViewDirWS", PixelCoordToViewDirWS);
-
-        //Compute.SetGlobalMatrix("_PrevViewProjMatrix", PrevViewProjMatrix);
-        //Shader.SetGlobalMatrix("_ViewMatrix", activeCam.worldToCameraMatrix);
-
-
-
-        //FroxelFogCompute.SetMatrix(inverseCameraProjectionMatrixID, projectionMatrix.inverse);
-        //FroxelFogCompute.SetMatrix(Camera2WorldID, activeCam.transform.worldToLocalMatrix);
-
-        //FroxelFogCompute.SetMatrix("LightProjectionMatrix", lightMatrix);
-        //FroxelFogCompute.SetVector("LightPosition", LightPosition.transform.position);
-        //FroxelFogCompute.SetVector("LightColor", LightPosition.color * LightPosition.intensity);
-
-        //FroxelFogCompute.SetFloat("reprojectionAmount", reprojectionAmount );
-
-        /* Replaced with ComputeBuffer*/
-        //Shader.SetGlobalVector("_VBufferDistanceEncodingParams", vbuff.depthEncodingParams);
-        //Shader.SetGlobalMatrix(CameraProjectionMatrixID,  projectionMatrix);
-        //Shader.SetGlobalMatrix(TransposedCameraProjectionMatrixID,  projectionMatrix.transpose); //Fragment shaders require the transposed version
-        //Shader.SetGlobalVector(CameraPositionID, activeCam.transform.position); //Can likely pack this into the 4th row of the projection matrix 
-        //Shader.SetGlobalVector(CameraMotionVectorID, activeCam.transform.position - PreviousCameraPosition); //Extract a motion vector per frame
-        //Shader.SetGlobalVector("_VolCameraPos", activeCam.transform.position );
-
 
         ShaderConstants[] shaderConsts = new ShaderConstants[1];
         shaderConsts[0].TransposedCameraProjectionMatrix = projectionMatrix.transpose;
@@ -1632,7 +1612,6 @@ public class VolumetricRendering : MonoBehaviour
             Graphics.SetRenderTarget(rt, 0, CubemapFace.NegativeZ, 0);
             GL.Clear(false, true, color);
         }
-
         RenderTexture.active = activeRT;
     }
 
@@ -1644,58 +1623,5 @@ public class VolumetricRendering : MonoBehaviour
             this.disable();
             this.enable();
         }
-    }
-
-        void DebugHeartBeat()
-    {
-        debugHeartBeat++;
-        if (debugHeartBeat > debugHeartBeatCount)
-        {
-            debugHeartBeat = 0;
-            Debug.Log("Volumetric Rendering: Alive");
-        }
-    }
-
-    
-
-    void DebugPrintTextureIDs()
-    {
-        string message = "";
-        
-        
-        //message += "ClipmapTextureID " + ClipmapTextureID + "\n";
-        //message += "ClipmapTextureID2 " + ClipmapTextureID2 + "\n";
-        message += "_VolumetricTexture " + ID_VolumetricResult + "\n";
-        message += "Result " + ID_Result + "\n";
-        message += "InLightingTexture " + ID_InLightingTexture + "\n";
-        message += "InTex " + ID_InTex + "\n";
-        message += "LightProjectionTextureArray" + ID_LightProjectionTextureArray + "\n";
-        //message += "_SkyTexture" + ID_SkyTexture + "\n";
-        message += "_VolumetricClipmapTexture" + ID_VolumetricClipmapTexture + "\n";
-        message += "PreResult " + ID_PreResult + "\n";
-        message += "VolumeMap " + ID_VolumeMap + "\n";
-        message += "_VolumetricClipmapTexture2 " + ID_VolumetricClipmapTexture2 + "\n";
-        message += "PreviousFrameLighting" + ID_PreviousFrameLighting + "\n";
-        message += "HistoryBuffer " + ID_HistoryBuffer + "\n";
-        //message += "Missing Texture " + Shader.(141)?.name + "\n";
-        message += "LightObjects " + LightObjectsID + "\n";
-        message += "_GlobalExtinction " + Shader.PropertyToID("_GlobalExtinction") + "\n";
-        message += "_FogBaseHeight " + Shader.PropertyToID("_FogBaseHeight") + "\n";
-        message += "_FogMaxHeight " + Shader.PropertyToID("_FogMaxHeight") + "\n";
-        message += "_StaticLightMultiplier " + Shader.PropertyToID("_StaticLightMultiplier") + "\n";
-        message += "_ClipmapScale " + Shader.PropertyToID("_ClipmapScale") + "\n";
-        message += "_ClipmapScale2 " + Shader.PropertyToID("_ClipmapScale2") + "\n";
-        message += "_ClipmapPosition " + Shader.PropertyToID("_ClipmapPosition") + "\n";
-        message += "PerFrameCB " + Shader.PropertyToID("PerFrameCB") + "\n";
-        message += "_VBufferUnitDepthTexelSpacing " + Shader.PropertyToID("_VBufferUnitDepthTexelSpacing") + "\n";
-        message += "_LinearClamp " + Shader.PropertyToID("_LinearClamp") + "\n";
-        message += "_point_repeat " + Shader.PropertyToID("_point_repeat") + "\n";
-        message += "Custom_trilinear_clamp_sampler " + Shader.PropertyToID("Custom_trilinear_clamp_sampler") + "\n";
-        message += "s_linear_clamp_sampler " + Shader.PropertyToID("s_linear_clamp_sampler") + "\n";
-        message += "_MipFogParameters " + Shader.PropertyToID("_MipFogParameters") + "\n";
-        message += "_SkyMipCount " + Shader.PropertyToID("_SkyMipCount") + "\n";
-        message += "135: " + Shader.GetGlobalTexture(135)?.name + "\n";
-        message += "141: " + Shader.GetGlobalTexture(141)?.name + "\n";
-        Debug.Log(message);
-    }
+    } 
 }
