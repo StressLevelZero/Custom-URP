@@ -104,15 +104,15 @@ ENDHLSL
 
             // -------------------------------------
             // Material Keywords
-            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _NORMALMAP // Just force this on
             //#pragma shader_feature_local _PARALLAXMAP
             // #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
-            #pragma shader_feature_local _ _DETAIL_MULX2
+            #pragma multi_compile_local_fragment _ _DETAIL_MULX2
             //_DETAIL_SCALED
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
             #pragma shader_feature_local_fragment _ALPHATEST_ON
             #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
-            #pragma shader_feature_local_fragment _EMISSION
+            #pragma shader_feature_local_fragment _EMISSION // Force this on, gotta get rid of keywords
             #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
             // #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local_fragment _OCCLUSIONMAP
@@ -130,7 +130,8 @@ ENDHLSL
             // Unity defined keywords
             
             #pragma multi_compile_fog
-            #pragma multi_compile_fragment _ DEBUG_DISPLAY
+            #pragma skip_variants FOG_LINEAR
+            //#pragma multi_compile_fragment _ DEBUG_DISPLAY
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
@@ -624,6 +625,6 @@ ENDHLSL
 //        }
 //    }
 
-    FallBack "Hidden/Universal Render Pipeline/FallbackError"
+    //FallBack "Hidden/Universal Render Pipeline/FallbackError"
     CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.LitShader"
 }

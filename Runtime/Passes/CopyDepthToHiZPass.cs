@@ -73,6 +73,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             if (this.AllocateRT)
                 cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
 
+
+
             // On Metal iOS, prevent camera attachments to be bound and cleared during this pass.
             ConfigureTarget(new RenderTargetIdentifier(destination.Identifier(), 0, CubemapFace.Unknown, -1), descriptor.depthStencilFormat, descriptor.width, descriptor.height, descriptor.msaaSamples, false);
             ConfigureClear(ClearFlag.None, Color.black);
@@ -188,7 +190,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 int highestMip = mipLevels - 1;
                 int i = 0;
                 int slices = 1;
-
+               
                 if (m_SRVSourceKW == null)
                 {
                     m_SRVSourceKW = new LocalKeyword(m_HiZMipCompute, "SRV_SOURCE");
@@ -216,6 +218,8 @@ namespace UnityEngine.Rendering.Universal.Internal
 
                     widthHeight[1] = height >> (i + 1);
                     widthHeight[1] = widthHeight[1] == 0 ? 1 : widthHeight[1];
+
+
 
                     int UOdd = (widthHeight[2] & 1) != 0 ? 1 : 0;
                     int VOdd = (widthHeight[3] & 1) != 0 ? 1 : 0;
@@ -268,6 +272,15 @@ namespace UnityEngine.Rendering.Universal.Internal
                     }
                 
                 } while (i <= highestMip);
+
+                float[] mipDims = new float[32];
+                for (int j = 0; j <= Mathf.Min(highestMip, 16); j++)
+                {
+                    mipDims[2*j] = (float)Mathf.Max(width >> j+1, 1);
+                    mipDims[2*j + 1] = (float)Mathf.Max(height >> j+1, 1);
+                }
+                SLZGlobals.instance.SetHiZGlobal(mipDims);
+                //Debug.Log("Mip dim 0: " + mipDims[0]);
             }
             //Debug.Log("Last Mip: " + i);
             context.ExecuteCommandBuffer(cmd);

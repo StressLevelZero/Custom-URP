@@ -11,18 +11,19 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareHiZTexture.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSRGlobals.hlsl"
 
 #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
-Texture2DArray<float> _CameraHiZDepthTexture;
+//Texture2DArray<float> _CameraHiZDepthTexture;
 float4x4 SLZ_PreviousViewStereo[2];
 #define prevVP SLZ_PreviousViewStereo[unity_StereoEyeIndex]
 #else
-Texture2D<float> _CameraHiZDepthTexture;
+//Texture2D<float> _CameraHiZDepthTexture;
 float4x4 SLZ_PreviousView;
 #define prevVP SLZ_PreviousView
 #endif
-SamplerState sampler_CameraHiZDepthTexture;
+//SamplerState sampler_CameraHiZDepthTexture;
 
 /* 
  * Port of BiRP's old screeen position calcuation, URP contains no direct equivalent. Modified slightly to
@@ -316,7 +317,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 
 
 
-float4 GetRayHit(const float3 wPos, const float3 wRay)
+float3 GetRayHit(const float3 wPos, const float3 wRay, const int steps, inout float depthOut)
 {
 	/* Raymarching in screenspace requires special handling, as the depth is not 
 	 * simply the z distance from the camera, but rather is a function of 1/z,
@@ -354,10 +355,10 @@ float4 GetRayHit(const float3 wPos, const float3 wRay)
 	 * xy_t = xy_1 + s * (xy_2 - xy_1); 
 	 */
 
-	float3 sOrigin = ComputeNormalizedDeviceCoordinatesWithZ(wPos); // origin of the ray
-	sOrigin.xy *= _ScreenParams.xy; //make xy units pixels rather than 0-1 to make rounding to the closest pixel musch easier
+	float3 sOrigin = ComputeNormalizedDeviceCoordinatesWithZ(wPos, UNITY_MATRIX_VP); // origin of the ray
+	sOrigin.xy *= _HiZMipDim[0]; //make xy units pixels rather than 0-1 to make rounding to the closest pixel musch easier
 	float3 sRayEnd = ComputeNormalizedDeviceCoordinatesWithZ(wPos + wRay, UNITY_MATRIX_VP); // second point along the ray
-	sRayEnd.xy *= _ScreenParams.xy;
+	sRayEnd.xy *= _HiZMipDim[0];
 	float3 sRay = sRayEnd - sOrigin;
 	float3 rcpSRay = rcp(sRay); // 1/(p_2 - p_1), used to find the interpolation factor
 
@@ -366,7 +367,7 @@ float4 GetRayHit(const float3 wPos, const float3 wRay)
 	 * the ray origin's depth with the depth sampled from mip 0 of the pyramid
 	 */
 	float2 rcpPixelDim = 2.0 / _ScreenParams.xy; // our depth pyramid starts at mip 1, so the base pixel size is doubled
-	sOrigin.z = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_CameraHiZDepthTexture, rcpPixelDim * sOrigin.xy, 0).r;
+	sOrigin.z = LoadHiZDepth(int3(sOrigin.xy, 0)).r;
 	
 	float3 sCurrPos = sOrigin;	// current position of the ray, starts at the origin
 
@@ -389,35 +390,54 @@ float4 GetRayHit(const float3 wPos, const float3 wRay)
 	* 
 	 */
 	float2 voxelOffset;
-	#define SSR_PIXEL_DELTA 1.0e-9 // lowest bit of 16,384 is 1
-	voxelOffset.x = sRay.x > 0 ? 1.0 + SSR_PIXEL_DELTA : SSR_PIXEL_DELTA;
-	voxelOffset.y = sRay.y > 0 ? 1.0 + SSR_PIXEL_DELTA : SSR_PIXEL_DELTA;
+	#define SSR_PIXEL_DELTA 1.0e-5f
+	voxelOffset.x = sRay.x > 0 ? 1.0 + SSR_PIXEL_DELTA : -SSR_PIXEL_DELTA;
+	voxelOffset.y = sRay.y > 0 ? 1.0 + SSR_PIXEL_DELTA : -SSR_PIXEL_DELTA;
+	float2 posDelta;
 
+	float2 raySign;
+	raySign.x = sRay.x > 0 ? 1.0 :-1.0;
+	raySign.y = sRay.y > 0 ? 1.0 : -1.0;
 	/* Make an initial step without testing if we've intersected the depth since by
 	 * definition we start on it. find the smallest interpolation factor that will take
 	 * the ray to one of the walls (i.e. the closest wall)
 	 */
 
-	float s_x = (floor(sCurrPos.x + 0.5) + voxelOffset.x  - sOrigin.x) * rcpSRay.x;
-	float s_y = (floor(sCurrPos.y + 0.5) + voxelOffset.y  - sOrigin.y) * rcpSRay.y;
+	float s_x = (floor(sCurrPos.x) + voxelOffset.x  - sOrigin.x) * rcpSRay.x;
+	float s_y = (floor(sCurrPos.y) + voxelOffset.y  - sOrigin.y) * rcpSRay.y;
 	float s_min = min(s_x, s_y);
 	int mipLevel = 0;
 	float mipPower = 1;
 	bool hit = false;
-	for (int i = 0; i < _SSRSteps && !hit; i++)
+	bool onScreen = sRay.z < 0;
+	for (int i = 0; (i < steps) && !hit && onScreen; i++)
 	{
 		sCurrPos = sOrigin + s_min * sRay; // interpolate/extrapolate the marcher's postion from the origin along the ray using the lerp factor calculated last iteration
-		float depth = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_CameraHiZDepthTexture, rcpPixelDim * sCurrPos.xy, mipLevel).r;
-		float2 s_xy = ((floor(mipPower * (sCurrPos.xy)) + voxelOffset.xy) / mipPower - sOrigin.xy) * rcpSRay.xy;
-		s_min = min(s_xy.x, s_xy.y);
+		onScreen = sCurrPos.x > 0 && sCurrPos.x < _HiZMipDim[0].x && sCurrPos.y > 0 && sCurrPos.y < _HiZMipDim[0].y;
+		if (s_min < 0 )
+		{
+			break;
+		}
+		int2 pixelCoords = int2(sCurrPos.xy) >> mipLevel;
+		float depth = LoadHiZDepth(int3(pixelCoords, mipLevel));
+		
+		
+		float2 s_xy = raySign*(((float2(pixelCoords.xy) + voxelOffset.xy) /_HiZMipDim[mipLevel] ) * _HiZMipDim[0] - sOrigin.xy) * rcpSRay.xy;
+		float s_min2 = min(s_xy.x, s_xy.y);
 		float s_z = (depth - sOrigin.z) * rcpSRay.z;
-		s_min = min(s_min, s_z);
-		hit = s_z < 1e-8 && mipLevel == 0 ? true : false;
-		mipLevel = s_min > s_z ? mipLevel + 1 : max(mipLevel - 1, 0);
-		mipPower = s_min > s_z ? mipLevel + 1 : max(mipLevel - 1, 0);
+		//s_min2 = min(s_min2, s_z);
+		mipLevel = s_min2 < s_z ? min(mipLevel + 1,8) : max(mipLevel - 1, 0);
+		//mipPower = s_min2 < s_z ? min(mipPower * 2, 256) : max(mipPower * 0.5 , 1);
+		
+		hit = sCurrPos.z <= depth && mipLevel == 0 ? true : false;
+		//hit = s_z < 0 ? true : hit;
+		s_min = s_min2 > s_min ? s_min2 : s_min;
+		
+		depthOut = depth;
 	}
-
-	return float4(0, 0, 0, 0);
+	depthOut = hit ? 1 : depthOut;
+	depthOut = !onScreen ? 1 : depthOut;
+	return float3(onScreen ? sCurrPos.xy * rcpPixelDim : sOrigin.xy * rcpPixelDim, sCurrPos.z);
 }
 
 

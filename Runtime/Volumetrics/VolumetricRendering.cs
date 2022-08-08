@@ -55,12 +55,6 @@ public class VolumetricRendering : MonoBehaviour
     Texture3D BlackTex; //Temp texture for 
     Color clearColor = new Color(0.0f, 0.0f, 0.0f, 0f);
 
-    static VolumetricRendering lastClipmapUpdate;
-    static VolumetricRendering lastBlur;
-    static VolumetricRendering lastFroxelFog;
-    static VolumetricRendering lastFroxelIntegrate;
-
-
     public Camera cam; //Main camera to base settings on
     private Camera activeCam;
     private UniversalAdditionalCameraData activeCamData;
@@ -132,7 +126,6 @@ public class VolumetricRendering : MonoBehaviour
     RenderTexture ClipmapBufferD;  //Sampling and combining baked maps asynchronously //TODO: get rid of this extra buffer and bool
     bool FlipClipBufferNear = true;
     bool FlipClipBufferFar = true;
-
 
     RenderTexture FroxelBufferA;   //Single froxel projection use for scattering and history reprojection
     RenderTexture FroxelBufferB;   //for history reprojection
@@ -219,7 +212,7 @@ public class VolumetricRendering : MonoBehaviour
 
     Texture2DArray LightProjectionTextures; // TODO: Make this a smart dynamic list pulling from light cookies
 
-    private List<LightObject> LightObjects;
+    private static List<LightObject> LightObjects;
     ComputeBuffer LightBuffer;
 
     /// END Dynamic Light Projection/// 
@@ -263,6 +256,7 @@ public class VolumetricRendering : MonoBehaviour
     int ID_VolumeMap = Shader.PropertyToID("VolumeMap");
     int ID_PreviousFrameLighting = Shader.PropertyToID("PreviousFrameLighting");
     int ID_HistoryBuffer = Shader.PropertyToID("HistoryBuffer");
+<<<<<<< HEAD
     int ID_LeftEyeMatrix = Shader.PropertyToID("LeftEyeMatrix");
     int ID_RightEyeMatrix = Shader.PropertyToID("RightEyeMatrix");
     int ID_ClipmapScale0 = Shader.PropertyToID("ClipmapScale");
@@ -281,6 +275,8 @@ public class VolumetricRendering : MonoBehaviour
     int ID_ClipMapClearKern;
     int ID_ClipMapHeightKern;
 
+=======
+>>>>>>> 488aec4cc0102e22592c26eea4c250f4f84453ec
     //Froxel Ids
     int PerFrameConstBufferID = Shader.PropertyToID("PerFrameCB");
 
@@ -305,20 +301,13 @@ public class VolumetricRendering : MonoBehaviour
     [Header("Extra variables"), Range(0, 1)]
     float[] jitters = new float[2] { 0.0f, 0.5f };
 
-    //GlobalKeyword VolumetricsKW;
+    GlobalKeyword VolumetricsKW;
     //Previous view matrix data
 
     Matrix4x4 PreviousFrameMatrix = Matrix4x4.identity;
-    Matrix4x4 LeftEyeMatrix;
-    Matrix4x4 RightEyeMatrix;
     Vector3 PreviousCameraPosition;
     Vector3 previousPos;
     Quaternion previousQuat;
-    Vector4 VolZBufferParams;
-
-    float ZPlaneTexelSpacing;
-    float Extinction;
-    Color ExtinctionColor;
 
     //General fog settings
     // [HideInInspector]
@@ -482,6 +471,11 @@ public class VolumetricRendering : MonoBehaviour
 
         BlurKernelX = BlurCompute.FindKernel("VolBlurX");
         BlurKernelY = BlurCompute.FindKernel("VolBlurY");
+        BlurCompute.SetTexture(BlurKernelX, ID_InTex, IntegrationBuffer);
+        BlurCompute.SetTexture(BlurKernelX, ID_Result, BlurBuffer);
+        BlurCompute.SetTexture(BlurKernelY, ID_InTex, BlurBuffer);
+        BlurCompute.SetTexture(BlurKernelY, ID_Result, BlurBufferB);
+        
     }
 
     void Intialize()
@@ -498,8 +492,8 @@ public class VolumetricRendering : MonoBehaviour
         ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
 
-        
-       
+        FroxelIntegrationCompute.SetConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
+        FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
 
 #if UNITY_EDITOR
         AssemblyReloadEvents.beforeAssemblyReload += CleanupOnReload;
@@ -584,27 +578,39 @@ public class VolumetricRendering : MonoBehaviour
         //IntegrationBufferB.enableRandomWrite = true;
         //IntegrationBufferB.Create();
 
-        Extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
-        ExtinctionColor = albedo * Extinction;
-
         if (FroxelBlur == BlurType.Gaussian) IntializeBlur(rtdiscrpt);
 
         LightObjects = new List<LightObject>();
 
         ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
+        FroxelFogCompute.SetTexture(ScatteringKernel, ID_Result, FroxelBufferA);
 
-        ZPlaneTexelSpacing = ComputZPlaneTexelSpacing(1, activeCam.fieldOfView, volumetricData.FroxelHeightResolution);
+        ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
 
+
+        //First Compute pass setup
+
+<<<<<<< HEAD
 
         //UpdateClipmap(Clipmap.Far);
+=======
+        SetupClipmap();
+
+
+        FroxelFogCompute.SetFloat("ClipmapScale", volumetricData.ClipmapScale);
+        FroxelFogCompute.SetFloat("_VBufferUnitDepthTexelSpacing", ComputZPlaneTexelSpacing(1, activeCam.fieldOfView, volumetricData.FroxelHeightResolution) );
+        UpdateClipmap(Clipmap.Near);
+        UpdateClipmap(Clipmap.Far);
+>>>>>>> 488aec4cc0102e22592c26eea4c250f4f84453ec
        // FroxelFogCompute.SetTexture(ScatteringKernel, ClipmapTextureID, ClipmapBufferA);
-       // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
+        FroxelFogCompute.SetTexture(ScatteringKernel, ID_LightProjectionTextureArray, LightProjectionTextures); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
                                                                                                               //     FroxelFogCompute.SetTexture(FogFroxelKernel, "BlueNoise", BlueNoise); // temp light cookie array. TODO: Make dynamic. Add to lighting engine too.
 
         ///Second compute pass setup
 
         IntegrateKernel = FroxelIntegrationCompute.FindKernel("StepAdd");
-        
+        FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_Result, IntegrationBuffer);
+        FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_InLightingTexture, FroxelBufferA);
 
         //Make view projection matricies
 
@@ -614,22 +620,21 @@ public class VolumetricRendering : MonoBehaviour
 
 
         Matrix4x4 CenterProjectionMatrixInverse = CenterProjectionMatrix.inverse;
-        LeftEyeMatrix = LeftProjectionMatrix * CenterProjectionMatrixInverse;
-        RightEyeMatrix = RightProjectionMatrix * CenterProjectionMatrixInverse;
-       
+
+        FroxelIntegrationCompute.SetMatrix("LeftEyeMatrix", LeftProjectionMatrix * CenterProjectionMatrixInverse);
+        FroxelIntegrationCompute.SetMatrix("RightEyeMatrix", RightProjectionMatrix * CenterProjectionMatrixInverse);
 
 
         //Global Variable setup
 
         if (FroxelBlur == BlurType.Gaussian)
         {
-            //Shader.SetGlobalTexture(ID_VolumetricResult, BlurBufferB);
+            Shader.SetGlobalTexture(ID_VolumetricResult, BlurBufferB);
             VolumetricResult = BlurBufferB;
         }
         else
         {
-            //FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricResult, IntegrationBuffer);
-            //Shader.SetGlobalTexture(ID_VolumetricResult, IntegrationBuffer);
+            Shader.SetGlobalTexture(ID_VolumetricResult, IntegrationBuffer);
             VolumetricResult = IntegrationBuffer;
         }
 
@@ -647,6 +652,7 @@ public class VolumetricRendering : MonoBehaviour
         // BAD! - _ZBufferParams is a unity default constant! Don't overwrite it with the volumetric information. Directly set on the compute shader instead of
         // globally setting the value. Name should probably also be unique.
         //_ZBufferParams used to not exsit in URP and we had to set it :P
+<<<<<<< HEAD
         VolZBufferParams = new Vector4();
         VolZBufferParams.x = 1.0f - volumetricData.far / volumetricData.near;
         VolZBufferParams.y = volumetricData.far / volumetricData.near;
@@ -657,10 +663,17 @@ public class VolumetricRendering : MonoBehaviour
         ID_ClipMapGenKern = ClipmapCompute.FindKernel("ClipMapGen");
         ID_ClipMapClearKern = ClipmapCompute.FindKernel("ClipMapClear");
         ID_ClipMapHeightKern = ClipmapCompute.FindKernel("ClipMapHeight");
+=======
+
+        float zBfP1 = 1.0f - volumetricData.far / volumetricData.near;
+        float zBfP2 = volumetricData.far / volumetricData.near;
+        FroxelIntegrationCompute.SetVector("_VolZBufferParams", new Vector4(zBfP1, zBfP2, zBfP1 / volumetricData.far, zBfP2 / volumetricData.far));
+>>>>>>> 488aec4cc0102e22592c26eea4c250f4f84453ec
 
         //Debug.Log("Dispatching " + ThreadsToDispatch);
 
         SkyManager.CheckSky();
+<<<<<<< HEAD
 
 
         SetupClipmap();
@@ -708,33 +721,12 @@ public class VolumetricRendering : MonoBehaviour
             }
         }
     }
-
-    void SetFroxelIntegrationUniforms(bool forceUpdate = false)
-    {
-        if (lastFroxelIntegrate != this || forceUpdate)
-        {
-            FroxelIntegrationCompute.SetMatrix(ID_LeftEyeMatrix, LeftEyeMatrix);
-            FroxelIntegrationCompute.SetMatrix(ID_RightEyeMatrix, RightEyeMatrix);
-            FroxelIntegrationCompute.SetVector(ID_VolZBufferParams, VolZBufferParams);
-            FroxelIntegrationCompute.SetVector(ID_GlobalScattering, ExtinctionColor);
-            FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_Result, IntegrationBuffer);
-            FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_InLightingTexture, FroxelBufferA);
-            FroxelIntegrationCompute.SetConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
-            lastFroxelIntegrate = this;
-        }
+=======
+        SetVariables();
     }
 
-    void SetBlurUniforms(bool forceUpdate = false)
-    {
-        if (FroxelBlur == BlurType.Gaussian && (lastBlur != this || forceUpdate))
-        {
-            BlurCompute.SetTexture(BlurKernelX, ID_InTex, IntegrationBuffer);
-            BlurCompute.SetTexture(BlurKernelX, ID_Result, BlurBuffer);
-            BlurCompute.SetTexture(BlurKernelY, ID_InTex, BlurBuffer);
-            BlurCompute.SetTexture(BlurKernelY, ID_Result, BlurBufferB);
-            lastBlur = this;
-        }
-    }
+>>>>>>> 488aec4cc0102e22592c26eea4c250f4f84453ec
+
 
     void UpdateLights()
     {
@@ -788,7 +780,9 @@ public class VolumetricRendering : MonoBehaviour
         ClearRenderTexture(ClipmapBufferD, clearColor);
         //TODO: Loop through and remove one of the buffers
 
-       
+        FroxelFogCompute.SetTexture(ScatteringKernel, ID_VolumetricClipmapTexture, ClipmapBufferA); //Set clipmap for
+        FroxelFogCompute.SetFloat("_ClipmapScale", volumetricData.ClipmapScale);
+        FroxelFogCompute.SetFloat("_ClipmapScale2", volumetricData.ClipmapScale2);
        
     }
     bool ClipFar = false;
@@ -809,6 +803,7 @@ public class VolumetricRendering : MonoBehaviour
 
     public void UpdateClipmaps()
     {
+<<<<<<< HEAD
         //Debug.Log("Clipmap Update: " + activeCam.transform.position);
         if (VolumetricRegisters.volumetricAreas.Count == 0)
         {
@@ -819,6 +814,25 @@ public class VolumetricRendering : MonoBehaviour
         {
             VolumetricRegisterEmpty = false;
         }
+=======
+        if (ClipmapBufferA == null)
+        {
+            Debug.LogError("Volumetric Rendering: ClipmapBufferA is null");
+        }
+        if (ClipmapBufferB == null)
+        {
+            Debug.LogError("Volumetric Rendering: ClipmapBufferB is null");
+        }
+        if (ClipmapBufferC == null)
+        {
+            Debug.LogError("Volumetric Rendering: ClipmapBufferC is null");
+        }
+        if (ClipmapBufferD == null)
+        {
+            Debug.LogError("Volumetric Rendering: ClipmapBufferD is null");
+        }
+
+>>>>>>> 488aec4cc0102e22592c26eea4c250f4f84453ec
         UpdateClipmap(Clipmap.Near);
         UpdateClipmap(Clipmap.Far);
     }
@@ -835,9 +849,7 @@ public class VolumetricRendering : MonoBehaviour
         RenderTexture BufferA;
         RenderTexture BufferB;
         //TODO: bake out variables at start to avoid extra math per clip gen
-
-        ClipmapCompute.SetFloat(ID_GlobalExtinction, Extinction);
-
+        
         if (clipmap == Clipmap.Near)
         {
             BufferA = ClipmapBufferB;
@@ -945,7 +957,6 @@ public class VolumetricRendering : MonoBehaviour
         }
 
         ClipmapCurrentPos = ClipmapTransform; //Set History
-        lastClipmapUpdate = this;
     }
 
 
@@ -978,12 +989,24 @@ public class VolumetricRendering : MonoBehaviour
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_PreviousFrameLighting, FroxelBufferA);
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_Result, FroxelBufferB);
             FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_InLightingTexture, FroxelBufferB);
+
+  //          FroxelIntegrationCompute.SetTexture(IntegrateKernel, "HistoryBuffer", IntegrationBuffer);
+   //         FroxelIntegrationCompute.SetTexture(IntegrateKernel, "Result", IntegrationBufferB);
+
+    //        Shader.SetGlobalTexture("_VolumetricResult", IntegrationBufferB);
+
         }
         else
         {
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_PreviousFrameLighting, FroxelBufferB);
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_Result, FroxelBufferA);
             FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_InLightingTexture, FroxelBufferA);
+
+    //        FroxelIntegrationCompute.SetTexture(IntegrateKernel, "HistoryBuffer", IntegrationBufferB);
+   //         FroxelIntegrationCompute.SetTexture(IntegrateKernel, "Result", IntegrationBuffer);
+
+   //         Shader.SetGlobalTexture("_VolumetricResult", IntegrationBuffer);
+
         }
 
         FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_HistoryBuffer, IntegrationBuffer);
@@ -995,9 +1018,12 @@ public class VolumetricRendering : MonoBehaviour
 
     public void SetVariables()
     {
+        
+        float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(meanFreePath);
+        Shader.SetGlobalFloat("_GlobalExtinction", extinction); //ExtinctionFromMeanFreePath
+        Shader.SetGlobalFloat("_StaticLightMultiplier", StaticLightMultiplier); //Global multiplier for static lights
+        Shader.SetGlobalVector("_GlobalScattering", extinction * albedo); //ScatteringFromExtinctionAndAlbedo
        
-         //Global multiplier for static lights
-         //ScatteringFromExtinctionAndAlbedo
     }
 
     float GetAspectRatio()
@@ -1040,29 +1066,64 @@ public class VolumetricRendering : MonoBehaviour
             Debug.Log("No active camera");
             return;
         }
-
-
-
+        /*
+        if (VolumetricResult == null)
+        {
+            Debug.LogError("Volumetric Rendering: VolumetricResult is null" );
+        }
+        if (IntegrationBuffer == null)
+        {
+            Debug.LogError("Volumetric Rendering: IntegrationBuffer is null" );
+        }
+        if (FroxelBufferA == null)
+        {
+            Debug.LogError("Volumetric Rendering: FroxelBufferA is null");
+        }
+        if (FroxelBufferB == null)
+        {
+            Debug.LogError("Volumetric Rendering: FroxelBufferB is null");
+        }
+        
+        if (BlurBuffer == null)
+        {
+            Debug.LogError("Volumetric Rendering: BlurBuffer is null");
+        }
+        if (BlurBufferB == null)
+        {
+            Debug.LogError("Volumetric Rendering: BlurBufferB is null");
+        }
+        
+        if (LightProjectionTextures == null)
+        {
+            Debug.LogError("Volumetric Rendering: LightProjectionTextures is null");
+        }
+        */
         CheckOverrideVolumes();
         //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
         //bleh
         CamAspectRatio = GetAspectRatio();
 
-        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(activeCam.transform.rotation).inverse;     
+//#if UNITY_EDITOR
+//        if (!Application.isPlaying)
+//        {
+//            return;
+//        }
+//#endif
+
+
+        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(activeCam.transform.rotation).inverse;
+        //Debug.Log(cam.fieldOfView + " " + CamAspectRatio + " " + cam.nearClipPlane);
         projectionMatrix = matScaleBias * projectionMatrix ;
 
         //Previous frame's matrix//!!!!!!!!!
+
+
         FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix);///
         //   FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix );///
         //            var controller = hdCamera.volumeStack.GetComponent<Fog>(); //TODO: Link with controller
         //     UpdateLights();
 
         CheckClipmap(); // UpdateClipmap();
-
-        SetFroxelFogUniforms();
-        SetFroxelIntegrationUniforms();
-        SetBlurUniforms();
-
         FlopIntegralBuffers();
         //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
         VBufferParameters vbuff =  new VBufferParameters(
