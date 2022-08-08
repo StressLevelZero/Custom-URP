@@ -493,9 +493,31 @@ public class VolumetricRendering : MonoBehaviour
         if (cam == null)
         {
             Debug.LogWarning("Volumetric Rendering Script with no camera assigned, disabling");
+            this.enabled = false;
+            return;
+        }
+
+#if UNITY_EDITOR
+        AssemblyReloadEvents.beforeAssemblyReload += CleanupOnReload;
+#endif
+        activeCam = cam;
+        activeCamData = activeCam?.GetComponent<UniversalAdditionalCameraData>();
+#if UNITY_EDITOR
+        if (!Application.isPlaying && !enableEditorPreview)
+        {
+            //Debug.Log("Intialize disabled volumetrics");
             disable();
             return;
         }
+#endif
+        if (activeCamData == null)
+        {
+            activeCam = null;
+            Debug.LogWarning("Volumetric Rendering: Assigned camera is missing a Universal Additional Camera Data component, disabling");
+            this.enabled = false;
+            return;
+        }
+
 
         //Debug.Log("Volumetric Renderer Initialized");
         //DebugPrintTextureIDs();
@@ -503,42 +525,6 @@ public class VolumetricRendering : MonoBehaviour
         ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
 
-        
-       
-
-#if UNITY_EDITOR
-        AssemblyReloadEvents.beforeAssemblyReload += CleanupOnReload;
-#endif
-
-#if UNITY_EDITOR
-        if (Application.isPlaying || activeCam == null)
-        {
-            activeCam = cam;
-            activeCamData = activeCam?.GetComponent<UniversalAdditionalCameraData>();
-        }
-        if (!Application.isPlaying && !enableEditorPreview)
-        {
-            Debug.Log("Intialize disabled volumetrics");
-            disable();
-            return;
-        }
-        if (activeCamData == null)
-        {
-            disable();
-            return;
-        }
-
-#else
-    activeCam = cam;
-    activeCamData = activeCam?.GetComponent<UniversalAdditionalCameraData>();
-#endif
-        if (activeCam == null || activeCamData == null)
-        {
-            activeCam = null;
-            Debug.LogWarning("Volumetric Rendering: Assigned camera is null or missing a Universal Additional Camera Data component, disabling");
-            disable();
-            return;
-        }
 
         //activeCameraState = activeCam.isActiveAndEnabled;
         CheckOverrideVolumes();
@@ -1038,20 +1024,25 @@ public class VolumetricRendering : MonoBehaviour
     }
     void UpdateFunc()
     {
-#if UNITY_EDITOR
-        if (!hasInitialized || (Application.isPlaying && !activeCam.isActiveAndEnabled && !enableEditorPreview))
-#else
-        if (!hasInitialized || !activeCam.isActiveAndEnabled)
-#endif
+        if (!hasInitialized)
         {
             return;
         }
         if (activeCam == null)
         {
             Debug.LogWarning("Volumetric Rendering: Active camera destroyed or de-assigned, disabling");
-            disable();
+            this.enabled = false;
             return;
         }
+#if UNITY_EDITOR
+        if ((Application.isPlaying && !activeCam.isActiveAndEnabled && !enableEditorPreview))
+#else
+        if (!activeCam.isActiveAndEnabled)
+#endif
+        {
+            return;
+        }
+
 
 
 
