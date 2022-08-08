@@ -234,10 +234,12 @@ public class VolumetricDebugTool : EditorTool
                 BakedVolumetricArea.VisStateGlobal = false;
                 toolWindow.Add(BlankLabel);
                 toolWindow.Add(CameraPopup);
+                InitializeFogParams();
                 //VolumetricScript.activeCam = CameraPopup.value == placeholderCam ? SceneView.lastActiveSceneView.camera : CameraPopup.value;
                 if (ActiveCam.GetComponent<UniversalAdditionalCameraData>() == null)
                 {
-                    ActiveCam.gameObject.AddComponent<UniversalAdditionalCameraData>();
+                    activeToggle2.value = false;
+                    return;
                 }
                 if (!SceneVolumetricRenderers.ContainsKey(SceneView.lastActiveSceneView.camera))
                 {
