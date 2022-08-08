@@ -14,6 +14,11 @@ namespace UnityEngine.Rendering.Universal
         static readonly int m_FogMaxHeight = Shader.PropertyToID("_FogMaxHeight");
         static readonly int m_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
         static readonly int m_VolumetricAlbedo = Shader.PropertyToID("_GlobalScattering");
+
+        // Volumetric rendering scripts need to be aware that this script has
+        // set the shader global variables so they don't overwrite them
+        public static bool hasSetGlobals { get; private set; } 
+
         //static readonly int m_SkyTexture = Shader.PropertyToID("_SkyTexture");
         //static readonly int m_SkyMipCount = Shader.PropertyToID("_SkyMipCount");
 
@@ -45,7 +50,7 @@ namespace UnityEngine.Rendering.Universal
 
         internal void PushFogShaderParameters()
         {
-
+            hasSetGlobals = true;
             Shader.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value) ); //ExtinctionFromMeanFreePath
             Shader.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
             Shader.SetGlobalFloat(m_FogBaseHeight, FogBaseHeight.value);
