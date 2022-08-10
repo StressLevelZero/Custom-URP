@@ -306,8 +306,9 @@ real SampleShadowmap(TEXTURE2D_SHADOW_PARAM(ShadowMap, sampler_ShadowMap), float
         shadowCoord.xyz /= shadowCoord.w;
 
     real attenuation;
-    real shadowStrength = shadowParams.x;
-
+    real shadowStrength = shadowParams.x;    
+    shadowCoord.z +=.0001; //Small offset to avoid blackening perfect perpendicular surfaces
+    
 #ifdef _SHADOWS_SOFT
     if(shadowParams.y != 0)
     {
