@@ -72,7 +72,8 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
                 bool isScaled = false;//material.GetFloat("_DetailAlbedoMapScale") != 1.0f;
                 bool hasDetailMap = material.GetTexture("_DetailMap");
                 CoreUtils.SetKeyword(material, "_DETAIL_MULX2", !isScaled && hasDetailMap);
-              //  CoreUtils.SetKeyword(material, "_DETAIL_SCALED", isScaled && hasDetailMap);
+                CoreUtils.SetKeyword(material, "_NORMALMAP", hasDetailMap); //Forcing on normalmap to avoid a darkening bug with mixed directional lights :/
+                //  CoreUtils.SetKeyword(material, "_DETAIL_SCALED", isScaled && hasDetailMap);
             }
         }
     }
