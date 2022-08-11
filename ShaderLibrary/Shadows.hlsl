@@ -5,7 +5,6 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Shadow/ShadowSamplingTent.hlsl"
 #include "Core.hlsl"
 
-
 #define MAX_SHADOW_CASCADES 4
 
 #if !defined(_RECEIVE_SHADOWS_OFF)
@@ -221,7 +220,7 @@ half SampleScreenSpaceShadowmap(float4 shadowCoord)
 real SampleShadowmapFiltered(TEXTURE2D_SHADOW_PARAM(ShadowMap, sampler_ShadowMap), float4 shadowCoord, ShadowSamplingData samplingData)
 {
     real attenuation;
-
+    
 #if defined(SHADER_API_MOBILE) || defined(SHADER_API_SWITCH)
     // 4-tap hardware comparison
     real4 attenuation4;
@@ -307,7 +306,6 @@ real SampleShadowmap(TEXTURE2D_SHADOW_PARAM(ShadowMap, sampler_ShadowMap), float
 
     real attenuation;
     real shadowStrength = shadowParams.x;    
-    shadowCoord.z +=.0001; //Small offset to avoid blackening perfect perpendicular surfaces
     
 #ifdef _SHADOWS_SOFT
     if(shadowParams.y != 0)

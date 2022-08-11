@@ -37,8 +37,8 @@ float4 GetShadowPositionHClip(Attributes input)
     float3 lightDirectionWS = _LightDirection;
 #endif
     float2 vShadowOffsets = GetShadowOffsets( normalWS, lightDirectionWS );
-    //positionWS.xyz -= vShadowOffsets.x * normalWS.xyz * .01;
-    positionWS.xyz += vShadowOffsets.y * lightDirectionWS.xyz * .001;    
+    //positionWS.xyz -= vShadowOffsets.x * normalWS.xyz * .003; //Causes light seams to appear 
+    positionWS.xyz -= vShadowOffsets.y * lightDirectionWS.xyz * .01;    
     float4 positionCS = TransformObjectToHClip( float4( mul( unity_WorldToObject, float4( positionWS.xyz, 1.0 ) ).xyz, 1.0 ) );
     //float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
 
