@@ -89,7 +89,7 @@ float GGXTerm (half3 N, half3 H, half NdotH, half roughness)
 // }
 
 ////Baked Specular using directional baked maps
-half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 viewDir, float smoothness)
+half DirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 viewDir, float smoothness)
 {
 	float3 dominantDir = LOAD_TEXTURE2D(unity_LightmapInd, lightmapUV).xyz * 2 - 1;
 	half3 halfDir = normalize(normalize(dominantDir) - viewDir);
@@ -101,7 +101,7 @@ half BakeryDirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, fl
  //   return 1;
 }
 //Baked Specular using directional baked maps
-half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 viewDir, float smoothness)
+half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 viewDir, float smoothness)
 {
     float3 dominantDir = direction.xyz * 2 - 1;
     half3 halfDir = normalize(normalize(dominantDir) + viewDir);
@@ -153,7 +153,7 @@ half BakeryDirectionalLightmapSpecular(float4 direction, float3 normalWorld, flo
      //}
      real halfLambert = dot(normalWS, direction.xyz - 0.5) + 0.5;
      real3 IndirectDiffuse = illuminance * halfLambert / max(1e-4, direction.w);
-     real IndirectSpecular = BakeryDirectionalLightmapSpecular(direction, normalWS, viewDirWS, smoothness) ;
+     real IndirectSpecular = DirectionalLightmapSpecular(direction, normalWS, viewDirWS, smoothness) ;
      return real4(IndirectDiffuse.xyz, IndirectSpecular) ;
   //   return 0;
  }
