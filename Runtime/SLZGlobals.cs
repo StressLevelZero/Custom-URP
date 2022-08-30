@@ -37,9 +37,9 @@ namespace UnityEngine.Rendering.Universal
             hasSetBNTextures = false;
             SSRGlobalCB = new ComputeBuffer(4, sizeof(float), ComputeBufferType.Constant);
             HiZDimBuffer = new ComputeBuffer(15, Marshal.SizeOf<Vector4>());
+            SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
             HiZMinMaxKW = GlobalKeyword.Create("_HIZ_MIN_MAX_ENABLED");
-            SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
         }
         public static SLZGlobals instance
         {
