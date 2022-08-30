@@ -1002,11 +1002,13 @@ namespace UnityEngine.Rendering.Universal
         public bool enableSSR
         {
             get { return m_EnableSSR; }
+            set { m_EnableSSR = value; }
         }
 
         public int maxSsrSteps
         {
             get { return m_MaxSsrSteps; }
+            set { m_MaxSsrSteps = value; }
         }
 
         /// End SLZ Additions
