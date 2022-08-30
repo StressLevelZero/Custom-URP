@@ -69,8 +69,8 @@ SSRData GetSSRData(
 	SSRData ssrData;
 	ssrData.wPos = wPos;
 	ssrData.viewDir = viewDir;
-	ssrData.rayDir = rayDir;
-	ssrData.faceNormal = faceNormal;
+	ssrData.rayDir = normalize(rayDir);
+	ssrData.faceNormal = normalize(faceNormal);
 	ssrData.perceptualRoughness = perceptualRoughness;
 	ssrData.zDerivativeSum = zDerivativeSum;
 	ssrData.noise = noise;
@@ -523,7 +523,8 @@ float4 getSSRColor(SSRData data)
 
 
 	float FdotR = dot(data.faceNormal, data.rayDir.xyz);
-	if (FdotR <= 0)
+	
+	UNITY_BRANCH if (FdotR <= 0)
 	{
 		return float4(0, 0, 0, 0);
 	}
@@ -541,9 +542,17 @@ float4 getSSRColor(SSRData data)
 	float3 rayNoise = rayTanAngle * (2*data.noise.rgb - 1);
 	rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
 	data.rayDir += rayNoise;
+	data.rayDir.xyz = normalize(data.rayDir.xyz);
+	float RdotV = saturate(0.95 * dot(data.rayDir, -data.viewDir.xyz) + 0.05);
+
+	UNITY_BRANCH if (RdotV <= 0)
+	{
+		return float4(0, 0, 0, 0);
+	}
+
 	data.rayDir = mul(UNITY_MATRIX_V, float4(data.rayDir.xyz, 0));
 	
-	data.rayDir.xyz = normalize(data.rayDir.xyz);
+	
 
 	/*
 	 * Do the raymarching against the depth texture. This returns a world-space position where the ray hit the depth texture,
@@ -605,7 +614,7 @@ float4 getSSRColor(SSRData data)
 	yfade *= yfade;
 	//float lengthFade = smoothstep(1, 0, 2*(totalSteps / data.maxSteps)-1);
 	
-	float fade = xfade * yfade;
+	float fade = saturate(2*(RdotV)) * xfade * yfade;
 	
 	/*
 	 * Get the color of the grabpass at the ray's screen uv location, applying
