@@ -56,8 +56,8 @@ namespace UnityEngine.Rendering.Universal
 
         public void SetHiZSSRKeyWords(bool enableSSR, bool requireHiZ, bool requireMinMax)
         {
-            Shader.SetKeyword(HiZEnabledKW, requireHiZ);
             Shader.SetKeyword(SSREnabledKW, enableSSR);
+            Shader.SetKeyword(HiZEnabledKW, requireHiZ);
             Shader.SetKeyword(HiZMinMaxKW, requireMinMax);
         }
 
@@ -168,6 +168,29 @@ namespace UnityEngine.Rendering.Universal
                 }
             }
             s_Instance = null;
+        }
+    }
+
+
+    public class SLZGlobalsSetPass : ScriptableRenderPass
+    {
+        private bool enableSSR;
+        private bool requireHiZ;
+        private bool requireMinMax;
+        public void Setup(CameraData camData)
+        {
+            enableSSR = camData.enableSSR;
+            requireHiZ = camData.requiresDepthPyramid;
+            requireMinMax = camData.requiresMinMaxDepthPyr;
+        }
+        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        {
+            CommandBuffer cmd = CommandBufferPool.Get();
+            cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
+            cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
+            cmd.SetKeyword(SLZGlobals.instance.HiZMinMaxKW, requireMinMax);
+            context.ExecuteCommandBuffer(cmd);
+            CommandBufferPool.Release(cmd);
         }
     }
 }
