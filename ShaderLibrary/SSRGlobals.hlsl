@@ -8,7 +8,7 @@ CBUFFER_START(SSRConstants)
 float _SSRHitRadius;
 float _SSREdgeFade;
 float _SSRSteps;
-float _empty;
+int _SSRMinMip;
 CBUFFER_END
 
 SamplerState sampler_trilinear_clamp;

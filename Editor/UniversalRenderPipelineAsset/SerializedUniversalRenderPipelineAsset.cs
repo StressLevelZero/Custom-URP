@@ -63,6 +63,10 @@ namespace UnityEditor.Rendering.Universal
         public SerializedProperty colorGradingMode { get; }
         public SerializedProperty colorGradingLutSize { get; }
         public SerializedProperty useFastSRGBLinearConversion { get; }
+        // SLZ Additions
+        public SerializedProperty enableSSR { get; }
+        public SerializedProperty maxSSRSteps { get; }
+        // End SLZ Additions
 
 #if ADAPTIVE_PERFORMANCE_2_0_0_OR_NEWER
         public SerializedProperty useAdaptivePerformance { get; }
@@ -79,6 +83,12 @@ namespace UnityEditor.Rendering.Universal
 
             requireDepthTextureProp = serializedObject.FindProperty("m_RequireDepthTexture");
             requireOpaqueTextureProp = serializedObject.FindProperty("m_RequireOpaqueTexture");
+
+            // SLZ Additions
+            enableSSR = serializedObject.FindProperty("m_EnableSSR");
+            maxSSRSteps = serializedObject.FindProperty("m_MaxSsrSteps");
+            // End SLZ Additions
+
             opaqueDownsamplingProp = serializedObject.FindProperty("m_OpaqueDownsampling");
             supportsTerrainHolesProp = serializedObject.FindProperty("m_SupportsTerrainHoles");
 

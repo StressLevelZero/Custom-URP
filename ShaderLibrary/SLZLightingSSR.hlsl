@@ -60,7 +60,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
 
 
 
-real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNormal, real4 noise)
+real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNormal, real depthDerivativeSum, real4 noise)
 {
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
@@ -122,12 +122,15 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNo
         //-------------------------------------------------------------------------------------------------
         real3 reflectionDir = reflect(-fragData.viewDir, fragData.normal);
 
-    SSRData ssrData = GetSSRDataWithGlobalSettings(
+    
+
+    SSRData ssrData = GetSSRData(
         fragData.position,
         fragData.viewDir,
         reflectionDir,
         meshNormal,
         surfData.perceptualRoughness,
+        depthDerivativeSum,
         noise);
 
     SLZImageBasedSpecularSSR(specular, reflectionDir, fragData, surfData, ssrData, ao.indirectAmbientOcclusion);

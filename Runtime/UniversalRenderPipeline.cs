@@ -748,6 +748,16 @@ namespace UnityEngine.Rendering.Universal
 #endif
 
             bool needsAlphaChannel = Graphics.preserveFramebufferAlpha;
+
+            // SLZ Additions
+            cameraData.requiresColorPyramid = asset.enableSSR;
+            cameraData.requiresDepthPyramid = asset.enableSSR;
+            cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
+            cameraData.enableSSR = asset.enableSSR;
+            cameraData.maxSSRSteps = asset.maxSsrSteps;
+            
+            // end SLZ additons
+
             cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, cameraData.renderScale,
                 cameraData.isHdrEnabled, msaaSamples, needsAlphaChannel, cameraData.requiresOpaqueTexture);
         }

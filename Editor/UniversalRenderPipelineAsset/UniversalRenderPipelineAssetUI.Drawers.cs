@@ -129,6 +129,10 @@ namespace UnityEditor.Rendering.Universal
                 EditorGUILayout.PropertyField(serialized.requireOpaqueTextureProp, Styles.requireOpaqueTextureText);
                 EditorGUI.BeginDisabledGroup(!serialized.requireOpaqueTextureProp.boolValue);
                 EditorGUILayout.PropertyField(serialized.opaqueDownsamplingProp, Styles.opaqueDownsamplingText);
+                // SLZ Additions
+                EditorGUILayout.PropertyField(serialized.enableSSR, Styles.enableSSR);
+                EditorGUILayout.PropertyField(serialized.maxSSRSteps, Styles.SSRSteps);
+                // End SLZ Additions
                 EditorGUI.EndDisabledGroup();
                 EditorGUILayout.PropertyField(serialized.supportsTerrainHolesProp, Styles.supportsTerrainHolesText);
             }

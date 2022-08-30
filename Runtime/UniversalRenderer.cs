@@ -71,6 +71,10 @@ namespace UnityEngine.Rendering.Universal
         TileDepthRangePass m_TileDepthRangeExtraPass; // TODO use subpass API to hide this pass
         DeferredPass m_DeferredPass;
         DrawObjectsPass m_RenderOpaqueForwardOnlyPass;
+#if PLATFORM_STANDALONE && FALSE
+        SLZFoveatedRenderingEnable m_FoveatedOn;
+        SLZFoveatedRenderingDisable m_FoveatedOff;
+#endif
         DrawObjectsPass m_RenderOpaqueForwardPass;
         DrawSkyboxPass m_DrawSkyboxPass;
         CopyDepthPass m_CopyDepthPass;
@@ -251,7 +255,9 @@ namespace UnityEngine.Rendering.Universal
 
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
             m_RenderOpaqueForwardPass = new DrawObjectsPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
-
+            //m_FoveatedOn = new SLZFoveatedRenderingEnable();
+          
+            //m_FoveatedOff = new SLZFoveatedRenderingDisable();
             m_CopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRenderingSkybox, m_CopyDepthMaterial);
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
             m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial);
@@ -308,8 +314,7 @@ namespace UnityEngine.Rendering.Universal
             LensFlareCommonSRP.Initialize();
 
             SLZGlobals.instance.SetBlueNoiseGlobals(data.textures.blueNoiseRGBA, data.textures.blueNoiseR);
-            SLZGlobals.instance.SetSSRGlobals();
-
+            
            
         }
 
@@ -388,8 +393,9 @@ namespace UnityEngine.Rendering.Universal
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
 
             DebugHandler?.Setup(context, ref cameraData);
+            SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, 0);
 
-
+            //SLZVRSManager.Instance.Initialize(renderingData.cameraData.camera.fieldOfView, renderingData.cameraData.aspectRatio);
 
             if (cameraData.cameraType != CameraType.Game)
                 useRenderPassEnabled = false;
@@ -635,7 +641,7 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_AdditionalLightsShadowCasterPass);
 
             int msaaSamplesTemp = cameraTargetDescriptor.msaaSamples;
-
+            
             if (requiresDepthPrepass)
             {
                 if (renderPassInputs.requiresNormalsTexture)
@@ -686,10 +692,12 @@ namespace UnityEngine.Rendering.Universal
 
                 EnqueuePass(m_PrimedDepthCopyPass);
             }
-            
-            if (requiresDepthPrepass)
+
+            SLZGlobals.instance.SetHiZSSRKeyWords(cameraData.enableSSR, cameraData.requiresDepthPyramid, cameraData.requiresMinMaxDepthPyr);
+
+            if (requiresDepthPrepass && cameraData.requiresDepthPyramid)
             {
-                m_CopyDepthToHiZPass.Setup(m_DepthTexture, m_DepthHiZTexture);
+                m_CopyDepthToHiZPass.Setup(m_DepthTexture, m_DepthHiZTexture, cameraData.requiresMinMaxDepthPyr);
                 EnqueuePass(m_CopyDepthToHiZPass);
             }
             
@@ -764,7 +772,7 @@ namespace UnityEngine.Rendering.Universal
                 // TODO: Downsampling method should be store in the renderer instead of in the asset.
                 // We need to migrate this data to renderer. For now, we query the method in the active asset.
                 Downsampling downsamplingMethod = UniversalRenderPipeline.asset.opaqueDownsampling;
-                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod, true);
+                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod, cameraData.requiresDepthPyramid);
                 
                 EnqueuePass(m_CopyColorPass);
             }
