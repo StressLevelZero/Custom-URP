@@ -80,8 +80,8 @@ SSRData GetSSRData(
 float GetDepthDerivativeSum(float depth)
 {
 	float2 slope;
-	slope.x = ddx_fine(depth);
-	slope.y = ddy_fine(depth);
+	slope.x = ddx(depth);
+	slope.y = ddy(depth);
 	slope = abs(slope);
 	return slope.x + slope.y;
 }
@@ -240,7 +240,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 	//reflectedRay += 1* defaultLR * (FdotV / (FdotR + 0.0000001)) * rayDir;
 	float rayLen = length(reflectedRay);
 	reflectedRay -= min(((largeRadius) * (FdotV / (FdotR + 1e-9))) / rayLen, 0.8) * (reflectedRay) ;
-
+	float4 underPos = float4(1.#INF, 0, 0, 0);
 	for (float i = 0; i < _SSRSteps; i++)
 	{
 		//totalIterations = i;
@@ -289,12 +289,15 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		// If it is, stop raymarching and set the final position. If it is not, decrease
 		// the step size and possibly reverse the ray direction if it went past the small
 		// radius
-
+		if (sampleDepth > realDepth && underPos.x == 1.#INF)
+		{
+			underPos = float4(reflectedRay, totalDistance);
+		}
 
 		UNITY_BRANCH if (direction == 1)
 		{
 				 
-			if(depthDifference < largeRadius && sampleDepth > realDepth - dynHitRadius)
+			if(depthDifference < largeRadius && sampleDepth > realDepth)
 			{
 				
 
@@ -312,7 +315,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 			if(sampleDepth < realDepth)
 			{
 
-				UNITY_BRANCH if(sampleDepth > realDepth - dynHitRadius && mipLevel == 0)
+				UNITY_BRANCH if(sampleDepth > realDepth - 2*dynHitRadius && mipLevel == 0)
 				{
 					finalPos = reflectedRay;
 					break;
@@ -332,12 +335,13 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 
 		largeRadius = max(2.0 * dynStepSize * stepMultiplier, hitRadius);
 	}
-	return float4(finalPos.xyz, totalDistance);
+	float4 outp = finalPos.x == 1.#INF && underPos.x != 1.#INF ? underPos : float4(finalPos.xyz, totalDistance);
+	return outp;
 }
 
 
 
-float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, const int steps, inout float depthOut, const float noise = 0)
+float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, const int steps, inout float depthOut, const float ddz, const float noise = 0)
 {
 	/* Raymarching in screenspace requires special handling, as the depth is not 
 	 * simply the z distance from the camera, but rather is a function of 1/z,
@@ -396,13 +400,17 @@ float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, con
 	// by the depth from the pyramid is very voxel-y. In cross-section, this looks like a saw, with the ray origins being on
 	// or underneath the 'teeth'. Rays moving at glancing angles will hit the 'teeth' and return. The solution is to move
 	// the rays back toward the camera to the plane
+	
 #ifndef PROGRAM_GS 
+	/*
 	float2 slope;
 	slope.x = ddx_fine(sOrigin.z);
 	slope.y = ddy_fine(sOrigin.z);
 	slope = abs(slope);
 	sOrigin.z += 2 * slope.x + FLT_MIN;
 	sOrigin.z += 2 * slope.y + FLT_MIN;
+	*/
+	sOrigin.z = sOrigin.z + (ddz) +1e-6;
 #endif	
 	//float dot1 = abs(dot(wRay, viewDir));
 	//sOrigin.z += HALF_MIN * noise;
@@ -460,7 +468,7 @@ float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, con
 	for (int i = 0; (i < steps) && !hit && onScreen;  i++) 
 	{
 		sCurrPos = sOrigin + s_min * sRay; // interpolate/extrapolate the marcher's postion from the origin along the ray using the lerp factor calculated last iteration
-		onScreen = sCurrPos.x > 0 && sCurrPos.x < HiZDimBuffer[0].dim.x && sCurrPos.y > 0 && sCurrPos.y < HiZDimBuffer[0].dim.y;
+		onScreen = sCurrPos.x >= 1 && sCurrPos.x <= HiZDimBuffer[0].dim.x && sCurrPos.y >= 1 && sCurrPos.y <= HiZDimBuffer[0].dim.y;
 		//if (s_min < 0 )
 		//{
 		//	break;
@@ -493,18 +501,12 @@ float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, con
 		
 		depthOut = depth;
 	}
-	if (!hit)
-	{
-		int2 pixelCoords = int2((sCurrPos.xy) + posDelta);
-		float2 depth = LoadHiZDepth(int3(pixelCoords, 0));
-		sCurrPos = sOrigin + s_min * sRay;
-		hit = sCurrPos.z <= depth.r + HALF_MIN ? true : false;
-	}
+	
 
 	depthOut = hit ? 1 : depthOut;
 	depthOut = !onScreen ? 0 : depthOut;
 #ifndef PROGRAM_GS
-	sCurrPos.x = hit ? sCurrPos.x : 1.#INF;
+	sCurrPos.x = hit && onScreen ? sCurrPos.x : 1.#INF;
 #endif
 	//depthOut = HiZDimBuffer[4].dim.zw == (HiZDimBuffer[0].dim.xy / HiZDimBuffer[4].dim.xy);
 	return float3(sCurrPos.xy * rcpPixelDim, sCurrPos.z);
@@ -648,14 +650,26 @@ float4 getSSRColorNew(SSRData data)
 {
 
 
-	float RdotV = saturate(dot(data.rayDir, -data.viewDir.xyz));
+	//float RdotV = saturate(dot(data.rayDir, -data.viewDir.xyz));
 	//if (RdotV <= 0)
 	//{
 	//	return float4(0, 0, 0, 0);
 	//}
 
 
-   
+	// Random offset to the ray, based on roughness
+	float rayTanAngle = 0.5 * TanPhongConeAngle(data.perceptualRoughness); //half the angle because random scatter looks bad, rely on the color pyramid for blur 
+	float3 rayNoise = rayTanAngle * (2 * data.noise.rgb - 1);
+	rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
+	data.rayDir += rayNoise;
+	data.rayDir.xyz = normalize(data.rayDir.xyz);
+	float RdotV = saturate(dot(data.rayDir, -data.viewDir.xyz));
+
+	UNITY_BRANCH if (RdotV <= 0)
+	{
+		return float4(0, 0, 0, 0);
+	}
+
 
 	/*
 	 * Do the raymarching against the depth texture. This returns a world-space position where the ray hit the depth texture,
@@ -664,7 +678,7 @@ float4 getSSRColorNew(SSRData data)
 
 	float4 finalPos;
 	float finalDepth;
-	finalPos.xyz = GetRayHit(data.wPos, data.rayDir, data.viewDir.xyz, _SSRSteps, finalDepth, data.noise.r);
+	finalPos.xyz = GetRayHit(data.wPos, data.rayDir, data.viewDir.xyz, _SSRSteps, finalDepth, data.zDerivativeSum, data.noise.r);
 
 	// get the total number of iterations out of finalPos's w component and replace with 1.
 	//float totalDistance = finalPos.w;
@@ -686,14 +700,13 @@ float4 getSSRColorNew(SSRData data)
 	 * Get the screen space coordinates of the ray's final position
 	 */
 	float3 uvs;
-
-#if defined(SSR_POST_OPAQUE)
-	uvs.xy = finalPos.xy;
-#else
-	float4 finalPosWorld = mul(UNITY_MATRIX_I_VP, ComputeClipSpacePosition(finalPos.xy, finalPos.z));
-	float4 finalPosClip = mul(prevVP, finalPosWorld);
-	uvs = ComputeGrabScreenPos(finalPosClip.xyw);
+	float4 finalPosClip = ComputeClipSpacePosition(finalPos.xy, finalPos.z);
+	float4 finalPosWorld = mul(UNITY_MATRIX_I_VP, finalPosClip);
+#if !defined(SSR_POST_OPAQUE)
+	finalPosClip = mul(prevVP, finalPosWorld);
 #endif
+	uvs = ComputeGrabScreenPos(finalPosClip.xyw);
+
 
 	uvs.xy = uvs.xy / uvs.z;
 
@@ -717,7 +730,7 @@ float4 getSSRColorNew(SSRData data)
 	yfade *= yfade;
 	//float lengthFade = smoothstep(1, 0, 2*(totalSteps / data.maxSteps)-1);
 
-	float fade = xfade * yfade * RdotV;
+	float fade = saturate(2 * (RdotV)) * xfade * yfade;
 
 	/*
 	 * Get the color of the grabpass at the ray's screen uv location, applying
@@ -736,7 +749,10 @@ float4 getSSRColorNew(SSRData data)
 		 mipLevels += 3;
  */
 	//float roughRadius = 1.33 * totalDistance * (1.0 / (1.0 - data.perceptualRoughness) - 1); // 1 / (1 - roughness) - 1 is approx. tan(0.5pi * roughness)
-	float blur = 0;// min(_CameraOpaqueTexture_Dim.w * roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos), _CameraOpaqueTexture_Dim.z);
+	float totalDistance = length(finalPosWorld.xyz - data.wPos.xyz);
+	float rayTanAngle2 = TanPhongConeAngle(data.perceptualRoughness);
+	float roughDiameter = 3 * rayTanAngle2 * totalDistance;
+	float blur = min(_CameraOpaqueTexture_Dim.w * roughDiameter * abs(UNITY_MATRIX_P._m11) / length(finalPosWorld.xyz - _WorldSpaceCameraPos), _CameraOpaqueTexture_Dim.z);
 	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 	//reflection *= _ProjectionParams.z;
 	//reflection.a *= smoothness*reflStr*fade;
