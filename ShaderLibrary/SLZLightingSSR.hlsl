@@ -31,9 +31,9 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
    
 #if !defined(SHADER_API_MOBILE)
     //ssrData.perceptualRoughness = -fresnelTerm * ssrData.perceptualRoughness + ssrData.perceptualRoughness;
-    real SSRLerp = smoothstep(0.6, 0.4, ssrData.perceptualRoughness);
+    real SSRLerp = smoothstep(0.3, 0.9, 1- surfData.roughness* surfData.roughness);
     real4 SSRColor = real4(0, 0, 0, 0);
-    UNITY_BRANCH if (SSRLerp > REAL_MIN)
+    UNITY_BRANCH if (SSRLerp > 0.008)
     {
         SSRColor = getSSRColor(ssrData);
     }
@@ -60,7 +60,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
 
 
 
-real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNormal, real depthDerivativeSum, real4 noise)
+real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNormal, real depthDerivativeSum, float4 lastClipPos, float temporalWeight, real4 noise)
 {
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
@@ -135,12 +135,18 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNo
 
     SLZImageBasedSpecularSSR(specular, reflectionDir, fragData, surfData, ssrData, ao.indirectAmbientOcclusion);
     SLZSpecularHorizonOcclusion(specular, fragData.normal, reflectionDir);
+    float3 currentDiffuse = surfData.occlusion * surfData.albedo * diffuse + surfData.emission;
+    float3 currentSpecular = specular * surfData.occlusion;
+    float2 oldScreenUV = SLZComputeNDCFromClip(lastClipPos);
+    float3 oldColor = _CameraOpaqueTexture.SampleLevel(sampler_trilinear_clamp, oldScreenUV, 0).xyz;
 
+    oldColor = max(0, oldColor - currentDiffuse);
+    currentSpecular = (1 - temporalWeight) * currentSpecular + temporalWeight * oldColor;
     //-------------------------------------------------------------------------------------------------
     // Combine the final lighting information
     //-------------------------------------------------------------------------------------------------
 
-    return surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
+    return currentSpecular + currentDiffuse;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
 }
 
 #endif

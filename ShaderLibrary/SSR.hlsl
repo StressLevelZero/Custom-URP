@@ -540,7 +540,7 @@ float4 getSSRColor(SSRData data)
 	float3 reflectedRay = mul(UNITY_MATRIX_V, float4(data.wPos.xyz, 1)).xyz;
 
 	// Random offset to the ray, based on roughness
-	float rayTanAngle = 0.5 * TanPhongConeAngle(data.perceptualRoughness); //half the angle because random scatter looks bad, rely on the color pyramid for blur 
+	float rayTanAngle = TanPhongConeAngle(data.perceptualRoughness * data.perceptualRoughness); //half the angle because random scatter looks bad, rely on the color pyramid for blur 
 	float3 rayNoise = rayTanAngle * (2*data.noise.rgb - 1);
 	rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
 	data.rayDir += rayNoise;
@@ -634,10 +634,11 @@ float4 getSSRColor(SSRData data)
 #endif
 		mipLevels += 3;
 */
-		float rayTanAngle2 = TanPhongConeAngle(data.perceptualRoughness);
-		float roughDiameter = 3 * rayTanAngle2 * totalDistance;
+		float rayTanAngle2 = TanPhongConeAngle(data.perceptualRoughness * data.perceptualRoughness);
+		float roughRadius = rayTanAngle2 * totalDistance;
 	
-		float blur = min(_CameraOpaqueTexture_Dim.w * roughDiameter * abs(UNITY_MATRIX_P._m11) / length(finalPos), _CameraOpaqueTexture_Dim.z);
+		float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
+		float blur = log2(_CameraOpaqueTexture_Dim.y * roughRatio);
 		float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 		//reflection *= _ProjectionParams.z;
 		//reflection.a *= smoothness*reflStr*fade;

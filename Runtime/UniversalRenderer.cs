@@ -256,6 +256,7 @@ namespace UnityEngine.Rendering.Universal
 
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
             m_RenderOpaqueForwardPass = new DrawObjectsPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
+
             //m_FoveatedOn = new SLZFoveatedRenderingEnable();
             m_SLZGlobalsSetPass = new SLZGlobalsSetPass();
             //m_FoveatedOff = new SLZFoveatedRenderingDisable();
@@ -395,8 +396,13 @@ namespace UnityEngine.Rendering.Universal
 
             DebugHandler?.Setup(context, ref cameraData);
             SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, 0);
+            
             m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
             EnqueuePass(m_SLZGlobalsSetPass);
+
+            //SLZ - Enable "motion vector data" (prev obj to world matricies) for SSR so we can get prev frame's pixel pos for temporal accumulation
+            m_RenderOpaqueForwardPass.useMotionVectorData = renderingData.cameraData.enableSSR;
+
             //SLZVRSManager.Instance.Initialize(renderingData.cameraData.camera.fieldOfView, renderingData.cameraData.aspectRatio);
             if (cameraData.cameraType != CameraType.Game)
                 useRenderPassEnabled = false;
