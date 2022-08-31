@@ -9,7 +9,31 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSR.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSRGlobals.hlsl"
 
+half4 CalcFogFactors(real3 viewDirectionWS, real fogFactor)
+{
+    half4 fogFactors = half4(0, 0, 0, 0);
+#if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+    fogFactors.w = ComputeFogIntensity(fogFactor);
+    fogFactors.xyz = MipFog(viewDirectionWS, fogFactor, 7);
+    //fogFactors = lerp(mipFog, fragColor, fogIntensity);
+#endif
+    return fogFactors;
+}
 
+half3 invertFogLerp(half fogIntensity, half3 mipFog, half3 finalColor)
+{
+    return fogIntensity > 1e-7 ? (finalColor + (fogIntensity - 1) * mipFog) / fogIntensity : finalColor;
+}
+
+struct SSRExtraData
+{
+    real3 meshNormal; 
+    float4 lastClipPos;
+    float temporalWeight;
+    float depthDerivativeSum;
+    real4 noise;
+    real fogFactor;
+};
 
  /**
   * Specular from reflection probes mixed with SSR
@@ -33,7 +57,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
    
 #if !defined(SHADER_API_MOBILE)
     //ssrData.perceptualRoughness = -fresnelTerm * ssrData.perceptualRoughness + ssrData.perceptualRoughness;
-    real SSRLerp = smoothstep(0.3, 0.9, 1- surfData.roughness* surfData.roughness);
+    real SSRLerp = smoothstep(0.3, 0.9, 1- surfData.roughness * surfData.roughness);
     real4 SSRColor = real4(0, 0, 0, 0);
     UNITY_BRANCH if (SSRLerp > 0.008)
     {
@@ -62,7 +86,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
 
 
 
-real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNormal, real depthDerivativeSum, float4 lastClipPos, float temporalWeight, real4 noise)
+real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData ssrExtra)
 {
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
@@ -130,25 +154,59 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNo
         fragData.position,
         fragData.viewDir,
         reflectionDir,
-        meshNormal,
+        ssrExtra.meshNormal,
         surfData.perceptualRoughness,
-        depthDerivativeSum,
-        noise);
+        ssrExtra.depthDerivativeSum,
+        ssrExtra.noise);
 
     SLZImageBasedSpecularSSR(specular, reflectionDir, fragData, surfData, ssrData, ao.indirectAmbientOcclusion);
     SLZSpecularHorizonOcclusion(specular, fragData.normal, reflectionDir);
-    float3 currentDiffuse = surfData.occlusion * surfData.albedo * diffuse + surfData.emission;
-    float3 currentSpecular = specular * surfData.occlusion;
-    float2 oldScreenUV = SLZComputeNDCFromClip(lastClipPos);
-    float3 oldColor = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, UnityStereoTransformScreenSpaceTex(oldScreenUV), 0).rgb;
 
-    oldColor = max(0, oldColor - currentDiffuse);
-    currentSpecular = (1 - temporalWeight) * currentSpecular + temporalWeight * oldColor;
+    float3 output;
+    float2 oldScreenUV = SLZComputeNDCFromClip(ssrExtra.lastClipPos);
+    real SSRLerp = smoothstep(0.3, 0.9, 1 - surfData.roughness * surfData.roughness);
+    float4 volColor = GetVolumetricColor(fragData.position);
+    UNITY_BRANCH if (SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
+    {
+        output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
+    }
+    else
+    {
+
+        float3 oldColor = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, UnityStereoTransformScreenSpaceTex(oldScreenUV), 0).rgb;
+
+#if defined(_VOLUMETRICS_ENABLED)
+        oldColor = (oldColor - volColor.rgb) / volColor.a;
+#endif
+
+#if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+        half4 fogFactors = CalcFogFactors(-fragData.viewDir, ssrExtra.fogFactor);
+        oldColor = invertFogLerp(fogFactors.w, fogFactors.rgb, oldColor);
+#endif
+
+
+        float3 currentDiffuse = surfData.occlusion * surfData.albedo * diffuse + surfData.emission;
+        oldColor = max(0, oldColor - currentDiffuse);
+
+        float3 currentSpecular = specular * surfData.occlusion;
+        currentSpecular = (1 - ssrExtra.temporalWeight) * currentSpecular + ssrExtra.temporalWeight * oldColor;
+
+        output = (currentSpecular + currentDiffuse);
+    }
+
     //-------------------------------------------------------------------------------------------------
     // Combine the final lighting information
     //-------------------------------------------------------------------------------------------------
 
-    return currentSpecular + currentDiffuse;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
+    //Do fog and volumetrics here to avoid sampling the volumetrics twice
+
+    output = MixFog(output, -fragData.viewDir, ssrExtra.fogFactor);
+
+#if defined(_VOLUMETRICS_ENABLED)
+    output = volColor.rgb + output * volColor.a;
+#endif
+
+    return output;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
 }
 
 #endif
