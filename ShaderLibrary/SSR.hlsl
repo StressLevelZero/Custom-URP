@@ -45,6 +45,38 @@ inline float3 ComputeGrabScreenPos(float3 pos) {
 }
 
 
+float2 SLZComputeNDCFromClip(float4 positionCS)
+{
+#if UNITY_UV_STARTS_AT_TOP
+	// Our world space, view space, screen space and NDC space are Y-up.
+	// Our clip space is flipped upside-down due to poor legacy Unity design.
+	// The flip is baked into the projection matrix, so we only have to flip
+	// manually when going from CS to NDC and back.
+	positionCS.y = -positionCS.y;
+#endif
+
+	positionCS.xy *= rcp(positionCS.w);
+	positionCS.xy = positionCS.xy * 0.5 + 0.5;
+
+	return positionCS.xy;
+}
+
+float3 SLZComputeNDCFromClipWithZ(float4 positionCS)
+{
+#if UNITY_UV_STARTS_AT_TOP
+	// Our world space, view space, screen space and NDC space are Y-up.
+	// Our clip space is flipped upside-down due to poor legacy Unity design.
+	// The flip is baked into the projection matrix, so we only have to flip
+	// manually when going from CS to NDC and back.
+	positionCS.y = -positionCS.y;
+#endif
+
+	positionCS *= rcp(positionCS.w);
+	positionCS.xy = positionCS.xy * 0.5 + 0.5;
+
+	return positionCS.xyz;
+}
+
 struct SSRData
 {
 	float3	wPos;

@@ -9,6 +9,8 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSR.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSRGlobals.hlsl"
 
+
+
  /**
   * Specular from reflection probes mixed with SSR
   *
@@ -138,7 +140,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, real3 meshNo
     float3 currentDiffuse = surfData.occlusion * surfData.albedo * diffuse + surfData.emission;
     float3 currentSpecular = specular * surfData.occlusion;
     float2 oldScreenUV = SLZComputeNDCFromClip(lastClipPos);
-    float3 oldColor = _CameraOpaqueTexture.SampleLevel(sampler_trilinear_clamp, oldScreenUV, 0).xyz;
+    float3 oldColor = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, UnityStereoTransformScreenSpaceTex(oldScreenUV), 0).rgb;
 
     oldColor = max(0, oldColor - currentDiffuse);
     currentSpecular = (1 - temporalWeight) * currentSpecular + temporalWeight * oldColor;
