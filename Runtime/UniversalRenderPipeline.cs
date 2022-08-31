@@ -712,7 +712,7 @@ namespace UnityEngine.Rendering.Universal
                 lightmapBakeTypes = LightmapBakeType.Baked | LightmapBakeType.Mixed | LightmapBakeType.Realtime,
                 lightmapsModes = LightmapsMode.CombinedDirectional | LightmapsMode.NonDirectional,
                 lightProbeProxyVolumes = false,
-                motionVectors = false,
+                motionVectors = true,
                 receiveShadows = false,
                 reflectionProbes = false,
                 reflectionProbesBlendDistance = true,

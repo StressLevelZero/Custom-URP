@@ -783,7 +783,7 @@ namespace UnityEngine.Rendering.Universal
                 
                 EnqueuePass(m_CopyColorPass);
             }
-
+            //SupportedRenderingFeatures.active.motionVectors = true;
             if (renderPassInputs.requiresMotionVectors && !cameraData.xr.enabled)
             {
                 SupportedRenderingFeatures.active.motionVectors = true; // hack for enabling UI

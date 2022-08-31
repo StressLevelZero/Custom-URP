@@ -185,6 +185,13 @@ namespace UnityEngine.Rendering.Universal
         }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
+            if (enableSSR)
+            {
+                // Hack to tell unity to store previous frame object to world vectors...
+                // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
+                renderingData.cameraData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
+            }
+
             CommandBuffer cmd = CommandBufferPool.Get();
             cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
             cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
