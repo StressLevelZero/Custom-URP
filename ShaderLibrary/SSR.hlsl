@@ -84,6 +84,7 @@ struct SSRData
 	float3	rayDir;
 	half3	faceNormal;
 	half	perceptualRoughness;
+	half	RdotV;
 	float   zDerivativeSum;
 	float4 noise;
 };
@@ -95,6 +96,7 @@ SSRData GetSSRData(
 	half3	rayDir,
 	half3	faceNormal,
 	half	perceptualRoughness,
+	half	RdotV,
 	float	zDerivativeSum,
 	half4   noise)
 {
@@ -104,6 +106,7 @@ SSRData GetSSRData(
 	ssrData.rayDir = normalize(rayDir);
 	ssrData.faceNormal = normalize(faceNormal);
 	ssrData.perceptualRoughness = perceptualRoughness;
+	ssrData.RdotV = RdotV;
 	ssrData.zDerivativeSum = zDerivativeSum;
 	ssrData.noise = noise;
 	return ssrData;
@@ -271,7 +274,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 	float totalDistance = 0.0f;
 	//reflectedRay += 1* defaultLR * (FdotV / (FdotR + 0.0000001)) * rayDir;
 	float rayLen = length(reflectedRay);
-	reflectedRay -= min(((largeRadius) * (FdotV / (FdotR + 1e-9))) / rayLen, 0.8) * (reflectedRay) ;
+	reflectedRay -= (((largeRadius) * (FdotV / (FdotR + 1e-9))) / rayLen) * (reflectedRay) ;
 	float4 underPos = float4(1.#INF, 0, 0, 0);
 	for (float i = 0; i < _SSRSteps; i++)
 	{
@@ -763,7 +766,7 @@ float4 getSSRColorNew(SSRData data)
 	yfade *= yfade;
 	//float lengthFade = smoothstep(1, 0, 2*(totalSteps / data.maxSteps)-1);
 
-	float fade = saturate(2 * (RdotV)) * xfade * yfade;
+	float fade = xfade * yfade;
 
 	/*
 	 * Get the color of the grabpass at the ray's screen uv location, applying

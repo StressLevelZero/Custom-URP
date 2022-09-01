@@ -25,6 +25,12 @@ half3 invertFogLerp(half fogIntensity, half3 mipFog, half3 finalColor)
     return fogIntensity > 1e-7 ? (finalColor + (fogIntensity - 1) * mipFog) / fogIntensity : finalColor;
 }
 
+real SLZSpecularHorizonOcclusion(half3 normal, half3 reflectionDir)
+{
+    real horizonOcclusion = min(1.0h + dot(reflectionDir, normal), 1.0h);
+    return horizonOcclusion * horizonOcclusion;
+}
+
 struct SSRExtraData
 {
     real3 meshNormal; 
@@ -36,7 +42,7 @@ struct SSRExtraData
 };
 
  /**
-  * Specular from reflection probes mixed with SSR
+  * Specular from reflection probes and SSR split, so we can reverse the non-ssr color later
   *
   *
   * @param[in,out] specular  Running total of the specular color
@@ -44,26 +50,34 @@ struct SSRExtraData
   * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
   * @param         indSSAO   Indirect screenspace ambient occlusion, not used if SSAO isn't enabled
   */
-void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, SSRData ssrData, half indSSAO)
+void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout real SSRLerp, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, SSRExtraData ssrExtra, half indSSAO)
 {
     real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, 1.0h);
 
-    real surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
-    real3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
-    real fresnelTerm = (1.0h - saturate(fragData.NoV));
-    fresnelTerm *= fresnelTerm;
-    fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
-    real3 IBSpec = real3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
+    
    
 #if !defined(SHADER_API_MOBILE)
     //ssrData.perceptualRoughness = -fresnelTerm * ssrData.perceptualRoughness + ssrData.perceptualRoughness;
-    real SSRLerp = smoothstep(0.3, 0.9, 1- surfData.roughness * surfData.roughness);
-    real4 SSRColor = real4(0, 0, 0, 0);
+    SSRLerp = smoothstep(0.3, 0.9, 1- surfData.roughness * surfData.roughness);
+    half RdotV = saturate(0.95 * dot(reflectionDir, -fragData.viewDir.xyz) + 0.05);
+    SSRLerp *= saturate(3 * RdotV * RdotV);
+    real4 SSR = real4(0, 0, 0, 0);
+
+    SSRData ssrData = GetSSRData(
+        fragData.position,
+        fragData.viewDir,
+        reflectionDir,
+        ssrExtra.meshNormal,
+        surfData.perceptualRoughness,
+        RdotV,
+        ssrExtra.depthDerivativeSum,
+        ssrExtra.noise);
+
     UNITY_BRANCH if (SSRLerp > 0.008)
     {
-        SSRColor = getSSRColor(ssrData);
+        SSR = getSSRColor(ssrData);
     }
-    /**/
+    /*
 #if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
     
     real4 colorX = QuadReadAcrossX(SSRColor);
@@ -74,14 +88,29 @@ void SLZImageBasedSpecularSSR(inout real3 specular, half3 reflectionDir, const S
     SSRColor = lerp(colorAvg, SSRColor,-SSRColor.a * saturate(2 * ssrData.perceptualRoughness) + SSRColor.a);
     
 #endif
-    reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
+*/
+    //reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
+    SSRColor = SSR.rgb;
+    reflectionProbe *= (1.0 - SSR.a * SSRLerp);
+    SSRColor *= SSR.a * SSRLerp;
 #endif
 
 #if defined(_SCREEN_SPACE_OCCLUSION)
     reflectionProbe *= indSSAO;
+    SSRColor.rgb *= indSSAO;
 #endif
 
-    specular += IBSpec * reflectionProbe;
+    real surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
+    real3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
+    real fresnelTerm = (1.0h - saturate(fragData.NoV));
+    fresnelTerm *= fresnelTerm;
+    fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
+    real3 IBSpec = real3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
+
+    reflectionProbe *= IBSpec;
+    SSRColor.rgb *= IBSpec;
+
+    specular += reflectionProbe;
 }
 
 
@@ -143,32 +172,24 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 
 
 
-        //-------------------------------------------------------------------------------------------------
-        // Image-based specular
-        //-------------------------------------------------------------------------------------------------
-        real3 reflectionDir = reflect(-fragData.viewDir, fragData.normal);
-
-    
-
-    SSRData ssrData = GetSSRData(
-        fragData.position,
-        fragData.viewDir,
-        reflectionDir,
-        ssrExtra.meshNormal,
-        surfData.perceptualRoughness,
-        ssrExtra.depthDerivativeSum,
-        ssrExtra.noise);
-
-    SLZImageBasedSpecularSSR(specular, reflectionDir, fragData, surfData, ssrData, ao.indirectAmbientOcclusion);
-    SLZSpecularHorizonOcclusion(specular, fragData.normal, reflectionDir);
-
-    float3 output;
+    //-------------------------------------------------------------------------------------------------
+    // Image-based specular
+    //-------------------------------------------------------------------------------------------------
+    real3 reflectionDir = reflect(-fragData.viewDir, fragData.normal);
+    real3 SSR = real3(0, 0, 0);
+    real SSRLerp = 0;
+    SLZImageBasedSpecularSSR(specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
+    real horizOcclusion = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
+    specular *= horizOcclusion;
+    SSR.rgb *= horizOcclusion;
+    //SSRLerp *= saturate(dot(-fragData.viewDir, ))
     float2 oldScreenUV = SLZComputeNDCFromClip(ssrExtra.lastClipPos);
-    real SSRLerp = smoothstep(0.3, 0.9, 1 - surfData.roughness * surfData.roughness);
+   
     float4 volColor = GetVolumetricColor(fragData.position);
+    float3 output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
     UNITY_BRANCH if (SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
-        output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
+        output += surfData.occlusion * SSR;
     }
     else
     {
@@ -183,15 +204,12 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         half4 fogFactors = CalcFogFactors(-fragData.viewDir, ssrExtra.fogFactor);
         oldColor = invertFogLerp(fogFactors.w, fogFactors.rgb, oldColor);
 #endif
+        oldColor = max(0, oldColor - output);
 
+        SSR = SSR * surfData.occlusion;
+        SSR = (1 - ssrExtra.temporalWeight) * SSR + ssrExtra.temporalWeight * oldColor;
 
-        float3 currentDiffuse = surfData.occlusion * surfData.albedo * diffuse + surfData.emission;
-        oldColor = max(0, oldColor - currentDiffuse);
-
-        float3 currentSpecular = specular * surfData.occlusion;
-        currentSpecular = (1 - ssrExtra.temporalWeight) * currentSpecular + ssrExtra.temporalWeight * oldColor;
-
-        output = (currentSpecular + currentDiffuse);
+        output += SSR;
     }
 
     //-------------------------------------------------------------------------------------------------

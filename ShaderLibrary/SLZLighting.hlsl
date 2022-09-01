@@ -920,6 +920,8 @@ void SLZSpecularHorizonOcclusion(inout real3 specular, half3 normal, half3 refle
     specular *= horizonOcclusion * horizonOcclusion;
 }
 
+
+
 /**
  * Primary diffuse and specular light. Assumes that only the lightmap or spherical harmonic lighting is in the diffuse
  * parameter to begin with. Adds diffuse and specular light from the directional light if its intensity is non-0. Otherwise,

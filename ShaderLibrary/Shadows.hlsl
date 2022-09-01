@@ -436,7 +436,7 @@ half BakedShadow(half4 shadowMask, half4 occlusionProbeChannels)
     // If occlusionProbeChannels all components are zero we use default baked shadow value 1.0
     // This code is optimized for mobile platforms:
     // half bakedShadow = any(occlusionProbeChannels) ? dot(shadowMask, occlusionProbeChannels) : 1.0h;
-    half bakedShadow = half(1.0) + dot(shadowMask - half(1.0), occlusionProbeChannels);
+    half bakedShadow = saturate(half(1.0) + dot(shadowMask - half(1.0), occlusionProbeChannels));
     return bakedShadow;
 }
 
