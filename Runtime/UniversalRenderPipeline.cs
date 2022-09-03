@@ -755,7 +755,8 @@ namespace UnityEngine.Rendering.Universal
             cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
             cameraData.enableSSR = asset.enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
             cameraData.maxSSRSteps = asset.maxSsrSteps;
-            
+            cameraData.SSRMinMip = asset.ssrMinMip;
+            cameraData.SSRHitRadius = asset.ssrHitRadius;
             // end SLZ additons
 
             cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, cameraData.renderScale,

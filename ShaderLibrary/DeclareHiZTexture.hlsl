@@ -12,6 +12,7 @@ struct HiZDim
 
 StructuredBuffer<HiZDim> HiZDimBuffer;
 uint _HiZHighestMip;
+float4 _HiZDim;
 /*
 CBUFFER_START(HiZDimBuffer)
 float4 _HiZMipDim[15];

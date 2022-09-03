@@ -22,8 +22,10 @@ namespace UnityEngine.Rendering.Universal
         private static long framecount = 0;
         private static double timeSinceStartup = 0.0;
 #endif
-        private int HiZDimBufferID = Shader.PropertyToID("HiZDimBuffer");
+        //private int HiZDimBufferID = Shader.PropertyToID("HiZDimBuffer");
         private int HiZMipNumID = Shader.PropertyToID("_HiZHighestMip");
+        private int HiZDimID = Shader.PropertyToID("_HiZDim");
+        private int SSRConstantsID = Shader.PropertyToID("SSRConstants");
        
         public GlobalKeyword HiZEnabledKW { get; private set; }
         public GlobalKeyword HiZMinMaxKW { get; private set; }
@@ -61,15 +63,16 @@ namespace UnityEngine.Rendering.Universal
             Shader.SetKeyword(HiZMinMaxKW, requireMinMax);
         }
 
-        public void SetHiZGlobal(Vector4[] data, int numMips, bool minmax)
+        public void SetHiZGlobal(int numMips, Vector4 dim)
         {
-            HiZDimBuffer.SetData(data);
-            Shader.SetGlobalBuffer(HiZDimBufferID, HiZDimBuffer);
+            //HiZDimBuffer.SetData(data);
+            //Shader.SetGlobalBuffer(HiZDimBufferID, HiZDimBuffer);
             Shader.SetGlobalInt(HiZMipNumID, numMips);
+            Shader.SetGlobalVector(HiZDimID, dim);
             //Shader.SetKeyword(HiZMinMaxKW, minmax);
         }
 
-        public void SetSSRGlobals(int maxSteps, int minMip)
+        public void SetSSRGlobals(int maxSteps, int minMip, float hitRadius, float cameraNear, float cameraFar)
         {
             /*
              * 0 float _SSRHitRadius;
@@ -78,12 +81,31 @@ namespace UnityEngine.Rendering.Universal
              * 3 none
              */
             float[] SSRGlobalArray = new float[4];
-            SSRGlobalArray[0] = 0.1f;
-            SSRGlobalArray[1] = 0.1f;
+            //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
+            SSRGlobalArray[0] = hitRadius;
+            SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
             SSRGlobalArray[2] = maxSteps;
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
             SSRGlobalCB.SetData(SSRGlobalArray);
-            Shader.SetGlobalConstantBuffer("SSRConstants", SSRGlobalCB, 0, 16);
+            Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, 16);
+        }
+
+        public void SetSSRGlobalsCmd(ref CommandBuffer cmd, int maxSteps, int minMip, float hitRadius, float cameraNear, float cameraFar)
+        {
+            /*
+             * 0 float _SSRHitRadius;
+             * 1 float _SSREdgeFade;
+             * 2 int _SSRSteps;
+             * 3 none
+             */
+            float[] SSRGlobalArray = new float[4];
+            //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
+            SSRGlobalArray[0] = hitRadius;
+            SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
+            SSRGlobalArray[2] = maxSteps;
+            SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
+            SSRGlobalCB.SetData(SSRGlobalArray);
+            cmd.SetGlobalConstantBuffer(SSRGlobalCB, SSRConstantsID, 0, 16);
         }
 
 
@@ -177,11 +199,23 @@ namespace UnityEngine.Rendering.Universal
         private bool enableSSR;
         private bool requireHiZ;
         private bool requireMinMax;
+
+        private float ssrHitRadius;
+        private int ssrMaxSteps;
+        private int ssrMinMip;
+        private float cameraNear;
+        private float cameraFar;
         public void Setup(CameraData camData)
         {
             enableSSR = camData.enableSSR;
             requireHiZ = camData.requiresDepthPyramid;
             requireMinMax = camData.requiresMinMaxDepthPyr;
+
+            ssrHitRadius = camData.SSRHitRadius;
+            ssrMaxSteps = camData.maxSSRSteps;
+            ssrMinMip = camData.SSRMinMip;
+            cameraNear = camData.camera.nearClipPlane;
+            cameraFar = camData.camera.farClipPlane;
         }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
@@ -193,6 +227,7 @@ namespace UnityEngine.Rendering.Universal
             }
 
             CommandBuffer cmd = CommandBufferPool.Get();
+            //SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, ssrMinMip, ssrMaxSteps, ssrHitRadius, cameraNear, cameraFar);
             cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
             cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
             cmd.SetKeyword(SLZGlobals.instance.HiZMinMaxKW, requireMinMax);

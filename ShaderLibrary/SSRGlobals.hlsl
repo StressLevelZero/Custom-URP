@@ -5,11 +5,14 @@
 
 
 CBUFFER_START(SSRConstants)
-float _SSRHitRadius;
-float _SSREdgeFade;
-float _SSRSteps;
-int _SSRMinMip;
+float4 _SSRVariables;
 CBUFFER_END
+
+#define _SSRHitRadius _SSRVariables.x
+#define _SSRHitScale _SSRVariables.x
+#define _SSRHitBias _SSRVariables.y
+#define _SSRSteps _SSRVariables.z
+#define _SSRMinMip asint(_SSRVariables.w)
 
 SamplerState sampler_trilinear_clamp;
 

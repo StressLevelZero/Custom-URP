@@ -58,10 +58,9 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
    
 #if !defined(SHADER_API_MOBILE)
     //ssrData.perceptualRoughness = -fresnelTerm * ssrData.perceptualRoughness + ssrData.perceptualRoughness;
-    SSRLerp = smoothstep(0.3, 0.9, 1- surfData.roughness * surfData.roughness);
+   
     half RdotV = saturate(0.95 * dot(reflectionDir, -fragData.viewDir.xyz) + 0.05);
-    SSRLerp *= saturate(3 * RdotV * RdotV);
-    real4 SSR = real4(0, 0, 0, 0);
+
 
     SSRData ssrData = GetSSRData(
         fragData.position,
@@ -72,6 +71,14 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
         RdotV,
         ssrExtra.depthDerivativeSum,
         ssrExtra.noise);
+
+    SSRLerp = smoothstep(0.3, 0.9, 1 - surfData.roughness * surfData.roughness);
+    //Piecewise function to make a sinusoidal falloff curve
+#define SSR_FALLOFF_START 0.6666667
+    RdotV = 2 * saturate( (1 / SSR_FALLOFF_START) * RdotV);
+    RdotV = RdotV > 1 ? -0.5*(RdotV * RdotV) + (2*RdotV - 1) : 0.5 * RdotV * RdotV;
+    SSRLerp *= RdotV;
+    real4 SSR = real4(0, 0, 0, 0);
 
     UNITY_BRANCH if (SSRLerp > 0.008)
     {

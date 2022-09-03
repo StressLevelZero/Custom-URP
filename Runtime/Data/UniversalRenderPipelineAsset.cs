@@ -253,7 +253,8 @@ namespace UnityEngine.Rendering.Universal
 
         [SerializeField] bool m_EnableSSR = false;
         [SerializeField] int m_MaxSsrSteps = 35;
-        
+        [SerializeField] int m_SsrMinMip = 0;
+        [SerializeField] float m_SsrHitRadius = 0.05f;
 
         // Note: A lut size of 16^3 is barely usable with the HDR grading mode. 32 should be the
         // minimum, the lut being encoded in log. Lower sizes would work better with an additional
@@ -1009,6 +1010,17 @@ namespace UnityEngine.Rendering.Universal
         {
             get { return m_MaxSsrSteps; }
             set { m_MaxSsrSteps = value; }
+        }
+        public int ssrMinMip
+        {
+            get { return m_SsrMinMip; }
+            set { m_SsrMinMip = value; }
+        }
+
+        public float ssrHitRadius
+        {
+            get { return m_SsrHitRadius; }
+            set { m_SsrHitRadius = value; }
         }
 
         /// End SLZ Additions

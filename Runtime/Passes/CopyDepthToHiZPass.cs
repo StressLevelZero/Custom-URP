@@ -287,6 +287,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                 
                 } while (i <= highestMip);
 
+                /* Old method for passing mip dimension info to shaders, 
+                 * Precalculates the ratios of each mip to mip 0. This isn't
+                 * ideal as it takes up way too many registers. Better to just
+                 * calculate mip 0 dimension / exp2(mipLevel)
                 Vector4[] mipDims = new Vector4[15];
                 float mip0Width = (float)(width >> 1);
                 float mip0Height = (float)(height >> 1);
@@ -298,8 +302,15 @@ namespace UnityEngine.Rendering.Universal.Internal
                     mipDims[j].z = mip0Width / mipDims[j].x;
                     mipDims[j].w = mip0Height / mipDims[j].y;
                 }
+                */
                 //float mipNum = BitConverter.Int32BitsToSingle(highestMip);
-                SLZGlobals.instance.SetHiZGlobal(mipDims, highestMip, true);
+                Vector4 dim = new Vector4();
+
+                dim.x = (float)(width >> 1);
+                dim.y = (float)(height >> 1);
+                dim.z = 1.0f / dim.x;
+                dim.w = 1.0f / dim.y;
+                SLZGlobals.instance.SetHiZGlobal(highestMip, dim);
                 //Debug.Log(string.Format("Mip dim: {0} {1} {2} {3} {4}", mipDims[0], mipDims[2], mipDims[4], mipDims[6], mipDims[8]));
             }
             //Debug.Log("Last Mip: " + i);

@@ -160,6 +160,8 @@ namespace UnityEngine.Rendering.Universal
         public bool requiresColorPyramid;
         public bool enableSSR;
         public int maxSSRSteps;
+        public int SSRMinMip;
+        public float SSRHitRadius;
 
         // end SLZ Additions
         /// <summary>

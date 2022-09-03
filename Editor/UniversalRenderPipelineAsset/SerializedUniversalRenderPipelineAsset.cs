@@ -66,6 +66,10 @@ namespace UnityEditor.Rendering.Universal
         // SLZ Additions
         public SerializedProperty enableSSR { get; }
         public SerializedProperty maxSSRSteps { get; }
+
+        public SerializedProperty ssrMinMip { get; }
+        public SerializedProperty ssrHitRadius { get; }
+
         // End SLZ Additions
 
 #if ADAPTIVE_PERFORMANCE_2_0_0_OR_NEWER
@@ -87,6 +91,8 @@ namespace UnityEditor.Rendering.Universal
             // SLZ Additions
             enableSSR = serializedObject.FindProperty("m_EnableSSR");
             maxSSRSteps = serializedObject.FindProperty("m_MaxSsrSteps");
+            ssrMinMip = serializedObject.FindProperty("m_SsrMinMip");
+            ssrHitRadius = serializedObject.FindProperty("m_SsrHitRadius");
             // End SLZ Additions
 
             opaqueDownsamplingProp = serializedObject.FindProperty("m_OpaqueDownsampling");

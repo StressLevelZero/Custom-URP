@@ -35,6 +35,9 @@ namespace UnityEditor.Rendering.Universal
             //SLZ Additions
             public static GUIContent enableSSR = EditorGUIUtility.TrTextContent("Enable SSR", "If enabled, sets the keyword _SLZ_SSR_ENABLED to switch shaders to an SSR variant");
             public static GUIContent SSRSteps = EditorGUIUtility.TrTextContent("Max SSR Steps", "Sets the maximum number of iterations in the SSR marcher");
+            public static GUIContent SSRHitRadius = EditorGUIUtility.TrTextContent("SSR Hit Radius", "Sets the fraction of the ray step length within which it will detect an intersection");
+            public static GUIContent SSRMinMip = EditorGUIUtility.TrTextContent("SSR Lowest Mip", "Sets the lowest mip level in the depth pyramid SSR rays will test against to find a hit. Increasing this value will make the SSR more pixelated, and hopefully take less iterations to find a hit");
+
             // End SLZ Additions
 
 

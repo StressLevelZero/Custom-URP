@@ -395,7 +395,8 @@ namespace UnityEngine.Rendering.Universal
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
 
             DebugHandler?.Setup(context, ref cameraData);
-            SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, 0);
+            SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
+                camera.nearClipPlane, camera.farClipPlane);
             
             m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
             EnqueuePass(m_SLZGlobalsSetPass);
