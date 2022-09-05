@@ -129,6 +129,10 @@ namespace UnityEditor.Rendering.Universal
                 EditorGUILayout.PropertyField(serialized.requireOpaqueTextureProp, Styles.requireOpaqueTextureText);
                 EditorGUI.BeginDisabledGroup(!serialized.requireOpaqueTextureProp.boolValue);
                 EditorGUILayout.PropertyField(serialized.opaqueDownsamplingProp, Styles.opaqueDownsamplingText);
+                // SLZ Additions
+                EditorGUILayout.PropertyField(serialized.enableSSR, Styles.enableSSR);
+
+                // End SLZ Additions
                 EditorGUI.EndDisabledGroup();
                 EditorGUILayout.PropertyField(serialized.supportsTerrainHolesProp, Styles.supportsTerrainHolesText);
             }
@@ -162,6 +166,12 @@ namespace UnityEditor.Rendering.Universal
                 }
 
                 --EditorGUI.indentLevel;
+            }
+            if (serialized.asset.enableSSR)
+            {
+                EditorGUILayout.PropertyField(serialized.maxSSRSteps, Styles.SSRSteps);
+                EditorGUILayout.PropertyField(serialized.ssrHitRadius, Styles.SSRHitRadius);
+                EditorGUILayout.PropertyField(serialized.ssrMinMip, Styles.SSRMinMip);
             }
         }
 

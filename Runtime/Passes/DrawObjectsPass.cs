@@ -18,7 +18,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         string m_ProfilerTag;
         ProfilingSampler m_ProfilingSampler;
         bool m_IsOpaque;
-
+        public bool useMotionVectorData;
         bool m_UseDepthPriming;
 
         static readonly int s_DrawObjectPassDataPropID = Shader.PropertyToID("_DrawObjectPassData");
@@ -113,7 +113,10 @@ namespace UnityEngine.Rendering.Universal.Internal
 #endif
 
                 DrawingSettings drawSettings = CreateDrawingSettings(m_ShaderTagIdList, ref renderingData, sortFlags);
-
+                if (useMotionVectorData)
+                {
+                    drawSettings.perObjectData = drawSettings.perObjectData | PerObjectData.MotionVectors;
+                }
                 var activeDebugHandler = GetActiveDebugHandler(renderingData);
                 if (activeDebugHandler != null)
                 {

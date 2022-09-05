@@ -158,10 +158,10 @@ void MAIN_GAUSSIAN(uint3 groupId : SV_GroupID, uint2 groupThreadId : SV_GroupThr
     uint2 uthreadUL = uint2(max(0, threadUL));
 
     uint2 size = uint2(_Size.xy) - 1u.xx;
-    float4 p00 = _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(0u, 0u), size))];
-    float4 p10 = _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 0u), size))];
-    float4 p11 = _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 1u), size))];
-    float4 p01 = _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(0u, 1u), size))];
+    float4 p00 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(0u, 0u), size))]);
+    float4 p10 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 0u), size))]);
+    float4 p11 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 1u), size))]);
+    float4 p01 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(0u, 1u), size))]);
 
     // Store the 4 downsampled pixels in LDS
     uint destIdx = groupThreadId.x + (groupThreadId.y << 4u);
@@ -192,10 +192,10 @@ void MAIN_DOWNSAMPLE(uint3 dispatchThreadId : SV_DispatchThreadID, uint3 groupId
     uint2 c10 = min(offset + uint2(1u, 0u), size);
     uint2 c11 = min(offset + uint2(1u, 1u), size);
     uint2 c01 = min(offset + uint2(0u, 1u), size);
-    float4 p00 = _Source[COORD_TEXTURE2D_X(c00)];
-    float4 p10 = _Source[COORD_TEXTURE2D_X(c10)];
-    float4 p11 = _Source[COORD_TEXTURE2D_X(c11)];
-    float4 p01 = _Source[COORD_TEXTURE2D_X(c01)];
+    float4 p00 = max(0.0, _Source[COORD_TEXTURE2D_X(c00)]);
+    float4 p10 = max(0.0, _Source[COORD_TEXTURE2D_X(c10)]);
+    float4 p11 = max(0.0, _Source[COORD_TEXTURE2D_X(c11)]);
+    float4 p01 = max(0.0, _Source[COORD_TEXTURE2D_X(c01)]);
 
     #if COPY_MIP_0
     _Mip0[COORD_TEXTURE2D_X(c00)] = p00;

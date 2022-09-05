@@ -152,6 +152,19 @@ namespace UnityEngine.Rendering.Universal
         public bool requiresOpaqueTexture;
 
         /// <summary>
+        /// SLZ Additions
+        /// /// <summary>
+        
+        public bool requiresDepthPyramid;
+        public bool requiresMinMaxDepthPyr;
+        public bool requiresColorPyramid;
+        public bool enableSSR;
+        public int maxSSRSteps;
+        public int SSRMinMip;
+        public float SSRHitRadius;
+
+        // end SLZ Additions
+        /// <summary>
         /// Returns true if post processing passes require depth texture.
         /// </summary>
         public bool postProcessingRequiresDepthTexture;

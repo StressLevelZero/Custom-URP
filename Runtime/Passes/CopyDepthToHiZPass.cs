@@ -26,10 +26,12 @@ namespace UnityEngine.Rendering.Universal.Internal
         internal int MssaSamples { get; set; }
         private int mipLevels;
         private bool isArray;
+        private bool requiresMinMax;
         Material m_CopyDepthToColorMaterial;
         public static ComputeShader m_HiZMipCompute;
         private GlobalKeyword m_StereoArrayKW;
         private LocalKeyword m_SRVSourceKW;
+        private LocalKeyword m_MinMaxKW;
         public CopyDepthToHiZPass(RenderPassEvent evt, Material copyDepthToColorMaterial)
         {
             base.profilingSampler = new ProfilingSampler(nameof(CopyDepthPass));
@@ -43,18 +45,19 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// </summary>
         /// <param name="source">Source Render Target</param>
         /// <param name="destination">Destination Render Targt</param>
-        public void Setup(RenderTargetHandle source, RenderTargetHandle destination)
+        public void Setup(RenderTargetHandle source, RenderTargetHandle destination, bool requiresMinMax)
         {
             this.source = source;
             this.destination = destination;
             this.AllocateRT = true;// !destination.HasInternalRenderTargetId();
             this.MssaSamples = -1;
+            this.requiresMinMax = requiresMinMax;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
             var descriptor = renderingData.cameraData.cameraTargetDescriptor;
-            descriptor.colorFormat = RenderTextureFormat.RHalf;
+            descriptor.colorFormat = requiresMinMax ? RenderTextureFormat.RGHalf : RenderTextureFormat.RHalf;
             descriptor.width /= 2;
             descriptor.height /= 2;
             descriptor.depthBufferBits = 0;
@@ -195,9 +198,20 @@ namespace UnityEngine.Rendering.Universal.Internal
                 {
                     m_SRVSourceKW = new LocalKeyword(m_HiZMipCompute, "SRV_SOURCE");
                 }
+               
+
+                m_MinMaxKW = new LocalKeyword(m_HiZMipCompute, "MIN_AND_MAX");
+                if (requiresMinMax)
+                {
+                    cmd.EnableKeyword(m_HiZMipCompute, m_MinMaxKW);
+                }
+                else
+                {
+                    cmd.DisableKeyword(m_HiZMipCompute, m_MinMaxKW);
+                }
                 //if (m_StereoArrayKW == null)
                 //{
-                    //m_StereoArrayKW = new GlobalKeyword("STEREO_INSTANCING_ON");
+                //m_StereoArrayKW = new GlobalKeyword("STEREO_INSTANCING_ON");
                 //}
 #if ENABLE_VR && ENABLE_XR_MODULE
                 if (renderingData.cameraData.xr.enabled)
@@ -239,10 +253,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                     }
                     else
                     {
-                        if (i == 1)
-                        {
-                            cmd.DisableKeyword(m_HiZMipCompute, m_SRVSourceKW);
-                        }
+                        //if (inputSRV == false)
+                        //{
+                        cmd.DisableKeyword(m_HiZMipCompute, m_SRVSourceKW);
+                        //}
                         src = destination.Identifier();
                         dst = destination.Identifier();
                         inputSRV = false;
@@ -273,14 +287,31 @@ namespace UnityEngine.Rendering.Universal.Internal
                 
                 } while (i <= highestMip);
 
-                float[] mipDims = new float[32];
-                for (int j = 0; j <= Mathf.Min(highestMip, 16); j++)
+                /* Old method for passing mip dimension info to shaders, 
+                 * Precalculates the ratios of each mip to mip 0. This isn't
+                 * ideal as it takes up way too many registers. Better to just
+                 * calculate mip 0 dimension / exp2(mipLevel)
+                Vector4[] mipDims = new Vector4[15];
+                float mip0Width = (float)(width >> 1);
+                float mip0Height = (float)(height >> 1);
+                for (int j = 0; j < mipLevels; j++)
                 {
-                    mipDims[2*j] = (float)Mathf.Max(width >> j+1, 1);
-                    mipDims[2*j + 1] = (float)Mathf.Max(height >> j+1, 1);
+                    mipDims[j] = new Vector4();
+                    mipDims[j].x = (float)Mathf.Max(width >> j+1, 1);
+                    mipDims[j].y = (float)Mathf.Max(height >> j+1, 1);
+                    mipDims[j].z = mip0Width / mipDims[j].x;
+                    mipDims[j].w = mip0Height / mipDims[j].y;
                 }
-                SLZGlobals.instance.SetHiZGlobal(mipDims);
-                //Debug.Log("Mip dim 0: " + mipDims[0]);
+                */
+                //float mipNum = BitConverter.Int32BitsToSingle(highestMip);
+                Vector4 dim = new Vector4();
+
+                dim.x = (float)(width >> 1);
+                dim.y = (float)(height >> 1);
+                dim.z = 1.0f / dim.x;
+                dim.w = 1.0f / dim.y;
+                SLZGlobals.instance.SetHiZGlobal(highestMip, dim);
+                //Debug.Log(string.Format("Mip dim: {0} {1} {2} {3} {4}", mipDims[0], mipDims[2], mipDims[4], mipDims[6], mipDims[8]));
             }
             //Debug.Log("Last Mip: " + i);
             context.ExecuteCommandBuffer(cmd);

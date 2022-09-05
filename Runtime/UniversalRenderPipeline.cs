@@ -712,7 +712,7 @@ namespace UnityEngine.Rendering.Universal
                 lightmapBakeTypes = LightmapBakeType.Baked | LightmapBakeType.Mixed | LightmapBakeType.Realtime,
                 lightmapsModes = LightmapsMode.CombinedDirectional | LightmapsMode.NonDirectional,
                 lightProbeProxyVolumes = false,
-                motionVectors = false,
+                motionVectors = true,
                 receiveShadows = false,
                 reflectionProbes = false,
                 reflectionProbesBlendDistance = true,
@@ -748,6 +748,17 @@ namespace UnityEngine.Rendering.Universal
 #endif
 
             bool needsAlphaChannel = Graphics.preserveFramebufferAlpha;
+
+            // SLZ Additions
+            cameraData.requiresColorPyramid = asset.supportsCameraOpaqueTexture && asset.enableSSR;
+            cameraData.requiresDepthPyramid = asset.supportsCameraDepthTexture && asset.enableSSR;
+            cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
+            cameraData.enableSSR = asset.enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
+            cameraData.maxSSRSteps = asset.maxSsrSteps;
+            cameraData.SSRMinMip = asset.ssrMinMip;
+            cameraData.SSRHitRadius = asset.ssrHitRadius;
+            // end SLZ additons
+
             cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, cameraData.renderScale,
                 cameraData.isHdrEnabled, msaaSamples, needsAlphaChannel, cameraData.requiresOpaqueTexture);
         }

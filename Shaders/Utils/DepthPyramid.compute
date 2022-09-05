@@ -8,6 +8,7 @@
 
 #pragma multi_compile _ STEREO_INSTANCING_ON STEREO_MULTIVIEW_ON
 #pragma multi_compile_local _ SRV_SOURCE
+#pragma multi_compile_local _ MIN_AND_MAX
 
 #if defined(STEREO_INSTANCING_ON)
     #define UNITY_STEREO_INSTANCING_ENABLED
@@ -22,14 +23,19 @@
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 
+#if defined(MIN_AND_MAX)
+    #define float1or2 float2
+#else
+    #define float1or2 float
+#endif
 
 #if defined(SRV_SOURCE)
     TEXTURE2D_X_FLOAT(_MipSource);
 #else
-    RW_TEXTURE2D_X(float, _MipSource);
+    RW_TEXTURE2D_X(float1or2, _MipSource);
 #endif
-    RW_TEXTURE2D_X(float, _MipDest);
-    RW_TEXTURE2D_X(float, _MipDest2);
+    RW_TEXTURE2D_X(float1or2, _MipDest);
+    RW_TEXTURE2D_X(float1or2, _MipDest2);
 
 #if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON)
     #define COORD_DEPTH(uv) (uv).xyz
@@ -37,15 +43,26 @@
     #define COORD_DEPTH(uv) (uv).xy
 #endif
 
-
-#if defined(SRV_SOURCE)
-    #if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON)
-        #define MIPSOURCE(uv) _MipSource.Load(int4(uv.xyz, 0)).r
+#if !defined(MIN_AND_MAX)
+    #if defined(SRV_SOURCE)
+        #if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON)
+            #define MIPSOURCE(uv) _MipSource.Load(int4(uv.xyz, 0)).r
+        #else
+            #define MIPSOURCE(uv) _MipSource.Load(int3(uv.xy, 0)).r
+        #endif
     #else
-        #define MIPSOURCE(uv) _MipSource.Load(int3(uv.xy, 0)).r
+        #define MIPSOURCE(uv) _MipSource[uv].r
     #endif
 #else
-    #define MIPSOURCE(uv) _MipSource[uv].r
+    #if defined(SRV_SOURCE)
+        #if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON)
+            #define MIPSOURCE(uv) _MipSource.Load(int4(uv.xyz, 0)).rr
+        #else
+            #define MIPSOURCE(uv) _MipSource.Load(int3(uv.xy, 0)).rr
+        #endif
+    #else
+        #define MIPSOURCE(uv) _MipSource[uv].rg
+    #endif
 #endif
 
 //CBUFFER_START(cb)
@@ -53,18 +70,18 @@ int4 data1; //current mip width, current mip height, lower mip width, lower mip 
 int4 data2; // number of mips to process at once, is U odd, is V odd, are both odd 
 //CBUFFER_END
 groupshared uint minLevel1[4][4];
-groupshared uint maxLevel1[4][4];
+//groupshared uint maxLevel1[4][4];
 
 #if UNITY_REVERSED_Z
     #define MIN_DEPTH(l, r) max(l, r)
     #define MAX_DEPTH(l, r) min(l, r)
-    #define INIT_DEPTH 0u
+    #define INIT_DEPTH 0xFFFF0000u
     #define INTERLOCKED_MIN(a, b) InterlockedMax(a, b)
     #define INTERLOCKED_MAX(a, b) InterlockedMin(a, b)
 #else
     #define MIN_DEPTH(l, r) min(l, r)
     #define MAX_DEPTH(l, r) max(l, r)
-    #define INIT_DEPTH 4294967295u
+    #define INIT_DEPTH 0x0000FFFFu
     #define INTERLOCKED_MIN(a, b) InterlockedMin(a, b)
     #define INTERLOCKED_MAX(a, b) InterlockedMax(a, b)
 #endif
@@ -76,15 +93,20 @@ void MipMin(uint3 id : SV_DispatchThreadID)
     //{
         uint2 srcPixelUV = id.xy << 1;
         uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
-        float p00 = MIPSOURCE(COORD_DEPTH(uv00));
+        float1or2 p00 = MIPSOURCE(COORD_DEPTH(uv00));
         uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
-        float p10 = MIPSOURCE(COORD_DEPTH(uv10));
+        float1or2 p10 = MIPSOURCE(COORD_DEPTH(uv10));
         uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
-        float p01 = MIPSOURCE(COORD_DEPTH(uv01));
+        float1or2 p01 = MIPSOURCE(COORD_DEPTH(uv01));
         uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
-        float p11 = MIPSOURCE(COORD_DEPTH(uv11));
-        _MipDest[COORD_DEPTH(id)] = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
-    //}
+        float1or2 p11 = MIPSOURCE(COORD_DEPTH(uv11));
+        float min4 = MIN_DEPTH(MIN_DEPTH(p00.r, p01.r), MIN_DEPTH(p10.r, p11.r));
+        #if defined(MIN_AND_MAX)
+            float max4 = MAX_DEPTH(MAX_DEPTH(p00.g, p01.g), MAX_DEPTH(p10.g, p11.g));
+        #else
+            float max4 = 0.0;
+        #endif
+        _MipDest[COORD_DEPTH(id)] = float4(min4,max4,0,0);
 }
 
 
@@ -97,6 +119,7 @@ void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, u
     if (groupID.x < 4 && groupID.y < 4)
     {
         minLevel1[groupID.x][groupID.y] = INIT_DEPTH;
+        //maxLevel1[groupID.x][groupID.y] = INIT_DEPTH;
     }
     GroupMemoryBarrierWithGroupSync();
 
@@ -104,33 +127,54 @@ void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, u
     //{
     uint2 srcPixelUV = id.xy << 1;
     uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
-    float p00 = _MipSource[COORD_DEPTH(uv00)].r;
+    float1or2 p00 = MIPSOURCE(COORD_DEPTH(uv00));
     uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
-    float p10 = _MipSource[COORD_DEPTH(uv10)].r;
+    float1or2 p10 = MIPSOURCE(COORD_DEPTH(uv10));
     uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
-    float p01 = _MipSource[COORD_DEPTH(uv01)].r;
+    float1or2 p01 = MIPSOURCE(COORD_DEPTH(uv01));
     uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
-    float p11 = _MipSource[COORD_DEPTH(uv11)].r;
-    float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
-    _MipDest[COORD_DEPTH(id)] = minLevel0;
+    float1or2 p11 = MIPSOURCE(COORD_DEPTH(uv11));
+    float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00.r, p01.r), MIN_DEPTH(p10.r, p11.r));
+#if defined(MIN_AND_MAX)
+    float maxLevel0 = MAX_DEPTH(MAX_DEPTH(p00.g, p01.g), MAX_DEPTH(p10.g, p11.g));
+#else
+    float maxLevel0 = 0.0;
+#endif
+    _MipDest[COORD_DEPTH(id)] = float4(minLevel0, maxLevel0, 0, 0);
     
     uint2 miniGroupId = uint2(0u,0u);
 
     [branch] if (data2.x > 1)
     {
-        uint minLevel0U = asuint(minLevel0);
         miniGroupId = groupID.xy >> 1;
+        uint minLevel0U = f32tof16(minLevel0) | (minLevel1[miniGroupId.x][miniGroupId.y] & 0xFFFF0000u);
         INTERLOCKED_MIN(minLevel1[miniGroupId.x][miniGroupId.y], minLevel0U);
     }
-
     GroupMemoryBarrierWithGroupSync();
+
+#if defined(MIN_AND_MAX)
+    [branch] if (data2.x > 1)
+    {
+        uint maxLevel0U = (f32tof16(maxLevel0) << 16) | (minLevel1[miniGroupId.x][miniGroupId.y] & 0x0000FFFFu);
+        INTERLOCKED_MAX(minLevel1[miniGroupId.x][miniGroupId.y], maxLevel0U);
+    }
+    GroupMemoryBarrierWithGroupSync();
+#endif
 
     [branch] if (data2.x > 1)
     {
         uint3 uv2 = uint3(id.xy >> 1u, id.z);
         [branch] if (((groupID.x & 1u) == 0u) && ((groupID.y & 1u) == 0u))
         {
-            _MipDest2[COORD_DEPTH(uv2)] = asfloat(minLevel1[miniGroupId.x][miniGroupId.y]);
+            float r0 = f16tof32(minLevel1[miniGroupId.x][miniGroupId.y] & 0x0000FFFFu);
+
+            #if defined(MIN_AND_MAX)
+                float r1 = f16tof32(minLevel1[miniGroupId.x][miniGroupId.y] >> 16u);
+            #else
+                float r1 = 0;
+            #endif
+
+            _MipDest2[COORD_DEPTH(uv2)] = float4(r0,r1,0,0);
         }
     }
     
@@ -143,40 +187,54 @@ void MipMinOdd(uint3 id : SV_DispatchThreadID)
     //if (id.x < data1.x && id.y < data1.y)
     uint2 srcPixelUV = id.xy << 1;
     uint3 uv00 = uint3(min(srcPixelUV + uint2(0u, 0u), data1.zw), id.z);
-    float p00 = _MipSource[COORD_DEPTH(uv00)].r;
+    float1or2 p00 = MIPSOURCE(COORD_DEPTH(uv00));
     uint3 uv10 = uint3(min(srcPixelUV + uint2(1u, 0u), data1.zw), id.z);
-    float p10 = _MipSource[COORD_DEPTH(uv10)].r;
+    float1or2 p10 = MIPSOURCE(COORD_DEPTH(uv10));
     uint3 uv01 = uint3(min(srcPixelUV + uint2(0u, 1u), data1.zw), id.z);
-    float p01 = _MipSource[COORD_DEPTH(uv01)].r;
+    float1or2 p01 = MIPSOURCE(COORD_DEPTH(uv01));
     uint3 uv11 = uint3(min(srcPixelUV + uint2(1u, 1u), data1.zw), id.z);
-    float p11 = _MipSource[COORD_DEPTH(uv11)].r;
-    float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00, p01), MIN_DEPTH(p10, p11));
+    float1or2 p11 = MIPSOURCE(COORD_DEPTH(uv11));
+    float minLevel0 = MIN_DEPTH(MIN_DEPTH(p00.r, p01.r), MIN_DEPTH(p10.r, p11.r));
+#if defined(MIN_AND_MAX)
+    float maxLevel0 = MAX_DEPTH(MAX_DEPTH(p00.g, p01.g), MAX_DEPTH(p10.g, p11.g));
+#else
+    float maxLevel0 = 0.0f;
+#endif
     
-    if (data2.x)
+    if (data2.y == 1)
     {
         uint3 uv20 = uint3(min(srcPixelUV + uint2(2u, 0u), data1.zw), id.z);
-        float p20 = _MipSource[COORD_DEPTH(uv20)].r;
+        float2 p20 = MIPSOURCE(COORD_DEPTH(uv20));
         uint3 uv21 = uint3(min(srcPixelUV + uint2(2u, 1u), data1.zw), id.z);
-        float p21 = _MipSource[COORD_DEPTH(uv21)].r;
-        minLevel0 = MIN_DEPTH(MIN_DEPTH(p20, p21), minLevel0);
+        float2 p21 = MIPSOURCE(COORD_DEPTH(uv21));
+        minLevel0 = MIN_DEPTH(MIN_DEPTH(p20.r, p21.r), minLevel0);
+#if defined(MIN_AND_MAX)
+        maxLevel0 = MAX_DEPTH(MAX_DEPTH(p20.g, p21.g), maxLevel0);
+#endif
     }
 
-    if (data2.y)
+    if (data2.z == 1)
     {
         uint3 uv02 = uint3(min(srcPixelUV + uint2(0u, 2u), data1.zw), id.z);
-        float p02 = _MipSource[COORD_DEPTH(uv02)].r;
+        float2 p02 = MIPSOURCE(COORD_DEPTH(uv02));
         uint3 uv12 = uint3(min(srcPixelUV + uint2(1u, 2u), data1.zw), id.z);
-        float p12 = _MipSource[COORD_DEPTH(uv12)].r;
-        minLevel0 = MIN_DEPTH(MIN_DEPTH(p02, p12), minLevel0);
+        float2 p12 = MIPSOURCE(COORD_DEPTH(uv12));
+        minLevel0 = MIN_DEPTH(MIN_DEPTH(p02.r, p12.r), minLevel0);
+#if defined(MIN_AND_MAX)
+        maxLevel0 = MAX_DEPTH(MAX_DEPTH(p02.g, p12.g), maxLevel0);
+#endif
     }
 
-    if (data2.z)
+    if (data2.z == 1 && data2.y == 1)
     {
         uint3 uv22 = uint3(min(srcPixelUV + uint2(2u, 2u), data1.zw), id.z);
-        float p22 = _MipSource[COORD_DEPTH(uv22)].r;
-        minLevel0 = MIN_DEPTH(p22, minLevel0);
+        float2 p22 = MIPSOURCE(COORD_DEPTH(uv22));
+        minLevel0 = MIN_DEPTH(p22.r, minLevel0);
+#if defined(MIN_AND_MAX)
+        maxLevel0 = MAX_DEPTH(p22.g, maxLevel0);
+#endif
     }
 
-    _MipDest[COORD_DEPTH(id)] = minLevel0;
+    _MipDest[COORD_DEPTH(id)] = float4(minLevel0, maxLevel0, 0,0);
     //}
 }
