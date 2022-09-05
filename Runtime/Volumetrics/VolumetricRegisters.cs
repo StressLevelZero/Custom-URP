@@ -16,7 +16,11 @@ public class VolumetricRegisters
 
     public static void RegisterVolumetricArea(BakedVolumetricArea volumetricArea)
     {
+#if UNITY_EDITOR
+        if (volumetricArea.bakedTexture == null && Application.isPlaying) return; //quick check to make sure that this is valid
+#else
         if (volumetricArea.bakedTexture == null) return; //quick check to make sure that this is valid
+#endif
         volumetricAreas.Add(volumetricArea);
     }
     public static void UnregisterVolumetricArea(BakedVolumetricArea volumetricArea)

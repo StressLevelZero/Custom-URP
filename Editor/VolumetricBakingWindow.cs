@@ -27,7 +27,7 @@ public class VolumetricBaking : EditorWindow
     [Range(4, 128), Tooltip("Size of the render buckets.")]
     public int BucketSize = 32;
     public bool DXRAcceletration = true;
-    public bool SkyboxContribution = true;
+    public bool SkyboxContribution = false;
     public Cubemap CustomEnvorment;
     public int EnvLightSamples = 2048;
 
@@ -630,7 +630,7 @@ public class VolumetricBaking : EditorWindow
         //Black Background
         if (SkyboxContribution != true){
 
-            RenderTexture cubetex = new RenderTexture(1, 1, 1, RenderTextureFormat.DefaultHDR);
+            RenderTexture cubetex = new RenderTexture(32, 32, 1, RenderTextureFormat.DefaultHDR);
             cubetex.enableRandomWrite = true;
             cubetex.dimension = UnityEngine.Rendering.TextureDimension.Cube;
             cubetex.Create();
