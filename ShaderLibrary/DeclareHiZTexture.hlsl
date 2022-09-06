@@ -5,7 +5,7 @@
 TEXTURE2D_X_FLOAT(_CameraHiZDepthTexture);
 SAMPLER(sampler_CameraHiZDepthTexture);
 
-TEXTURE2D(_PrevHiZ0Texture);
+TEXTURE2D_X_FLOAT(_PrevHiZ0Texture);
 
 struct HiZDim
 {
