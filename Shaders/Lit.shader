@@ -10,7 +10,7 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
 
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
-        _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
+        _Smoothness("Smoothness", Range(0.0, 1.0)) = 1.0 //defaulting to 1 instead of 0.5 because applying a texture will keep the default value as a scaler 
         // _SmoothnessTextureChannel("Smoothness texture channel", Float) = 0 //Unneeded variant
 
         _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
@@ -25,7 +25,7 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
         _BumpScale("Scale", Float) = 1.0
         _BumpMap("Normal Map", 2D) = "bump" {}
 
-        // _Parallax("Scale", Range(0.005, 0.08)) = 0.005
+        // _Parallax("Scale", Range(0.005, 0.08)) = 0.005 //too heavy for quest
         // _ParallaxMap("Height Map", 2D) = "black" {}
 
         //_OcclusionStrength("Strength", Range(0.0, 1.0)) = 1.0 //Meh. Not really needed. Just fix your texture
@@ -58,6 +58,8 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
          [ToggleUI] _ReceiveShadows("Receive Shadows", Float) = 1.0
         // Editmode props
         _QueueOffset("Queue offset", Float) = 0.0
+        _OffsetUnits("OffsetUnits", Int) = 0.0
+		_OffsetFactor("OffsetFactor", Int) = 0.0
 
         // ObsoleteProperties
         [HideInInspector] _MainTex("BaseMap", 2D) = "white" {}
@@ -97,6 +99,7 @@ ENDHLSL
             Blend[_SrcBlend][_DstBlend]
             ZWrite[_ZWrite]
             Cull[_Cull]
+            Offset[_OffsetFactor] ,[_OffsetUnits]
 
             HLSLPROGRAM
             #pragma exclude_renderers gles gles3 glcore
