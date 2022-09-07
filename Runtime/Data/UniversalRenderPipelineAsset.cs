@@ -875,7 +875,7 @@ namespace UnityEngine.Rendering.Universal
         public float cascadeBorder
         {
             get { return m_CascadeBorder; }
-            set { cascadeBorder = value; }
+            set { m_CascadeBorder = value; }
         }
 
         /// <summary>
