@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime;
 using System.Runtime.InteropServices;
+using System.Linq;
 using System;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -26,10 +27,19 @@ namespace UnityEngine.Rendering.Universal
         private int HiZMipNumID = Shader.PropertyToID("_HiZHighestMip");
         private int HiZDimID = Shader.PropertyToID("_HiZDim");
         private int SSRConstantsID = Shader.PropertyToID("SSRConstants");
-       
+        private int CameraOpaqueTextureID = Shader.PropertyToID("_CameraOpaqueTexture");
+        private int PrevHiZ0TextureID = Shader.PropertyToID("_PrevHiZ0Texture");
+        public int opaqueTexID { get { return CameraOpaqueTextureID; } }
+        public int prevHiZTexID { get { return PrevHiZ0TextureID; } }
+
         public GlobalKeyword HiZEnabledKW { get; private set; }
         public GlobalKeyword HiZMinMaxKW { get; private set; }
         public GlobalKeyword SSREnabledKW { get; private set; }
+
+        private Dictionary<Camera, RenderTargetHandle> PerCameraOpaque;
+        private Dictionary<Camera, RenderTargetHandle> PerCameraPrevHiZ;
+        private uint PerCameraPrevHiZIter = 0;
+        private uint PerCameraOpaqueIter = 0;
 
         private ComputeBuffer SSRGlobalCB;
         private SLZGlobals()
@@ -42,6 +52,9 @@ namespace UnityEngine.Rendering.Universal
             SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
             HiZMinMaxKW = GlobalKeyword.Create("_HIZ_MIN_MAX_ENABLED");
+            PerCameraOpaque = new Dictionary<Camera, RenderTargetHandle>();
+            PerCameraPrevHiZ = new Dictionary<Camera, RenderTargetHandle>();
+            
         }
         public static SLZGlobals instance
         {
@@ -169,6 +182,119 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
+        public static void StaticRemoveTempRTsFromList(Camera cam)
+        {
+            CommandBuffer cmd = CommandBufferPool.Get();
+            SLZGlobals.instance.RemoveCameraFromOpaqueList(cmd, cam);
+            SLZGlobals.instance.RemoveCameraFromHiZ0List(cmd, cam);
+            Graphics.ExecuteCommandBuffer(cmd);
+            cmd.Release();
+        }
+
+        public void RemoveTempRTStupid()
+        {
+           
+            CommandBuffer cmd = CommandBufferPool.Get();
+            bool executeCmd = false;
+            List<Camera> RemoveListOpq = new List<Camera>();
+            foreach (var OpqPair in PerCameraOpaque)
+            {
+#if !UNITY_EDITOR
+                if (OpqPair.Key == null || OpqPair.Key.isActiveAndEnabled == false)
+#else
+                if (OpqPair.Key == null)
+#endif
+                {
+                    cmd.ReleaseTemporaryRT(OpqPair.Value.id);
+                    RemoveListOpq.Add(OpqPair.Key);
+                    executeCmd = true;
+                }
+            }
+            for (int i = 0; i < RemoveListOpq.Count; i++)
+            {
+                PerCameraOpaque.Remove(RemoveListOpq[i]);
+            }
+
+
+            List<Camera> RemoveListHiZ = new List<Camera>();
+            foreach (var HiZPair in PerCameraPrevHiZ)
+            {
+#if !UNITY_EDITOR
+                if (HiZPair.Key == null || HiZPair.Key.isActiveAndEnabled == false)
+#else
+                if (HiZPair.Key == null)
+#endif
+                {
+                    cmd.ReleaseTemporaryRT(HiZPair.Value.id);
+                    RemoveListHiZ.Add(HiZPair.Key);
+                    executeCmd = true;
+                }
+            }
+            for (int i = 0; i < RemoveListOpq.Count; i++)
+            {
+                PerCameraPrevHiZ.Remove(RemoveListHiZ[i]);
+            }
+
+
+            if (executeCmd)
+            {
+                Debug.Log("Cleaned Old Textures: " + PerCameraOpaque.Count + " " + PerCameraPrevHiZ.Count + " " + PerCameraPrevHiZIter);
+                Graphics.ExecuteCommandBuffer(cmd);
+            }
+            cmd.Release();
+        }
+        public void RemoveCameraFromOpaqueList(CommandBuffer cmd, Camera cam)
+        {
+            RenderTargetHandle handle;
+            if (PerCameraOpaque.TryGetValue(cam, out handle))
+            {
+                cmd.ReleaseTemporaryRT(handle.id);
+                PerCameraOpaque.Remove(cam);
+            }
+        }
+        public RenderTargetHandle GetCameraOpaque(Camera cam)
+        {
+            RenderTargetHandle handle;
+            if (PerCameraOpaque.TryGetValue(cam, out handle))
+            {
+                return handle;
+            }
+            else
+            {
+                handle = new RenderTargetHandle();
+                handle.Init("_CameraOpaqueTexture" + PerCameraOpaqueIter);
+                PerCameraOpaqueIter++;
+                PerCameraOpaque.Add(cam, handle);
+                return handle;
+            }
+        }
+
+        public void RemoveCameraFromHiZ0List(CommandBuffer cmd, Camera cam)
+        {
+            RenderTargetHandle handle;
+            if (PerCameraPrevHiZ.TryGetValue(cam, out handle))
+            {
+                cmd.ReleaseTemporaryRT(handle.id);
+                PerCameraPrevHiZ.Remove(cam);
+            }
+
+        }
+        public RenderTargetHandle GetCameraHiZ0(Camera cam)
+        {
+            RenderTargetHandle handle;
+            if (PerCameraPrevHiZ.TryGetValue(cam, out handle))
+            {
+                return handle;
+            }
+            else
+            {
+                handle = new RenderTargetHandle();
+                handle.Init("_PrevHiZ0Texture" + PerCameraPrevHiZIter);
+                PerCameraPrevHiZIter++;
+                PerCameraPrevHiZ.Add(cam, handle);
+                return handle;
+            }
+        }
         public static void Dispose()
         {
             if (s_Instance != null)
@@ -188,6 +314,25 @@ namespace UnityEngine.Rendering.Universal
                     s_Instance.HiZDimBuffer.Dispose();
                     s_Instance.HiZDimBuffer = null;
                 }
+                CommandBuffer cmd = CommandBufferPool.Get();
+                if (s_Instance.PerCameraOpaque != null)
+                {
+                    foreach ( RenderTargetHandle r in s_Instance.PerCameraOpaque.Values)
+                    {
+                        cmd.ReleaseTemporaryRT(r.id);
+                    }
+                }
+                if (s_Instance.PerCameraPrevHiZ != null)
+                {
+                    foreach (RenderTargetHandle r in s_Instance.PerCameraPrevHiZ.Values)
+                    {
+                        cmd.ReleaseTemporaryRT(r.id);
+                    }
+                }
+                Graphics.ExecuteCommandBuffer(cmd);
+                s_Instance.PerCameraOpaque = null;
+                s_Instance.PerCameraPrevHiZ = null;
+                cmd.Release();
             }
             s_Instance = null;
         }
@@ -205,6 +350,12 @@ namespace UnityEngine.Rendering.Universal
         private int ssrMinMip;
         private float cameraNear;
         private float cameraFar;
+        private RenderTargetHandle prevOpaque;
+        private RenderTargetHandle prevHiZ;
+        public SLZGlobalsSetPass(RenderPassEvent evt)
+        {
+            renderPassEvent = evt;
+        }
         public void Setup(CameraData camData)
         {
             enableSSR = camData.enableSSR;
@@ -216,6 +367,9 @@ namespace UnityEngine.Rendering.Universal
             ssrMinMip = camData.SSRMinMip;
             cameraNear = camData.camera.nearClipPlane;
             cameraFar = camData.camera.farClipPlane;
+
+            prevOpaque = SLZGlobals.instance.GetCameraOpaque(camData.camera);
+            prevHiZ = SLZGlobals.instance.GetCameraHiZ0(camData.camera);
         }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
@@ -231,6 +385,8 @@ namespace UnityEngine.Rendering.Universal
             cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
             cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
             cmd.SetKeyword(SLZGlobals.instance.HiZMinMaxKW, requireMinMax);
+            cmd.SetGlobalTexture(SLZGlobals.instance.opaqueTexID, prevOpaque.Identifier());
+            cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, prevHiZ.Identifier());
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }

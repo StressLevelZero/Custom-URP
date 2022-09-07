@@ -1,4 +1,4 @@
-
+using System.Collections.Generic;
 using System;
 
 namespace UnityEngine.Rendering.Universal.Internal
@@ -30,6 +30,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         private int downsampleKernelID;
         private int gaussianKernelID;
 
+      
         private RenderTargetIdentifier source { get; set; }
         private RenderTargetHandle destination { get; set; }
         private RenderTargetHandle tempBuffer { get; set; }

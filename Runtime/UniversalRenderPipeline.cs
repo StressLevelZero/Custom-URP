@@ -251,7 +251,7 @@ namespace UnityEngine.Rendering.Universal
                 if(m_GlobalSettings == null) return;
             }
 #endif
-
+            SLZGlobals.instance.RemoveTempRTStupid();
             SortCameras(cameras);
 #if UNITY_2021_1_OR_NEWER
             for (int i = 0; i < cameras.Count; ++i)
