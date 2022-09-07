@@ -18,7 +18,7 @@ namespace UnityEngine.Rendering.Universal
     {
         public RenderTexture renderTexture;
 
-        public RenderTexture GetRenderTexture(RenderTextureDescriptor desc)
+        public RenderTexture GetRenderTexture(RenderTextureDescriptor desc, string name = "", string name2 = "")
         {
 
             if (renderTexture != null)
@@ -35,9 +35,10 @@ namespace UnityEngine.Rendering.Universal
                     clearRT();
                 }
             }
+
             //Debug.Log("New RenderTexture?");
             renderTexture = new RenderTexture(desc);
-            renderTexture.name = "PersistentRT";
+            renderTexture.name = string.Format("PersistentRT {0} {1}", name, name2);
 
             return renderTexture;
         }

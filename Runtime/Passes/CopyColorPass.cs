@@ -114,7 +114,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
             if (useRT)
             {
-                permanentDest.GetRenderTexture(descriptor);
+                permanentDest.GetRenderTexture(descriptor, renderingData.cameraData.camera.name, "Opaque");
             }
             else
             {

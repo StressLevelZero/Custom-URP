@@ -401,7 +401,7 @@ namespace UnityEngine.Rendering.Universal
 
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
-            m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
+           
             //m_OpaqueColor = SLZGlobals.instance.GetCameraOpaque(camera);
 
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
@@ -808,6 +808,7 @@ namespace UnityEngine.Rendering.Universal
             {
                 //m_SetHiZ0GlobalPass.Setup(m_PrevHiZ0Texture.Identifier(), m_PrevHiZ0Texture.id);
                 //EnqueuePass(m_SetHiZ0GlobalPass);
+                m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
                 m_CopyHiZ0Pass.Setup(m_DepthHiZTexture.Identifier(), m_PrevHiZ0Texture);
                 EnqueuePass(m_CopyHiZ0Pass);
             }

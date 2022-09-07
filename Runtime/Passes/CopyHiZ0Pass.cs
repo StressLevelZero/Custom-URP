@@ -100,7 +100,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             descriptor.autoGenerateMips = false;
             descriptor.sRGB = false;
             descriptor.enableRandomWrite = false;
-            destination.GetRenderTexture(descriptor);
+            destination.GetRenderTexture(descriptor, renderingData.cameraData.camera.name, "PrevHiZ");
             //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
         }
 
