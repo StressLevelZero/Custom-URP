@@ -66,6 +66,10 @@ namespace UnityEngine.Rendering.Universal
     }
     public class SLZFoveatedRenderingEnable : ScriptableRenderPass
     {     
+        public SLZFoveatedRenderingEnable(RenderPassEvent evt)
+        {
+            renderPassEvent = evt;
+        }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             if (SLZVRSManager.Instance.hasIntialized)
@@ -86,6 +90,10 @@ namespace UnityEngine.Rendering.Universal
     }
     public class SLZFoveatedRenderingDisable : ScriptableRenderPass
     {
+        public SLZFoveatedRenderingDisable(RenderPassEvent evt)
+        {
+            renderPassEvent = evt;
+        }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             CommandBuffer cmd = CommandBufferPool.Get();

@@ -128,10 +128,10 @@ namespace UnityEngine.Rendering.Universal
             //Debug.Log("Count: " + perCameraRTHandle.Count);
             foreach (var cam in perCameraRTHandle)
             {
-#if !UNITY_EDITOR
-                if (OpqPair.Key == null || OpqPair.Key.isActiveAndEnabled == false)
-#else
+#if UNITY_EDITOR
                 if (cam.Key == null)
+#else
+                if (cam.Key == null || cam.Key.isActiveAndEnabled == false)
 #endif
                 {
                     cam.Value.clearRT();
