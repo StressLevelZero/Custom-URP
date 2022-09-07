@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime;
 using System.Runtime.InteropServices;
+using System.Linq;
 using System;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -10,6 +11,61 @@ using UnityEditor;
 
 namespace UnityEngine.Rendering.Universal
 {
+    /*
+    public class RTPermanentHandle : IDisposable
+    {
+        public RenderTexture renderTexture;
+
+        public RenderTexture GetRenderTexture(RenderTextureDescriptor desc)
+        {
+
+            if (renderTexture != null)
+            {
+
+                if (desc.width == renderTexture.width &&
+                    desc.height == renderTexture.height &&
+                    desc.colorFormat == renderTexture.format)
+                {
+                    return renderTexture;
+                }
+                else
+                {
+                    clearRT();
+                }
+            }
+            renderTexture = new RenderTexture(desc);
+            return renderTexture;
+        }
+
+        public void Dispose()
+        {
+           
+                clearRT();
+            
+        }
+
+        public void clearRT()
+        {
+            if (renderTexture != null)
+            {
+                renderTexture.DiscardContents();
+                renderTexture.Release();
+#if UNITY_EDITOR
+                if (Application.isPlaying)
+                {
+                    Object.Destroy(renderTexture);
+                }
+                else
+                {
+                    Object.DestroyImmediate(renderTexture);
+                }
+#else
+                Object.Destroy(renderTexture);
+#endif
+            }
+        }
+    }
+    */
     public class SLZGlobals
     {
         static SLZGlobals s_Instance;
@@ -26,10 +82,19 @@ namespace UnityEngine.Rendering.Universal
         private int HiZMipNumID = Shader.PropertyToID("_HiZHighestMip");
         private int HiZDimID = Shader.PropertyToID("_HiZDim");
         private int SSRConstantsID = Shader.PropertyToID("SSRConstants");
-       
+        private int CameraOpaqueTextureID = Shader.PropertyToID("_CameraOpaqueTexture");
+        private int PrevHiZ0TextureID = Shader.PropertyToID("_PrevHiZ0Texture");
+        public int opaqueTexID { get { return CameraOpaqueTextureID; } }
+        public int prevHiZTexID { get { return PrevHiZ0TextureID; } }
+
         public GlobalKeyword HiZEnabledKW { get; private set; }
         public GlobalKeyword HiZMinMaxKW { get; private set; }
         public GlobalKeyword SSREnabledKW { get; private set; }
+
+        public SLZPerCameraRTStorage PerCameraOpaque;
+        public SLZPerCameraRTStorage PerCameraPrevHiZ;
+        private uint PerCameraPrevHiZIter = 0;
+        private uint PerCameraOpaqueIter = 0;
 
         private ComputeBuffer SSRGlobalCB;
         private SLZGlobals()
@@ -42,6 +107,9 @@ namespace UnityEngine.Rendering.Universal
             SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
             HiZMinMaxKW = GlobalKeyword.Create("_HIZ_MIN_MAX_ENABLED");
+            PerCameraOpaque = new SLZPerCameraRTStorage();
+            PerCameraPrevHiZ = new SLZPerCameraRTStorage();
+            
         }
         public static SLZGlobals instance
         {
@@ -169,6 +237,14 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
+      
+
+        public void RemoveTempRTStupid()
+        {
+            PerCameraOpaque.RemoveAllNull();
+            PerCameraPrevHiZ.RemoveAllNull();
+        }
+
         public static void Dispose()
         {
             if (s_Instance != null)
@@ -188,9 +264,20 @@ namespace UnityEngine.Rendering.Universal
                     s_Instance.HiZDimBuffer.Dispose();
                     s_Instance.HiZDimBuffer = null;
                 }
+               
+                if (s_Instance.PerCameraOpaque != null)
+                {
+                    s_Instance.PerCameraOpaque.Dispose();
+                }
+                if (s_Instance.PerCameraPrevHiZ != null)
+                {
+                    s_Instance.PerCameraPrevHiZ.Dispose();
+                }
+               
             }
             s_Instance = null;
         }
+
     }
 
 
@@ -205,6 +292,13 @@ namespace UnityEngine.Rendering.Universal
         private int ssrMinMip;
         private float cameraNear;
         private float cameraFar;
+        private Camera camera;
+        private RTPermanentHandle prevOpaque;
+        private RTPermanentHandle prevHiZ;
+        public SLZGlobalsSetPass(RenderPassEvent evt)
+        {
+            renderPassEvent = evt;
+        }
         public void Setup(CameraData camData)
         {
             enableSSR = camData.enableSSR;
@@ -216,21 +310,38 @@ namespace UnityEngine.Rendering.Universal
             ssrMinMip = camData.SSRMinMip;
             cameraNear = camData.camera.nearClipPlane;
             cameraFar = camData.camera.farClipPlane;
+
+            prevOpaque = SLZGlobals.instance.PerCameraOpaque.GetHandle(camData.camera);
+            prevHiZ = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camData.camera);
+
+            //Debug.Log("Setup for " + camData.camera.name);
         }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-            if (enableSSR)
-            {
-                // Hack to tell unity to store previous frame object to world vectors...
-                // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
-                renderingData.cameraData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
-            }
-
             CommandBuffer cmd = CommandBufferPool.Get();
-            //SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, ssrMinMip, ssrMaxSteps, ssrHitRadius, cameraNear, cameraFar);
-            cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
-            cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
-            cmd.SetKeyword(SLZGlobals.instance.HiZMinMaxKW, requireMinMax);
+            Camera cam = renderingData.cameraData.camera;
+            //cmd.SetGlobalTexture(SLZGlobals.instance.opaqueTexID, prevOpaque.Identifier());
+            //cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, Texture2D.whiteTexture);
+            //cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, prevHiZ.Identifier());
+            //Debug.Log("Execute for " + cam.name + " " + SLZGlobals.instance.opaqueTexID + " " + prevOpaque.Identifier());
+            using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.SetSLZGlobals)))
+            {
+                
+                if (enableSSR)
+                {
+                    // Hack to tell unity to store previous frame object to world vectors...
+                    // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
+                    renderingData.cameraData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
+                   
+                    cmd.SetGlobalTexture(SLZGlobals.instance.opaqueTexID, prevOpaque.renderTexture);
+                    cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, prevHiZ.renderTexture);
+                }
+
+                //SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, ssrMinMip, ssrMaxSteps, ssrHitRadius, cameraNear, cameraFar);
+                cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
+                cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
+                cmd.SetKeyword(SLZGlobals.instance.HiZMinMaxKW, requireMinMax);
+            }
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }

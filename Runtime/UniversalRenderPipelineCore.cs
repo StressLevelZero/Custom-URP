@@ -911,6 +911,7 @@ namespace UnityEngine.Rendering.Universal
         RenderCameraStack,
 
         // GPU
+        SetSLZGlobals,
         AdditionalLightsShadow,
         ColorGradingLUT,
         CopyColor,
@@ -921,7 +922,7 @@ namespace UnityEngine.Rendering.Universal
         // DrawObjectsPass
         DrawOpaqueObjects,
         DrawTransparentObjects,
-
+        StoreHiZ0,
         // RenderObjectsPass
         //RenderObjects,
 

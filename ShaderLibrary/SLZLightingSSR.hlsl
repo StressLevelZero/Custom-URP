@@ -185,6 +185,10 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 reflectionDir = reflect(-fragData.viewDir, fragData.normal);
     real3 SSR = real3(0, 0, 0);
     real SSRLerp = 0;
+
+    float oldVertDepth = ssrExtra.lastClipPos.z / ssrExtra.lastClipPos.w;
+    float ddzOld = GetDepthDerivativeSum(oldVertDepth);
+
     SLZImageBasedSpecularSSR(specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
     real horizOcclusion = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
     specular *= horizOcclusion;
@@ -192,11 +196,14 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     //SSRLerp *= saturate(dot(-fragData.viewDir, ))
     float2 oldScreenUV = SLZComputeNDCFromClip(ssrExtra.lastClipPos);
    
+    float oldDepth = LOAD_TEXTURE2D_X(_PrevHiZ0Texture, oldScreenUV.xy * _HiZDim.xy).r;
+    
+    bool isWithinDepthError = abs(oldDepth - oldVertDepth) < 2 * ddzOld + HALF_MIN;
     float4 volColor = GetVolumetricColor(fragData.position);
     float3 output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
-    UNITY_BRANCH if (SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
+    UNITY_BRANCH if (!isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
-        output += surfData.occlusion * SSR;
+        output += surfData.occlusion * SSR.rgb;
     }
     else
     {
