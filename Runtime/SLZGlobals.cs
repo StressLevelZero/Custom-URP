@@ -238,7 +238,7 @@ namespace UnityEngine.Rendering.Universal
 
             if (executeCmd)
             {
-                Debug.Log("Cleaned Old Textures: " + PerCameraOpaque.Count + " " + PerCameraPrevHiZ.Count + " " + PerCameraPrevHiZIter);
+                //Debug.Log("Cleaned Old Textures: " + PerCameraOpaque.Count + " " + PerCameraPrevHiZ.Count + " " + PerCameraPrevHiZIter);
                 Graphics.ExecuteCommandBuffer(cmd);
             }
             cmd.Release();
