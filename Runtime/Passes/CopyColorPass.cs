@@ -33,6 +33,8 @@ namespace UnityEngine.Rendering.Universal.Internal
       
         private RenderTargetIdentifier source { get; set; }
         private RenderTargetHandle destination { get; set; }
+        private RTPermanentHandle permanentDest { get; set; }
+        private bool useRT;
         private RenderTargetHandle tempBuffer { get; set; }
         private RenderTextureDescriptor tempDescriptor;
 
@@ -52,8 +54,10 @@ namespace UnityEngine.Rendering.Universal.Internal
             gaussianKernelID = m_ColorPyramidCompute.FindKernel("KColorGaussian");
             m_DownsamplingMethod = Downsampling.None;
             m_MipLevels = 1;
+            
             base.useNativeRenderPass = false;
         }
+
 
         /// <summary>
         /// Configure the pass with the source and destination to execute on.
@@ -66,10 +70,21 @@ namespace UnityEngine.Rendering.Universal.Internal
             this.destination = destination;
             m_DownsamplingMethod = downsampling;
             m_RequiresMips = RequiresMips;
+            useRT = false;
+        }
+
+        public void Setup(RenderTargetIdentifier source, RTPermanentHandle destination, Downsampling downsampling, bool RequiresMips)
+        {
+            this.source = source;
+            this.permanentDest = destination;
+            m_DownsamplingMethod = downsampling;
+            m_RequiresMips = RequiresMips;
+            useRT = true;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
+
             RenderTextureDescriptor descriptor = renderingData.cameraData.cameraTargetDescriptor;
             descriptor.msaaSamples = 1;
             descriptor.depthBufferBits = 0;
@@ -96,7 +111,17 @@ namespace UnityEngine.Rendering.Universal.Internal
                 descriptor.mipCount = m_MipLevels;
             }
             m_Size = new int[4] { descriptor.width, descriptor.height, 0, 0 };
-            cmd.GetTemporaryRT(destination.id, descriptor, m_RequiresMips == true ? FilterMode.Trilinear : FilterMode.Bilinear);
+
+            if (useRT)
+            {
+                permanentDest.GetRenderTexture(descriptor);
+            }
+            else
+            {
+                cmd.GetTemporaryRT(destination.id, descriptor, m_RequiresMips == true ? FilterMode.Trilinear : FilterMode.Bilinear);
+                //cmd.SetGlobalTexture(SLZGlobals.instance.opaqueTexID, destination.Identifier());
+            }
+
             //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Bilinear,);
             if (m_RequiresMips)
             {
@@ -124,14 +149,20 @@ namespace UnityEngine.Rendering.Universal.Internal
             {
                 source = renderingData.cameraData.renderer.cameraColorTarget;
             }
-
+            RenderTargetIdentifier opaqueColorRT;
+            if (useRT)
+            {
+                opaqueColorRT = new RenderTargetIdentifier(permanentDest.renderTexture);
+            }
+            else
+            {
+                opaqueColorRT = destination.Identifier();
+            }
             using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.CopyColor)))
             {
-                RenderTargetIdentifier opaqueColorRT = destination.Identifier();
-
+    
                 ScriptableRenderer.SetRenderTarget(cmd, opaqueColorRT, BuiltinRenderTextureType.CameraTarget, clearFlag,
-                    clearColor);
-
+                       clearColor);
                 bool useDrawProceduleBlit = renderingData.cameraData.xr.enabled;
                 switch (m_DownsamplingMethod)
                 {
@@ -168,12 +199,13 @@ namespace UnityEngine.Rendering.Universal.Internal
                 tempBuffer = new RenderTargetHandle();
                 cmd.GetTemporaryRT(tempBuffer.id, tempDescriptor, FilterMode.Bilinear);
                 cmd.SetComputeIntParams(m_ColorPyramidCompute, sizeID, mipSize);
+
                 cmd.SetComputeTextureParam(m_ColorPyramidCompute, downsampleKernelID, destinationID, tempBuffer.Identifier(), 0);
                 cmd.SetComputeTextureParam(m_ColorPyramidCompute, gaussianKernelID, sourceID, tempBuffer.Identifier(), 0);
                 for (int i = 1; i < m_MipLevels; i++)
                 {
                    
-                    cmd.SetComputeTextureParam(m_ColorPyramidCompute, downsampleKernelID, sourceID, destination.Identifier(), i - 1);
+                    cmd.SetComputeTextureParam(m_ColorPyramidCompute, downsampleKernelID, sourceID, opaqueColorRT, i - 1);
                     
                     mipSize[0] = Mathf.Max(mipSize[0] >> 1, 1);
                     mipSize[1] = Mathf.Max(mipSize[1] >> 1, 1);
@@ -182,7 +214,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                     
                     cmd.SetComputeIntParams(m_ColorPyramidCompute, sizeID, mipSize);
                     
-                    cmd.SetComputeTextureParam(m_ColorPyramidCompute, gaussianKernelID, destinationID, destination.Identifier(), i);
+                    cmd.SetComputeTextureParam(m_ColorPyramidCompute, gaussianKernelID, destinationID, opaqueColorRT, i);
                     cmd.DispatchCompute(m_ColorPyramidCompute, gaussianKernelID, Mathf.CeilToInt((float)mipSize[0] / 8.0f + 0.0001f),
                                                                                  Mathf.CeilToInt((float)mipSize[1] / 8.0f + 0.0001f), slices);
                     

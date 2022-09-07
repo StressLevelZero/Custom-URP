@@ -105,7 +105,7 @@ namespace UnityEngine.Rendering.Universal
         RenderTargetHandle m_DepthTexture;
         RenderTargetHandle m_NormalsTexture;
         RenderTargetHandle m_DepthHiZTexture;
-        RenderTargetHandle m_PrevHiZ0Texture;
+        RTPermanentHandle m_PrevHiZ0Texture;
     
         RenderTargetHandle m_OpaqueColor;
         // For tiled-deferred shading.
@@ -265,7 +265,7 @@ namespace UnityEngine.Rendering.Universal
             m_RenderOpaqueForwardPass = new DrawObjectsPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
 
             //m_FoveatedOn = new SLZFoveatedRenderingEnable();
-            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingPrePasses - 10);
+            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques-1);
             //m_FoveatedOff = new SLZFoveatedRenderingDisable();
             m_CopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRenderingSkybox, m_CopyDepthMaterial);
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
@@ -297,7 +297,7 @@ namespace UnityEngine.Rendering.Universal
             m_NormalsTexture.Init("_CameraNormalsTexture");
             m_DepthHiZTexture.Init("_CameraHiZDepthTexture");
             //m_PrevHiZ0Texture.Init("_PrevHiZ0Texture");
-            //m_OpaqueColor.Init("_CameraOpaqueTexture");
+            m_OpaqueColor.Init("_CameraOpaqueTexture");
             m_DepthInfoTexture.Init("_DepthInfoTexture");
             m_TileDepthInfoTexture.Init("_TileDepthInfoTexture");
 
@@ -401,8 +401,8 @@ namespace UnityEngine.Rendering.Universal
 
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
-            m_PrevHiZ0Texture = SLZGlobals.instance.GetCameraHiZ0(camera);
-            m_OpaqueColor = SLZGlobals.instance.GetCameraOpaque(camera);
+            m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
+            //m_OpaqueColor = SLZGlobals.instance.GetCameraOpaque(camera);
 
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
 
@@ -792,8 +792,15 @@ namespace UnityEngine.Rendering.Universal
                 // TODO: Downsampling method should be store in the renderer instead of in the asset.
                 // We need to migrate this data to renderer. For now, we query the method in the active asset.
                 Downsampling downsamplingMethod = UniversalRenderPipeline.asset.opaqueDownsampling;
-                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod, cameraData.requiresDepthPyramid);
-                
+                if (cameraData.enableSSR)
+                {
+                    RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
+                    m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), opaqueHandle, downsamplingMethod, cameraData.requiresDepthPyramid);
+                }
+                else
+                {
+                    m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod, cameraData.requiresDepthPyramid);
+                }
                 EnqueuePass(m_CopyColorPass);
             }
 

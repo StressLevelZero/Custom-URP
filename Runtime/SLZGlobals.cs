@@ -11,6 +11,61 @@ using UnityEditor;
 
 namespace UnityEngine.Rendering.Universal
 {
+    /*
+    public class RTPermanentHandle : IDisposable
+    {
+        public RenderTexture renderTexture;
+
+        public RenderTexture GetRenderTexture(RenderTextureDescriptor desc)
+        {
+
+            if (renderTexture != null)
+            {
+
+                if (desc.width == renderTexture.width &&
+                    desc.height == renderTexture.height &&
+                    desc.colorFormat == renderTexture.format)
+                {
+                    return renderTexture;
+                }
+                else
+                {
+                    clearRT();
+                }
+            }
+            renderTexture = new RenderTexture(desc);
+            return renderTexture;
+        }
+
+        public void Dispose()
+        {
+           
+                clearRT();
+            
+        }
+
+        public void clearRT()
+        {
+            if (renderTexture != null)
+            {
+                renderTexture.DiscardContents();
+                renderTexture.Release();
+#if UNITY_EDITOR
+                if (Application.isPlaying)
+                {
+                    Object.Destroy(renderTexture);
+                }
+                else
+                {
+                    Object.DestroyImmediate(renderTexture);
+                }
+#else
+                Object.Destroy(renderTexture);
+#endif
+            }
+        }
+    }
+    */
     public class SLZGlobals
     {
         static SLZGlobals s_Instance;
@@ -36,8 +91,8 @@ namespace UnityEngine.Rendering.Universal
         public GlobalKeyword HiZMinMaxKW { get; private set; }
         public GlobalKeyword SSREnabledKW { get; private set; }
 
-        private Dictionary<Camera, RenderTargetHandle> PerCameraOpaque;
-        private Dictionary<Camera, RenderTargetHandle> PerCameraPrevHiZ;
+        public SLZPerCameraRTStorage PerCameraOpaque;
+        public SLZPerCameraRTStorage PerCameraPrevHiZ;
         private uint PerCameraPrevHiZIter = 0;
         private uint PerCameraOpaqueIter = 0;
 
@@ -52,8 +107,8 @@ namespace UnityEngine.Rendering.Universal
             SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
             HiZMinMaxKW = GlobalKeyword.Create("_HIZ_MIN_MAX_ENABLED");
-            PerCameraOpaque = new Dictionary<Camera, RenderTargetHandle>();
-            PerCameraPrevHiZ = new Dictionary<Camera, RenderTargetHandle>();
+            PerCameraOpaque = new SLZPerCameraRTStorage();
+            PerCameraPrevHiZ = new SLZPerCameraRTStorage();
             
         }
         public static SLZGlobals instance
@@ -182,119 +237,14 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
-        public static void StaticRemoveTempRTsFromList(Camera cam)
-        {
-            CommandBuffer cmd = CommandBufferPool.Get();
-            SLZGlobals.instance.RemoveCameraFromOpaqueList(cmd, cam);
-            SLZGlobals.instance.RemoveCameraFromHiZ0List(cmd, cam);
-            Graphics.ExecuteCommandBuffer(cmd);
-            cmd.Release();
-        }
+      
 
         public void RemoveTempRTStupid()
         {
-           
-            CommandBuffer cmd = CommandBufferPool.Get();
-            bool executeCmd = false;
-            List<Camera> RemoveListOpq = new List<Camera>();
-            foreach (var OpqPair in PerCameraOpaque)
-            {
-#if !UNITY_EDITOR
-                if (OpqPair.Key == null || OpqPair.Key.isActiveAndEnabled == false)
-#else
-                if (OpqPair.Key == null)
-#endif
-                {
-                    cmd.ReleaseTemporaryRT(OpqPair.Value.id);
-                    RemoveListOpq.Add(OpqPair.Key);
-                    executeCmd = true;
-                }
-            }
-            for (int i = 0; i < RemoveListOpq.Count; i++)
-            {
-                PerCameraOpaque.Remove(RemoveListOpq[i]);
-            }
-
-
-            List<Camera> RemoveListHiZ = new List<Camera>();
-            foreach (var HiZPair in PerCameraPrevHiZ)
-            {
-#if !UNITY_EDITOR
-                if (HiZPair.Key == null || HiZPair.Key.isActiveAndEnabled == false)
-#else
-                if (HiZPair.Key == null)
-#endif
-                {
-                    cmd.ReleaseTemporaryRT(HiZPair.Value.id);
-                    RemoveListHiZ.Add(HiZPair.Key);
-                    executeCmd = true;
-                }
-            }
-            for (int i = 0; i < RemoveListOpq.Count; i++)
-            {
-                PerCameraPrevHiZ.Remove(RemoveListHiZ[i]);
-            }
-
-
-            if (executeCmd)
-            {
-                //Debug.Log("Cleaned Old Textures: " + PerCameraOpaque.Count + " " + PerCameraPrevHiZ.Count + " " + PerCameraPrevHiZIter);
-                Graphics.ExecuteCommandBuffer(cmd);
-            }
-            cmd.Release();
-        }
-        public void RemoveCameraFromOpaqueList(CommandBuffer cmd, Camera cam)
-        {
-            RenderTargetHandle handle;
-            if (PerCameraOpaque.TryGetValue(cam, out handle))
-            {
-                cmd.ReleaseTemporaryRT(handle.id);
-                PerCameraOpaque.Remove(cam);
-            }
-        }
-        public RenderTargetHandle GetCameraOpaque(Camera cam)
-        {
-            RenderTargetHandle handle;
-            if (PerCameraOpaque.TryGetValue(cam, out handle))
-            {
-                return handle;
-            }
-            else
-            {
-                handle = new RenderTargetHandle();
-                handle.Init("_CameraOpaqueTexture" + PerCameraOpaqueIter);
-                PerCameraOpaqueIter++;
-                PerCameraOpaque.Add(cam, handle);
-                return handle;
-            }
+            PerCameraOpaque.RemoveAllNull();
+            PerCameraPrevHiZ.RemoveAllNull();
         }
 
-        public void RemoveCameraFromHiZ0List(CommandBuffer cmd, Camera cam)
-        {
-            RenderTargetHandle handle;
-            if (PerCameraPrevHiZ.TryGetValue(cam, out handle))
-            {
-                cmd.ReleaseTemporaryRT(handle.id);
-                PerCameraPrevHiZ.Remove(cam);
-            }
-
-        }
-        public RenderTargetHandle GetCameraHiZ0(Camera cam)
-        {
-            RenderTargetHandle handle;
-            if (PerCameraPrevHiZ.TryGetValue(cam, out handle))
-            {
-                return handle;
-            }
-            else
-            {
-                handle = new RenderTargetHandle();
-                handle.Init("_PrevHiZ0Texture" + PerCameraPrevHiZIter);
-                PerCameraPrevHiZIter++;
-                PerCameraPrevHiZ.Add(cam, handle);
-                return handle;
-            }
-        }
         public static void Dispose()
         {
             if (s_Instance != null)
@@ -314,28 +264,20 @@ namespace UnityEngine.Rendering.Universal
                     s_Instance.HiZDimBuffer.Dispose();
                     s_Instance.HiZDimBuffer = null;
                 }
-                CommandBuffer cmd = CommandBufferPool.Get();
+               
                 if (s_Instance.PerCameraOpaque != null)
                 {
-                    foreach ( RenderTargetHandle r in s_Instance.PerCameraOpaque.Values)
-                    {
-                        cmd.ReleaseTemporaryRT(r.id);
-                    }
+                    s_Instance.PerCameraOpaque.Dispose();
                 }
                 if (s_Instance.PerCameraPrevHiZ != null)
                 {
-                    foreach (RenderTargetHandle r in s_Instance.PerCameraPrevHiZ.Values)
-                    {
-                        cmd.ReleaseTemporaryRT(r.id);
-                    }
+                    s_Instance.PerCameraPrevHiZ.Dispose();
                 }
-                Graphics.ExecuteCommandBuffer(cmd);
-                s_Instance.PerCameraOpaque = null;
-                s_Instance.PerCameraPrevHiZ = null;
-                cmd.Release();
+               
             }
             s_Instance = null;
         }
+
     }
 
 
@@ -350,8 +292,9 @@ namespace UnityEngine.Rendering.Universal
         private int ssrMinMip;
         private float cameraNear;
         private float cameraFar;
-        private RenderTargetHandle prevOpaque;
-        private RenderTargetHandle prevHiZ;
+        private Camera camera;
+        private RTPermanentHandle prevOpaque;
+        private RTPermanentHandle prevHiZ;
         public SLZGlobalsSetPass(RenderPassEvent evt)
         {
             renderPassEvent = evt;
@@ -368,25 +311,37 @@ namespace UnityEngine.Rendering.Universal
             cameraNear = camData.camera.nearClipPlane;
             cameraFar = camData.camera.farClipPlane;
 
-            prevOpaque = SLZGlobals.instance.GetCameraOpaque(camData.camera);
-            prevHiZ = SLZGlobals.instance.GetCameraHiZ0(camData.camera);
+            prevOpaque = SLZGlobals.instance.PerCameraOpaque.GetHandle(camData.camera);
+            prevHiZ = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camData.camera);
+
+            //Debug.Log("Setup for " + camData.camera.name);
         }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-            if (enableSSR)
-            {
-                // Hack to tell unity to store previous frame object to world vectors...
-                // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
-                renderingData.cameraData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
-            }
-
             CommandBuffer cmd = CommandBufferPool.Get();
-            //SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, ssrMinMip, ssrMaxSteps, ssrHitRadius, cameraNear, cameraFar);
-            cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
-            cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
-            cmd.SetKeyword(SLZGlobals.instance.HiZMinMaxKW, requireMinMax);
-            cmd.SetGlobalTexture(SLZGlobals.instance.opaqueTexID, prevOpaque.Identifier());
-            cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, prevHiZ.Identifier());
+            Camera cam = renderingData.cameraData.camera;
+            //cmd.SetGlobalTexture(SLZGlobals.instance.opaqueTexID, prevOpaque.Identifier());
+            //cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, Texture2D.whiteTexture);
+            //cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, prevHiZ.Identifier());
+            //Debug.Log("Execute for " + cam.name + " " + SLZGlobals.instance.opaqueTexID + " " + prevOpaque.Identifier());
+            using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.SetSLZGlobals)))
+            {
+                
+                if (enableSSR)
+                {
+                    // Hack to tell unity to store previous frame object to world vectors...
+                    // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
+                    renderingData.cameraData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
+                   
+                    cmd.SetGlobalTexture(SLZGlobals.instance.opaqueTexID, prevOpaque.renderTexture);
+                    cmd.SetGlobalTexture(SLZGlobals.instance.prevHiZTexID, prevHiZ.renderTexture);
+                }
+
+                //SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, ssrMinMip, ssrMaxSteps, ssrHitRadius, cameraNear, cameraFar);
+                cmd.SetKeyword(SLZGlobals.instance.SSREnabledKW, enableSSR);
+                cmd.SetKeyword(SLZGlobals.instance.HiZEnabledKW, requireHiZ);
+                cmd.SetKeyword(SLZGlobals.instance.HiZMinMaxKW, requireMinMax);
+            }
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }

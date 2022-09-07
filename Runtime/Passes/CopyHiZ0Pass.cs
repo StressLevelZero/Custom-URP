@@ -54,7 +54,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         private int gaussianKernelID;
 
         private RenderTargetIdentifier source { get; set; }
-        private RenderTargetHandle destination { get; set; }
+        private RTPermanentHandle destination { get; set; }
         private RenderTargetHandle tempBuffer { get; set; }
         private RenderTextureDescriptor tempDescriptor;
 
@@ -78,7 +78,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// </summary>
         /// <param name="source">Source Render Target</param>
         /// <param name="destination">Destination Render Target</param>
-        public void Setup(RenderTargetIdentifier source, RenderTargetHandle destination)
+        public void Setup(RenderTargetIdentifier source, RTPermanentHandle destination)
         {
             this.source = source;
             this.destination = destination;
@@ -88,6 +88,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
+            
             bool requiresMinMax = renderingData.cameraData.requiresMinMaxDepthPyr;
             var descriptor = renderingData.cameraData.cameraTargetDescriptor;
             descriptor.colorFormat = requiresMinMax ? RenderTextureFormat.RGHalf : RenderTextureFormat.RHalf;
@@ -99,9 +100,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             descriptor.autoGenerateMips = false;
             descriptor.sRGB = false;
             descriptor.enableRandomWrite = false;
-
-            m_Size = new int[4] { descriptor.width, descriptor.height, 0, 0 };
-            cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
+            destination.GetRenderTexture(descriptor);
+            //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
         }
 
         /// <inheritdoc/>
@@ -117,13 +117,13 @@ namespace UnityEngine.Rendering.Universal.Internal
 
             using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.StoreHiZ0)))
             {
-                RenderTargetIdentifier oldHiZRT = destination.Identifier();
+                //RenderTargetIdentifier oldHiZRT = destination.Identifier();
 
-                ScriptableRenderer.SetRenderTarget(cmd, oldHiZRT, BuiltinRenderTextureType.CameraTarget, clearFlag,
+                ScriptableRenderer.SetRenderTarget(cmd, destination.renderTexture, BuiltinRenderTextureType.CameraTarget, clearFlag,
                     clearColor);
 
                 bool useDrawProceduleBlit = renderingData.cameraData.xr.enabled;
-                RenderingUtils.Blit(cmd, source, oldHiZRT, m_CopyColorMaterial, 0, useDrawProceduleBlit);
+                RenderingUtils.Blit(cmd, source, destination.renderTexture, m_CopyColorMaterial, 0, useDrawProceduleBlit);
             }
             // In shader, we need to know how many mip levels to 1x1 and not actually how many mips there are, so re-add mipTruncation to the true number of mips
             context.ExecuteCommandBuffer(cmd);
@@ -136,11 +136,11 @@ namespace UnityEngine.Rendering.Universal.Internal
             if (cmd == null)
                 throw new ArgumentNullException("cmd");
 
-            if (destination != RenderTargetHandle.CameraTarget)
-            {
-                cmd.ReleaseTemporaryRT(destination.id);
-                destination = RenderTargetHandle.CameraTarget;
-            }
+            //if (destination != RenderTargetHandle.CameraTarget)
+            //{
+            //    cmd.ReleaseTemporaryRT(destination.id);
+            //    destination = RenderTargetHandle.CameraTarget;
+            //}
         }
     }
 }
