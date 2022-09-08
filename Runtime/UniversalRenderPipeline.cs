@@ -757,6 +757,7 @@ namespace UnityEngine.Rendering.Universal
             cameraData.maxSSRSteps = asset.maxSsrSteps;
             cameraData.SSRMinMip = asset.ssrMinMip;
             cameraData.SSRHitRadius = asset.ssrHitRadius;
+            cameraData.SSRTemporalWeight = asset.ssrTemporalWeight;
             // end SLZ additons
 
             cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, cameraData.renderScale,

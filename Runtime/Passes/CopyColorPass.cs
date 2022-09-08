@@ -160,7 +160,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.CopyColor)))
             {
-    
+                
                 ScriptableRenderer.SetRenderTarget(cmd, opaqueColorRT, BuiltinRenderTextureType.CameraTarget, clearFlag,
                        clearColor);
                 bool useDrawProceduleBlit = renderingData.cameraData.xr.enabled;

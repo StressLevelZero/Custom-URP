@@ -37,9 +37,10 @@ namespace UnityEditor.Rendering.Universal
             public static GUIContent SSRSteps = EditorGUIUtility.TrTextContent("Max SSR Steps", "Sets the maximum number of iterations in the SSR marcher");
             public static GUIContent SSRHitRadius = EditorGUIUtility.TrTextContent("SSR Hit Radius", "Sets the fraction of the ray step length within which it will detect an intersection");
             public static GUIContent SSRMinMip = EditorGUIUtility.TrTextContent("SSR Lowest Mip", "Sets the lowest mip level in the depth pyramid SSR rays will test against to find a hit. Increasing this value will make the SSR more pixelated, and hopefully take less iterations to find a hit");
+            public static GUIContent SSRTemporalWeight = EditorGUIUtility.TrTextContent("SSR Temporal Weight", "Sets the factor to lerp between the SSR color calculated by the fragment with the ssr color read at the fragments position last frame");
 
             // End SLZ Additions
-
+            
 
             // Quality
             public static GUIContent hdrText = EditorGUIUtility.TrTextContent("HDR", "Controls the global HDR settings.");

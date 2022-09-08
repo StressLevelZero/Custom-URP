@@ -11,61 +11,6 @@ using UnityEditor;
 
 namespace UnityEngine.Rendering.Universal
 {
-    /*
-    public class RTPermanentHandle : IDisposable
-    {
-        public RenderTexture renderTexture;
-
-        public RenderTexture GetRenderTexture(RenderTextureDescriptor desc)
-        {
-
-            if (renderTexture != null)
-            {
-
-                if (desc.width == renderTexture.width &&
-                    desc.height == renderTexture.height &&
-                    desc.colorFormat == renderTexture.format)
-                {
-                    return renderTexture;
-                }
-                else
-                {
-                    clearRT();
-                }
-            }
-            renderTexture = new RenderTexture(desc);
-            return renderTexture;
-        }
-
-        public void Dispose()
-        {
-           
-                clearRT();
-            
-        }
-
-        public void clearRT()
-        {
-            if (renderTexture != null)
-            {
-                renderTexture.DiscardContents();
-                renderTexture.Release();
-#if UNITY_EDITOR
-                if (Application.isPlaying)
-                {
-                    Object.Destroy(renderTexture);
-                }
-                else
-                {
-                    Object.DestroyImmediate(renderTexture);
-                }
-#else
-                Object.Destroy(renderTexture);
-#endif
-            }
-        }
-    }
-    */
     public class SLZGlobals
     {
         static SLZGlobals s_Instance;
@@ -140,7 +85,7 @@ namespace UnityEngine.Rendering.Universal
             //Shader.SetKeyword(HiZMinMaxKW, minmax);
         }
 
-        public void SetSSRGlobals(int maxSteps, int minMip, float hitRadius, float cameraNear, float cameraFar)
+        public void SetSSRGlobals(int maxSteps, int minMip, float hitRadius, float temporalWeight)
         {
             /*
              * 0 float _SSRHitRadius;
@@ -151,7 +96,7 @@ namespace UnityEngine.Rendering.Universal
             float[] SSRGlobalArray = new float[4];
             //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
             SSRGlobalArray[0] = hitRadius;
-            SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
+            SSRGlobalArray[1] = temporalWeight; //-cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
             SSRGlobalArray[2] = maxSteps;
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
             SSRGlobalCB.SetData(SSRGlobalArray);

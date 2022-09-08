@@ -10,6 +10,7 @@ CBUFFER_END
 
 #define _SSRHitRadius _SSRVariables.x
 #define _SSRHitScale _SSRVariables.x
+#define _SSRTemporalWeight _SSRVariables.y
 #define _SSRHitBias _SSRVariables.y
 #define _SSRSteps _SSRVariables.z
 #define _SSRMinMip asint(_SSRVariables.w)

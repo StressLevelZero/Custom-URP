@@ -228,7 +228,7 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] bool m_SupportsDynamicBatching = false;
         [SerializeField] bool m_MixedLightingSupported = true;
         [SerializeField] bool m_SupportsLightLayers = false;
-        [SerializeField] [Obsolete] PipelineDebugLevel m_DebugLevel;
+        [SerializeField][Obsolete] PipelineDebugLevel m_DebugLevel;
 
         // Adaptive performance settings
         [SerializeField] bool m_UseAdaptivePerformance = true;
@@ -255,6 +255,7 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] int m_MaxSsrSteps = 35;
         [SerializeField] int m_SsrMinMip = 0;
         [SerializeField] float m_SsrHitRadius = 0.05f;
+        [SerializeField] float m_SsrTemporalWeight = 0.5f;
 
         // Note: A lut size of 16^3 is barely usable with the HDR grading mode. 32 should be the
         // minimum, the lut being encoded in log. Lower sizes would work better with an additional
@@ -331,19 +332,19 @@ namespace UnityEngine.Rendering.Universal
             {
                 case RendererType.UniversalRenderer:
                 default:
-                {
-                    var rendererData = CreateInstance<UniversalRendererData>();
-                    rendererData.postProcessData = PostProcessData.GetDefaultPostProcessData();
-                    return rendererData;
-                }
+                    {
+                        var rendererData = CreateInstance<UniversalRendererData>();
+                        rendererData.postProcessData = PostProcessData.GetDefaultPostProcessData();
+                        return rendererData;
+                    }
                 // 2D renderer is experimental
                 case RendererType._2DRenderer:
-                {
-                    var rendererData = CreateInstance<Renderer2DData>();
-                    rendererData.postProcessData = PostProcessData.GetDefaultPostProcessData();
-                    return rendererData;
-                    // Universal Renderer is the fallback renderer that works on all platforms
-                }
+                    {
+                        var rendererData = CreateInstance<Renderer2DData>();
+                        rendererData.postProcessData = PostProcessData.GetDefaultPostProcessData();
+                        return rendererData;
+                        // Universal Renderer is the fallback renderer that works on all platforms
+                    }
             }
         }
 
@@ -1021,6 +1022,12 @@ namespace UnityEngine.Rendering.Universal
         {
             get { return m_SsrHitRadius; }
             set { m_SsrHitRadius = value; }
+        }
+
+        public float ssrTemporalWeight
+        {
+            get { return m_SsrTemporalWeight; }
+            set {m_SsrTemporalWeight = value; }
         }
 
         /// End SLZ Additions

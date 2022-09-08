@@ -71,10 +71,7 @@ namespace UnityEngine.Rendering.Universal
         TileDepthRangePass m_TileDepthRangeExtraPass; // TODO use subpass API to hide this pass
         DeferredPass m_DeferredPass;
         DrawObjectsPass m_RenderOpaqueForwardOnlyPass;
-#if PLATFORM_STANDALONE && FALSE
-        SLZFoveatedRenderingEnable m_FoveatedOn;
-        SLZFoveatedRenderingDisable m_FoveatedOff;
-#endif
+
         SLZGlobalsSetPass m_SLZGlobalsSetPass;
         DrawObjectsPass m_RenderOpaqueForwardPass;
         DrawSkyboxPass m_DrawSkyboxPass;
@@ -264,9 +261,8 @@ namespace UnityEngine.Rendering.Universal
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
             m_RenderOpaqueForwardPass = new DrawObjectsPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
 
-            //m_FoveatedOn = new SLZFoveatedRenderingEnable();
-            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques-1);
-            //m_FoveatedOff = new SLZFoveatedRenderingDisable();
+            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques-2);
+            
             m_CopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRenderingSkybox, m_CopyDepthMaterial);
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
             m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial);
@@ -408,8 +404,7 @@ namespace UnityEngine.Rendering.Universal
 
             DebugHandler?.Setup(context, ref cameraData);
             SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
-                camera.nearClipPlane, camera.farClipPlane);
-            
+                renderingData.cameraData.SSRTemporalWeight);
             m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
             EnqueuePass(m_SLZGlobalsSetPass);
 
@@ -661,10 +656,11 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_AdditionalLightsShadowCasterPass);
 
             int msaaSamplesTemp = cameraTargetDescriptor.msaaSamples;
-            
+
+            bool usingVRS = true;
             if (requiresDepthPrepass)
             {
-                if (renderPassInputs.requiresNormalsTexture)
+                if (renderPassInputs.requiresNormalsTexture || usingVRS)
                 {
                     if (this.actualRenderingMode == RenderingMode.Deferred)
                     {
@@ -731,6 +727,7 @@ namespace UnityEngine.Rendering.Universal
             if (cameraData.xr.hasValidOcclusionMesh)
                 EnqueuePass(m_XROcclusionMeshPass);
 #endif
+
 
             if (this.actualRenderingMode == RenderingMode.Deferred)
             {
@@ -847,6 +844,7 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_RenderTransparentForwardPass);
             }
             EnqueuePass(m_OnRenderObjectCallbackPass);
+
 
             bool hasCaptureActions = renderingData.cameraData.captureActions != null && lastCameraInTheStack;
 

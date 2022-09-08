@@ -221,7 +221,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         oldColor = max(0, oldColor - output);
 
         SSR = SSR * surfData.occlusion;
-        SSR = (1 - ssrExtra.temporalWeight) * SSR + ssrExtra.temporalWeight * oldColor;
+        SSR = (1 - _SSRTemporalWeight) * SSR + _SSRTemporalWeight * oldColor;
 
         output += SSR;
     }

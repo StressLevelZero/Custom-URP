@@ -162,6 +162,7 @@ namespace UnityEngine.Rendering.Universal
         public int maxSSRSteps;
         public int SSRMinMip;
         public float SSRHitRadius;
+        public float SSRTemporalWeight;
 
         // end SLZ Additions
         /// <summary>
