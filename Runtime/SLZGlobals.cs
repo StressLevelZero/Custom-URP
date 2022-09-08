@@ -42,6 +42,8 @@ namespace UnityEngine.Rendering.Universal
         private uint PerCameraOpaqueIter = 0;
 
         private ComputeBuffer SSRGlobalCB;
+
+        private double extraSmoothedDT = 0.01111;
         private SLZGlobals()
         {
             BlueNoiseCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
@@ -95,8 +97,14 @@ namespace UnityEngine.Rendering.Universal
              */
             float[] SSRGlobalArray = new float[4];
             //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
+            //SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
             SSRGlobalArray[0] = hitRadius;
-            SSRGlobalArray[1] = temporalWeight; //-cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
+            extraSmoothedDT = 0.95 * extraSmoothedDT + 0.05 * Time.smoothDeltaTime;
+            float framerateConst = 1.0f / (float)extraSmoothedDT * (1.0f / 90.0f);
+            float expConst = Mathf.Exp(-framerateConst);
+            float FRTemporal = (Mathf.Exp(-framerateConst * temporalWeight) - expConst) * (1.0f / (1.0f - expConst));
+            //Debug.Log(FRTemporal);
+            SSRGlobalArray[1] = Mathf.Clamp(1.0f - temporalWeight, 0.0078f, 1.0f); //Mathf.Clamp(FRTemporal, 0.0078f, 1.0f); 
             SSRGlobalArray[2] = maxSteps;
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
             SSRGlobalCB.SetData(SSRGlobalArray);

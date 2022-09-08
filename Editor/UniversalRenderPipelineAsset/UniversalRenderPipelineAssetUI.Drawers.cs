@@ -172,7 +172,7 @@ namespace UnityEditor.Rendering.Universal
                 EditorGUILayout.PropertyField(serialized.maxSSRSteps, Styles.SSRSteps);
                 EditorGUILayout.PropertyField(serialized.ssrHitRadius, Styles.SSRHitRadius);
                 EditorGUILayout.PropertyField(serialized.ssrMinMip, Styles.SSRMinMip);
-                EditorGUILayout.PropertyField(serialized.ssrTemporalWeight, Styles.SSRTemporalWeight);
+                EditorGUILayout.Slider(serialized.ssrTemporalWeight, 0, 1, Styles.SSRTemporalWeight);
             }
         }
 

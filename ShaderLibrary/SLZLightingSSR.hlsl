@@ -201,7 +201,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     bool isWithinDepthError = abs(oldDepth - oldVertDepth) < 2 * ddzOld + HALF_MIN;
     float4 volColor = GetVolumetricColor(fragData.position);
     float3 output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
-    UNITY_BRANCH if (!isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
+    UNITY_BRANCH if (ssrExtra.temporalWeight  == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
         output += surfData.occlusion * SSR.rgb;
     }
@@ -219,11 +219,14 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         oldColor = invertFogLerp(fogFactors.w, fogFactors.rgb, oldColor);
 #endif
         oldColor = max(0, oldColor - output);
-
+        float frameTemp = ssrExtra.temporalWeight < 0.5 ? 
+            lerp(1.0, _SSRTemporalWeight, ssrExtra.temporalWeight) :
+            lerp(_SSRTemporalWeight, 0.0078, ssrExtra.temporalWeight - 1.0);
         SSR = SSR * surfData.occlusion;
-        SSR = (1 - _SSRTemporalWeight) * SSR + _SSRTemporalWeight * oldColor;
+        SSR = frameTemp * SSR + (1 - frameTemp) * oldColor;
 
         output += SSR;
+        //output = frameTemp.xxx + 0.0001 * output;
     }
 
     //-------------------------------------------------------------------------------------------------
@@ -232,10 +235,10 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 
     //Do fog and volumetrics here to avoid sampling the volumetrics twice
 
-    output = MixFog(output, -fragData.viewDir, ssrExtra.fogFactor);
+    //output = MixFog(output, -fragData.viewDir, ssrExtra.fogFactor);
 
 #if defined(_VOLUMETRICS_ENABLED)
-    output = volColor.rgb + output * volColor.a;
+    //output = volColor.rgb + output * volColor.a;
 #endif
 
     return output;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
