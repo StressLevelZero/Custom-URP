@@ -235,10 +235,10 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 
     //Do fog and volumetrics here to avoid sampling the volumetrics twice
 
-    //output = MixFog(output, -fragData.viewDir, ssrExtra.fogFactor);
+    output = MixFog(output, -fragData.viewDir, ssrExtra.fogFactor);
 
 #if defined(_VOLUMETRICS_ENABLED)
-    //output = volColor.rgb + output * volColor.a;
+    output = volColor.rgb + output * volColor.a;
 #endif
 
     return output;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
