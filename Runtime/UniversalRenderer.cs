@@ -792,11 +792,11 @@ namespace UnityEngine.Rendering.Universal
                 if (cameraData.enableSSR)
                 {
                     RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
-                    m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), opaqueHandle, downsamplingMethod, cameraData.requiresDepthPyramid);
+                    m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), opaqueHandle, downsamplingMethod, cameraData.requiresColorPyramid);
                 }
                 else
                 {
-                    m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod, cameraData.requiresDepthPyramid);
+                    m_CopyColorPass.Setup(m_ActiveCameraColorAttachment.Identifier(), m_OpaqueColor, downsamplingMethod, cameraData.requiresColorPyramid);
                 }
                 EnqueuePass(m_CopyColorPass);
             }

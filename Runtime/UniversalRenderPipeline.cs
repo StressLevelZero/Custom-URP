@@ -750,10 +750,11 @@ namespace UnityEngine.Rendering.Universal
             bool needsAlphaChannel = Graphics.preserveFramebufferAlpha;
 
             // SLZ Additions
-            cameraData.requiresColorPyramid = asset.supportsCameraOpaqueTexture && asset.enableSSR;
-            cameraData.requiresDepthPyramid = asset.supportsCameraDepthTexture && asset.enableSSR;
+            bool enableSSR = asset.enableSSR && cameraData.postProcessEnabled;
+            cameraData.requiresColorPyramid = asset.supportsCameraOpaqueTexture && enableSSR;
+            cameraData.requiresDepthPyramid = asset.supportsCameraDepthTexture && enableSSR;
             cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
-            cameraData.enableSSR = asset.enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
+            cameraData.enableSSR = enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
             cameraData.maxSSRSteps = asset.maxSsrSteps;
             cameraData.SSRMinMip = asset.ssrMinMip;
             cameraData.SSRHitRadius = asset.ssrHitRadius;

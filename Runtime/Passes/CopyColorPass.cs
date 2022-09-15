@@ -99,10 +99,9 @@ namespace UnityEngine.Rendering.Universal.Internal
                 descriptor.height /= 4;
             }
             descriptor.autoGenerateMips = false;
+            descriptor.useMipMap = m_RequiresMips;
             if (m_RequiresMips)
             {
-                descriptor.useMipMap = m_RequiresMips;
-               
                 descriptor.enableRandomWrite = true;
                 // mips with smallest dimension of 1, 2, and 4 useless, and compute shader works on 8x8 blocks, so subtract 3 (mipTruncation) from the mip count
                 m_MipLevels = Mathf.FloorToInt(
@@ -185,7 +184,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             Shader.SetGlobalVector(opaqueTextureDimID, 
                 new Vector4( tempDescriptor.width * 2, tempDescriptor.height * 2, m_MipLevels - 1, m_MipLevels + mipTruncation));
 
-            if (m_MipLevels > 1)
+            if (m_MipLevels > 1 && m_RequiresMips)
             {
                 int slices = 1;
 #if ENABLE_VR && ENABLE_XR_MODULE

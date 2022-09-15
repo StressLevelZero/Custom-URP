@@ -201,6 +201,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     bool isWithinDepthError = abs(oldDepth - oldVertDepth) < 2 * ddzOld + HALF_MIN;
     float4 volColor = GetVolumetricColor(fragData.position);
     float3 output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
+
     UNITY_BRANCH if (ssrExtra.temporalWeight  == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
         output += surfData.occlusion * SSR.rgb;
