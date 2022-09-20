@@ -461,6 +461,8 @@ namespace UnityEditor.Rendering.Universal
                 return true;
 
             // Screen Space Occlusion
+            //Hardcoding a check for android platform. If android, then normal stripping. If not, skip stripping because we need the multicomplie to toggle SSAO. UNITY WHYU DUMB
+#if UNITY_ANDROID
             if (IsFeatureEnabled(features, ShaderFeatures.ScreenSpaceOcclusionAfterOpaque))
             {
                 // SSAO after opaque setting requires off variants
@@ -472,7 +474,7 @@ namespace UnityEditor.Rendering.Universal
                 if (stripTool.StripMultiCompile(m_ScreenSpaceOcclusion, ShaderFeatures.ScreenSpaceOcclusion))
                     return true;
             }
-
+#endif
             // Decal DBuffer
             if (stripTool.StripMultiCompile(
                 m_DBufferMRT1, ShaderFeatures.DBufferMRT1,
