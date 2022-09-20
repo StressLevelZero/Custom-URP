@@ -239,7 +239,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 	float FdotR4 = FdotR * FdotR;
 	FdotR4 *= FdotR4;
 	reflectedRay -= lerp(0, largeRadius, 1 - FdotR4) * normalize(reflectedRay);
-
+	bool storeLastPos = true;
 	for (float i = 0; i < _SSRSteps; i++)
 	{
 
@@ -288,11 +288,12 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		// If the ray never hits, this position will be used instead of falling back
 		// to the cubemap. This fills holes behind objects less obviously than sampling
 		// from the cubemap
-		if (!isRayInFront && finalPos.x == 1.#INF)
+		if (!isRayInFront && storeLastPos)
 		{
 			finalPos = reflectedRay;
+			
 		}
-
+		storeLastPos = isRayInFront ? true : false;
 		// If we're within the hit radius, we're done
 		UNITY_BRANCH if (inHitRadius && isMinMip)
 		{
