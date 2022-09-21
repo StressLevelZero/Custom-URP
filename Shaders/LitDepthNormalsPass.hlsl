@@ -116,8 +116,11 @@ half4 DepthNormalsFragment(Varyings input) : SV_TARGET
         #else
             float3 normalWS = input.normalWS;
         #endif
-
-        return half4(NormalizeNormalPerPixel(normalWS), 0.0);
+        normalWS = NormalizeNormalPerPixel(normalWS);
+        //half3 normalVS = mul((half3x3)UNITY_MATRIX_V, normalWS);
+        half2 octNormalWS = PackNormalOctQuadEncode(normalWS);
+        return half4(octNormalWS, 0.0, 0.0);
+        //return half4(normalWS, 0);
     #endif
 }
 
