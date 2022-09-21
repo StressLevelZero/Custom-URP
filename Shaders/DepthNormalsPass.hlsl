@@ -2,6 +2,7 @@
 #define UNIVERSAL_DEPTH_NORMALS_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 
 struct Attributes
 {
@@ -51,7 +52,7 @@ half4 DepthNormalsFragment(Varyings input) : SV_TARGET
     return half4(packedNormalWS, 0.0);
     #else
     float3 normalWS = NormalizeNormalPerPixel(input.normalWS);
-    return half4(normalWS, 0.0);
+    return half4(EncodeWSNormalForNormalsTex(normalWS), 0.0);
     #endif
 }
 #endif

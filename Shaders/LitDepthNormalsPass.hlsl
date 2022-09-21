@@ -2,6 +2,7 @@
 #define UNIVERSAL_FORWARD_LIT_DEPTH_NORMALS_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 
 #if defined(_DETAIL_MULX2) || defined(_DETAIL_SCALED)
 #define _DETAIL
@@ -118,8 +119,8 @@ half4 DepthNormalsFragment(Varyings input) : SV_TARGET
         #endif
         normalWS = NormalizeNormalPerPixel(normalWS);
         //half3 normalVS = mul((half3x3)UNITY_MATRIX_V, normalWS);
-        half2 octNormalWS = PackNormalOctQuadEncode(normalWS);
-        return half4(octNormalWS, 0.0, 0.0);
+       // half2 octNormalWS = PackNormalOctQuadEncode(normalWS);
+        return half4(EncodeWSNormalForNormalsTex(normalWS), 0.0);
         //return half4(normalWS, 0);
     #endif
 }

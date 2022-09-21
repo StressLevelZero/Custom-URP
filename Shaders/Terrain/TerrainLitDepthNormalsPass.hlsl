@@ -2,6 +2,7 @@
 #define UNIVERSAL_FORWARD_LIT_DEPTH_NORMALS_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitPasses.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 
 // DepthNormal pass
 struct AttributesDepthNormal
@@ -93,7 +94,7 @@ half4 DepthNormalOnlyFragment(VaryingsDepthNormal IN) : SV_TARGET
 
     normalWS = NormalizeNormalPerPixel(normalWS);
 
-    return half4(normalWS, 0.0);
+    return half4(EncodeWSNormalForNormalsTex(normalWS), 0.0);
 }
 
 #endif

@@ -2,6 +2,8 @@
 #define UNIVERSAL_PARTICLES_LIT_DEPTH_NORMALS_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
+
 
 VaryingsDepthNormalsParticle DepthNormalsVertex(AttributesDepthNormalsParticle input)
 {
@@ -91,7 +93,7 @@ half4 DepthNormalsFragment(VaryingsDepthNormalsParticle input) : SV_TARGET
         half3 packedNormalWS = PackFloat2To888(remappedOctNormalWS);      // values between [ 0,  1]
         return half4(packedNormalWS, 0.0);
     #else
-        return half4(NormalizeNormalPerPixel(normalWS), 0.0);
+        return half4(EncodeWSNormalForNormalsTex(NormalizeNormalPerPixel(normalWS)), 0.0);
     #endif
 }
 
