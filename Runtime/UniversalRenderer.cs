@@ -657,10 +657,10 @@ namespace UnityEngine.Rendering.Universal
 
             int msaaSamplesTemp = cameraTargetDescriptor.msaaSamples;
 
-            bool usingVRS = true;
+           
             if (requiresDepthPrepass)
             {
-                if (renderPassInputs.requiresNormalsTexture || usingVRS)
+                if (renderPassInputs.requiresNormalsTexture)
                 {
                     if (this.actualRenderingMode == RenderingMode.Deferred)
                     {
