@@ -723,13 +723,13 @@ namespace UnityEngine.Rendering.Universal
         public LightRenderingMode mainLightRenderingMode
         {
             get { return m_MainLightRenderingMode; }
-            internal set { m_MainLightRenderingMode = value; }
+            set { m_MainLightRenderingMode = value; }
         }
 
         public bool supportsMainLightShadows
         {
             get { return m_MainLightShadowsSupported; }
-            internal set { m_MainLightShadowsSupported = value; }
+            set { m_MainLightShadowsSupported = value; }
         }
 
         public int mainLightShadowmapResolution
@@ -903,7 +903,7 @@ namespace UnityEngine.Rendering.Universal
         public bool supportsSoftShadows
         {
             get { return m_SoftShadowsSupported; }
-            internal set { m_SoftShadowsSupported = value; }
+            set { m_SoftShadowsSupported = value; }
         }
 
         public bool supportsDynamicBatching
