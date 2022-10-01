@@ -20,24 +20,33 @@ public class SimpleTextureConvert : EditorWindow
 
     public Texture2D metallicSmoothness;
     public Texture2D ambientOcclusion;
-    public ComputeShader convertCS;
+    public static ComputeShader convertCS;
 
-    private void SaveTextureToFile(Texture2D texture)
+    private static Texture2D SaveTextureToFile(Texture2D texture, string path, bool focus = false)
     {
         byte[] pixels = texture.EncodeToPNG();
 
-        string path = EditorUtility.SaveFilePanel("Save Image", "", "", "png");
+        string relative = path;
+        if (string.IsNullOrEmpty(path))
+        {
+            path = EditorUtility.SaveFilePanel("Save Image", "", "", "png");
+            relative = "Assets" + path.Replace(Application.dataPath, "");
+        }
 
         File.WriteAllBytes(path, pixels);
-
-        string relative = "Assets" + path.Replace(Application.dataPath, "");
         AssetDatabase.ImportAsset(relative);
 
-        EditorUtility.FocusProjectWindow();
-        Selection.activeObject = AssetDatabase.LoadAssetAtPath<Texture2D>(relative);
+        var assetTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(relative);
+        if (focus)
+        {
+            EditorUtility.FocusProjectWindow();
+            Selection.activeObject = assetTexture;
+        }
+
+        return assetTexture;
     }
 
-    private void SaveBuffer(RenderTexture target = null)
+    private static Texture2D SaveBuffer(RenderTexture target = null, string path = null, bool focus = false)
     {
         RenderTexture.active = target;
 
@@ -47,12 +56,36 @@ public class SimpleTextureConvert : EditorWindow
         temp.ReadPixels(new Rect(0, 0, width, height), 0, 0);
         temp.Apply();
 
-        SaveTextureToFile(temp);
+        var texture = SaveTextureToFile(temp, path, focus);
         RenderTexture.active = null;
+
+        return texture;
     }
 
 
-    private int GetTile(int size, int tile) => Mathf.FloorToInt((float)size / (float)tile);
+    private static int GetTile(int size, int tile) => Mathf.FloorToInt((float)size / (float)tile);
+
+    public static Texture2D ConvertToMAS(Texture2D ambientOcclusion, Texture2D metallicSmoothness, string path = null, bool focus = false)
+    {
+        if (convertCS == null)
+            convertCS = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Editor/Converter/TextureConvert/ConvertToMAS.compute");
+
+        RenderTexture buffer = new RenderTexture(ambientOcclusion.width, ambientOcclusion.height, 0) { enableRandomWrite = true };
+        buffer.Create();
+
+        var kernel = convertCS.FindKernel("CSMain");
+
+        convertCS.SetTexture(kernel, "MetallicSmoothness", metallicSmoothness);
+        convertCS.SetTexture(kernel, "OcclusionMap", ambientOcclusion);
+        convertCS.SetTexture(kernel, "Result", buffer);
+
+        convertCS.Dispatch(kernel, GetTile(buffer.width, 8), GetTile(buffer.height, 8), 1);
+
+        var texture = SaveBuffer(buffer, path, focus);
+        buffer.Release();
+
+        return texture;
+    }
 
     public void OnGUI()
     {
@@ -77,24 +110,8 @@ public class SimpleTextureConvert : EditorWindow
                 return;
             }
             else
-            {
                 if (GUILayout.Button("Convert To MAS"))
-                {
-                    RenderTexture buffer = new RenderTexture(ambientOcclusion.width, ambientOcclusion.height, 0) { enableRandomWrite = true };
-                    buffer.Create();
-
-                    var kernel = convertCS.FindKernel("CSMain");
-
-                    convertCS.SetTexture(kernel, "MetallicSmoothness", metallicSmoothness);
-                    convertCS.SetTexture(kernel, "OcclusionMap", ambientOcclusion);
-                    convertCS.SetTexture(kernel, "Result", buffer);
-
-                    convertCS.Dispatch(kernel, GetTile(buffer.width, 8), GetTile(buffer.height, 8), 1);
-
-                    SaveBuffer(buffer);
-                    buffer.Release();
-                }
-            }
+                    ConvertToMAS(ambientOcclusion, metallicSmoothness, null, true);
         }
         else
             EditorGUILayout.HelpBox(helpMessage, MessageType.Info);

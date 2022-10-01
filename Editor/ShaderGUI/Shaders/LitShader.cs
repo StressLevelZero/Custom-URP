@@ -45,6 +45,31 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
         // material main surface inputs
         public override void DrawSurfaceInputs(Material material)
         {
+            // Discourages users from using the standard workflow
+            if (material.shader.name.Contains("Standard"))
+            {
+                EditorGUILayout.HelpBox("Using the standard workflow is discouraged! Please use the PBR workflow instead! This is here only to help in porting materials from other URP projects!", MessageType.Warning);
+                //EditorGUILayout.HelpBox("Please 'Stress Level Zero/Convert To MAS' to pack your textures and switch to the PBR workflow!", MessageType.Info);
+                EditorGUILayout.HelpBox("Please use the automated conversion tool to convert to a PBR workflow!", MessageType.Info);
+
+                if (GUILayout.Button("Convert to PBR"))
+                {
+                    Texture2D metallicSmoothness = material.GetTexture("_MetallicGlossMap") as Texture2D;
+                    Texture2D ambientOcclusion = material.GetTexture("_OcclusionMap") as Texture2D;
+
+                    string path = AssetDatabase.GetAssetPath(material) + "_GeneratedMAS.png";
+
+                    Texture2D masTexture = null;
+                    if (metallicSmoothness && ambientOcclusion)
+                        masTexture = SimpleTextureConvert.ConvertToMAS(ambientOcclusion, metallicSmoothness, path);
+
+                    material.shader = Shader.Find("Universal Render Pipeline/Lit (PBR Workflow)");
+
+                    if (masTexture)
+                        material.SetTexture("_MetallicGlossMap", masTexture);
+                }
+            }
+
             base.DrawSurfaceInputs(material);
             LitGUI.Inputs(litProperties, materialEditor, material);
             DrawEmissionProperties(material, true);
