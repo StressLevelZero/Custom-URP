@@ -54,6 +54,8 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
 
                 if (GUILayout.Button("Convert to PBR"))
                 {
+                    Undo.RecordObject(material, "Automated PBR conversion");
+
                     Texture2D metallicSmoothness = material.GetTexture("_MetallicGlossMap") as Texture2D;
                     Texture2D ambientOcclusion = material.GetTexture("_OcclusionMap") as Texture2D;
 
