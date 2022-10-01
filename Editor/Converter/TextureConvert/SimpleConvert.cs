@@ -28,6 +28,9 @@ public class SimpleTextureConvert : EditorWindow {
 
         string relative = "Assets" + path.Replace(Application.dataPath, "");
         AssetDatabase.ImportAsset(relative);
+
+        EditorUtility.FocusProjectWindow();
+        Selection.activeObject = AssetDatabase.LoadAssetAtPath<Texture2D>(relative);
     }
 
     private void SaveBuffer(RenderTexture target = null)
@@ -55,7 +58,7 @@ public class SimpleTextureConvert : EditorWindow {
 
         if (convertCS == null)
         {
-            GUILayout.Label("Failed to load ComputeShader!");
+            EditorGUILayout.HelpBox("Failed to load ComputeShader!", MessageType.Error);
             return;
         } 
 
@@ -65,7 +68,9 @@ public class SimpleTextureConvert : EditorWindow {
         if (metallicSmoothness && ambientOcclusion) {
             if (metallicSmoothness.width != ambientOcclusion.width || metallicSmoothness.height != ambientOcclusion.height)
             {
-
+                EditorGUILayout.HelpBox("Mismatched texture dimensions!", MessageType.Error);
+                EditorGUILayout.HelpBox($"{metallicSmoothness.width}x{metallicSmoothness.height} != {ambientOcclusion.width}x{ambientOcclusion.height}!", MessageType.Error);
+                return;
             }
             else 
             {
