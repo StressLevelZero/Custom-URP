@@ -28,6 +28,9 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             public static GUIContent metallicMapText =
                 EditorGUIUtility.TrTextContent("Mask Map", "Metallic (R), AO (G), Detail Mask (B), Smoothness (A)"); //Using HDRP's packing to free up some texture channels
 
+            public static GUIContent standardMetallicMapText =
+                EditorGUIUtility.TrTextContent("Metallic Map", "Metallic (R), Smoothness (A)");
+
             public static GUIContent smoothnessText = EditorGUIUtility.TrTextContent("Smoothness",
                 "Controls the spread of highlights and reflections on the surface.");
 
@@ -194,7 +197,13 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             {
                 hasGlossMap = properties.metallicGlossMap.textureValue != null;
                 smoothnessChannelNames = Styles.metallicSmoothnessChannelNames;
-                materialEditor.TexturePropertySingleLine(Styles.metallicMapText, properties.metallicGlossMap,
+
+                // Make this better?
+                var metallicText = Styles.metallicMapText;
+                if (material.shader.name.Contains("Standard"))
+                    metallicText = Styles.standardMetallicMapText;
+
+                materialEditor.TexturePropertySingleLine(metallicText, properties.metallicGlossMap,
                     hasGlossMap ? null : properties.metallic);
             }
             else
@@ -282,8 +291,9 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             //if (material.HasProperty("_EnvironmentReflections"))
             //    CoreUtils.SetKeyword(material, "_ENVIRONMENTREFLECTIONS_OFF",
             //        material.GetFloat("_EnvironmentReflections") == 0.0f);
-            //if (material.HasProperty("_OcclusionMap"))
-            //    CoreUtils.SetKeyword(material, "_OCCLUSIONMAP", material.GetTexture("_OcclusionMap"));
+            
+            if (material.HasProperty("_OcclusionMap"))
+                CoreUtils.SetKeyword(material, "_OCCLUSIONMAP", material.GetTexture("_OcclusionMap"));
 
             if (material.HasProperty("_ParallaxMap"))
                 CoreUtils.SetKeyword(material, "_PARALLAXMAP", material.GetTexture("_ParallaxMap"));
