@@ -5,12 +5,16 @@ using System.IO;
 
 // Feel free to remove this
 // I'm aware of ConvertToMAS, but I figured I'd make a simpler tool!
-public class SimpleTextureConvert : EditorWindow {
+public class SimpleTextureConvert : EditorWindow
+{
+    private static GUIContent windowContent = new GUIContent("Convert To MAS", "Tool to help in the creation of MAS maps without external software");
+    private static string helpMessage = "Please provide a metallic smoothness map and a occlusion map. They must be the same width and height!";
+
     [MenuItem("Stress Level Zero/Convert To MAS")]
     static void Init()
     {
         SimpleTextureConvert window = EditorWindow.GetWindow<SimpleTextureConvert>();
-        window.titleContent = new GUIContent("Convert To MAS");
+        window.titleContent = new GUIContent(windowContent);
         window.Show();
     }
 
@@ -50,7 +54,6 @@ public class SimpleTextureConvert : EditorWindow {
 
     private int GetTile(int size, int tile) => Mathf.FloorToInt((float)size / (float)tile);
 
-
     public void OnGUI()
     {
         if (convertCS == null)
@@ -60,19 +63,20 @@ public class SimpleTextureConvert : EditorWindow {
         {
             EditorGUILayout.HelpBox("Failed to load ComputeShader!", MessageType.Error);
             return;
-        } 
+        }
 
         metallicSmoothness = EditorGUILayout.ObjectField("Metallic Smoothness", metallicSmoothness, typeof(Texture2D), false) as Texture2D;
         ambientOcclusion = EditorGUILayout.ObjectField("Occlusion", ambientOcclusion, typeof(Texture2D), false) as Texture2D;
 
-        if (metallicSmoothness && ambientOcclusion) {
+        if (metallicSmoothness && ambientOcclusion)
+        {
             if (metallicSmoothness.width != ambientOcclusion.width || metallicSmoothness.height != ambientOcclusion.height)
             {
                 EditorGUILayout.HelpBox("Mismatched texture dimensions!", MessageType.Error);
                 EditorGUILayout.HelpBox($"{metallicSmoothness.width}x{metallicSmoothness.height} != {ambientOcclusion.width}x{ambientOcclusion.height}!", MessageType.Error);
                 return;
             }
-            else 
+            else
             {
                 if (GUILayout.Button("Convert To MAS"))
                 {
@@ -92,5 +96,7 @@ public class SimpleTextureConvert : EditorWindow {
                 }
             }
         }
+        else
+            EditorGUILayout.HelpBox(helpMessage, MessageType.Info);
     }
 }
