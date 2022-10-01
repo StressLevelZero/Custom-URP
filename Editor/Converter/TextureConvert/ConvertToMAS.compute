@@ -1,0 +1,11 @@
+#pragma kernel CSMain
+
+Texture2D<float4> MetallicSmoothness;
+Texture2D<float4> OcclusionMap;
+RWTexture2D<float4> Result;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    Result[id.xy] = float4(MetallicSmoothness[id.xy].r, OcclusionMap[id.xy].r, 0, MetallicSmoothness[id.xy].a);
+}
