@@ -27,6 +27,7 @@ struct Varyings
 {
     float4 positionCS : SV_POSITION;
     float2 uv         : TEXCOORD0;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
 
@@ -34,8 +35,8 @@ Varyings FullscreenVert(Attributes input)
 {
     Varyings output;
     UNITY_SETUP_INSTANCE_ID(input);
+    UNITY_TRANSFER_INSTANCE_ID(input, output);
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-
 #if _USE_DRAW_PROCEDURAL
     output.positionCS = GetQuadVertexPosition(input.vertexID);
     output.positionCS.xy = output.positionCS.xy * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f); //convert to -1..1

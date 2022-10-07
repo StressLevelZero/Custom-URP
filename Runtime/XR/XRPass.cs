@@ -64,11 +64,11 @@ namespace UnityEngine.Rendering.Universal
         }
     }
 
-    class XRPass
+    public class XRPass
     {
         internal List<XRView> views = new List<XRView>(2);
 
-        internal bool enabled      { get => views.Count > 0; }
+        public bool enabled      { get => views.Count > 0; }
         internal bool xrSdkEnabled { get; private set; }
         internal bool copyDepth    { get; private set; }
 
@@ -76,8 +76,8 @@ namespace UnityEngine.Rendering.Universal
         internal int cullingPassId  { get; private set; }
 
         // Ability to specify where to render the pass
-        internal RenderTargetIdentifier  renderTarget     { get; private set; }
-        internal RenderTextureDescriptor renderTargetDesc { get; private set; }
+        public RenderTargetIdentifier  renderTarget     { get; private set; }
+        public RenderTextureDescriptor renderTargetDesc { get; private set; }
         static   RenderTargetIdentifier  invalidRT = -1;
         internal bool                    renderTargetValid { get => renderTarget != invalidRT; }
         internal bool                    renderTargetIsRenderTexture { get; private set; }
@@ -96,7 +96,7 @@ namespace UnityEngine.Rendering.Universal
 
         // Single-pass rendering support (instanced draw calls or multiview extension)
         internal int viewCount { get => views.Count; }
-        internal bool singlePassEnabled { get => viewCount > 1; }
+        public bool singlePassEnabled { get => viewCount > 1; }
 
         // Occlusion mesh rendering
         Material occlusionMeshMaterial = null;
@@ -431,6 +431,38 @@ namespace UnityEngine.Rendering.Universal
                     else if (views[0].occlusionMesh != null)
                     {
                         cmd.DrawMesh(views[0].occlusionMesh, Matrix4x4.identity, occlusionMeshMaterial);
+                    }
+                }
+            }
+        }
+
+        public void RenderOcclusionMeshExternal(CommandBuffer cmd, Material occlusionMat)
+        {
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+            if (XRGraphicsAutomatedTests.enabled && XRGraphicsAutomatedTests.running)
+                return;
+#endif
+
+            if (isOcclusionMeshSupported)
+            {
+                //using (new ProfilingScope(cmd, _XROcclusionProfilingSampler))
+                {
+                    if (singlePassEnabled)
+                    {
+                        if (occlusionMeshCombined != null && SystemInfo.supportsRenderTargetArrayIndexFromVertexShader)
+                        {
+                            StopSinglePass(cmd);
+
+                            cmd.EnableShaderKeyword("XR_OCCLUSION_MESH_COMBINED");
+                            cmd.DrawMesh(occlusionMeshCombined, Matrix4x4.identity, occlusionMat);
+                            cmd.DisableShaderKeyword("XR_OCCLUSION_MESH_COMBINED");
+
+                            StartSinglePass(cmd);
+                        }
+                    }
+                    else if (views[0].occlusionMesh != null)
+                    {
+                        cmd.DrawMesh(views[0].occlusionMesh, Matrix4x4.identity, occlusionMat);
                     }
                 }
             }

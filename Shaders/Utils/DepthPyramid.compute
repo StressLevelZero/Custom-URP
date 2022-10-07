@@ -43,10 +43,28 @@
     #define COORD_DEPTH(uv) (uv).xy
 #endif
 
+#if defined(SRV_SOURCE)
+    #if UNITY_REVERSED_Z
+        #if defined(MIN_AND_MAX)
+            #define XR_MESH_CORRECTION(d) float2(d.x == 1 ? 0 : d.x, d.y == 1 ? 1 : d.y)
+        #else
+            #define XR_MESH_CORRECTION(d) (d.x == 1 ? 0 : d.x)
+        #endif
+    #else
+        #if defined(MIN_AND_MAX)
+            #define XR_MESH_CORRECTION(d) float2(d.x == 0 ? 1 : d.x, d.y == 0 ? 0 : d.y)
+        #else
+            #define XR_MESH_CORRECTION(d) (d.x == 0 ? 1 : d.x)
+        #endif
+    #endif
+#else
+    #define XR_MESH_CORRECTION(d) d
+#endif
+
 #if !defined(MIN_AND_MAX)
     #if defined(SRV_SOURCE)
         #if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON)
-            #define MIPSOURCE(uv) _MipSource.Load(int4(uv.xyz, 0)).r
+            #define MIPSOURCE(uv) XR_MESH_CORRECTION((_MipSource.Load(int4(uv.xyz, 0)).r))
         #else
             #define MIPSOURCE(uv) _MipSource.Load(int3(uv.xy, 0)).r
         #endif
@@ -56,7 +74,7 @@
 #else
     #if defined(SRV_SOURCE)
         #if defined(STEREO_INSTANCING_ON) || defined(STEREO_MULTIVIEW_ON)
-            #define MIPSOURCE(uv) _MipSource.Load(int4(uv.xyz, 0)).rr
+            #define MIPSOURCE(uv) XR_MESH_CORRECTION((_MipSource.Load(int4(uv.xyz, 0)).rr))
         #else
             #define MIPSOURCE(uv) _MipSource.Load(int3(uv.xy, 0)).rr
         #endif
@@ -64,6 +82,8 @@
         #define MIPSOURCE(uv) _MipSource[uv].rg
     #endif
 #endif
+
+
 
 //CBUFFER_START(cb)
 int4 data1; //current mip width, current mip height, lower mip width, lower mip height 
@@ -73,12 +93,14 @@ groupshared uint minLevel1[4][4];
 //groupshared uint maxLevel1[4][4];
 
 #if UNITY_REVERSED_Z
+   // #define MIN_DEPTH 1
     #define MIN_DEPTH(l, r) max(l, r)
     #define MAX_DEPTH(l, r) min(l, r)
     #define INIT_DEPTH 0xFFFF0000u
     #define INTERLOCKED_MIN(a, b) InterlockedMax(a, b)
     #define INTERLOCKED_MAX(a, b) InterlockedMin(a, b)
 #else
+   // #define MIN_DEPTH 0
     #define MIN_DEPTH(l, r) min(l, r)
     #define MAX_DEPTH(l, r) max(l, r)
     #define INIT_DEPTH 0x0000FFFFu

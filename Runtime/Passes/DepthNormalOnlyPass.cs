@@ -12,6 +12,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         internal bool allocateNormal { get; set; } = true;
         internal List<ShaderTagId> shaderTagIds { get; set; }
 
+        private bool clearDepth = true;
         private RenderTargetHandle depthHandle { get; set; }
         private RenderTargetHandle normalHandle { get; set; }
         private FilteringSettings m_FilteringSettings;
@@ -24,18 +25,19 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <summary>
         /// Create the DepthNormalOnlyPass
         /// </summary>
-        public DepthNormalOnlyPass(RenderPassEvent evt, RenderQueueRange renderQueueRange, LayerMask layerMask)
+        public DepthNormalOnlyPass(RenderPassEvent evt, RenderQueueRange renderQueueRange, LayerMask layerMask, bool clearDepth = true)
         {
             base.profilingSampler = new ProfilingSampler(nameof(DepthNormalOnlyPass));
             m_FilteringSettings = new FilteringSettings(renderQueueRange, layerMask);
             renderPassEvent = evt;
             useNativeRenderPass = false;
+            
         }
 
         /// <summary>
         /// Configure the pass
         /// </summary>
-        public void Setup(RenderTextureDescriptor baseDescriptor, RenderTargetHandle depthHandle, RenderTargetHandle normalHandle)
+        public void Setup(RenderTextureDescriptor baseDescriptor, RenderTargetHandle depthHandle, RenderTargetHandle normalHandle, bool clearDepth = true)
         {
             // Find compatible render-target format for storing normals.
             // Shader code outputs normals in signed format to be compatible with deferred gbuffer layout.
@@ -74,6 +76,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             this.allocateDepth = true;
             this.allocateNormal = true;
             this.shaderTagIds = k_DepthNormals;
+            this.clearDepth = clearDepth;
         }
 
         /// <inheritdoc/>
@@ -102,8 +105,14 @@ namespace UnityEngine.Rendering.Universal.Internal
                     new RenderTargetIdentifier(depthHandle.Identifier(), 0, CubemapFace.Unknown, -1)
                 );
             }
-
-            ConfigureClear(ClearFlag.All, Color.black);
+            if (clearDepth)
+            {
+                ConfigureClear(ClearFlag.All, Color.black);
+            }
+            else
+            {
+                ConfigureClear(ClearFlag.ColorStencil, Color.black);
+            }
         }
 
         /// <inheritdoc/>
