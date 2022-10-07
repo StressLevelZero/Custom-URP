@@ -11,7 +11,14 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 97c3b6b787afcf34f9058b81b0012a5d, type: 3}
   m_Name: DefaultTemplateSettings
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: ConverterSettings, Unity.RenderPipelines.Universal.Editor
+    $ GlobalObjectId_V1-3-56d0e5fa8e08e304c82937358721218a-11400000-0
   ShaderDefaultTemplate:
   - shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
     DefaultTemplate: {fileID: 11400000, guid: 665e22abbe7a4c04a868c6b6c6d0db90, type: 2}
+  - shader: {fileID: 4800000, guid: b7839dad95683814aa64166edc107ae2, type: 3}
+    DefaultTemplate: {fileID: 11400000, guid: 27482deef72ab394bbdbdc5c520eb08f, type: 2}
+  - shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
+    DefaultTemplate: {fileID: 11400000, guid: 3841a07c4cd4b5e4480914a9382a7a30, type: 2}
+  - shader: {fileID: 4800000, guid: 0e9d5a909a1f7e84882a534d0d11e49f, type: 3}
+    DefaultTemplate: {fileID: 11400000, guid: 58eb2e6dd60047b40b587b139318a91e, type: 2}

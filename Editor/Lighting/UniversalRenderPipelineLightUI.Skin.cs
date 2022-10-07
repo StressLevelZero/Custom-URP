@@ -8,6 +8,9 @@ namespace UnityEditor.Rendering.Universal
         static class Styles
         {
             public static readonly GUIContent lightCookieHeader = new GUIContent("Light Cookie");
+            public static readonly GUIContent VolumetricsHeader = new GUIContent("Volumetrics");
+            public static readonly GUIContent VolumetricsMultiplier = new GUIContent("Baked Volumetric Multiplier", "Should be set to 1. Multiply the light with this value for volumetric bake. ");
+
 
             public static readonly GUIContent Type = EditorGUIUtility.TrTextContent("Type", "Specifies the current type of light. Possible types are Directional, Spot, Point, and Area lights.");
 
@@ -26,6 +29,7 @@ namespace UnityEditor.Rendering.Universal
 
             public static readonly GUIContent ShadowRealtimeSettings = EditorGUIUtility.TrTextContent("Realtime Shadows", "Settings for realtime direct shadows.");
             public static readonly GUIContent ShadowStrength = EditorGUIUtility.TrTextContent("Strength", "Controls how dark the shadows cast by the light will be.");
+            //WTF? This is still a thing? BiRP was too agressive with this and HDRP bypassed it completely. Just fucking fix it!
             public static readonly GUIContent ShadowNearPlane = EditorGUIUtility.TrTextContent("Near Plane", "Controls the value for the near clip plane when rendering shadows. Currently clamped to 0.1 units or 1% of the lights range property, whichever is lower.");
             public static readonly GUIContent ShadowNormalBias = EditorGUIUtility.TrTextContent("Normal", "Controls the distance shadow caster vertices are offset along their normals when rendering shadow maps. Currently ignored for Point Lights.");
             public static readonly GUIContent ShadowDepthBias = EditorGUIUtility.TrTextContent("Depth", "Determines the distance at which Unity pushes shadows away from the shadow-casting GameObject along the line from the Light.");
@@ -61,6 +65,9 @@ namespace UnityEditor.Rendering.Universal
 
             public static readonly GUIContent LightCookieSize = EditorGUIUtility.TrTextContent("Cookie Size", "Controls the size of the cookie mask currently assigned to the light.");
             public static readonly GUIContent LightCookieOffset = EditorGUIUtility.TrTextContent("Cookie Offset", "Controls the offset of the cookie mask currently assigned to the light.");
+
+            public static readonly GUIContent VolumetricStrength = EditorGUIUtility.TrTextContent("Volumetric controbution multiplier", "Controls how strong volumetrics are. Should be set to 1 majority of the time");
+
         }
     }
 }

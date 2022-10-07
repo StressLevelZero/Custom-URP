@@ -120,7 +120,8 @@ Varyings BuildVaryings(Attributes input)
     #else
         float3 lightDirectionWS = _LightDirection;
     #endif
-    output.positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+    //output.positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+    output.positionCS = ApplySLZShadowBias(positionWS, normalWS, lightDirectionWS);
     #if UNITY_REVERSED_Z
         output.positionCS.z = min(output.positionCS.z, UNITY_NEAR_CLIP_VALUE);
     #else

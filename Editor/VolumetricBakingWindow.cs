@@ -4,9 +4,9 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.SceneManagement;
-
 using UnityEngine.Experimental.Rendering;
-
+using UnityEngine.Rendering.Universal;
+using System.IO;
 
 public class VolumetricBaking : EditorWindow
 {
@@ -419,10 +419,8 @@ public class VolumetricBaking : EditorWindow
             ///
 
             //Define path and save 3d texture
-            string path = SceneManager.GetActiveScene().path;
-            path = path.Replace(".unity", "") + "/" + "Volumemap-" + j; //TODO Check to make sure path exsits
+            string path = CheckDirectoryAndReturnPath() + j;
             RT3d.SaveToTexture3D(path);
-
             RT3d.Release();
 
             VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D) AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D) );
@@ -580,8 +578,7 @@ public class VolumetricBaking : EditorWindow
             //}
 
             //Define path and save 3d texture
-            string path = SceneManager.GetActiveScene().path;
-            path = path.Replace(".unity", "") + "/" + "Volumemap-" + j; //TODO Check to make sure path exsits
+            string path = CheckDirectoryAndReturnPath() + j; 
             RT3d.SaveToTexture3D(path);
 
             RT3d.Release();
@@ -604,6 +601,20 @@ public class VolumetricBaking : EditorWindow
 
      //   UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
+    }
+
+    string CheckDirectoryAndReturnPath()
+    {
+        //Define path 
+        string path = SceneManager.GetActiveScene().path;
+        path = path.Replace(".unity", "");
+        if (!Directory.Exists(path)) //Check if path exists
+        {
+            Directory.CreateDirectory(path); //if it doesn't, create it
+            Debug.Log("Made Directory " + path);
+            AssetDatabase.Refresh();
+        }
+        return path + "/" + "Volumemap-";
     }
 
     RenderTexture initializeVolume(int i)
@@ -680,6 +691,7 @@ public class VolumetricBaking : EditorWindow
         Color colorModulation = light.color;
         if (light.useColorTemperature) colorModulation *= Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
         colorModulation *= light.intensity;
+        colorModulation *= light.gameObject.GetComponent<UniversalAdditionalLightData>().volumetricDimmer;
         return colorModulation;
     }
 
@@ -841,8 +853,7 @@ public class VolumetricBaking : EditorWindow
             /// 
             ///
 
-            string path = SceneManager.GetActiveScene().path;
-            path = path.Replace(".unity", "") + "/" + "Volumemap-" + j; //TODO Check to make sure path exsits
+            string path = CheckDirectoryAndReturnPath() + j;
             RT3d.SaveToTexture3D(path);
             RT3d.Release();
             VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
@@ -872,7 +883,7 @@ public class VolumetricBaking : EditorWindow
 
         //Setup light data
 
-        Vector4 lightColor = light.color * light.intensity * light.color.a;
+        Vector4 lightColor = light.color * light.intensity;
         Vector4 lightPos = light.transform.position;
         int shaderKernel;
 

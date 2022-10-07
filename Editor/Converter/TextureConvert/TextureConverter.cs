@@ -13,6 +13,7 @@ public class TextureConverter : ScriptableWizard
     [Space(20)]
     public Shader TargetShader;
     public PackingTargetLayout[] PackingArray;
+    public ReassignTargetLayout[] ReassigningArray;
 
     TexturePackingTemplate PrevTemplate;
 
@@ -84,9 +85,14 @@ public class TextureConverter : ScriptableWizard
 
         TargetShader = template.TargetShader;
         PackingArray = new PackingTargetLayout[template.Packing.Length];
+        ReassigningArray = new ReassignTargetLayout[template.Reassigning.Length];
         for (int i = 0; i < template.Packing.Length; i++)
         {
-            PackingArray[i] = ParseTemplate(template.Packing[i]);
+            PackingArray[i] = ParsePackingTemplate(template.Packing[i]);
+        }
+        for (int i = 0; i < template.Reassigning.Length; i++)
+        {
+            ReassigningArray[i] = ParseReassiningTemplate(template.Reassigning[i]);
         }
 
         PrevTemplate = template;
@@ -103,7 +109,7 @@ public class TextureConverter : ScriptableWizard
         TextureConvert();
     }
 
-    public PackingTargetLayout ParseTemplate(PackingLayout layout) //Read template and load any connected textures
+    public PackingTargetLayout ParsePackingTemplate(PackingLayout layout) //Read template and load any connected textures
     {
         PackingTargetLayout targetLayout = new PackingTargetLayout();
 
@@ -127,11 +133,23 @@ public class TextureConverter : ScriptableWizard
         return targetLayout;
     }
 
+    public ReassignTargetLayout ParseReassiningTemplate(ReassignLayout layout) //Read template and load any connected textures
+    {
+        ReassignTargetLayout targetLayout = new ReassignTargetLayout();
+
+        var props = TargetMaterial.GetTexturePropertyNames();
+
+        targetLayout.PropertyName = layout.PropertyName;
+        if (ArrayUtility.Contains(props, layout.InputPropertyName)) targetLayout.InputTexture = TargetMaterial.GetTexture(layout.InputPropertyName) as Texture2D;
+        return targetLayout;
+    }
+
+
     string SavedPath;
 
     public void TextureConvert()
     {
-        if (PackingArray.Length < 1) return;
+        if (PackingArray.Length < 1 && ReassigningArray.Length < 1) return;
 
 
         //SHADER CONVERSION//
@@ -220,10 +238,12 @@ public class TextureConverter : ScriptableWizard
 
                     AssignProperty(PackingArray[i]);
                 }
-
             }
+        }
 
-
+        for (int i = 0; i < ReassigningArray.Length; i++) //Reassign Textures
+        {
+            TargetMaterial.SetTexture(ReassigningArray[i].PropertyName, ReassigningArray[i].InputTexture);
         }
 
         if (TargetShader!=null) TargetMaterial.shader = TargetShader;

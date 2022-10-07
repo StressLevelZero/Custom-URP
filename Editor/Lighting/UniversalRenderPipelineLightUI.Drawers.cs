@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -20,7 +20,8 @@ namespace UnityEditor.Rendering.Universal
             Emission = 1 << 2,
             Rendering = 1 << 3,
             Shadows = 1 << 4,
-            LightCookie = 1 << 5
+            LightCookie = 1 << 5,
+            Volumetrics = 1 << 6
         }
 
         static readonly ExpandedState<Expandable, Light> k_ExpandedState = new(~-1, "URP");
@@ -60,7 +61,7 @@ namespace UnityEditor.Rendering.Universal
                 Expandable.Emission,
                 k_ExpandedState,
                 CED.Group(
-                    LightUI.DrawColor,
+                    LightUI.DrawColor, DrawUVContent,
                     DrawEmissionContent)),
             CED.FoldoutGroup(LightUI.Styles.renderingHeader,
                 Expandable.Rendering,
@@ -73,8 +74,19 @@ namespace UnityEditor.Rendering.Universal
             CED.FoldoutGroup(Styles.lightCookieHeader,
                 Expandable.LightCookie,
                 k_ExpandedState,
-                DrawLightCookieContent)
+                DrawLightCookieContent),
+           CED.FoldoutGroup(Styles.VolumetricsHeader,
+                Expandable.Volumetrics,
+                k_ExpandedState,
+                DrawVolumetricsContent)
         );
+
+
+        //static CED.IDrawer LightThingy(ISerializedLight serializedLight, Editor owner)
+        //{
+
+        //}
+
 
         static Func<int> s_SetGizmosDirty = SetGizmosDirty();
         static Func<int> SetGizmosDirty()
@@ -266,6 +278,13 @@ namespace UnityEditor.Rendering.Universal
             }
         }
 
+        static void DrawUVContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
+        {
+            GUIContent UltravioletStyle = new GUIContent("Ultraviolet", "Ultraviolet light intensity. Used by fluorescent materials");
+            var light = (Light)owner.target;
+            light.color = new Color(light.color.r, light.color.g, light.color.b ,EditorGUILayout.Slider(UltravioletStyle, light.color.a, 0f, 1f) );
+        }
+
         static void DrawRenderingContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
             serializedLight.settings.DrawRenderMode();
@@ -324,10 +343,10 @@ namespace UnityEditor.Rendering.Universal
                         EditorGUILayout.Slider(serializedLight.settings.shadowsStrength, 0f, 1f, Styles.ShadowStrength);
 
                         // Bias
-                        DrawAdditionalShadowData(serializedLight);
+                        //DrawAdditionalShadowData(serializedLight); //No more need for this ¯\_(ツ)_/¯
 
                         // this min bound should match the calculation in SharedLightData::GetNearPlaneMinBound()
-                        float nearPlaneMinBound = Mathf.Min(0.01f * serializedLight.settings.range.floatValue, 0.1f);
+                        float nearPlaneMinBound = Mathf.Min(0.001f * serializedLight.settings.range.floatValue, 0.01f);
                         EditorGUILayout.Slider(serializedLight.settings.shadowsNearPlane, nearPlaneMinBound, 10.0f, Styles.ShadowNearPlane);
                     }
 
@@ -463,6 +482,43 @@ namespace UnityEditor.Rendering.Universal
                     EditorGUILayout.PropertyField(serializedLight.lightCookieOffsetProp, Styles.LightCookieOffset);
                     if (EditorGUI.EndChangeCheck())
                         Experimental.Lightmapping.SetLightDirty((UnityEngine.Light)serializedLight.serializedObject.targetObject);
+                }
+            }
+        }
+
+
+
+        static void DrawVolumetricsContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
+        {
+            var settings = serializedLight.settings;
+            var additionData = (settings.light).gameObject.GetComponent<UniversalAdditionalLightData>();
+            //if (additionData.customShadowLayers)
+            //    continue;
+
+            //settings.DrawCookie();
+
+            // Draw 2D cookie size for directional lights
+            bool isVolumetricsEnabled = additionData.useVolumetric;
+            //Realtime isn't implmented yet
+            if (isVolumetricsEnabled && serializedLight.settings.lightmapping.intValue != (int)LightmapBakeType.Realtime)
+            {
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
+                }
+                //EditorGUI.BeginChangeCheck();
+                //EditorGUILayout.PropertyField(serializedLight.lightCookieSizeProp, Styles.LightCookieSize);
+                //EditorGUILayout.PropertyField(serializedLight.lightCookieOffsetProp, Styles.LightCookieOffset);
+                //if (EditorGUI.EndChangeCheck())
+                //    Experimental.Lightmapping.SetLightDirty((UnityEngine.Light)serializedLight.serializedObject.targetObject);
+            }
+            else
+            {
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    GUI.enabled = false;
+                    additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
+                    GUI.enabled = true;
                 }
             }
         }
