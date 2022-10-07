@@ -7,12 +7,15 @@ SAMPLER(sampler_CameraHiZDepthTexture);
 
 TEXTURE2D_X_FLOAT(_PrevHiZ0Texture);
 
+/*
 struct HiZDim
 {
     float4 dim;// XY: dimensions of mip X, ZW: dimensions of mip X divided by mip 0
 };
 
 StructuredBuffer<HiZDim> HiZDimBuffer;
+*/
+
 uint _HiZHighestMip;
 float4 _HiZDim;
 /*

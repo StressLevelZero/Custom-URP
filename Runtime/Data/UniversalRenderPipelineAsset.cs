@@ -723,13 +723,13 @@ namespace UnityEngine.Rendering.Universal
         public LightRenderingMode mainLightRenderingMode
         {
             get { return m_MainLightRenderingMode; }
-            internal set { m_MainLightRenderingMode = value; }
+            set { m_MainLightRenderingMode = value; }
         }
 
         public bool supportsMainLightShadows
         {
             get { return m_MainLightShadowsSupported; }
-            internal set { m_MainLightShadowsSupported = value; }
+            set { m_MainLightShadowsSupported = value; }
         }
 
         public int mainLightShadowmapResolution
@@ -741,7 +741,7 @@ namespace UnityEngine.Rendering.Universal
         public LightRenderingMode additionalLightsRenderingMode
         {
             get { return m_AdditionalLightsRenderingMode; }
-            internal set { m_AdditionalLightsRenderingMode = value; }
+            set { m_AdditionalLightsRenderingMode = value; }
         }
 
         public int maxAdditionalLightsCount
@@ -753,7 +753,7 @@ namespace UnityEngine.Rendering.Universal
         public bool supportsAdditionalLightShadows
         {
             get { return m_AdditionalLightShadowsSupported; }
-            internal set { m_AdditionalLightShadowsSupported = value; }
+            set { m_AdditionalLightShadowsSupported = value; }
         }
 
         public int additionalLightsShadowmapResolution
@@ -806,13 +806,13 @@ namespace UnityEngine.Rendering.Universal
         public bool reflectionProbeBlending
         {
             get { return m_ReflectionProbeBlending; }
-            internal set { m_ReflectionProbeBlending = value; }
+            set { m_ReflectionProbeBlending = value; }
         }
 
         public bool reflectionProbeBoxProjection
         {
             get { return m_ReflectionProbeBoxProjection; }
-            internal set { m_ReflectionProbeBoxProjection = value; }
+            set { m_ReflectionProbeBoxProjection = value; }
         }
 
         /// <summary>
@@ -903,7 +903,7 @@ namespace UnityEngine.Rendering.Universal
         public bool supportsSoftShadows
         {
             get { return m_SoftShadowsSupported; }
-            internal set { m_SoftShadowsSupported = value; }
+            set { m_SoftShadowsSupported = value; }
         }
 
         public bool supportsDynamicBatching

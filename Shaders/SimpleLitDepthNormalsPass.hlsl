@@ -2,6 +2,7 @@
 #define UNIVERSAL_SIMPLE_LIT_DEPTH_NORMALS_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 
 struct Attributes
 {
@@ -78,7 +79,7 @@ half4 DepthNormalsFragment(Varyings input) : SV_TARGET
         #endif
 
         normalWS = NormalizeNormalPerPixel(normalWS);
-        return half4(normalWS, 0.0);
+        return half4(EncodeWSNormalForNormalsTex(normalWS), 0.0);
     #endif
 }
 

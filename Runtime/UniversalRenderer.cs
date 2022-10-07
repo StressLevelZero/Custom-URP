@@ -404,7 +404,7 @@ namespace UnityEngine.Rendering.Universal
 
             DebugHandler?.Setup(context, ref cameraData);
             SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
-                renderingData.cameraData.SSRTemporalWeight);
+                renderingData.cameraData.SSRTemporalWeight, camera.fieldOfView, cameraTargetDescriptor.height);
             m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
             EnqueuePass(m_SLZGlobalsSetPass);
 
@@ -657,10 +657,10 @@ namespace UnityEngine.Rendering.Universal
 
             int msaaSamplesTemp = cameraTargetDescriptor.msaaSamples;
 
-            bool usingVRS = true;
+           
             if (requiresDepthPrepass)
             {
-                if (renderPassInputs.requiresNormalsTexture || usingVRS)
+                if (renderPassInputs.requiresNormalsTexture)
                 {
                     if (this.actualRenderingMode == RenderingMode.Deferred)
                     {

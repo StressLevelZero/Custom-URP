@@ -2,6 +2,7 @@
 #define UNIVERSAL_BAKEDLIT_DEPTH_NORMALS_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 
 struct Attributes
 {
@@ -75,7 +76,7 @@ float4 DepthNormalsFragment(Varyings input) : SV_TARGET
             half3 normalWS = input.normalWS;
         #endif
 
-        return half4(NormalizeNormalPerPixel(normalWS), 0.0);
+        return half4(EncodeWSNormalForNormalsTex(NormalizeNormalPerPixel(normalWS)), 0.0);
     #endif
 
 }

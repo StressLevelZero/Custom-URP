@@ -2,6 +2,8 @@
 #ifndef SLZ_LightingExtend
 #define SLZ_LightingExtend
 
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
+
 #define M_PI  3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
 #define PI_R  0.31830988618f                        //Reciprocal

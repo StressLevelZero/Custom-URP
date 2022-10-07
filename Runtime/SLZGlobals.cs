@@ -49,7 +49,7 @@ namespace UnityEngine.Rendering.Universal
             BlueNoiseCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
             BlueNoiseDim = new float[4];
             hasSetBNTextures = false;
-            SSRGlobalCB = new ComputeBuffer(4, sizeof(float), ComputeBufferType.Constant);
+            SSRGlobalCB = new ComputeBuffer(2, 4*sizeof(float), ComputeBufferType.Constant);
             HiZDimBuffer = new ComputeBuffer(15, Marshal.SizeOf<Vector4>());
             SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
@@ -87,7 +87,7 @@ namespace UnityEngine.Rendering.Universal
             //Shader.SetKeyword(HiZMinMaxKW, minmax);
         }
 
-        public void SetSSRGlobals(int maxSteps, int minMip, float hitRadius, float temporalWeight)
+        public void SetSSRGlobals(int maxSteps, int minMip, float hitRadius, float temporalWeight, float fov, int screenHeight)
         {
             /*
              * 0 float _SSRHitRadius;
@@ -95,7 +95,7 @@ namespace UnityEngine.Rendering.Universal
              * 2 int _SSRSteps;
              * 3 none
              */
-            float[] SSRGlobalArray = new float[4];
+            float[] SSRGlobalArray = new float[8];
             //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
             //SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
             SSRGlobalArray[0] = hitRadius;
@@ -107,6 +107,8 @@ namespace UnityEngine.Rendering.Universal
             SSRGlobalArray[1] = Mathf.Clamp(1.0f - temporalWeight, 0.0078f, 1.0f); //Mathf.Clamp(FRTemporal, 0.0078f, 1.0f); 
             SSRGlobalArray[2] = maxSteps;
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
+            float halfTan = Mathf.Tan(Mathf.Deg2Rad * (fov * 0.5f));
+            SSRGlobalArray[4] = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
             SSRGlobalCB.SetData(SSRGlobalArray);
             Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, 16);
         }
