@@ -658,6 +658,7 @@ public class VolumetricRendering : MonoBehaviour
         SetFroxelIntegrationUniforms(true);
         SetBlurUniforms(true);
         hasInitialized = true;
+        //RenderPipelineManager.beginCameraRendering += UpdatePreRender;
     }
 
     void SetFroxelFogUniforms(bool forceUpdate = false)
@@ -1006,17 +1007,17 @@ public class VolumetricRendering : MonoBehaviour
         return XRSettings.eyeTextureHeight == 0 ? activeCam.aspect : (float)XRSettings.eyeTextureHeight / (float)XRSettings.eyeTextureWidth;
     }
 
-    void Update()
-    {
-#if UNITY_EDITOR
-        if (Application.isPlaying)
-        {
-            UpdateFunc();
-        }
-#else
-        UpdateFunc();
-#endif
-    }
+//    void Update()
+//    {
+//#if UNITY_EDITOR
+//        if (Application.isPlaying)
+//        {
+//            UpdateFunc();
+//        }
+//#else
+//        UpdateFunc();
+//#endif
+//    }
 
     void UpdatePreRender(ScriptableRenderContext ctxt, Camera cam1)
     {
@@ -1288,6 +1289,8 @@ public class VolumetricRendering : MonoBehaviour
 #if UNITY_EDITOR
             RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
             AssemblyReloadEvents.beforeAssemblyReload -= CleanupOnReload;
+#else
+            RenderPipelineManager.beginCameraRendering -= UpdatePreRender;
 #endif
         ReleaseAssets();
         CleanupCameraData();
@@ -1302,11 +1305,9 @@ public class VolumetricRendering : MonoBehaviour
     public void StartSceneViewRendering()
     {
 #if UNITY_EDITOR
-        if (enableEditorPreview && !Application.isPlaying)
-        {
-
-            RenderPipelineManager.beginCameraRendering += UpdatePreRender;
-        }
+        if (enableEditorPreview && !Application.isPlaying) RenderPipelineManager.beginCameraRendering += UpdatePreRender;
+#else
+        RenderPipelineManager.beginCameraRendering += UpdatePreRender;
 #endif
     }
 

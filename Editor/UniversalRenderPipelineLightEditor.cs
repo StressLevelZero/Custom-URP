@@ -4,6 +4,8 @@ using UnityEngine.Rendering.Universal;
 
 namespace UnityEditor.Rendering.Universal
 {
+
+
     [CanEditMultipleObjects]
     [CustomEditorForRenderPipeline(typeof(Light), typeof(UniversalRenderPipelineAsset))]
     class UniversalRenderPipelineLightEditor : LightEditor
@@ -22,6 +24,9 @@ namespace UnityEditor.Rendering.Universal
             return (int)((editor.target as Component).gameObject.hideFlags) == 93;
         }
 
+
+        bool showvolume = false;
+
         public override void OnInspectorGUI()
         {
             serializedLight.Update();
@@ -34,6 +39,25 @@ namespace UnityEditor.Rendering.Universal
             {
                 UniversalRenderPipelineLightUI.Inspector.Draw(serializedLight, this);
             }
+
+            Light light = (Light)target ;
+            if (light.lightmapBakeType != LightmapBakeType.Realtime)
+            {
+                //Clamping range to the lowset possible value in 12bit precision.
+                //Baked Lights should techically be infinite range with a simple inverse square falloff, but Unity has a bug with how range affects baked lights and will not render correctly if the values are too high.
+                //light.range = Mathf.Sqrt(light.intensity / 0.000244140625f); 
+            }
+            //  CED.FoldoutGroup(LightUI.Styles.shapeHeader, Expandable.Shape, k_ExpandedState, DrawShapeContent),
+
+
+            //CoreEditorDrawer.FoldoutGroup(LightUI.Styles.shapeHeader);
+
+            //showvolume = EditorGUILayout.BeginFoldoutHeaderGroup(showvolume, "Dropdown");
+            //if (showvolume)
+            //{
+            //    GUILayout.Label("This is a Label in a Custom Editor");
+            //}
+            //EditorGUILayout.EndFoldoutHeaderGroup();
 
             serializedLight.Apply();
         }

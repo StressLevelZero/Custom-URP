@@ -486,7 +486,7 @@ float4 GetShadowCoord(VertexPositionInputs vertexInput)
     return TransformWorldToShadowCoord(vertexInput.positionWS);
 #endif
 }
-
+//GARBAGE!
 float3 ApplyShadowBias(float3 positionWS, float3 normalWS, float3 lightDirection)
 {
     float invNdotL = 1.0 - saturate(dot(lightDirection, normalWS));
@@ -496,6 +496,14 @@ float3 ApplyShadowBias(float3 positionWS, float3 normalWS, float3 lightDirection
     positionWS = lightDirection * _ShadowBias.xxx + positionWS;
     positionWS = normalWS * scale.xxx + positionWS;
     return positionWS;
+}
+
+float4 ApplySLZShadowBias(float3 positionWS, float3 normalWS, float3 lightDirection)
+{
+    float2 vShadowOffsets = GetShadowOffsets( normalWS, lightDirection );
+    //positionWS.xyz -= vShadowOffsets.x * normalWS.xyz * .003;
+    positionWS.xyz -= vShadowOffsets.y * lightDirection.xyz * 0.01; //_ShadowBias.x    
+    return   TransformObjectToHClip(mul( unity_WorldToObject, float4( positionWS.xyz, 1.0 ) ).xyz) ;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

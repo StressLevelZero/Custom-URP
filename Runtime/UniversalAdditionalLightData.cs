@@ -130,5 +130,46 @@ namespace UnityEngine.Rendering.Universal
             get => m_LightCookieOffset;
             set => m_LightCookieOffset = value;
         }
+
+        float m_Intensity;
+        /// <summary>
+        /// Get/Set the intensity of the light using the current light unit.
+        /// </summary>
+        public float intensity
+        {
+            get => m_Intensity;
+            set
+            {
+                if (m_Intensity == value)
+                    return;
+
+                m_Intensity = Mathf.Clamp(value, 0, float.MaxValue);
+            //    UpdateLightIntensity();
+            }
+        }
+
+        public bool useVolumetric = true;
+
+
+        [Range(0.0f, 16.0f), SerializeField]
+        float m_VolumetricDimmer = 1.0f;
+        /// <summary>
+        /// Get/Set the light dimmer / multiplier on volumetric effects, between 0 and 16.
+        /// </summary>
+        public float volumetricDimmer
+        {
+            get => useVolumetric ? m_VolumetricDimmer : 0.0f;
+            set
+            {
+                if (m_VolumetricDimmer == value)
+                    return;
+
+                m_VolumetricDimmer = Mathf.Clamp(value, 0.0f, 16.0f);
+
+                //if (lightEntity.valid)
+                //    HDLightRenderDatabase.instance.EditLightDataAsRef(lightEntity).volumetricDimmer = m_VolumetricDimmer;
+            }
+        }
+
     }
 }

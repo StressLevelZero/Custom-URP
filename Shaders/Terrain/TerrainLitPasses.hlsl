@@ -479,7 +479,8 @@ VaryingsLean ShadowPassVertex(AttributesLean v)
     float3 lightDirectionWS = _LightDirection;
 #endif
 
-    float4 clipPos = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+   // float4 clipPos = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+   float4 clipPos = ApplySLZShadowBias(positionWS, normalWS, lightDirectionWS);
 
 #if UNITY_REVERSED_Z
     clipPos.z = min(clipPos.z, UNITY_NEAR_CLIP_VALUE);

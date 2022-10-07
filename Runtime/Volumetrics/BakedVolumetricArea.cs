@@ -2,10 +2,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 [ExecuteInEditMode]
 public class BakedVolumetricArea : MonoBehaviour
 {
-    [SerializeField, Tooltip("Texel density per meter. Controls the resolution of the baked texture.")] float TexelDensity = 5;
+    [SerializeField, Tooltip("Texel density per meter. Controls the resolution of the baked texture.")] public float TexelDensity = 5;
   //  [SerializeField, Tooltip("Texel density ratio scaler. Multiples Texel density per dimension")] Vector3 TexelRatio = new Vector3(1,1,1);
     [SerializeField] public Vector3 BoxScale = new Vector3(10,5,10);
     [SerializeField] public Texture3D bakedTexture;
@@ -189,5 +193,18 @@ public class BakedVolumetricArea : MonoBehaviour
         }        
     }
 
+
+    [MenuItem("GameObject/Light/Baked Volumetric Area", false, 10)]
+    static void CreateBakedVolumetricArea(MenuCommand menuCommand)
+    {
+        // Create a custom game object
+        GameObject go = new GameObject("Baked Volumetric Area");
+        // Ensure it gets reparented if this was a context click (otherwise does nothing)
+        GameObjectUtility.SetParentAndAlign(go, menuCommand.context as GameObject);
+        // Register the creation in the undo system
+        go.AddComponent<BakedVolumetricArea>();
+        Undo.RegisterCreatedObjectUndo(go, "Create " + go.name);
+        Selection.activeObject = go;
+    }
 #endif
 }

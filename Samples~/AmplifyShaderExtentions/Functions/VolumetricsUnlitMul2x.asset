@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78b2425a2284af743826c689403a4924, type: 3}
+  m_Name: VolumetricsUnlitMul2x
+  m_EditorClassIdentifier: 
+  m_functionInfo: "// Made with Amplify Shader Editor\n// Available at the Unity
+    Asset Store - http://u3d.as/y3X \n/*ASEBEGIN\nVersion=18935\n2028;88;1920;1019;1630.69;352.8253;1.000001;True;True\nNode;AmplifyShaderEditor.FunctionInput;2;-664,-48.5;Inherit;False;Color;4;0;False;1;0;FLOAT4;0,0,0,0;False;1;FLOAT4;0\nNode;AmplifyShaderEditor.FunctionInput;3;-730,41.5;Inherit;False;World
+    Space Position;3;1;False;1;0;FLOAT3;0,0,0;False;1;FLOAT3;0\nNode;AmplifyShaderEditor.SwizzleNode;14;-707.3295,482.3381;Inherit;False;FLOAT2;0;1;2;3;1;0;FLOAT4;0,0,0,0;False;1;FLOAT2;0\nNode;AmplifyShaderEditor.ScreenPosInputsNode;23;-974.9197,508.9712;Inherit;False;0;False;0;5;FLOAT4;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4\nNode;AmplifyShaderEditor.CustomExpressionNode;1;-421.9999,-33.5;Inherit;False;$$#if
+    defined(_VOLUMETRICS_ENABLED) && !defined(SHADER_API_MOBILE)$    half3 FroxelColor
+    = GetVolumetricColor(positionWS).rgb@$    //color.rgb = 0.5 *( 2.0 * TargetColor.rgb
+    * color.rgb + FroxelColor) / (TargetColor.rgb + FroxelColor)@$    color.rgb =
+    color.rgb - 0.5* (2.0*color.rgb - 1.0) * FroxelColor / TargetColor.rgb@$#endif$$;7;Create;3;True;color;FLOAT4;0,0,0,0;InOut;;Inherit;False;True;positionWS;FLOAT3;0,0,0;In;;Inherit;False;True;TargetColor;FLOAT3;0,0,0;In;;Inherit;False;My
+    Custom Expression;False;False;0;;False;4;0;FLOAT;0;False;1;FLOAT4;0,0,0,0;False;2;FLOAT3;0,0,0;False;3;FLOAT3;0,0,0;False;2;FLOAT;0;FLOAT4;2\nNode;AmplifyShaderEditor.CustomExpressionNode;24;-558.2775,423.7393;Inherit;False;#if
+    defined(_VOLUMETRICS_ENABLED) && !defined(SHADER_API_MOBILE)$screenCol = SampleSceneColor(uv)@$#endif;7;Create;2;True;uv;FLOAT2;0,0;In;;Inherit;False;True;screenCol;FLOAT3;0,0,0;Out;;Inherit;False;My
+    Custom Expression;True;False;0;;False;3;0;FLOAT;0;False;1;FLOAT2;0,0;False;2;FLOAT3;0,0,0;False;2;FLOAT;0;FLOAT3;3\nNode;AmplifyShaderEditor.FunctionOutput;0;0,0;Inherit;False;True;-1;Output;0;False;1;0;FLOAT4;0,0,0,0;False;1;FLOAT4;0\nWireConnection;14;0;23;0\nWireConnection;1;1;2;0\nWireConnection;1;2;3;0\nWireConnection;1;3;24;3\nWireConnection;24;1;14;0\nWireConnection;0;0;1;2\nASEEND*/\n//CHKSM=941B69BB15E5C231684303306784AB302CD165D6"
+  m_functionName: 
+  m_description: Custom intagration of volumetrics meant for unlit template which
+    doesn't store surface world position by default.
+  m_additionalIncludes:
+    m_additionalIncludes: []
+    m_outsideIncludes: []
+  m_additionalPragmas:
+    m_additionalPragmas: []
+    m_outsidePragmas: []
+  m_additionalDirectives:
+    m_validData: 0
+    m_isDirty: 1
+    m_moduleName: ' Additional Directives'
+    m_independentModule: 1
+    m_customEdited: 0
+    m_additionalDirectives:
+    - {fileID: 0}
+    - {fileID: 0}
+    m_shaderFunctionDirectives: []
+    m_nativeDirectives: []
+    m_nativeDirectivesIndex: -1
+    m_nativeDirectivesFoldout: 0
+    m_directivesSaveItems:
+    - LineType: 2
+      LineValue: 'multi_compile _  _VOLUMETRICS_ENABLED '
+      GUIDToggle: 0
+      GUIDValue: 
+      Origin: 2
+    - LineType: 0
+      LineValue: Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl
+      GUIDToggle: 0
+      GUIDValue: 
+      Origin: 2
+  m_nodeCategory: 3
+  m_customNodeCategory: 
+  m_previewPosition: 0
+  m_hidden: 0
+  m_url: 

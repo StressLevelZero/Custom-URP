@@ -51,6 +51,16 @@ public struct PackingOptions
 }
 
 [System.Serializable]
+public struct ReassignLayout
+{
+    [Tooltip("Which property will this texture be applied to")]
+    public string PropertyName;
+    [Tooltip("Orginal source")]
+    public string InputPropertyName;
+}
+
+
+[System.Serializable]
 public enum OverrideSlot
 {
     New, Red, Green, Blue, Alpha
@@ -97,8 +107,17 @@ public struct PackingTargetLayout
     public ChannelOptions AlphaOptions;
 
     public PackingOptions packingOptions;
-    }
+}
 
+
+[System.Serializable]
+public struct ReassignTargetLayout
+{
+    [Tooltip("Which property will this texture be applied to")]
+    public string PropertyName;
+    [Tooltip("Orginal source")]
+    public Texture2D InputTexture;
+}
 
 
 [CreateAssetMenu(fileName = "PackingTemplate", menuName = "Rendering/Texture Packing Template", order = 5)]
@@ -106,4 +125,5 @@ public class TexturePackingTemplate : ScriptableObject
 {
     public Shader TargetShader;
     public PackingLayout[] Packing;
+    public ReassignLayout[] Reassigning;
 }
