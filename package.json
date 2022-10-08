@@ -1,6 +1,6 @@
 {
   "name": "com.unity.render-pipelines.universal",
-  "description": "SLZ's moddified URP",
+  "description": "SLZ's modified URP",
   "version": "8148.0.1",
   "unity": "2021.2",
   "displayName": "SLZ Universal RP",
