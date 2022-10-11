@@ -36,6 +36,10 @@ namespace UnityEngine.Rendering.Universal
                     ConfigureClear(ClearFlag.Depth, Color.black);
                 }
             }
+            else
+            {
+                ConfigureClear(ClearFlag.None, Color.black);
+            }
         }
 
         /// <inheritdoc/>

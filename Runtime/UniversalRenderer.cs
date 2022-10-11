@@ -86,7 +86,7 @@ namespace UnityEngine.Rendering.Universal
         CapturePass m_CapturePass;
 #if ENABLE_VR && ENABLE_XR_MODULE
         XROcclusionMeshPass m_XROcclusionMeshPass;
-        XROcclusionMeshPass m_XROcclusionMeshPass2;
+        XROcclusionMeshPass m_XROcclusionMeshPass_BeforeDepth;
         CopyDepthPass m_XRCopyDepthPass;
 #endif
 #if UNITY_EDITOR
@@ -203,17 +203,16 @@ namespace UnityEngine.Rendering.Universal
             m_AdditionalLightsShadowCasterPass = new AdditionalLightsShadowCasterPass(RenderPassEvent.BeforeRenderingShadows);
 
 #if ENABLE_VR && ENABLE_XR_MODULE
-            m_XROcclusionMeshPass = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingPrePasses-1);
-            m_XROcclusionMeshPass2 = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingOpaques);
-            // Schedule XR copydepth right after m_FinalBlitPass(AfterRendering + 1)
-            m_XRCopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRendering + 2, m_CopyDepthMaterial);
-            m_DepthPrepass = new DepthOnlyPass(RenderPassEvent.BeforeRenderingPrePasses, RenderQueueRange.opaque, data.opaqueLayerMask);
-            m_DepthNormalPrepass = new DepthNormalOnlyPass(RenderPassEvent.BeforeRenderingPrePasses, RenderQueueRange.opaque, data.opaqueLayerMask);
-#else
 
+            m_XROcclusionMeshPass_BeforeDepth = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingPrePasses-1);
+            m_XROcclusionMeshPass = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingOpaques);
+            // Schedule XR copydepth right after m_FinalBlitPass(AfterRendering + 1) 
+
+
+             m_XRCopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRendering + 2, m_CopyDepthMaterial);
+#endif
             m_DepthPrepass = new DepthOnlyPass(RenderPassEvent.BeforeRenderingPrePasses, RenderQueueRange.opaque, data.opaqueLayerMask);
             m_DepthNormalPrepass = new DepthNormalOnlyPass(RenderPassEvent.BeforeRenderingPrePasses, RenderQueueRange.opaque, data.opaqueLayerMask);
-#endif
             m_MotionVectorPass = new MotionVectorRenderPass(m_CameraMotionVecMaterial, m_ObjectMotionVecMaterial);
 
             if (this.renderingMode == RenderingMode.Forward)
@@ -668,12 +667,11 @@ namespace UnityEngine.Rendering.Universal
 
             bool occlusionMeshClearsDepth = false;
 #if ENABLE_VR && ENABLE_XR_MODULE
-            if (cameraData.xr.hasValidOcclusionMesh)
+            if (cameraData.xr.hasValidOcclusionMesh && requiresDepthPrepass)
             {
                 occlusionMeshClearsDepth = true;
-                m_XROcclusionMeshPass.Setup(true);
-                
-                EnqueuePass(m_XROcclusionMeshPass);
+                m_XROcclusionMeshPass_BeforeDepth.Setup(true);
+                EnqueuePass(m_XROcclusionMeshPass_BeforeDepth);
             }
 #endif
 
@@ -745,8 +743,8 @@ namespace UnityEngine.Rendering.Universal
 #if ENABLE_VR && ENABLE_XR_MODULE
             if (cameraData.xr.hasValidOcclusionMesh)
             {
-                m_XROcclusionMeshPass2.Setup(false);
-                EnqueuePass(m_XROcclusionMeshPass2);
+                m_XROcclusionMeshPass.Setup(false);
+                EnqueuePass(m_XROcclusionMeshPass);
             }
 #endif
 
