@@ -1304,11 +1304,11 @@ public class VolumetricRendering : MonoBehaviour
 
     public void StartSceneViewRendering()
     {
-#if UNITY_EDITOR
-        if (enableEditorPreview && !Application.isPlaying) RenderPipelineManager.beginCameraRendering += UpdatePreRender;
-#else
+//#if UNITY_EDITOR
+//        if (enableEditorPreview && !Application.isPlaying) RenderPipelineManager.beginCameraRendering += UpdatePreRender;
+//#else
         RenderPipelineManager.beginCameraRendering += UpdatePreRender;
-#endif
+//#endif
     }
 
     public void UpdateStateAfterReload()
