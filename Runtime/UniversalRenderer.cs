@@ -86,6 +86,7 @@ namespace UnityEngine.Rendering.Universal
         CapturePass m_CapturePass;
 #if ENABLE_VR && ENABLE_XR_MODULE
         XROcclusionMeshPass m_XROcclusionMeshPass;
+        XROcclusionMeshPass m_XROcclusionMeshPass_BeforeDepth;
         CopyDepthPass m_XRCopyDepthPass;
 #endif
 #if UNITY_EDITOR
@@ -202,9 +203,13 @@ namespace UnityEngine.Rendering.Universal
             m_AdditionalLightsShadowCasterPass = new AdditionalLightsShadowCasterPass(RenderPassEvent.BeforeRenderingShadows);
 
 #if ENABLE_VR && ENABLE_XR_MODULE
+
+            m_XROcclusionMeshPass_BeforeDepth = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingPrePasses-1);
             m_XROcclusionMeshPass = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingOpaques);
-            // Schedule XR copydepth right after m_FinalBlitPass(AfterRendering + 1)
-            m_XRCopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRendering + 2, m_CopyDepthMaterial);
+            // Schedule XR copydepth right after m_FinalBlitPass(AfterRendering + 1) 
+
+
+             m_XRCopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRendering + 2, m_CopyDepthMaterial);
 #endif
             m_DepthPrepass = new DepthOnlyPass(RenderPassEvent.BeforeRenderingPrePasses, RenderQueueRange.opaque, data.opaqueLayerMask);
             m_DepthNormalPrepass = new DepthNormalOnlyPass(RenderPassEvent.BeforeRenderingPrePasses, RenderQueueRange.opaque, data.opaqueLayerMask);
@@ -215,7 +220,7 @@ namespace UnityEngine.Rendering.Universal
                 m_PrimedDepthCopyPass = new CopyDepthPass(RenderPassEvent.AfterRenderingPrePasses, m_CopyDepthMaterial);
                 m_CopyDepthToHiZPass = new CopyDepthToHiZPass(RenderPassEvent.AfterRenderingPrePasses + 10, m_CopyDepthToColorMat);
                 m_CopyHiZ0Pass = new CopyHiZ0Pass(RenderPassEvent.AfterRenderingTransparents, m_SamplingMaterial, m_BlitMaterial);
-                m_SetHiZ0GlobalPass = new SetHiZ0GlobalPass(RenderPassEvent.BeforeRenderingPrePasses);
+                m_SetHiZ0GlobalPass = new SetHiZ0GlobalPass(RenderPassEvent.BeforeRenderingPrePasses+2);
                 if (CopyDepthToHiZPass.m_HiZMipCompute == null)
                 {
                     CopyDepthToHiZPass.m_HiZMipCompute = data.shaders.computeDepthPyramid;
@@ -265,7 +270,7 @@ namespace UnityEngine.Rendering.Universal
             
             m_CopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRenderingSkybox, m_CopyDepthMaterial);
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
-            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial);
+            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial, true);
            
 #if ADAPTIVE_PERFORMANCE_2_1_0_OR_NEWER
             if (needTransparencyPass)
@@ -567,6 +572,9 @@ namespace UnityEngine.Rendering.Universal
             bool useDepthPriming = (m_DepthPrimingRecommended && m_DepthPrimingMode == DepthPrimingMode.Auto) || (m_DepthPrimingMode == DepthPrimingMode.Forced);
             useDepthPriming &= requiresDepthPrepass && (createDepthTexture || createColorTexture) && m_RenderingMode == RenderingMode.Forward && (cameraData.renderType == CameraRenderType.Base || cameraData.clearDepth);
 
+          
+
+
             // Temporarily disable depth priming on certain platforms such as Vulkan because we lack proper depth resolve support.
             useDepthPriming &= SystemInfo.graphicsDeviceType != GraphicsDeviceType.Vulkan || cameraTargetDescriptor.msaaSamples == 1;
 
@@ -657,7 +665,16 @@ namespace UnityEngine.Rendering.Universal
 
             int msaaSamplesTemp = cameraTargetDescriptor.msaaSamples;
 
-           
+            bool occlusionMeshClearsDepth = false;
+#if ENABLE_VR && ENABLE_XR_MODULE
+            if (cameraData.xr.hasValidOcclusionMesh && requiresDepthPrepass)
+            {
+                occlusionMeshClearsDepth = true;
+                m_XROcclusionMeshPass_BeforeDepth.Setup(true);
+                EnqueuePass(m_XROcclusionMeshPass_BeforeDepth);
+            }
+#endif
+
             if (requiresDepthPrepass)
             {
                 if (renderPassInputs.requiresNormalsTexture)
@@ -684,7 +701,7 @@ namespace UnityEngine.Rendering.Universal
                     }
                     else
                     {
-                        m_DepthNormalPrepass.Setup(cameraTargetDescriptor, m_DepthTexture, m_NormalsTexture);
+                        m_DepthNormalPrepass.Setup(cameraTargetDescriptor, m_DepthTexture, m_NormalsTexture, !occlusionMeshClearsDepth);
                     }
 
                     EnqueuePass(m_DepthNormalPrepass);
@@ -694,7 +711,7 @@ namespace UnityEngine.Rendering.Universal
                     // Deferred renderer does not require a depth-prepass to generate samplable depth texture.
                     if (this.actualRenderingMode != RenderingMode.Deferred)
                     {
-                        m_DepthPrepass.Setup(cameraTargetDescriptor, m_DepthTexture);
+                        m_DepthPrepass.Setup(cameraTargetDescriptor, m_DepthTexture, !occlusionMeshClearsDepth);
                         EnqueuePass(m_DepthPrepass);
                     }
                 }
@@ -725,7 +742,10 @@ namespace UnityEngine.Rendering.Universal
 
 #if ENABLE_VR && ENABLE_XR_MODULE
             if (cameraData.xr.hasValidOcclusionMesh)
+            {
+                m_XROcclusionMeshPass.Setup(false);
                 EnqueuePass(m_XROcclusionMeshPass);
+            }
 #endif
 
 
@@ -1218,7 +1238,7 @@ namespace UnityEngine.Rendering.Universal
             return supportsDepthCopy || msaaDepthResolve;
         }
 
-        internal override void SwapColorBuffer(CommandBuffer cmd)
+        public override void SwapColorBuffer(CommandBuffer cmd)
         {
             m_ColorBufferSystem.Swap();
 
@@ -1233,12 +1253,12 @@ namespace UnityEngine.Rendering.Universal
             cmd.SetGlobalTexture("_AfterPostProcessTexture", m_ActiveCameraColorAttachment.id);
         }
 
-        internal override RenderTargetIdentifier GetCameraColorFrontBuffer(CommandBuffer cmd)
+        public override RenderTargetIdentifier GetCameraColorFrontBuffer(CommandBuffer cmd)
         {
             return m_ColorBufferSystem.GetFrontBuffer(cmd).id;
         }
 
-        internal override void EnableSwapBufferMSAA(bool enable)
+        public override void EnableSwapBufferMSAA(bool enable)
         {
             m_ColorBufferSystem.EnableMSAA(enable);
         }

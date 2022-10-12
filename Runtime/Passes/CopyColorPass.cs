@@ -30,6 +30,9 @@ namespace UnityEngine.Rendering.Universal.Internal
         private int downsampleKernelID;
         private int gaussianKernelID;
 
+        private bool m_ReconstructTiles = false;
+        private static GlobalKeyword _RECONSTRUCT_VRS_TILES;
+
       
         private RenderTargetIdentifier source { get; set; }
         private RenderTargetHandle destination { get; set; }
@@ -41,7 +44,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <summary>
         /// Create the CopyColorPass
         /// </summary>
-        public CopyColorPass(RenderPassEvent evt, Material samplingMaterial, ComputeShader colorPyramid, Material copyColorMaterial = null)
+        public CopyColorPass(RenderPassEvent evt, Material samplingMaterial, ComputeShader colorPyramid, Material copyColorMaterial = null, bool reconstructTiles = false)
         {
             base.profilingSampler = new ProfilingSampler(nameof(CopyColorPass));
 
@@ -54,7 +57,12 @@ namespace UnityEngine.Rendering.Universal.Internal
             gaussianKernelID = m_ColorPyramidCompute.FindKernel("KColorGaussian");
             m_DownsamplingMethod = Downsampling.None;
             m_MipLevels = 1;
-            
+            if (reconstructTiles)
+            {
+                m_ReconstructTiles = true;
+                //Debug.Log(m_CopyColorMaterial.shader.name + " 0");
+                _RECONSTRUCT_VRS_TILES = GlobalKeyword.Create("_RECONSTRUCT_VRS_TILES");
+            }
             base.useNativeRenderPass = false;
         }
 
@@ -84,10 +92,11 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
-
+            
             RenderTextureDescriptor descriptor = renderingData.cameraData.cameraTargetDescriptor;
             descriptor.msaaSamples = 1;
             descriptor.depthBufferBits = 0;
+            
             if (m_DownsamplingMethod == Downsampling._2xBilinear)
             {
                 descriptor.width /= 2;
@@ -163,6 +172,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                 ScriptableRenderer.SetRenderTarget(cmd, opaqueColorRT, BuiltinRenderTextureType.CameraTarget, clearFlag,
                        clearColor);
                 bool useDrawProceduleBlit = renderingData.cameraData.xr.enabled;
+                if (m_ReconstructTiles)
+                {
+                    cmd.EnableKeyword(_RECONSTRUCT_VRS_TILES);
+                }
                 switch (m_DownsamplingMethod)
                 {
                     case Downsampling.None:
@@ -179,7 +192,11 @@ namespace UnityEngine.Rendering.Universal.Internal
                         RenderingUtils.Blit(cmd, source, opaqueColorRT, m_CopyColorMaterial, 0, useDrawProceduleBlit);
                         break;
                 }
+
+
             }
+
+
             // In shader, we need to know how many mip levels to 1x1 and not actually how many mips there are, so re-add mipTruncation to the true number of mips
             Shader.SetGlobalVector(opaqueTextureDimID, 
                 new Vector4( tempDescriptor.width * 2, tempDescriptor.height * 2, m_MipLevels - 1, m_MipLevels + mipTruncation));
@@ -219,6 +236,11 @@ namespace UnityEngine.Rendering.Universal.Internal
                     
                 }
                 cmd.ReleaseTemporaryRT(tempBuffer.id);
+            }
+
+            if (m_ReconstructTiles)
+            {
+                cmd.DisableKeyword(_RECONSTRUCT_VRS_TILES);
             }
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);

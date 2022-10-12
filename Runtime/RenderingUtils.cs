@@ -234,6 +234,42 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
+
+        /// <summary>
+        /// Blit that does DrawProcedural for both flat and VR
+        /// </summary>
+        /// <param name="cmd"></param>
+        /// <param name="source"></param>
+        /// <param name="destination"></param>
+        /// <param name="material"></param>
+        /// <param name="passIndex"></param>
+        /// <param name="useDrawProcedural"></param>
+        /// <param name="colorLoadAction"></param>
+        /// <param name="colorStoreAction"></param>
+        /// <param name="depthLoadAction"></param>
+        /// <param name="depthStoreAction"></param>
+        public static void BlitUnified(CommandBuffer cmd,
+            RenderTargetIdentifier source,
+            RenderTargetIdentifier destination,
+            Material material,
+            int passIndex = 0,
+            RenderBufferLoadAction colorLoadAction = RenderBufferLoadAction.Load,
+            RenderBufferStoreAction colorStoreAction = RenderBufferStoreAction.Store,
+            RenderBufferLoadAction depthLoadAction = RenderBufferLoadAction.DontCare,
+            RenderBufferStoreAction depthStoreAction = RenderBufferStoreAction.DontCare)
+        {
+            cmd.SetGlobalTexture(ShaderPropertyId.sourceTex, source);
+            
+            Vector4 scaleBias = new Vector4(1, 1, 0, 0);
+            Vector4 scaleBiasRt = new Vector4(1, 1, 0, 0);
+            cmd.SetGlobalVector(ShaderPropertyId.scaleBias, scaleBias);
+            cmd.SetGlobalVector(ShaderPropertyId.scaleBiasRt, scaleBiasRt);
+            cmd.SetRenderTarget(new RenderTargetIdentifier(destination, 0, CubemapFace.Unknown, -1),
+                colorLoadAction, colorStoreAction, depthLoadAction, depthStoreAction);
+            // cmd.SetViewMatrix(Matrix4x4.identity);
+            cmd.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Quads, 4, 1, null);
+            //cmd.SetKeyword(procedural, false);
+        }
         // This is used to render materials that contain built-in shader passes not compatible with URP.
         // It will render those legacy passes with error/pink shader.
         [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]

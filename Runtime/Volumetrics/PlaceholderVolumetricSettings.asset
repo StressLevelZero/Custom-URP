@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12df6f25bd2bedf478f47d04069582bc, type: 3}
-  m_Name: Placeholder Volumetric Settings
+  m_Name: PlaceholderVolumetricSettings
   m_EditorClassIdentifier: 
   near: 0.01
   far: 80

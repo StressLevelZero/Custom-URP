@@ -226,7 +226,7 @@ namespace UnityEngine.Rendering.Universal
 
         public SortingCriteria defaultOpaqueSortFlags;
 
-        internal XRPass xr;
+        public XRPass xr;
 
         [Obsolete("Please use xr.enabled instead.")]
         public bool isStereoEnabled;
@@ -345,7 +345,7 @@ namespace UnityEngine.Rendering.Universal
         public uint layerMask;
     }
 
-    internal static class ShaderPropertyId
+    public static class ShaderPropertyId
     {
         public static readonly int glossyEnvironmentColor = Shader.PropertyToID("_GlossyEnvironmentColor");
         public static readonly int subtractiveShadowColor = Shader.PropertyToID("_SubtractiveShadowColor");
