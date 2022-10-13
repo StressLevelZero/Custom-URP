@@ -79,7 +79,7 @@ public class VolumetricRendering : MonoBehaviour
 
     public VolumetricData volumetricData;
     [Range(0, 1)]
-    public float reprojectionAmount = 0.95f;
+    public float reprojectionAmount = 0.5f;
     //   [Tooltip("Does a final blur pass on the rendered fog")]
     //    public bool FroxelBlur = false;
 
@@ -650,17 +650,13 @@ public class VolumetricRendering : MonoBehaviour
 
         SkyManager.CheckSky();
 
-        ClearRenderTexture(FroxelBufferA, Color.black);
-        ClearRenderTexture(FroxelBufferB, Color.black);
-        ClearRenderTexture(IntegrationBuffer, Color.black);
-
         SetVariables();
+
         SetupClipmap();
         UpdateClipmaps();
         SetFroxelFogUniforms(true);
         SetFroxelIntegrationUniforms(true);
         SetBlurUniforms(true);
-
         hasInitialized = true;
         //RenderPipelineManager.beginCameraRendering += UpdatePreRender;
     }
