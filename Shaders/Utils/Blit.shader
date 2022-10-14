@@ -19,7 +19,7 @@ Shader "Hidden/Universal Render Pipeline/Blit"
             #pragma multi_compile _ _USE_DRAW_PROCEDURAL
             #pragma multi_compile_fragment _ DEBUG_DISPLAY
             #pragma multi_compile_fragment _ _RECONSTRUCT_VRS_TILES
-            #pragma multi_compile_fragment _ _VRS_TILE_MODE
+            #pragma multi_compile_fragment _ _VRS_MASK_MODE
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Fullscreen.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Debug/DebuggingFullscreen.hlsl"
@@ -29,7 +29,7 @@ Shader "Hidden/Universal Render Pipeline/Blit"
             TEXTURE2D_X(_SourceTex);
             SAMPLER(sampler_SourceTex);
             float4 _TileRadii;
-#if defined(_RECONSTRUCT_VRS_TILES) && defined(_VRS_TILE_MODE)
+#if defined(_RECONSTRUCT_VRS_TILES) && defined(_VRS_MASK_MODE)
             float4 _SourceTex_TexelSize;
             float4 _EyeCenterCoords;
 
@@ -97,13 +97,14 @@ Shader "Hidden/Universal Render Pipeline/Blit"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float2 uv = input.uv;
-#if defined(_RECONSTRUCT_VRS_TILES) && defined(_VRS_TILE_MODE)
+#if defined(_RECONSTRUCT_VRS_TILES) && defined(_VRS_MASK_MODE)
                 //float xCenter = (UNITY_MATRIX_P._m03 - UNITY_MATRIX_P._m02) / (UNITY_MATRIX_P._m33 - UNITY_MATRIX_P._m32);
                 //xCenter = 0.5;
                 float2 screenUV = _SourceTex_TexelSize.zw * uv ;
                 
                 float2 gridUnit2 = 4 * floor(screenUV * 0.25);
                 float2 center = unity_StereoEyeIndex == 0 ? _EyeCenterCoords.xy : _EyeCenterCoords.zw;
+                center *= _SourceTex_TexelSize.zw;
                 float4 radii;
                 radii.x = length(gridUnit2 + float2(0.0, 0.0) - center) * _SourceTex_TexelSize.y;
                 radii.y = length(gridUnit2 + float2(4.0, 0.0) - center) * _SourceTex_TexelSize.y;
