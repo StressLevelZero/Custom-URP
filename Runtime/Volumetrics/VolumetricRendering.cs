@@ -560,8 +560,6 @@ public class VolumetricRendering : MonoBehaviour
         FroxelBufferB = new RenderTexture(rtdiscrpt);
         FroxelBufferB.Create();
 
-
-
         rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
         IntegrationBuffer = new RenderTexture(rtdiscrpt);
       //  IntegrationBuffer.format = RenderTextureFormat.ARGB32;
@@ -650,9 +648,9 @@ public class VolumetricRendering : MonoBehaviour
 
         SkyManager.CheckSky();
 
-        ClearRenderTexture(FroxelBufferA, Color.black);
-        ClearRenderTexture(FroxelBufferB, Color.black);
-        ClearRenderTexture(IntegrationBuffer, Color.black);
+        ClearRenderTexture(FroxelBufferA, clearColor);
+        ClearRenderTexture(FroxelBufferB, clearColor);
+        ClearRenderTexture(IntegrationBuffer, clearColor);
 
         SetVariables();
         SetupClipmap();
