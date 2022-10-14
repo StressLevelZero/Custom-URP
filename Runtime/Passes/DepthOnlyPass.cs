@@ -68,7 +68,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             {
                 if (clearDepth)
                 {
-                    ConfigureTarget(renderingData.cameraData.renderer.cameraDepthTarget, desc.depthStencilFormat, desc.width, desc.height, 1, true);
+                    ConfigureTarget(renderingData.cameraData.renderer.cameraDepthTarget, descriptor.depthStencilFormat, desc.width, desc.height, 1, true);
                 }
             }
             // When not using depth priming the camera target should be set to our non MSAA depth target.
