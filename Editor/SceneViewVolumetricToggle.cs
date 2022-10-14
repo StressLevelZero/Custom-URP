@@ -12,7 +12,7 @@ using FrameCapture = UnityEngine.Apple.FrameCapture;
 using FrameCaptureDestination = UnityEngine.Apple.FrameCaptureDestination;
 using UnityEngine.Rendering.Universal;
 
-namespace SLZ.Editor
+namespace SLZ.SLZEditorTools
 {
     
     [EditorToolbarElement(elementID, typeof(SceneView))]
