@@ -374,7 +374,7 @@ public class TextureConverter : ScriptableWizard
         if (targetLayout.RedInputTexture != null) return AssetDatabase.GetAssetPath(targetLayout.RedInputTexture);
         else if (targetLayout.GreenInputTexture != null) return AssetDatabase.GetAssetPath(targetLayout.GreenInputTexture);
         else if (targetLayout.BlueInputTexture != null) return AssetDatabase.GetAssetPath(targetLayout.BlueInputTexture);
-        else if (targetLayout.AlphaInputTexture != null) return AssetDatabase.GetAssetPath(targetLayout.RedInputTexture);
+        else if (targetLayout.AlphaInputTexture != null) return AssetDatabase.GetAssetPath(targetLayout.AlphaInputTexture);
         else return "/Asset/";
 
     }
