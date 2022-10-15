@@ -397,7 +397,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	//Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount); // Temporal sampling ComputeHistoryWeight()
 	//Doing a simple curve based on depth so nearer slices take longer to converge. This is to get rid of the near flickering. There is likely something else to fix and this is just a bandaid solution.
-	Result[id.xyz] = lerp(accumLighting , previousResult, ComputeHistoryWeight((1 / (id.z * id.z + .4) + 1)) ); // Temporal sampling 
+	Result[id.xyz] = lerp(max(0,accumLighting) , previousResult, ComputeHistoryWeight((1 / (id.z * id.z + .4) + 1)) ); // Temporal sampling 
 	
 }
 
