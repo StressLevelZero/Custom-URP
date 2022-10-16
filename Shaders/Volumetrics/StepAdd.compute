@@ -148,7 +148,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 
 	//	float4 normalizedVoxelValue = accumScatteringTransmittance * rcp(travelDis);
 
-		Result[int3(id.x, id.y, depth)] =  accumScatteringTransmittance;
+		Result[int3(id.x, id.y, depth)] = max(0 ,accumScatteringTransmittance);
 
 		previousDepth = zDepth;
 	}
