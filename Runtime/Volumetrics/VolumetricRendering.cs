@@ -727,6 +727,18 @@ public class VolumetricRendering : MonoBehaviour
         }
     }
 
+    public void ClearAllBuffers()
+    {        
+        ClearRenderTexture(ClipmapBufferA, clearColor);
+        ClearRenderTexture(ClipmapBufferB, clearColor);
+        ClearRenderTexture(ClipmapBufferC, clearColor);
+        ClearRenderTexture(ClipmapBufferD, clearColor);
+
+        ClearRenderTexture(FroxelBufferA, clearColor);
+        ClearRenderTexture(FroxelBufferB, clearColor);
+        ClearRenderTexture(IntegrationBuffer, clearColor);
+    }
+
     void UpdateLights()
     {
         LightObjects.Clear(); //clear and rebuild for now. TODO: Make a smarter constructor
