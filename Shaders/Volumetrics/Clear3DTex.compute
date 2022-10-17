@@ -1,0 +1,17 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Clear3D
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture3D<half4> _Source;
+uint4 _SourceDim;
+half4 _ClearColor;
+
+[numthreads(4,4,4)]
+void Clear3D (uint3 id : SV_DispatchThreadID)
+{
+    if (all(id.xyz < _SourceDim.xyz))
+    {
+        Result[id.xy] = _ClearColor;
+    }
+}

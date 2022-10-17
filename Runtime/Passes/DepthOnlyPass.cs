@@ -66,10 +66,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             // When depth priming is in use the camera target should not be overridden so the Camera's MSAA depth attachment is used.
             if (renderingData.cameraData.renderer.useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth))
             {
-                if (clearDepth)
-                {
-                    ConfigureTarget(renderingData.cameraData.renderer.cameraDepthTarget, descriptor.depthStencilFormat, desc.width, desc.height, 1, true);
-                }
+                ConfigureTarget(renderingData.cameraData.renderer.cameraDepthTarget, descriptor.depthStencilFormat, desc.width, desc.height, 1, true);
             }
             // When not using depth priming the camera target should be set to our non MSAA depth target.
             else
@@ -85,7 +82,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             else
             {
-                ConfigureClear(ClearFlag.None, Color.black);
+                ConfigureClear(ClearFlag.Stencil, Color.black);
             }
         }
 

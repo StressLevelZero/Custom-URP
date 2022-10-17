@@ -667,7 +667,7 @@ namespace UnityEngine.Rendering.Universal
 
             bool occlusionMeshClearsDepth = false;
 #if ENABLE_VR && ENABLE_XR_MODULE
-            if (cameraData.xr.hasValidOcclusionMesh && requiresDepthPrepass)
+            if (cameraData.xr.hasValidOcclusionMesh)
             {
                 occlusionMeshClearsDepth = true;
                 m_XROcclusionMeshPass_BeforeDepth.Setup(true);
