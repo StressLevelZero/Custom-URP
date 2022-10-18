@@ -471,14 +471,14 @@ public class VolumetricRendering : MonoBehaviour
         BlurBuffer.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBuffer.enableRandomWrite = true;
         BlurBuffer.Create();
-        ClearRenderTexture(BlurBuffer, clearColor);
+        Clear3DTexture(BlurBuffer);
 
 
         BlurBufferB = new RenderTexture(rtdiscrpt);
         BlurBufferB.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBufferB.enableRandomWrite = true;
         BlurBufferB.Create();
-        ClearRenderTexture(BlurBufferB, clearColor);
+        Clear3DTexture(BlurBufferB);
 
         BlurKernelX = BlurCompute.FindKernel("VolBlurX");
         BlurKernelY = BlurCompute.FindKernel("VolBlurY");
@@ -648,9 +648,9 @@ public class VolumetricRendering : MonoBehaviour
 
         SkyManager.CheckSky();
 
-        ClearRenderTexture(FroxelBufferA, clearColor);
-        ClearRenderTexture(FroxelBufferB, clearColor);
-        ClearRenderTexture(IntegrationBuffer, clearColor);
+        Clear3DTexture(FroxelBufferA);
+        Clear3DTexture(FroxelBufferB);
+        Clear3DTexture(IntegrationBuffer);
 
         SetVariables();
         SetupClipmap();
@@ -728,15 +728,15 @@ public class VolumetricRendering : MonoBehaviour
     }
 
     public void ClearAllBuffers()
-    {        
-        ClearRenderTexture(ClipmapBufferA, clearColor);
-        ClearRenderTexture(ClipmapBufferB, clearColor);
-        ClearRenderTexture(ClipmapBufferC, clearColor);
-        ClearRenderTexture(ClipmapBufferD, clearColor);
+    {
+        ClearClipmap(ClipmapBufferA);
+        ClearClipmap(ClipmapBufferB);
+        ClearClipmap(ClipmapBufferC);
+        ClearClipmap(ClipmapBufferD);
 
-        ClearRenderTexture(FroxelBufferA, clearColor);
-        ClearRenderTexture(FroxelBufferB, clearColor);
-        ClearRenderTexture(IntegrationBuffer, clearColor);
+        Clear3DTexture(FroxelBufferA);
+        Clear3DTexture(FroxelBufferB);
+        Clear3DTexture(IntegrationBuffer);
     }
 
     void UpdateLights()
@@ -784,16 +784,24 @@ public class VolumetricRendering : MonoBehaviour
         ClipmapBufferC.Create();        
         ClipmapBufferD = new RenderTexture(ClipRTdiscrpt);
         ClipmapBufferD.Create();
-       
-        ClearRenderTexture(ClipmapBufferA, clearColor);
-        ClearRenderTexture(ClipmapBufferB, clearColor);
-        ClearRenderTexture(ClipmapBufferC, clearColor);
-        ClearRenderTexture(ClipmapBufferD, clearColor);
-        //TODO: Loop through and remove one of the buffers
 
-       
-       
+        ////TODO: Loop through and remove one of the buffers
+
+        ClearClipmap(ClipmapBufferA);
+        ClearClipmap(ClipmapBufferB);
+        ClearClipmap(ClipmapBufferC);
+        ClearClipmap(ClipmapBufferD);
+
     }
+
+    void ClearClipmap(RenderTexture buffer)
+    {
+        int clipMapDispatchNum = Mathf.Max(volumetricData.ClipMapResolution / 4, 1);
+
+        ClipmapCompute.SetTexture(ID_ClipMapClearKern, ID_Result, buffer);
+        ClipmapCompute.Dispatch(ID_ClipMapClearKern, clipMapDispatchNum, clipMapDispatchNum, clipMapDispatchNum);
+    }
+
     bool ClipFar = false;
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
     {
@@ -1589,36 +1597,44 @@ public class VolumetricRendering : MonoBehaviour
     //    print("The scene was unloaded!");
     //}
 
-    void ClearRenderTexture(RenderTexture rt, Color color)
+    void Clear3DTexture(RenderTexture buffer)
     {
-        RenderTexture activeRT = RenderTexture.active;
-        RenderTexture.active = rt;
-        GL.sRGBWrite = rt.sRGB;
-        if (rt.dimension == TextureDimension.Tex3D)
-        {
-            for (int i = 0; i < rt.depth; i++)
-            {
-                Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, i);
-                GL.Clear(false, true, color);
-            }
-            
-        }
-        else if (rt.dimension == TextureDimension.Cube)
-        {    
-            Graphics.SetRenderTarget(rt, 0, CubemapFace.PositiveX, 0);
-            GL.Clear(false, true, color);
-            Graphics.SetRenderTarget(rt, 0, CubemapFace.PositiveY, 0);
-            GL.Clear(false, true, color);
-            Graphics.SetRenderTarget(rt, 0, CubemapFace.PositiveZ, 0);
-            GL.Clear(false, true, color);
-            Graphics.SetRenderTarget(rt, 0, CubemapFace.NegativeX, 0);
-            GL.Clear(false, true, color);
-            Graphics.SetRenderTarget(rt, 0, CubemapFace.NegativeY, 0);
-            GL.Clear(false, true, color);
-            Graphics.SetRenderTarget(rt, 0, CubemapFace.NegativeZ, 0);
-            GL.Clear(false, true, color);
-        }
-        RenderTexture.active = activeRT;
+        ClipmapCompute.SetTexture(ID_ClipMapClearKern, ID_Result, buffer);
+        ClipmapCompute.Dispatch(ID_ClipMapClearKern, Mathf.Max(buffer.width / 4, 1), Mathf.Max(buffer.height / 4, 1), Mathf.Max(buffer.volumeDepth / 4, 1));
+
+        //RenderTexture activeRT = RenderTexture.active;
+        //RenderTexture.active = rt;
+        //GL.sRGBWrite = rt.sRGB;
+        //if (rt.dimension == TextureDimension.Tex3D)
+        //{
+        //    CoreUtils.SetRenderTarget(
+        //        command,
+        //        rt,
+        //        ClearFlag.Color, Color.clear,
+        //        0, CubemapFace.Unknown, -1
+        //    );
+
+        //}
+        //else if (rt.dimension == TextureDimension.Cube)
+        //{    
+        //    Graphics.SetRenderTarget(rt, 0, CubemapFace.PositiveX, 0);
+        //    GL.Clear(false, true, color);
+        //    Graphics.SetRenderTarget(rt, 0, CubemapFace.PositiveY, 0);
+        //    GL.Clear(false, true, color);
+        //    Graphics.SetRenderTarget(rt, 0, CubemapFace.PositiveZ, 0);
+        //    GL.Clear(false, true, color);
+        //    Graphics.SetRenderTarget(rt, 0, CubemapFace.NegativeX, 0);
+        //    GL.Clear(false, true, color);
+        //    Graphics.SetRenderTarget(rt, 0, CubemapFace.NegativeY, 0);
+        //    GL.Clear(false, true, color);
+        //    Graphics.SetRenderTarget(rt, 0, CubemapFace.NegativeZ, 0);
+        //    GL.Clear(false, true, color);
+        //}
+        //        CoreUtils.SetRenderTarget(
+        //           rt,
+        //           BuiltinRenderTextureType.CameraTarget
+        //);
+        //        RenderTexture.active = activeRT;
     }
 
     void RefreshOnSceneChange(Scene oldS, Scene newS)
