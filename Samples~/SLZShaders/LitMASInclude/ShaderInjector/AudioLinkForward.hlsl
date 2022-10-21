@@ -61,7 +61,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 
 // Begin Injection INCLUDES from Injection_AudioLink.hlsl ----------------------------------------------------------
-#include "/Assets/AudioLink/Shaders/AudioLink.cginc"
+#include "AudioLink/Shaders/AudioLink.cginc"
 // End Injection INCLUDES from Injection_AudioLink.hlsl ----------------------------------------------------------
 
 

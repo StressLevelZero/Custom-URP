@@ -1,5 +1,5 @@
 //#!INJECT_BEGIN INCLUDES 1
-#include "/Assets/AudioLink/Shaders/AudioLink.cginc"
+#include "AudioLink/Shaders/AudioLink.cginc"
 //#!INJECT_END
 
 //#!INJECT_BEGIN UNIFORMS 1

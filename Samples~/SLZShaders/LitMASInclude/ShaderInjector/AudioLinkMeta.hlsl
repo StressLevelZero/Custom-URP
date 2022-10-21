@@ -29,7 +29,7 @@
 #include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
 // Begin Injection INCLUDES from Injection_AudioLink.hlsl ----------------------------------------------------------
-#include "/Assets/AudioLink/Shaders/AudioLink.cginc"
+#include "AudioLink/Shaders/AudioLink.cginc"
 // End Injection INCLUDES from Injection_AudioLink.hlsl ----------------------------------------------------------
 
 TEXTURE2D(_BaseMap);

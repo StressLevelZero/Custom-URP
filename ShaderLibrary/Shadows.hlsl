@@ -503,7 +503,7 @@ float4 ApplySLZShadowBias(float3 positionWS, float3 normalWS, float3 lightDirect
     float2 vShadowOffsets = GetShadowOffsets( normalWS, lightDirection );
     //positionWS.xyz -= vShadowOffsets.x * normalWS.xyz * .003;
     positionWS.xyz -= vShadowOffsets.y * lightDirection.xyz * 0.01; //_ShadowBias.x    
-    return   TransformObjectToHClip(mul( unity_WorldToObject, float4( positionWS.xyz, 1.0 ) ).xyz) ;
+    return TransformWorldToHClip(positionWS.xyz);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

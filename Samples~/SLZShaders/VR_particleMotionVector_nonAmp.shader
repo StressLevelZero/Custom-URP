@@ -86,7 +86,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 			//#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
-			#include "Shaders/include/billboard.hlsl"
+			#include "Include/Particle/billboard.hlsl"
 			#define ASE_NEEDS_VERT_POSITION
 			#define ASE_NEEDS_VERT_NORMAL
 			#define ASE_NEEDS_FRAG_COLOR
@@ -572,7 +572,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
-			#include "Shaders/include/billboard.hlsl"
+			#include "Include/Particle/billboard.hlsl"
 			#define ASE_NEEDS_VERT_POSITION
 			#define ASE_NEEDS_VERT_NORMAL
 			#pragma shader_feature_local _SCALEDEPTHDITHER_ON
