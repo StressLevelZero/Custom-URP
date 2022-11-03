@@ -84,8 +84,8 @@ public class TextureConverter : ScriptableWizard
         if (template == null) return;
 
         TargetShader = template.TargetShader;
-        if (template.Packing.Length > 0) PackingArray = new PackingTargetLayout[template.Packing.Length];
-        if (template.Reassigning.Length > 0) ReassigningArray = new ReassignTargetLayout[template.Reassigning.Length];
+        if (template.Packing.Length != 0) PackingArray = new PackingTargetLayout[template.Packing.Length];
+        if (template.Reassigning.Length != 0) ReassigningArray = new ReassignTargetLayout[template.Reassigning.Length];
         for (int i = 0; i < template.Packing.Length; i++)
         {
             PackingArray[i] = ParsePackingTemplate(template.Packing[i]);
