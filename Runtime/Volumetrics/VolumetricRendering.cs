@@ -468,6 +468,7 @@ public class VolumetricRendering : MonoBehaviour
     void IntializeBlur(RenderTextureDescriptor rtdiscrpt)
     {
         BlurBuffer = new RenderTexture(rtdiscrpt);
+        BlurBuffer.name = activeCam.name + "_BlurBuffer";
         BlurBuffer.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBuffer.enableRandomWrite = true;
         BlurBuffer.Create();
@@ -475,6 +476,7 @@ public class VolumetricRendering : MonoBehaviour
 
 
         BlurBufferB = new RenderTexture(rtdiscrpt);
+        BlurBuffer.name = activeCam.name + "_BlurBufferB";
         BlurBufferB.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         BlurBufferB.enableRandomWrite = true;
         BlurBufferB.Create();
@@ -529,7 +531,7 @@ public class VolumetricRendering : MonoBehaviour
         //activeCameraState = activeCam.isActiveAndEnabled;
         CheckOverrideVolumes();
      //   if (VerifyVolumetricRegisters() == false) return; //Check registers to see if there's anything to render. If not, then disable system. TODO: Remove this 
-        CheckCookieList();
+      //  CheckCookieList();
 
 
         //   SetSkyTexture( skytex);
@@ -554,15 +556,18 @@ public class VolumetricRendering : MonoBehaviour
         rtdiscrpt.msaaSamples = 1;
 
         FroxelBufferA = new RenderTexture(rtdiscrpt);
+        FroxelBufferA.name = activeCam.name + "_FroxelBufferA";
         FroxelBufferA.Create();
 
         //Ugh... extra android buffer mess. Can I use a custom RT double buffer instead?
         FroxelBufferB = new RenderTexture(rtdiscrpt);
+        FroxelBufferB.name = activeCam.name + "_FroxelBufferB";
         FroxelBufferB.Create();
 
         rtdiscrpt.width = volumetricData.FroxelWidthResolution * 2; // Make double wide texture for stereo use. Make smarter for non VR use case?
         IntegrationBuffer = new RenderTexture(rtdiscrpt);
-      //  IntegrationBuffer.format = RenderTextureFormat.ARGB32;
+        IntegrationBuffer.name = activeCam.name + "_IntegrationBuffer";
+        //  IntegrationBuffer.format = RenderTextureFormat.ARGB32;
         IntegrationBuffer.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         IntegrationBuffer.filterMode = FilterMode.Trilinear;
         IntegrationBuffer.enableRandomWrite = true;
@@ -777,12 +782,16 @@ public class VolumetricRendering : MonoBehaviour
         ClipRTdiscrpt.msaaSamples = 1;
         
         ClipmapBufferA = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferA.name = activeCam.name + "_ClipmapBufferA";
         ClipmapBufferA.Create();
         ClipmapBufferB = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferB.name = activeCam.name + "_ClipmapBufferB";
         ClipmapBufferB.Create();        
-        ClipmapBufferC = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferC = new RenderTexture(ClipRTdiscrpt);        
+        ClipmapBufferC.name = activeCam.name + "_ClipmapBufferC";
         ClipmapBufferC.Create();        
-        ClipmapBufferD = new RenderTexture(ClipRTdiscrpt);
+        ClipmapBufferD = new RenderTexture(ClipRTdiscrpt); 
+        ClipmapBufferD.name = activeCam.name + "_ClipmapBufferD";
         ClipmapBufferD.Create();
 
         ////TODO: Loop through and remove one of the buffers
@@ -1389,8 +1398,16 @@ public class VolumetricRendering : MonoBehaviour
 #endif
       
         if (ClipmapBufferA != null) ClipmapBufferA.Release();
+        if (ClipmapBufferB != null) ClipmapBufferB.Release();
+        if (ClipmapBufferC != null) ClipmapBufferC.Release();
+        if (ClipmapBufferD != null) ClipmapBufferD.Release();
+
         if (FroxelBufferA != null) FroxelBufferA.Release();
+        if (FroxelBufferB != null) FroxelBufferB.Release();
         if (IntegrationBuffer != null) IntegrationBuffer.Release();
+
+        if (BlurBuffer != null) BlurBuffer.Release();
+        if (BlurBufferB != null) BlurBufferB.Release();
     }
 
 
