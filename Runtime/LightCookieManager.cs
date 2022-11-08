@@ -503,14 +503,34 @@ namespace UnityEngine.Rendering.Universal
 
         public bool isInitialized() => m_AdditionalLightsCookieAtlas != null && m_AdditionalLightsCookieShaderData != null;
 
+        private bool disposed = false;
+        ~LightCookieManager()
+        {
+            Dispose(false);
+        }
+
         /// <summary>
         /// Release LightCookieManager resources.
         /// </summary>
         public void Dispose()
         {
-            m_AdditionalLightsCookieAtlas?.Release();
-            m_AdditionalLightsCookieShaderData?.Dispose();
+            Dispose(true);
         }
+
+        public void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                m_AdditionalLightsCookieAtlas?.Release();
+                m_AdditionalLightsCookieShaderData?.Dispose();
+                disposed = true;
+            }
+            if (disposing)
+            {
+                GC.SuppressFinalize(this);
+            }
+        }
+
 
         // -1 on invalid/disabled cookie.
         public int GetLightCookieShaderDataIndex(int visibleLightIndex)
