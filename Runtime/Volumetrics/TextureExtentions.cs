@@ -117,6 +117,16 @@ public static class TextureExtentions
 #endif
         return   new Vector2Int(0,0);
     }
+    /// <summary>
+    /// Releases and destroys the rendertexture
+    /// </summary>
+    /// <param name="renderTexture"></param>
+    public static void Clear(this RenderTexture renderTexture)
+    {
+        if (renderTexture == null) return;
+        renderTexture.Release();
+        UnityEngine.Rendering.CoreUtils.Destroy(renderTexture);
+    }
 
 
     public static void SaveToTexture3D(this RenderTexture Rtex3d, string NameAtPath)
