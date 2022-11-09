@@ -478,6 +478,7 @@ namespace UnityEngine.Rendering.Universal
                     FilterMode.Bilinear,
                     "Universal Light Cookie Pow2 Atlas",
                     true);
+                
             }
             else
             {
@@ -492,7 +493,7 @@ namespace UnityEngine.Rendering.Universal
                     false); // to support mips, use Pow2Atlas
             }
 
-
+            m_AdditionalLightsCookieAtlas.AtlasTexture.rt.hideFlags = m_AdditionalLightsCookieAtlas.AtlasTexture.rt.hideFlags & ~(HideFlags.DontUnloadUnusedAsset);
             m_AdditionalLightsCookieShaderData = new LightCookieShaderData(size, m_Settings.useStructuredBuffer);
             const int mainLightCount = 1;
             m_VisibleLightIndexToShaderDataIndex = new int[m_Settings.maxAdditionalLights + mainLightCount];
