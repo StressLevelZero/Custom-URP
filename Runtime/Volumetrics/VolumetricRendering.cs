@@ -1401,21 +1401,24 @@ public class VolumetricRendering : MonoBehaviour
         }
 #endif
 
+    }
+
+    private void DestroyAllTextureAssets()
+    {
         if (ClipmapBufferA != null) { ClipmapBufferA.Release(); CoreUtils.Destroy(ClipmapBufferA); }
         if (ClipmapBufferB != null) { ClipmapBufferB.Release(); CoreUtils.Destroy(ClipmapBufferB); }
         if (ClipmapBufferC != null) { ClipmapBufferC.Release(); CoreUtils.Destroy(ClipmapBufferC); }
         if (ClipmapBufferD != null) { ClipmapBufferD.Release(); CoreUtils.Destroy(ClipmapBufferD); }
-
+        
         if (FroxelBufferA != null) { FroxelBufferA.Release(); CoreUtils.Destroy(FroxelBufferA); }
         if (FroxelBufferB != null) { FroxelBufferB.Release(); CoreUtils.Destroy(FroxelBufferB); }
         if (IntegrationBuffer != null) { IntegrationBuffer.Release(); CoreUtils.Destroy(IntegrationBuffer); }
-
+        
         if (BlurBuffer != null) { BlurBuffer.Release(); CoreUtils.Destroy(BlurBuffer); }
         if (BlurBufferB != null) { BlurBufferB.Release(); CoreUtils.Destroy(BlurBufferB); }
-
+        
         if (createdLightProjectionTexture && LightProjectionTextures != null) { CoreUtils.Destroy(LightProjectionTextures); }
     }
-
 
     Matrix4x4 ComputePixelCoordToWorldSpaceViewDirectionMatrix(Camera cam, Vector4 resolution)
     {
@@ -1484,9 +1487,8 @@ public class VolumetricRendering : MonoBehaviour
 
     void ReleaseAssets()
     {
-        if (ClipmapBufferA!= null) { ClipmapBufferA.Release(); CoreUtils.Destroy(ClipmapBufferA); }
-        if (FroxelBufferA != null) { FroxelBufferA.Release(); CoreUtils.Destroy(FroxelBufferA); } 
-        if (IntegrationBuffer != null)IntegrationBuffer.Release();
+        DestroyAllTextureAssets();
+
         if (ComputePerFrameConstantBuffer != null)
         {
             ComputePerFrameConstantBuffer.Dispose();
