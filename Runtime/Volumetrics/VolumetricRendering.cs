@@ -420,11 +420,14 @@ public class VolumetricRendering : MonoBehaviour
 //#endif
     }
 
-
+    bool createdLightProjectionTexture = false;
     void CheckCookieList()
     {
         if (LightProjectionTextures != null) return;
         LightProjectionTextures = new Texture2DArray(1, 1, 1, TextureFormat.RGBA32, false);
+        LightProjectionTextures.hideFlags = HideFlags.DontSave;
+        LightProjectionTextures.name = activeCam.name + " Volumetric Light Cookies";
+        createdLightProjectionTexture = true;
         //Debug.Log("Made blank cookie sheet");
     }
 
@@ -678,6 +681,7 @@ public class VolumetricRendering : MonoBehaviour
             //FroxelFogCompute.SetFloat(ID_GlobalExtinction, Extinction);
             //FroxelFogCompute.SetFloat(ID_StaticLightMultiplier, StaticLightMultiplier);
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_Result, FroxelBufferA);
+            CheckCookieList();
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_LightProjectionTextureArray, LightProjectionTextures);
             FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
             lastFroxelFog = this;
@@ -1396,18 +1400,20 @@ public class VolumetricRendering : MonoBehaviour
             AssemblyReloadEvents.afterAssemblyReload -= UpdateStateAfterReload;
         }
 #endif
-      
-        if (ClipmapBufferA != null) ClipmapBufferA.Release();
-        if (ClipmapBufferB != null) ClipmapBufferB.Release();
-        if (ClipmapBufferC != null) ClipmapBufferC.Release();
-        if (ClipmapBufferD != null) ClipmapBufferD.Release();
 
-        if (FroxelBufferA != null) FroxelBufferA.Release();
-        if (FroxelBufferB != null) FroxelBufferB.Release();
-        if (IntegrationBuffer != null) IntegrationBuffer.Release();
+        if (ClipmapBufferA != null) { ClipmapBufferA.Release(); CoreUtils.Destroy(ClipmapBufferA); }
+        if (ClipmapBufferB != null) { ClipmapBufferB.Release(); CoreUtils.Destroy(ClipmapBufferB); }
+        if (ClipmapBufferC != null) { ClipmapBufferC.Release(); CoreUtils.Destroy(ClipmapBufferC); }
+        if (ClipmapBufferD != null) { ClipmapBufferD.Release(); CoreUtils.Destroy(ClipmapBufferD); }
 
-        if (BlurBuffer != null) BlurBuffer.Release();
-        if (BlurBufferB != null) BlurBufferB.Release();
+        if (FroxelBufferA != null) { FroxelBufferA.Release(); CoreUtils.Destroy(FroxelBufferA); }
+        if (FroxelBufferB != null) { FroxelBufferB.Release(); CoreUtils.Destroy(FroxelBufferB); }
+        if (IntegrationBuffer != null) { IntegrationBuffer.Release(); CoreUtils.Destroy(IntegrationBuffer); }
+
+        if (BlurBuffer != null) { BlurBuffer.Release(); CoreUtils.Destroy(BlurBuffer); }
+        if (BlurBufferB != null) { BlurBufferB.Release(); CoreUtils.Destroy(BlurBufferB); }
+
+        if (createdLightProjectionTexture && LightProjectionTextures != null) { CoreUtils.Destroy(LightProjectionTextures); }
     }
 
 
@@ -1478,8 +1484,8 @@ public class VolumetricRendering : MonoBehaviour
 
     void ReleaseAssets()
     {
-        if (ClipmapBufferA!= null) ClipmapBufferA.Release();
-        if (FroxelBufferA != null) FroxelBufferA.Release();   
+        if (ClipmapBufferA!= null) { ClipmapBufferA.Release(); CoreUtils.Destroy(ClipmapBufferA); }
+        if (FroxelBufferA != null) { FroxelBufferA.Release(); CoreUtils.Destroy(FroxelBufferA); } 
         if (IntegrationBuffer != null)IntegrationBuffer.Release();
         if (ComputePerFrameConstantBuffer != null)
         {
