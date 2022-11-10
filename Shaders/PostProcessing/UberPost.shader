@@ -1,6 +1,7 @@
 Shader "Hidden/Universal Render Pipeline/UberPost"
 {
     HLSLINCLUDE
+#if !defined(SHADER_API_MOBILE)
         #pragma exclude_renderers gles
         #pragma multi_compile_local_fragment _ _DISTORTION
         #pragma multi_compile_local_fragment _ _CHROMATIC_ABERRATION
@@ -237,7 +238,7 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
 
             return half4(color, 1.0);
         }
-
+#endif
     ENDHLSL
 
     SubShader
@@ -251,8 +252,10 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
             Name "UberPost"
 
             HLSLPROGRAM
+#if !defined(SHADER_API_MOBILE)
                 #pragma vertex FullscreenVert
                 #pragma fragment Frag
+#endif
             ENDHLSL
         }
     }

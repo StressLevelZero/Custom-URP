@@ -12,6 +12,6 @@ void Clear3D (uint3 id : SV_DispatchThreadID)
 {
     if (all(id.xyz < _SourceDim.xyz))
     {
-        Result[id.xy] = _ClearColor;
+        _Source[id.xyz] = _ClearColor;
     }
 }
