@@ -238,7 +238,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 	float totalDistance = 0.0f;
 	float FdotR4 = FdotR * FdotR;
 	FdotR4 *= FdotR4;
-	reflectedRay -= lerp(0, largeRadius, 1 - FdotR4) * normalize(reflectedRay);
+	reflectedRay += lerp(0, 0.5*largeRadius, 1 - FdotR4) * rayDir;
 	bool storeLastPos = true;
 	for (float i = 0; i < _SSRSteps; i++)
 	{
@@ -280,7 +280,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		
 		bool inLargeRadius = depthDifference < largeRadius;
 		bool inHitRadius = depthDifference < dynHitRadius;
-		bool isMinMip = mipLevel == _SSRMinMip;
+		bool isMinMip = mipLevel <= _SSRMinMip+1;
 		bool isRayInFront = sampleDepth < realDepth;
 		
 		
@@ -291,7 +291,6 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		if (!isRayInFront && storeLastPos)
 		{
 			finalPos = reflectedRay;
-			
 		}
 		storeLastPos = isRayInFront ? true : false;
 		// If we're within the hit radius, we're done
@@ -387,8 +386,9 @@ float4 getSSRColor(SSRData data)
 
 	data.rayDir = mul(UNITY_MATRIX_V, float4(data.rayDir.xyz, 0));
 	
+	float3 screenOffset = normalize(mul(UNITY_MATRIX_V, float4(data.faceNormal, 0)));
 	
-
+	reflectedRay += float(2u << _SSRMinMip) * screenOffset * perspectiveScaledStep(float3(screenOffset), reflectedRay);
 	/*
 	 * Do the raymarching against the depth texture. This returns a world-space position where the ray hit the depth texture,
 	 * along with the number of iterations it took stored as the w component.
@@ -677,7 +677,7 @@ float4 getSSRColorNew(SSRData data)
 		return float4(0, 0, 0, 0);
 	}
 
-
+	
 	/*
 	 * Do the raymarching against the depth texture. This returns a world-space position where the ray hit the depth texture,
 	 * along with the number of iterations it took stored as the w component.
