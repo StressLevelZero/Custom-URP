@@ -1,8 +1,14 @@
-# Upgrading to URP 13 (Unity 2022.1)
+# Upgrading to URP 14 (Unity 2022.2)
 
-This page describes how to upgrade from an older version of the Universal Render Pipeline (URP) to URP 13 (Unity 2022.1).
+This page describes how to upgrade from an older version of the Universal Render Pipeline (URP) to URP 14 (Unity 2022.2).
 
 For information on converting assets made for a Built-in Render Pipeline project to assets compatible with URP, see the page [Render Pipeline Converter](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/features/rp-converter.html).
+
+## Upgrading from URP 13 (Unity 2022.1)
+
+### Two shader defines were removed
+
+`SHADER_QUALITY_LOW/MEDIUM/HIGH` and `SHADER_HINT_NICE_QUALITY` shader defines were removed. If you used those defines in custom shaders, consider using `SHADER_API_MOBILE` or `SHADER_API_GLES` defines to replace `SHADER_QUALITY_LOW/MEDIUM/HIGH`.
 
 ## Upgrading from URP 12 (Unity 2021.2)
 
