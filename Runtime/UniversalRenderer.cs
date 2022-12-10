@@ -468,10 +468,18 @@ namespace UnityEngine.Rendering.Universal
             RenderPassInputSummary renderPassInputs = GetRenderPassInputs(ref renderingData);
 
             // Should apply post-processing after rendering this camera?
-            bool applyPostProcessing = cameraData.postProcessEnabled && m_PostProcessPasses.isCreated;
 
+
+            bool applyPostProcessing = cameraData.postProcessEnabled && m_PostProcessPasses.isCreated;
+#if PLATFORM_ANDROID
+            applyPostProcessing = false;
+#endif
             // There's at least a camera in the camera stack that applies post-processing
             bool anyPostProcessing = renderingData.postProcessingEnabled && m_PostProcessPasses.isCreated;
+
+#if PLATFORM_ANDROID
+            anyPostProcessing = false;
+#endif
 
             // If Camera's PostProcessing is enabled and if there any enabled PostProcessing requires depth texture as shader read resource (Motion Blur/DoF)
             bool cameraHasPostProcessingWithDepth = applyPostProcessing && cameraData.postProcessingRequiresDepthTexture;
@@ -876,7 +884,9 @@ namespace UnityEngine.Rendering.Universal
             bool applyFinalPostProcessing = anyPostProcessing && lastCameraInTheStack &&
                 ((renderingData.cameraData.antialiasing == AntialiasingMode.FastApproximateAntialiasing) ||
                  ((renderingData.cameraData.imageScalingMode == ImageScalingMode.Upscaling) && (renderingData.cameraData.upscalingFilter != ImageUpscalingFilter.Linear)));
-
+#if PLATFORM_ANDROID
+            applyFinalPostProcessing = false;
+#endif
             // When post-processing is enabled we can use the stack to resolve rendering to camera target (screen or RT).
             // However when there are render passes executing after post we avoid resolving to screen so rendering continues (before sRGBConvertion etc)
             bool resolvePostProcessingToCameraTarget = !hasCaptureActions && !hasPassesAfterPostProcessing && !applyFinalPostProcessing;
@@ -886,6 +896,7 @@ namespace UnityEngine.Rendering.Universal
                 SetupFinalPassDebug(ref cameraData);
 
                 // Post-processing will resolve to final target. No need for final blit pass.
+#if !PLATFORM_ANDROID
                 if (applyPostProcessing)
                 {
                     // if resolving to screen we need to be able to perform sRGBConversion in post-processing if necessary
@@ -893,16 +904,17 @@ namespace UnityEngine.Rendering.Universal
                     postProcessPass.Setup(cameraTargetDescriptor, m_ActiveCameraColorAttachment, resolvePostProcessingToCameraTarget, m_ActiveCameraDepthAttachment, colorGradingLut, applyFinalPostProcessing, doSRGBConversion, hasPassesAfterPostProcessing);
                     EnqueuePass(postProcessPass);
                 }
-
+#endif
                 var sourceForFinalPass = m_ActiveCameraColorAttachment;
 
+#if !PLATFORM_ANDROID
                 // Do FXAA or any other final post-processing effect that might need to run after AA.
                 if (applyFinalPostProcessing)
                 {
                     finalPostProcessPass.SetupFinalPass(sourceForFinalPass, true, hasPassesAfterPostProcessing);
                     EnqueuePass(finalPostProcessPass);
                 }
-
+#endif
                 if (renderingData.cameraData.captureActions != null)
                 {
                     m_CapturePass.Setup(sourceForFinalPass);
