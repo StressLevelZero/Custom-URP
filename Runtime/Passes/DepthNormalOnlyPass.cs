@@ -105,7 +105,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                     new RenderTargetIdentifier(depthHandle.Identifier(), 0, CubemapFace.Unknown, -1)
                 );
             }
-            if (true || clearDepth)
+            if (clearDepth)
             {
                 ConfigureClear(ClearFlag.All, Color.black);
             }
