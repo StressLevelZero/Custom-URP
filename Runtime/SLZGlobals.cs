@@ -272,7 +272,10 @@ namespace UnityEngine.Rendering.Universal
             //Debug.Log("Setup for " + camData.camera.name);
         }
 
-
+        public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
+        {
+            ConfigureClear(ClearFlag.None, Color.black);
+        }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             CommandBuffer cmd = CommandBufferPool.Get();
