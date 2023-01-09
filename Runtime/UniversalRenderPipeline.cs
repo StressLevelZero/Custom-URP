@@ -248,6 +248,9 @@ namespace UnityEngine.Rendering.Universal
             Blitter.Cleanup();
 
             base.Dispose(disposing);
+            // SLZ MODIFIED
+            SLZGlobals.Dispose();
+            // END SLZ MODIFIED
 
             pipelineAsset.DestroyRenderers();
 
@@ -336,6 +339,10 @@ namespace UnityEngine.Rendering.Universal
                 if(m_GlobalSettings == null) return;
             }
 #endif
+
+            // SLZ MODIFED
+            SLZGlobals.instance.RemoveTempRTStupid();
+            // END SLZ MODIFIED
 
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
             if (DebugManager.instance.isAnyDebugUIActive)
@@ -510,8 +517,12 @@ namespace UnityEngine.Rendering.Universal
         internal static void RenderSingleCameraInternal(ScriptableRenderContext context, Camera camera)
         {
             UniversalAdditionalCameraData additionalCameraData = null;
+            // SLZ MODIFIED // Modified to only check if the camera is a game camera outside of the editor. Not sure why I did this, probably something to do with the scene view cameras 
+#if !UNITY_EDITOR
             if (IsGameCamera(camera))
+#endif
                 camera.gameObject.TryGetComponent(out additionalCameraData);
+            // END SLZ MODIFIED
 
             if (additionalCameraData != null && additionalCameraData.renderType != CameraRenderType.Base)
             {
@@ -1045,6 +1056,18 @@ namespace UnityEngine.Rendering.Universal
             cameraData.hdrColorBufferPrecision = asset ? asset.hdrColorBufferPrecision : HDRColorBufferPrecision._32Bits;
             cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, renderScale,
                 cameraData.isHdrEnabled, cameraData.hdrColorBufferPrecision, msaaSamples, needsAlphaChannel, cameraData.requiresOpaqueTexture);
+
+            // SLZ MODIFIED // Set additional values relating to SSR
+            bool enableSSR = asset.enableSSR && cameraData.postProcessEnabled;
+            cameraData.requiresColorPyramid = asset.supportsCameraOpaqueTexture && enableSSR;
+            cameraData.requiresDepthPyramid = asset.supportsCameraDepthTexture && enableSSR;
+            cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
+            cameraData.enableSSR = enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
+            cameraData.maxSSRSteps = asset.maxSsrSteps;
+            cameraData.SSRMinMip = asset.ssrMinMip;
+            cameraData.SSRHitRadius = asset.ssrHitRadius;
+            cameraData.SSRTemporalWeight = asset.ssrTemporalWeight;
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1260,6 +1283,29 @@ namespace UnityEngine.Rendering.Universal
 #endif
 
             cameraData.backgroundColor = CoreUtils.ConvertSRGBToActiveColorSpace(backgroundColorSRGB);
+
+            // SLZ MODIFIED // Set volumetric parameters
+
+            ///----------------------------------------------------------------------------------------
+            /// SLZ Volumetrics
+            ///----------------------------------------------------------------------------------------
+            if (additionalCameraData != null)
+            {
+                //Debug.Log("Found Additional Camera Data");
+                cameraData.volumetricsEnabled = additionalCameraData.m_EnableVolumetrics;
+                cameraData.volumetricsClipMap = additionalCameraData.m_VolumetricClipMap;
+                cameraData.volumetricsConstants = additionalCameraData.m_VolumetricShaderGlobals;
+            }
+            else
+            {
+                //Debug.LogError("Null Additional Camera Data");
+
+                cameraData.volumetricsEnabled = false;
+                cameraData.volumetricsClipMap = null;
+                cameraData.volumetricsConstants = null;
+            }
+
+            // END SLZ MODIFIED
         }
 
         static void InitializeRenderingData(UniversalRenderPipelineAsset settings, ref CameraData cameraData, ref CullingResults cullResults,
@@ -1304,6 +1350,11 @@ namespace UnityEngine.Rendering.Universal
             InitializeLightData(settings, visibleLights, mainLightIndex, out renderingData.lightData);
             InitializeShadowData(settings, visibleLights, mainLightCastShadows, additionalLightsCastShadows && !renderingData.lightData.shadeAdditionalLightsPerVertex, out renderingData.shadowData);
             InitializePostProcessingData(settings, out renderingData.postProcessingData);
+
+            // SLZ MODIFIED // Set up volumetrics
+            SetupVolumetricConstants(cameraData);
+            // END SLZ MODIFIED
+
             renderingData.supportsDynamicBatching = settings.supportsDynamicBatching;
             renderingData.perObjectData = GetPerObjectLightFlags(renderingData.lightData.additionalLightsCount, ((settings.scriptableRendererData as UniversalRendererData)?.renderingMode ?? RenderingMode.Forward) == RenderingMode.ForwardPlus);
             renderingData.postProcessingEnabled = anyPostProcessingEnabled;
@@ -1612,6 +1663,22 @@ namespace UnityEngine.Rendering.Universal
                 Shader.SetGlobalTexture(ShaderPropertyId.ditheringTexture, asset.textures.blueNoise64LTex);
             }
         }
+
+        // SLZ MODIFIED
+
+        static void SetupVolumetricConstants(CameraData cameraData)
+        {
+            if (cameraData.volumetricsEnabled)
+            {
+                VolumetricConstants.instance.EnableVolumetrics(cameraData.volumetricsClipMap, cameraData.volumetricsConstants);
+            }
+            else
+            {
+                VolumetricConstants.instance.DisableVolumetrics();
+            }
+        }
+
+        // END SLZ MODIFIED
 
         static void CheckAndApplyDebugSettings(ref RenderingData renderingData)
         {

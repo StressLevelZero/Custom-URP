@@ -868,6 +868,9 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
             public static readonly KeywordCollection Forward = new KeywordCollection
             {
                 { CoreKeywordDescriptors.ScreenSpaceAmbientOcclusion },
+                // SLZ MODIFIED
+                { Volumetrics },
+                // END SLZ MODIFIED
                 { CoreKeywordDescriptors.StaticLightmap },
                 { CoreKeywordDescriptors.DynamicLightmap },
                 { CoreKeywordDescriptors.DirectionalLightmapCombined },
@@ -902,7 +905,9 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
                 { CoreKeywordDescriptors.ReflectionProbeBoxProjection },
                 { CoreKeywordDescriptors.ShadowsSoft },
                 { CoreKeywordDescriptors.LightmapShadowMixing },
-                { CoreKeywordDescriptors.ShadowsShadowmask },
+                // SLZ MODIFIED
+                //{ CoreKeywordDescriptors.ShadowsShadowmask },
+                // END SLZ MODIFIED
                 { CoreKeywordDescriptors.MixedLightingSubtractive },
                 { CoreKeywordDescriptors.DBuffer },
                 { CoreKeywordDescriptors.GBufferNormalsOct },
@@ -910,6 +915,17 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
                 { CoreKeywordDescriptors.RenderPassEnabled },
                 { CoreKeywordDescriptors.DebugDisplay },
             };
+
+            // SLZ MODIFIED
+            public static readonly KeywordDescriptor Volumetrics = new KeywordDescriptor()
+            {
+                displayName = "Volumetrics",
+                referenceName = "_VOLUMETRICS_ENABLED",
+                type = KeywordType.Boolean,
+                definition = KeywordDefinition.MultiCompile,
+                scope = KeywordScope.Global,
+            };
+            // END SLZ MODIFIED
         }
         #endregion
 

@@ -1,6 +1,8 @@
 #ifndef SG_DEPTH_NORMALS_PASS_INCLUDED
 #define SG_DEPTH_NORMALS_PASS_INCLUDED
 
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
+
 PackedVaryings vert(Attributes input)
 {
     Varyings output = (Varyings)0;
@@ -54,7 +56,7 @@ void frag(
             float3 normalWS = unpacked.normalWS;
         #endif
 
-        outNormalWS = half4(NormalizeNormalPerPixel(normalWS), 0.0);
+        outNormalWS = half4(EncodeWSNormalForNormalsTex(NormalizeNormalPerPixel(normalWS)), 0.0);
     #endif
 
     #ifdef _WRITE_RENDERING_LAYERS

@@ -442,7 +442,11 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] internal ScriptableRendererData m_RendererData = null;
 
         // Renderer settings
-        [SerializeField] internal ScriptableRendererData[] m_RendererDataList = new ScriptableRendererData[1];
+        // SLZ MODIFIED
+
+        [SerializeField] public ScriptableRendererData[] m_RendererDataList = new ScriptableRendererData[1];
+
+        // END SLZ MODIFIED
         [SerializeField] internal int m_DefaultRendererIndex = 0;
 
         // General settings
@@ -583,6 +587,16 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] VolumeFrameworkUpdateMode m_VolumeFrameworkUpdateMode = VolumeFrameworkUpdateMode.EveryFrame;
 
         [SerializeField] TextureResources m_Textures;
+
+        // SLZ MODIFIED
+
+        [SerializeField] bool m_EnableSSR = false;
+        [SerializeField] int m_MaxSsrSteps = 35;
+        [SerializeField] int m_SsrMinMip = 0;
+        [SerializeField] float m_SsrHitRadius = 0.05f;
+        [SerializeField] float m_SsrTemporalWeight = 0.5f;
+
+        // END SLZ MODIFIED
 
         // Note: A lut size of 16^3 is barely usable with the HDR grading mode. 32 should be the
         // minimum, the lut being encoded in log. Lower sizes would work better with an additional
@@ -1164,7 +1178,9 @@ namespace UnityEngine.Rendering.Universal
         public LightRenderingMode mainLightRenderingMode
         {
             get { return m_MainLightRenderingMode; }
-            internal set { m_MainLightRenderingMode = value; }
+            // SLZ MODIFIED
+            set { m_MainLightRenderingMode = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1173,7 +1189,10 @@ namespace UnityEngine.Rendering.Universal
         public bool supportsMainLightShadows
         {
             get { return m_MainLightShadowsSupported; }
-            internal set {
+            // SLZ MODIFIED
+            set
+            // END SLZ MODIFIED
+            {
                 m_MainLightShadowsSupported = value;
 #if UNITY_EDITOR
                 m_AnyShadowsSupported = m_MainLightShadowsSupported || m_AdditionalLightShadowsSupported;
@@ -1187,7 +1206,9 @@ namespace UnityEngine.Rendering.Universal
         public int mainLightShadowmapResolution
         {
             get { return (int)m_MainLightShadowmapResolution; }
-            internal set { m_MainLightShadowmapResolution = (ShadowResolution)value; }
+            // SLZ MODIFIED
+            set { m_MainLightShadowmapResolution = (ShadowResolution)value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1197,7 +1218,9 @@ namespace UnityEngine.Rendering.Universal
         public LightRenderingMode additionalLightsRenderingMode
         {
             get { return m_AdditionalLightsRenderingMode; }
-            internal set { m_AdditionalLightsRenderingMode = value; }
+            // SLZ MODIFIED
+            set { m_AdditionalLightsRenderingMode = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1215,7 +1238,10 @@ namespace UnityEngine.Rendering.Universal
         public bool supportsAdditionalLightShadows
         {
             get { return m_AdditionalLightShadowsSupported; }
-            internal set {
+            // SLZ MODIFIED
+            set
+            // END SLZ MODIFIED
+            {
                 m_AdditionalLightShadowsSupported = value;
 #if UNITY_EDITOR
                 m_AnyShadowsSupported = m_MainLightShadowsSupported || m_AdditionalLightShadowsSupported;
@@ -1229,7 +1255,9 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowmapResolution
         {
             get { return (int)m_AdditionalLightsShadowmapResolution; }
-            internal set { m_AdditionalLightsShadowmapResolution = (ShadowResolution)value; }
+            // SLZ MODIFIED
+            set { m_AdditionalLightsShadowmapResolution = (ShadowResolution)value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1238,7 +1266,9 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowResolutionTierLow
         {
             get { return (int)m_AdditionalLightsShadowResolutionTierLow; }
-            internal set { m_AdditionalLightsShadowResolutionTierLow = value; }
+            // SLZ MODIFIED
+            set { m_AdditionalLightsShadowResolutionTierLow = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1247,7 +1277,9 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowResolutionTierMedium
         {
             get { return (int)m_AdditionalLightsShadowResolutionTierMedium; }
-            internal set { m_AdditionalLightsShadowResolutionTierMedium = value; }
+            // SLZ MODIFIED
+            set { m_AdditionalLightsShadowResolutionTierMedium = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1256,7 +1288,9 @@ namespace UnityEngine.Rendering.Universal
         public int additionalLightsShadowResolutionTierHigh
         {
             get { return (int)m_AdditionalLightsShadowResolutionTierHigh; }
-            internal set { m_AdditionalLightsShadowResolutionTierHigh = value; }
+            // SLZ MODIFIED
+            set { m_AdditionalLightsShadowResolutionTierHigh = value; }
+            // END SLZ MODIFIED
         }
 
         internal int GetAdditionalLightsShadowResolution(int additionalLightsShadowResolutionTier)
@@ -1279,7 +1313,9 @@ namespace UnityEngine.Rendering.Universal
         public bool reflectionProbeBlending
         {
             get { return m_ReflectionProbeBlending; }
-            internal set { m_ReflectionProbeBlending = value; }
+            // SLZ MODIFIED
+            set { m_ReflectionProbeBlending = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1288,7 +1324,9 @@ namespace UnityEngine.Rendering.Universal
         public bool reflectionProbeBoxProjection
         {
             get { return m_ReflectionProbeBoxProjection; }
-            internal set { m_ReflectionProbeBoxProjection = value; }
+            // SLZ MODIFIED
+            set { m_ReflectionProbeBoxProjection = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1323,7 +1361,9 @@ namespace UnityEngine.Rendering.Universal
         public float cascade2Split
         {
             get { return m_Cascade2Split; }
-            internal set { m_Cascade2Split = value; }
+            // SLZ MODIFIED
+            set { m_Cascade2Split = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1333,7 +1373,9 @@ namespace UnityEngine.Rendering.Universal
         public Vector2 cascade3Split
         {
             get { return m_Cascade3Split; }
-            internal set { m_Cascade3Split = value; }
+            // SLZ MODIFIED
+            set { m_Cascade3Split = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1343,7 +1385,9 @@ namespace UnityEngine.Rendering.Universal
         public Vector3 cascade4Split
         {
             get { return m_Cascade4Split; }
-            internal set { m_Cascade4Split = value; }
+            // SLZ MODIFIED
+            set { m_Cascade4Split = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1379,7 +1423,9 @@ namespace UnityEngine.Rendering.Universal
         public bool supportsSoftShadows
         {
             get { return m_SoftShadowsSupported; }
-            internal set { m_SoftShadowsSupported = value; }
+            // SLZ MODIFIED
+            set { m_SoftShadowsSupported = value; }
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1980,5 +2026,37 @@ namespace UnityEngine.Rendering.Universal
                 return blueNoise64LTex == null || bayerMatrixTex == null;
             }
         }
+
+        // SLZ MODIFIED
+        public bool enableSSR
+        {
+            get { return m_EnableSSR; }
+            set { m_EnableSSR = value; }
+        }
+
+        public int maxSsrSteps
+        {
+            get { return m_MaxSsrSteps; }
+            set { m_MaxSsrSteps = value; }
+        }
+        public int ssrMinMip
+        {
+            get { return m_SsrMinMip; }
+            set { m_SsrMinMip = value; }
+        }
+
+        public float ssrHitRadius
+        {
+            get { return m_SsrHitRadius; }
+            set { m_SsrHitRadius = value; }
+        }
+
+        public float ssrTemporalWeight
+        {
+            get { return m_SsrTemporalWeight; }
+            set { m_SsrTemporalWeight = value; }
+        }
+
+        // END SLZ MODIFIED
     }
 }

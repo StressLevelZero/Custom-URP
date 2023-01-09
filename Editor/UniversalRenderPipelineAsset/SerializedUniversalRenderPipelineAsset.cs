@@ -69,6 +69,15 @@ namespace UnityEditor.Rendering.Universal
         public SerializedProperty colorGradingLutSize { get; }
         public SerializedProperty useFastSRGBLinearConversion { get; }
 
+        // SLZ MODIFIED
+        public SerializedProperty enableSSR { get; }
+        public SerializedProperty maxSSRSteps { get; }
+
+        public SerializedProperty ssrMinMip { get; }
+        public SerializedProperty ssrHitRadius { get; }
+        public SerializedProperty ssrTemporalWeight { get; }
+        // END SLZ MODIFIED
+
 #if ADAPTIVE_PERFORMANCE_2_0_0_OR_NEWER
         public SerializedProperty useAdaptivePerformance { get; }
 #endif
@@ -151,6 +160,14 @@ namespace UnityEditor.Rendering.Universal
 #endif
             string Key = "Universal_Shadow_Setting_Unit:UI_State";
             state = new EditorPrefBoolFlags<EditorUtils.Unit>(Key);
+
+            // SLZ MODIFIED
+            enableSSR = serializedObject.FindProperty("m_EnableSSR");
+            maxSSRSteps = serializedObject.FindProperty("m_MaxSsrSteps");
+            ssrMinMip = serializedObject.FindProperty("m_SsrMinMip");
+            ssrHitRadius = serializedObject.FindProperty("m_SsrHitRadius");
+            ssrTemporalWeight = serializedObject.FindProperty("m_SsrTemporalWeight");
+            // END SLZ MODIFIED
         }
 
         /// <summary>

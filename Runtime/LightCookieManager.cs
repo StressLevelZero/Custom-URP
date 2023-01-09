@@ -503,18 +503,49 @@ namespace UnityEngine.Rendering.Universal
 
             m_CookieSizeDivisor = 1;
             m_PrevCookieRequestPixelCount = 0xFFFFFFFF;
+
+            // SLZ MODIFIED
+
+            // Remove DontUnloadUnusedAsset flag from atlas to prevent memory leak
+            m_AdditionalLightsCookieAtlas.AtlasTexture.rt.hideFlags = m_AdditionalLightsCookieAtlas.AtlasTexture.rt.hideFlags & ~(HideFlags.DontUnloadUnusedAsset);
+
+            // END SLZ MODIFIED
         }
 
         public bool isInitialized() => m_AdditionalLightsCookieAtlas != null && m_AdditionalLightsCookieShaderData != null;
+
+        // SLZ MODIFIED
+        // Add more complete IDisposable disposing implementation
+
+        private bool disposed = false;
+        ~LightCookieManager()
+        {
+            Dispose(false);
+        }
 
         /// <summary>
         /// Release LightCookieManager resources.
         /// </summary>
         public void Dispose()
         {
-            m_AdditionalLightsCookieAtlas?.Release();
-            m_AdditionalLightsCookieShaderData?.Dispose();
+            Dispose(true);
         }
+
+        public void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                m_AdditionalLightsCookieAtlas?.Release();
+                m_AdditionalLightsCookieShaderData?.Dispose();
+                disposed = true;
+            }
+            if (disposing)
+            {
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        // END SLZ MODIFIED
 
         // -1 on invalid/disabled cookie.
         public int GetLightCookieShaderDataIndex(int visibleLightIndex)

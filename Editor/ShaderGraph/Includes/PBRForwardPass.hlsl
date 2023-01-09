@@ -136,7 +136,10 @@ void frag(
 #endif
 
     half4 color = UniversalFragmentPBR(inputData, surface);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    //SLZ MODIFIED
+    color.rgb = MixFog(color.rgb, -inputData.viewDirectionWS, inputData.fogCoord);
+    color = Volumetrics(color, inputData.positionWS);
+    //END SLZ MODIFIED
 
     color.a = OutputAlpha(color.a, isTransparent);
 

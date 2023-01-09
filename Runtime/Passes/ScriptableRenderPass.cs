@@ -546,6 +546,14 @@ namespace UnityEngine.Rendering.Universal
                 renderTargetFormat[i] = formats[i];
         }
 
+        // SLZ MODIFIED
+        public void ConfigureTarget(RTHandle colorAttachment, RTHandle depthAttachment, GraphicsFormat format)
+        {
+            ConfigureTarget(colorAttachment, depthAttachment);
+            renderTargetFormat[0] = format;
+        }
+        // END SLZ MODIFIED
+
         /// <summary>
         /// Configures render targets for this render pass. Call this instead of CommandBuffer.SetRenderTarget.
         /// This method should be called inside Configure.

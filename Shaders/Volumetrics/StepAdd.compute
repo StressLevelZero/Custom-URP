@@ -1,0 +1,156 @@
+﻿//Second froxel pass 
+// 	Sebastien Hillaire https://www.slideshare.net/DICEStudio/physically-based-and-unified-volumetric-rendering-in-frostbite/26
+
+#pragma kernel StepAdd
+#define EPSILON  1e-8;
+
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GeometricTools.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/EntityLighting.hlsl"
+
+
+
+RWTexture3D<float4> Result;
+Texture3D<float4> InLightingTexture;
+Texture3D<float4> HistoryBuffer;
+SamplerState Custom_trilinear_clamp_sampler;
+
+
+//shared float4 _GlobalExtinctionTint;
+
+
+//#define extinction _GlobalExtinction
+
+
+
+
+float4x4    LeftEyeMatrix;
+float4x4    RightEyeMatrix;
+
+//shared float4 _VolumePlaneSettings;
+//shared float _GlobalExtinction;
+shared float4 _GlobalScattering;
+
+float4 _VolZBufferParams;
+
+//shared float4 _VBufferDistanceEncodingParams;
+
+CBUFFER_START(PerFrameCB)
+float4 _VBufferDistanceDecodingParams;
+float3 SeqOffset; //z offseter
+CBUFFER_END
+
+//float4 StereoOffset() {
+//
+//
+//	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
+//	float3 ws_repro = WS_coordinate - CameraMotionVector;
+//
+//	//float2	positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, PrevViewProjMatrix );
+//	float	vdistance = distance(ws_repro, prevPos);
+//	float	W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+//
+//
+//	half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
+//
+//	ls = mul(ls, transpose(PreviousFrameMatrix));
+//	ls.xyz = ls.xyz / ls.w;
+//
+//	float3 reprojection = float3(ls.xy, W);
+//
+//
+//}
+
+
+[numthreads(8, 8, 1)]	
+void StepAdd(uint3 id : SV_DispatchThreadID)
+{
+	//Use this to figure out distance between layers
+	//float near = _VolumePlaneSettings.x;
+	//float far = _VolumePlaneSettings.y;
+
+	// T (A → B) = 𝑒 ^ -({ S [𝐴 - 𝐵]}	𝛽𝑒(𝑥) 𝑑x	)
+	//float Absorption = 0.01f; //temp Absorption rate
+
+	float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
+
+// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
+// Each of them is the centroid of the interval of length 2/14.
+	float3 rndVal =  frac(perPixelRandomOffset + 1-SeqOffset);
+
+	float3 whd ; //make floating to avoid interger calulations later
+	Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this in scrpit instead of getting it here
+
+	float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //used for current slice output
+
+	//Make stereoscopic.
+	float4 Stereo_UVWs = float4( ((id ))/ whd ,1);
+
+	//Shift space to linear. TODO: link to a shared file and add bias
+	//Stereo_UVWs.z = Stereo_UVWs.z * _VolumePlaneSettings.y / (1 + Stereo_UVWs.z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
+
+	int EyeID = floor(Stereo_UVWs.x * 2); //Assume left and right eyes
+
+	Stereo_UVWs.x = frac(Stereo_UVWs.x * 2); //Make both eyes have proper UV.x
+	
+	///Doesn't support android.
+	//if (id.x < whd.x / 2) 	{
+	//	Stereo_UVWs = mul(LeftEyeMatrix, Stereo_UVWs);
+	//}
+	//else	{
+	//	Stereo_UVWs = mul(RightEyeMatrix, Stereo_UVWs);
+	//}
+
+	//Mask matrix transforms per eye
+//		Stereo_UVWs = (mul(LeftEyeMatrix, Stereo_UVWs) * (1-EyeID)) + (mul(RightEyeMatrix, Stereo_UVWs) * EyeID);
+	//Disabled until it's done correctly for log space
+
+	Stereo_UVWs.z = DecodeLogarithmicDepthGeneralized(Stereo_UVWs.z, _VBufferDistanceDecodingParams);
+
+	float ipd = 0.0001;
+
+	Stereo_UVWs.x = (((Stereo_UVWs.x + (ipd * (1- Stereo_UVWs.z)) )* (1-EyeID)) + (Stereo_UVWs.x - (ipd * (1 - Stereo_UVWs.z)) )*EyeID);
+
+	float invDepthNum = 1.0 / whd.z; // used to avoid division per slice TODO: move to sccpit
+
+	float previousDepth = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
+
+	float4 previousResult = HistoryBuffer[id];
+
+ //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
+//#if defined(SHADER_API_MOBILE)
+//	[unroll(32)]
+//#else
+//	[unroll(128)]
+//#endif 
+	for (float depth = 0.0; depth < whd.z; depth++) {
+
+		float UVSlice = depth * invDepthNum; // slice / slicecount
+
+		//Sampling the input texture here instead of doing an ID lookup because we are offsetting the UVs to get stereo instead of doing it the previous step
+		float4 scatteringExtinction = 
+			InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0)  ; //Sample current Layer 
+		//float zDepth = GetWDepth(UVSlice);
+		float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
+		float travelDis = (zDepth - previousDepth)   ; //Distance between layers. Jittering and do temporal blend
+		//* (.5 + rndVal.z *.5)
+		float extinction = scatteringExtinction.a;
+		 float transmittance = exp(-extinction * travelDis );
+
+	//	accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * _GlobalScattering; //Non-energy conserve
+		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction) * _GlobalScattering; //Corrected version
+		accumScatteringTransmittance.a *= transmittance ;
+
+
+	//	float4 normalizedVoxelValue = accumScatteringTransmittance * rcp(travelDis);
+
+		Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
+
+		previousDepth = zDepth;
+	}
+
+}

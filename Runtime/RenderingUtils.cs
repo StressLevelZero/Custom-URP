@@ -171,6 +171,31 @@ namespace UnityEngine.Rendering.Universal
             Blitter.BlitTexture(cmd, source, viewportScale, material, passIndex);
         }
 
+        // SLZ MODIFIED
+        /// <summary>
+        /// Blit, without needlessly setting the viewport rect
+        /// </summary>
+        /// <param name="cmd">Command buffer</param>
+        /// <param name="source">RTHandle of the source texture</param>
+        /// <param name="destination">RTHandle of the destination texture</param>
+        /// <param name="material">Material to use in the blit</param>
+        /// <param name="loadAction"></param>
+        /// <param name="storeAction"></param>
+        /// <param name="passIndex"></param>
+        internal static void BlitNoRect(CommandBuffer cmd,
+            RTHandle source,
+            RTHandle destination,
+            Material material,
+            RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load,
+            RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store,
+            int passIndex = 0)
+        {
+            Vector2 viewportScale = source.useScaling ? new Vector2(source.rtHandleProperties.rtHandleScale.x, source.rtHandleProperties.rtHandleScale.y) : Vector2.one;
+            CoreUtils.SetRenderTarget(cmd, destination, loadAction, storeAction, ClearFlag.None, Color.clear);
+            Blitter.BlitTexture(cmd, source, viewportScale, material, passIndex);
+        }
+        // END SLZ MODIFIED
+
         internal static void Blit(CommandBuffer cmd,
             RTHandle source,
             Rect viewport,

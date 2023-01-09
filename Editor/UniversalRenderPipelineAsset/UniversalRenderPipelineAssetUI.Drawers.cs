@@ -136,6 +136,13 @@ namespace UnityEditor.Rendering.Universal
                 EditorGUILayout.PropertyField(serialized.requireOpaqueTextureProp, Styles.requireOpaqueTextureText);
                 EditorGUI.BeginDisabledGroup(!serialized.requireOpaqueTextureProp.boolValue);
                 EditorGUILayout.PropertyField(serialized.opaqueDownsamplingProp, Styles.opaqueDownsamplingText);
+
+                // SLZ MODIFIED
+
+                EditorGUILayout.PropertyField(serialized.enableSSR, Styles.enableSSR);
+
+                // END SLZ MODIFIED
+
                 EditorGUI.EndDisabledGroup();
                 EditorGUILayout.PropertyField(serialized.supportsTerrainHolesProp, Styles.supportsTerrainHolesText);
             }
@@ -173,6 +180,17 @@ namespace UnityEditor.Rendering.Universal
 
                 --EditorGUI.indentLevel;
             }
+            // SLZ MODIFIED
+
+            if (serialized.asset.enableSSR)
+            {
+                EditorGUILayout.PropertyField(serialized.maxSSRSteps, Styles.SSRSteps);
+                EditorGUILayout.PropertyField(serialized.ssrHitRadius, Styles.SSRHitRadius);
+                EditorGUILayout.PropertyField(serialized.ssrMinMip, Styles.SSRMinMip);
+                EditorGUILayout.Slider(serialized.ssrTemporalWeight, 0, 1, Styles.SSRTemporalWeight);
+            }
+
+            // END SLZ MODIFIED
             EditorGUILayout.PropertyField(serialized.enableLODCrossFadeProp, Styles.enableLODCrossFadeText);
             EditorGUI.BeginDisabledGroup(!serialized.enableLODCrossFadeProp.boolValue);
             EditorGUILayout.PropertyField(serialized.lodCrossFadeDitheringTypeProp, Styles.lodCrossFadeDitheringTypeText);

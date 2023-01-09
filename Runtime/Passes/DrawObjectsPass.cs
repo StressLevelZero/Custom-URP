@@ -70,6 +70,10 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         static readonly int s_DrawObjectPassDataPropID = Shader.PropertyToID("_DrawObjectPassData");
 
+        // SLZ MODIFIED
+        public bool useMotionVectorData;
+        // END SLZ MODIFIED
+
         /// <summary>
         /// Creates a new <c>DrawObjectsPass</c> instance.
         /// </summary>
@@ -143,7 +147,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_PassData.m_ShaderTagIdList = m_ShaderTagIdList;
             m_PassData.m_ProfilingSampler = m_ProfilingSampler;
             m_PassData.pass = this;
-
+            //m_PassData.m_UseMotionVectorData = useMotionVectorData;
+            m_PassData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
             CameraSetup(renderingData.commandBuffer, m_PassData, ref renderingData);
             ExecutePass(context, m_PassData, ref renderingData, renderingData.cameraData.IsCameraProjectionMatrixFlipped());
         }
@@ -211,6 +216,13 @@ namespace UnityEngine.Rendering.Universal.Internal
 
                 DrawingSettings drawSettings = RenderingUtils.CreateDrawingSettings(data.m_ShaderTagIdList, ref renderingData, sortFlags);
 
+                // SLZ MODIFIED
+                if (data.m_UseMotionVectorData)
+                {
+                    drawSettings.perObjectData = drawSettings.perObjectData | PerObjectData.MotionVectors;
+                }
+                // END SLZ MODIFIED
+
                 var activeDebugHandler = GetActiveDebugHandler(ref renderingData);
                 if (activeDebugHandler != null)
                 {
@@ -246,6 +258,10 @@ namespace UnityEngine.Rendering.Universal.Internal
             internal bool m_ShouldTransparentsReceiveShadows;
 
             internal DrawObjectsPass pass;
+
+            // SLZ MODIFIED
+            internal bool m_UseMotionVectorData;
+            // END SLZ MODIFIED
         }
 
         internal void Render(RenderGraph renderGraph, TextureHandle colorTarget, TextureHandle depthTarget, TextureHandle mainShadowsTexture, TextureHandle additionalShadowsTexture, ref RenderingData renderingData)
@@ -276,6 +292,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                 passData.m_ShouldTransparentsReceiveShadows = m_ShouldTransparentsReceiveShadows;
 
                 passData.pass = this;
+
+                // SLZ MODIFIED
+                passData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
+                // END SLZ MODIFIED
 
                 builder.SetRenderFunc((PassData data, RenderGraphContext context) =>
                 {

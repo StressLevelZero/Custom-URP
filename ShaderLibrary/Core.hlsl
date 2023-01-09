@@ -46,6 +46,9 @@
     #define TEXTURE2D_X_ARGS(textureName, samplerName)                      TEXTURE2D_ARRAY_ARGS(textureName, samplerName)
     #define TEXTURE2D_X_HALF(textureName)                                   TEXTURE2D_ARRAY_HALF(textureName)
     #define TEXTURE2D_X_FLOAT(textureName)                                  TEXTURE2D_ARRAY_FLOAT(textureName)
+    // SLZ MODIFIED // Add macro for screen UAV Textures
+    #define RW_TEXTURE2D_X(type, textureName)                               RW_TEXTURE2D_ARRAY(type, textureName)
+    // END SLZ MODIFIED
 
     #define LOAD_TEXTURE2D_X(textureName, unCoord2)                         LOAD_TEXTURE2D_ARRAY(textureName, unCoord2, SLICE_ARRAY_INDEX)
     #define LOAD_TEXTURE2D_X_LOD(textureName, unCoord2, lod)                LOAD_TEXTURE2D_ARRAY_LOD(textureName, unCoord2, SLICE_ARRAY_INDEX, lod)
@@ -64,6 +67,9 @@
     #define TEXTURE2D_X_ARGS(textureName, samplerName)                      TEXTURE2D_ARGS(textureName, samplerName)
     #define TEXTURE2D_X_HALF(textureName)                                   TEXTURE2D_HALF(textureName)
     #define TEXTURE2D_X_FLOAT(textureName)                                  TEXTURE2D_FLOAT(textureName)
+    // SLZ MODIFIED // Add macro for screen UAV Textures
+    #define RW_TEXTURE2D_X(type, textureName)                               RW_TEXTURE2D(type, textureName)
+    // END SLZ MODIFIED
 
     #define LOAD_TEXTURE2D_X(textureName, unCoord2)                         LOAD_TEXTURE2D(textureName, unCoord2)
     #define LOAD_TEXTURE2D_X_LOD(textureName, unCoord2, lod)                LOAD_TEXTURE2D_LOD(textureName, unCoord2, lod)

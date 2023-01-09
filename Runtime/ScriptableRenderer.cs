@@ -434,7 +434,9 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         /// <param name="cmd"></param>
         /// <returns></returns>
-        virtual internal RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
+        // SLZ MODIFIED
+        virtual public RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
+        // END SLZ MODIFIED
         {
             return null;
         }
@@ -1994,8 +1996,11 @@ namespace UnityEngine.Rendering.Universal
             CoreUtils.SetRenderTarget(cmd, m_ActiveColorAttachments, depthAttachment, clearFlag, clearColor);
         }
 
-        internal virtual void SwapColorBuffer(CommandBuffer cmd) { }
-        internal virtual void EnableSwapBufferMSAA(bool enable) { }
+        // SLZ MODIFIED
+        // Make internal public
+        public virtual void SwapColorBuffer(CommandBuffer cmd) { }
+        public virtual void EnableSwapBufferMSAA(bool enable) { }
+        // END SLZ MODIFIED
 
         [Conditional("UNITY_EDITOR")]
         void DrawGizmos(ScriptableRenderContext context, Camera camera, GizmoSubset gizmoSubset, ref RenderingData renderingData)

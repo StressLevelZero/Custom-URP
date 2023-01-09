@@ -125,13 +125,15 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
         /// <param name="properties"></param>
         public static void Advanced(SimpleLitProperties properties)
         {
-            SpecularSource specularSource = (SpecularSource)properties.specHighlights.floatValue;
-            EditorGUI.BeginChangeCheck();
-            EditorGUI.showMixedValue = properties.specHighlights.hasMixedValue;
-            bool enabled = EditorGUILayout.Toggle(LitGUI.Styles.highlightsText, specularSource == SpecularSource.SpecularTextureAndColor);
-            if (EditorGUI.EndChangeCheck())
-                properties.specHighlights.floatValue = enabled ? (float)SpecularSource.SpecularTextureAndColor : (float)SpecularSource.NoSpecular;
-            EditorGUI.showMixedValue = false;
+            // SLZ MODIFIED
+            //SpecularSource specularSource = (SpecularSource)properties.specHighlights.floatValue;
+            //EditorGUI.BeginChangeCheck();
+            //EditorGUI.showMixedValue = properties.specHighlights.hasMixedValue;
+            //bool enabled = EditorGUILayout.Toggle(LitGUI.Styles.highlightsText, specularSource == SpecularSource.SpecularTextureAndColor);
+            //if (EditorGUI.EndChangeCheck())
+            //    properties.specHighlights.floatValue = enabled ? (float)SpecularSource.SpecularTextureAndColor : (float)SpecularSource.NoSpecular;
+            //EditorGUI.showMixedValue = false;
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -142,11 +144,16 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
         /// <param name="material">The material to use.</param>
         public static void DoSpecularArea(SimpleLitProperties properties, MaterialEditor materialEditor, Material material)
         {
-            SpecularSource specSource = (SpecularSource)properties.specHighlights.floatValue;
-            EditorGUI.BeginDisabledGroup(specSource == SpecularSource.NoSpecular);
+            // SLZ MODIFIED
+            
+            //SpecularSource specSource = (SpecularSource)properties.specHighlights.floatValue;
+            //EditorGUI.BeginDisabledGroup(specSource == SpecularSource.NoSpecular);
+            
+            // END SLZ MODIFIED
             BaseShaderGUI.TextureColorProps(materialEditor, Styles.specularMapText, properties.specGlossMap, properties.specColor, true);
             LitGUI.DoSmoothness(materialEditor, material, properties.smoothness, properties.smoothnessMapChannel, LitGUI.Styles.specularSmoothnessChannelNames);
             EditorGUI.EndDisabledGroup();
+
         }
 
         /// <summary>
@@ -162,29 +169,33 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
         {
             var opaque = ((BaseShaderGUI.SurfaceType)material.GetFloat("_Surface") ==
                 BaseShaderGUI.SurfaceType.Opaque);
-            SpecularSource specSource = (SpecularSource)material.GetFloat("_SpecularHighlights");
-            if (specSource == SpecularSource.NoSpecular)
+            // SLZ MODIFIED
+
+            //SpecularSource specSource = (SpecularSource)material.GetFloat("_SpecularHighlights");
+            //if (specSource == SpecularSource.NoSpecular)
+            //{
+            //    CoreUtils.SetKeyword(material, "_SPECGLOSSMAP", false);
+            //    CoreUtils.SetKeyword(material, "_SPECULAR_COLOR", false);
+            //    CoreUtils.SetKeyword(material, "_GLOSSINESS_FROM_BASE_ALPHA", false);
+            //}
+            //else
             {
-                CoreUtils.SetKeyword(material, "_SPECGLOSSMAP", false);
-                CoreUtils.SetKeyword(material, "_SPECULAR_COLOR", false);
-                CoreUtils.SetKeyword(material, "_GLOSSINESS_FROM_BASE_ALPHA", false);
-            }
-            else
-            {
-                var smoothnessSource = (SmoothnessMapChannel)material.GetFloat("_SmoothnessSource");
+                //var smoothnessSource = (SmoothnessMapChannel)material.GetFloat("_SmoothnessSource");
                 bool hasMap = material.GetTexture("_SpecGlossMap");
                 CoreUtils.SetKeyword(material, "_SPECGLOSSMAP", hasMap);
                 CoreUtils.SetKeyword(material, "_SPECULAR_COLOR", !hasMap);
-                if (opaque)
-                    CoreUtils.SetKeyword(material, "_GLOSSINESS_FROM_BASE_ALPHA", smoothnessSource == SmoothnessMapChannel.AlbedoAlpha);
-                else
-                    CoreUtils.SetKeyword(material, "_GLOSSINESS_FROM_BASE_ALPHA", false);
+                //if (opaque)
+                //    CoreUtils.SetKeyword(material, "_GLOSSINESS_FROM_BASE_ALPHA", smoothnessSource == SmoothnessMapChannel.AlbedoAlpha);
+                //else
+                //    CoreUtils.SetKeyword(material, "_GLOSSINESS_FROM_BASE_ALPHA", false);
 
                 string color;
-                if (smoothnessSource != SmoothnessMapChannel.AlbedoAlpha || !opaque)
+                //if (smoothnessSource != SmoothnessMapChannel.AlbedoAlpha || !opaque)
                     color = "_SpecColor";
-                else
-                    color = "_BaseColor";
+                //else
+                //    color = "_BaseColor";
+
+            // END SLZ MODIFIED
 
                 var col = material.GetColor(color);
                 float smoothness = material.GetFloat("_Smoothness");

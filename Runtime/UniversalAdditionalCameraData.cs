@@ -337,6 +337,16 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] Vector4 m_ScreenCoordScaleBias;
 
         [NonSerialized] Camera m_Camera;
+
+        // SLZ MODIFIED
+
+        /* SLZ Volumetrics */
+        [NonSerialized] public bool m_EnableVolumetrics = false;
+        [NonSerialized] public RenderTexture m_VolumetricClipMap = null;
+        [NonSerialized] public ComputeBuffer m_VolumetricShaderGlobals = null;
+
+        // END SLZ MODIFIED
+
         // Deprecated:
         [FormerlySerializedAs("requiresDepthTexture"), SerializeField]
         bool m_RequiresDepthTexture = false;

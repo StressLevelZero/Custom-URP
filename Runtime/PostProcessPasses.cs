@@ -105,7 +105,12 @@ namespace UnityEngine.Rendering.Universal
 
             if (data != null)
             {
-                m_ColorGradingLutPass = new ColorGradingLutPass(RenderPassEvent.BeforeRenderingPrePasses, data);
+                // SLZ MODIFIED
+
+                // SLZ edit: Foveated rendering needs to be turned off for this pass! Move queue back 2 to give space for turning on foveation after LUT creation
+                m_ColorGradingLutPass = new ColorGradingLutPass(RenderPassEvent.BeforeRenderingPrePasses - 2, data);
+
+                // END SLZ MODIFIED
                 m_PostProcessPass = new PostProcessPass(RenderPassEvent.BeforeRenderingPostProcessing, data, ref ppParams);
                 m_FinalPostProcessPass = new PostProcessPass(RenderPassEvent.AfterRenderingPostProcessing, data, ref ppParams);
                 m_CurrentPostProcessData = data;

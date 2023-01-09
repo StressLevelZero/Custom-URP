@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 6588d23683e38f14db1f26f57f266dd6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - cam: {instanceID: 0}
+  - volumetricData: {fileID: 11400000, guid: 9aa770ca8d706d24aa3f993a2394fd83, type: 2}
+  - FroxelFogCompute: {instanceID: 0}
+  - FroxelIntegrationCompute: {instanceID: 0}
+  - ClipmapCompute: {instanceID: 0}
+  - BlurCompute: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

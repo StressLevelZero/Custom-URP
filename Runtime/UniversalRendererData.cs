@@ -121,7 +121,33 @@ namespace UnityEngine.Rendering.Universal
             /// </summary>
             [Reload("Shaders/ObjectMotionVectors.shader")]
             public Shader objectMotionVector;
+
+            // SLZ MODIFIED
+
+            [Reload("Shaders/Utils/CopyDepthToColor.shader")]
+            public Shader copyDepthToColorPS;
+
+            [Reload("Shaders/Utils/DepthPyramid.compute")]
+            public ComputeShader computeDepthPyramid;
+
+            [Reload("Shaders/Utils/ColorPyramid.compute")]
+            public ComputeShader computeColorPyramid;
+
+            // END SLZ MODIFIED
         }
+
+        // SLZ MODIFIED
+        [Serializable, ReloadGroup]
+        public sealed class TextureResources
+        {
+            [Reload("Textures/BlueNoiseRGBA.asset")]
+            public Texture2DArray blueNoiseRGBA;
+            [Reload("Textures/BlueNoiseR.asset")]
+            public Texture2DArray blueNoiseR;
+        }
+
+        public TextureResources textures = null;
+        // END SLZ MODIFIED
 
         /// <summary>
         /// Resources needed for Post Processing.

@@ -163,7 +163,17 @@ namespace UnityEngine.Rendering.Universal.Internal
                 ConfigureTarget(m_EmptyLightShadowmapTexture);
             else
                 ConfigureTarget(m_MainLightShadowmapTexture);
-            ConfigureClear(ClearFlag.All, Color.black);
+            // SLZ MODIFIED
+            //ConfigureClear(ClearFlag.All, Color.black);
+            if (m_CreateEmptyShadowmap)
+            {
+                ConfigureClear(ClearFlag.None, Color.black);
+            }
+            else
+            {
+                ConfigureClear(ClearFlag.All, Color.black);
+            }
+            // END SLZ MODIFIED
         }
 
         /// <inheritdoc/>

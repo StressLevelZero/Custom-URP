@@ -57,13 +57,17 @@ namespace UnityEngine.Rendering.Universal
         }
 
         /// <inheritdoc/>
-        internal override void SwapColorBuffer(CommandBuffer cmd)
+        // SLZ MODIFIED
+        public override void SwapColorBuffer(CommandBuffer cmd)
+        // END SLZ MODIFIED
         {
             throw new NotSupportedException(k_ErrorMessage);
         }
 
         /// <inheritdoc/>
-        internal override RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
+        // SLZ MODIFIED
+        public override RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
+        // END SLZ MODIFIED
         {
             throw new NotImplementedException();
         }

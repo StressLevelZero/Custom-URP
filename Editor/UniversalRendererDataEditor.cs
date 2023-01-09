@@ -52,6 +52,12 @@ namespace UnityEditor.Rendering.Universal
         SerializedProperty m_ShadowTransparentReceiveProp;
         SerializedProperty m_IntermediateTextureMode;
 
+        // SLZ MODIFIED
+
+        SerializedProperty m_Textures;
+
+        // END SLZ MODIFIED
+
         private void OnEnable()
         {
             m_OpaqueLayerMask = serializedObject.FindProperty("m_OpaqueLayerMask");
@@ -66,6 +72,9 @@ namespace UnityEditor.Rendering.Universal
             m_Shaders = serializedObject.FindProperty("shaders");
             m_ShadowTransparentReceiveProp = serializedObject.FindProperty("m_ShadowTransparentReceive");
             m_IntermediateTextureMode = serializedObject.FindProperty("m_IntermediateTextureMode");
+            // SLZ MODIFIED
+            m_Textures = serializedObject.FindProperty("textures");
+            // END SLZ MODIFIED
         }
 
         /// <inheritdoc/>
@@ -181,6 +190,21 @@ namespace UnityEditor.Rendering.Universal
                     ResourceReloader.ReloadAllNullIn(target, UniversalRenderPipelineAsset.packagePath);
                 }
             }
+
+            // SLZ MODIFIED
+            if (EditorPrefs.GetBool("DeveloperMode"))
+            {
+                EditorGUILayout.Space();
+                EditorGUILayout.PropertyField(m_Textures, true);
+
+                if (GUILayout.Button("Reload All"))
+                {
+                    var resources = target as UniversalRendererData;
+                    resources.textures = null;
+                    ResourceReloader.ReloadAllNullIn(target, UniversalRenderPipelineAsset.packagePath);
+                }
+            }
+            // END SLZ MODIFIED
         }
     }
 }

@@ -114,6 +114,15 @@ namespace UnityEngine.Rendering.Universal
         CopyDepthPass m_FinalDepthCopyPass;
 #endif
 
+        // SLZ MODIFIED
+
+        CopyDepthToHiZPass m_CopyDepthToHiZPass;
+        SLZGlobalsSetPass m_SLZGlobalsSetPass;
+        CopyHiZ0Pass m_CopyHiZ0Pass;
+        SetHiZ0GlobalPass m_SetHiZ0GlobalPass;
+
+        // END SLZ MODIFIED
+
         internal RenderTargetBufferSystem m_ColorBufferSystem;
 
         internal RTHandle m_ActiveCameraColorAttachment;
@@ -127,6 +136,13 @@ namespace UnityEngine.Rendering.Universal
         RTHandle m_OpaqueColor;
         RTHandle m_MotionVectorColor;
         RTHandle m_MotionVectorDepth;
+
+        // SLZ MODIFIED
+
+        RTHandle m_DepthHiZTexture;
+        RTPermanentHandle m_PrevHiZ0Texture;
+
+        // END SLZ MODIFIED
 
         ForwardLights m_ForwardLights;
         DeferredLights m_DeferredLights;
@@ -145,6 +161,12 @@ namespace UnityEngine.Rendering.Universal
         Material m_StencilDeferredMaterial = null;
         Material m_CameraMotionVecMaterial = null;
         Material m_ObjectMotionVecMaterial = null;
+
+        // SLZ MODIFIED
+
+        Material m_CopyDepthToColorMat = null;
+
+        // END SLZ MODIFIED
 
         PostProcessPasses m_PostProcessPasses;
         internal ColorGradingLutPass colorGradingLutPass { get => m_PostProcessPasses.colorGradingLutPass; }
@@ -192,6 +214,12 @@ namespace UnityEngine.Rendering.Universal
             m_StencilDeferredMaterial = CoreUtils.CreateEngineMaterial(data.shaders.stencilDeferredPS);
             m_CameraMotionVecMaterial = CoreUtils.CreateEngineMaterial(data.shaders.cameraMotionVector);
             m_ObjectMotionVecMaterial = CoreUtils.CreateEngineMaterial(data.shaders.objectMotionVector);
+
+            // SLZ MODIFIED
+
+            m_CopyDepthToColorMat = CoreUtils.CreateEngineMaterial(data.shaders.copyDepthToColorPS);
+
+            // END SLZ MODIFIED
 
             StencilStateData stencilData = data.defaultStencilState;
             m_DefaultStencilState = StencilState.defaultValue;
@@ -248,7 +276,9 @@ namespace UnityEngine.Rendering.Universal
             m_AdditionalLightsShadowCasterPass = new AdditionalLightsShadowCasterPass(RenderPassEvent.BeforeRenderingShadows);
 
 #if ENABLE_VR && ENABLE_XR_MODULE
-            m_XROcclusionMeshPass = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingOpaques);
+            // SLZ MODIFIED
+            m_XROcclusionMeshPass = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingOpaques, false);
+            // END SLZ MODIFIED
             // Schedule XR copydepth right after m_FinalBlitPass(AfterRendering + 1)
             m_XRCopyDepthPass = new CopyDepthPass(RenderPassEvent.AfterRendering + 2, m_CopyDepthMaterial);
 #endif
@@ -259,6 +289,16 @@ namespace UnityEngine.Rendering.Universal
             if (renderingModeRequested == RenderingMode.Forward || renderingModeRequested == RenderingMode.ForwardPlus)
             {
                 m_PrimedDepthCopyPass = new CopyDepthPass(RenderPassEvent.AfterRenderingPrePasses, m_CopyDepthMaterial, true);
+
+                // SLZ MODIFIED
+                m_CopyDepthToHiZPass = new CopyDepthToHiZPass(RenderPassEvent.AfterRenderingPrePasses + 10, m_CopyDepthToColorMat);
+                m_CopyHiZ0Pass = new CopyHiZ0Pass(RenderPassEvent.AfterRenderingTransparents, m_SamplingMaterial, m_BlitMaterial);
+                m_SetHiZ0GlobalPass = new SetHiZ0GlobalPass(RenderPassEvent.BeforeRenderingPrePasses + 2);
+                if (CopyDepthToHiZPass.m_HiZMipCompute == null)
+                {
+                    CopyDepthToHiZPass.m_HiZMipCompute = data.shaders.computeDepthPyramid;
+                }
+                // END SLZ MODIFIED
             }
 
             if (this.renderingModeRequested == RenderingMode.Deferred)
@@ -291,6 +331,10 @@ namespace UnityEngine.Rendering.Universal
                 m_RenderOpaqueForwardOnlyPass = new DrawObjectsPass("Render Opaques Forward Only", forwardOnlyShaderTagIds, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, forwardOnlyStencilState, forwardOnlyStencilRef);
             }
 
+            // SLZ MODIFIED
+            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2);
+            // END SLZ MODIFIED
+
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
             m_RenderOpaqueForwardPass = new DrawObjectsPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
             m_RenderOpaqueForwardWithRenderingLayersPass = new DrawObjectsWithRenderingLayersPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
@@ -304,7 +348,9 @@ namespace UnityEngine.Rendering.Universal
                 copyResolvedDepth: RenderingUtils.MultisampleDepthResolveSupported() && copyDepthAfterTransparents);
 
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
-            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, m_BlitMaterial);
+            // SLZ MODIFIED
+            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial, true);
+            // END SLZ MODIFIED
 #if ADAPTIVE_PERFORMANCE_2_1_0_OR_NEWER
             if (needTransparencyPass)
 #endif
@@ -355,6 +401,10 @@ namespace UnityEngine.Rendering.Universal
             LensFlareCommonSRP.mergeNeeded = 0;
             LensFlareCommonSRP.maxLensFlareWithOcclusionTemporalSample = 1;
             LensFlareCommonSRP.Initialize();
+
+            // SLZ MODIFIED
+            SLZGlobals.instance.SetBlueNoiseGlobals(data.textures.blueNoiseRGBA, data.textures.blueNoiseR);
+            // END SLZ MODIFIED
         }
 
         /// <inheritdoc />
@@ -379,6 +429,11 @@ namespace UnityEngine.Rendering.Universal
             CleanupRenderGraphResources();
 
             LensFlareCommonSRP.Dispose();
+
+            // SLZ MODIFIED
+            SLZGlobals.Dispose();
+            m_DepthHiZTexture?.Release();
+            // END SLZ MODIFIED
         }
 
         internal override void ReleaseRenderTargets()
@@ -508,6 +563,22 @@ namespace UnityEngine.Rendering.Universal
             var cmd = renderingData.commandBuffer;
             DebugHandler?.Setup(context, ref renderingData);
 
+            // SLZ MODIFIED // Set up SLZGlobals pass which sets a bunch of random global shader variables. Also set motion vectors on Opaque pass, update blue noise, and set previous frame globals
+
+            SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
+                renderingData.cameraData.SSRTemporalWeight, camera.fieldOfView, cameraTargetDescriptor.height);
+            m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
+            EnqueuePass(m_SLZGlobalsSetPass);
+
+            //SLZ - Enable "motion vector data" (prev obj to world matricies) for SSR so we can get prev frame's pixel pos for temporal accumulation
+            m_RenderOpaqueForwardPass.useMotionVectorData = renderingData.cameraData.enableSSR;
+
+            //TODO: This should probably happen in the SLZGlobals pass, not here
+            PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
+            SLZGlobals.instance.UpdateBlueNoiseFrame();
+
+            // END SLZ MODIFIED
+
             if (cameraData.cameraType != CameraType.Game)
                 useRenderPassEnabled = false;
 
@@ -575,6 +646,13 @@ namespace UnityEngine.Rendering.Universal
 
             // There's at least a camera in the camera stack that applies post-processing
             bool anyPostProcessing = renderingData.postProcessingEnabled && m_PostProcessPasses.isCreated;
+
+            // SLZ MODIFIED // Force post-processing off on Android, as we gutted the post-processing shaders which will cause issues if the post-processing tries to run
+#if PLATFORM_ANDROID
+            applyPostProcessing = false;
+            anyPostProcessing = false;
+#endif
+            // END SLZ MODIFIED
 
             // If Camera's PostProcessing is enabled and if there any enabled PostProcessing requires depth texture as shader read resource (Motion Blur/DoF)
             bool cameraHasPostProcessingWithDepth = applyPostProcessing && cameraData.postProcessingRequiresDepthTexture;
@@ -804,7 +882,17 @@ namespace UnityEngine.Rendering.Universal
                 }
 
                 depthDescriptor.msaaSamples = 1;// Depth-Only pass don't use MSAA
+
                 RenderingUtils.ReAllocateIfNeeded(ref m_DepthTexture, depthDescriptor, FilterMode.Point, wrapMode: TextureWrapMode.Clamp, name: "_CameraDepthTexture");
+
+                // SLZ MODIFIED // Initialize Hi-Z RTHandle, and set it as a global
+                if (cameraData.requiresDepthPyramid)
+                {
+                    var hiZDesc = CopyDepthToHiZPass.GetHiZDescriptor(cameraTargetDescriptor, cameraData.requiresMinMaxDepthPyr);
+                    RenderingUtils.ReAllocateIfNeeded(ref m_DepthHiZTexture, hiZDesc, FilterMode.Point, wrapMode: TextureWrapMode.Clamp, name: "_CameraHiZDepthTexture");
+                    cmd.SetGlobalTexture(m_DepthHiZTexture.name, m_DepthHiZTexture.nameID);
+                }
+                // END SLZ MODIFIED
 
                 cmd.SetGlobalTexture(m_DepthTexture.name, m_DepthTexture.nameID);
                 context.ExecuteCommandBuffer(cmd);
@@ -930,6 +1018,16 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_PrimedDepthCopyPass);
             }
 
+            // SLZ MODIFIED // Hi-Z Prepass
+
+            if (requiresDepthPrepass && cameraData.requiresDepthPyramid)
+            {
+                m_CopyDepthToHiZPass.Setup(m_DepthTexture, m_DepthHiZTexture, cameraData.requiresMinMaxDepthPyr);
+                EnqueuePass(m_CopyDepthToHiZPass);
+            }
+
+            // END SLZ MODIFIED
+
             if (generateColorGradingLUT)
             {
                 colorGradingLutPass.ConfigureDescriptor(in renderingData.postProcessingData, out var desc, out var filterMode);
@@ -1033,20 +1131,47 @@ namespace UnityEngine.Rendering.Universal
             // Set the depth texture to the far Z if we do not have a depth prepass or copy depth
             // Don't do this for Overlay cameras to not lose depth data in between cameras (as Base is guaranteed to be first)
             if (cameraData.renderType == CameraRenderType.Base && !requiresDepthPrepass && !requiresDepthCopyPass)
+            {
                 Shader.SetGlobalTexture("_CameraDepthTexture", SystemInfo.usesReversedZBuffer ? Texture2D.blackTexture : Texture2D.whiteTexture);
+                // SLZ MODIFIED // Set depth pyramid global texture to blank if depth prepass isn't used
+                Shader.SetGlobalTexture("_CameraHiZDepthTexture", SystemInfo.usesReversedZBuffer ? Texture2D.blackTexture : Texture2D.whiteTexture);
+                // END SLZ MODIFIED
+            }
 
             if (copyColorPass)
             {
                 // TODO: Downsampling method should be stored in the renderer instead of in the asset.
                 // We need to migrate this data to renderer. For now, we query the method in the active asset.
                 Downsampling downsamplingMethod = UniversalRenderPipeline.asset.opaqueDownsampling;
-                var descriptor = cameraTargetDescriptor;
-                CopyColorPass.ConfigureDescriptor(downsamplingMethod, ref descriptor, out var filterMode);
 
-                RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueColor, descriptor, filterMode, TextureWrapMode.Clamp, name: "_CameraOpaqueTexture");
-                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, m_OpaqueColor, downsamplingMethod);
+                // SLZ MODIFIED // We use a permanent render texture for the opaque texture so we can access the last frame's color during the opaque pass
+
+                // var descriptor = cameraTargetDescriptor;
+                // CopyColorPass.ConfigureDescriptor(downsamplingMethod, ref descriptor, out var filterMode);
+                // 
+                // RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueColor, descriptor, filterMode, TextureWrapMode.Clamp, name: "_CameraOpaqueTexture");
+                // m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, m_OpaqueColor, downsamplingMethod);
+
+                RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
+                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, opaqueHandle, downsamplingMethod, cameraData.requiresColorPyramid);
+
+                // END SLZ MODIFIED
+
                 EnqueuePass(m_CopyColorPass);
             }
+
+            // SLZ MODIFIED // Store mip 0 of the depth pyramid for SSR so we can do temporal blending with the last frame
+
+            if (cameraData.enableSSR)
+            {
+                //m_SetHiZ0GlobalPass.Setup(m_PrevHiZ0Texture.Identifier(), m_PrevHiZ0Texture.id);
+                //EnqueuePass(m_SetHiZ0GlobalPass);
+                m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
+                m_CopyHiZ0Pass.Setup(m_DepthHiZTexture, m_PrevHiZ0Texture);
+                EnqueuePass(m_CopyHiZ0Pass);
+            }
+
+            // END SLZ MODIFIED
 
             // Motion vectors
             if (renderPassInputs.requiresMotionVectors)
@@ -1107,6 +1232,12 @@ namespace UnityEngine.Rendering.Universal
                 ((renderingData.cameraData.antialiasing == AntialiasingMode.FastApproximateAntialiasing) ||
                  ((renderingData.cameraData.imageScalingMode == ImageScalingMode.Upscaling) && (renderingData.cameraData.upscalingFilter != ImageUpscalingFilter.Linear)) ||
                  (renderingData.cameraData.IsTemporalAAEnabled() && renderingData.cameraData.taaSettings.contrastAdaptiveSharpening > 0.0f));
+
+            // SLZ MODIFIED // Force post-processing off on android since we gutted the pp shaders on that platform
+#if PLATFORM_ANDROID
+            applyFinalPostProcessing = false;
+#endif
+            // END SLZ MODIFIED
 
             // When post-processing is enabled we can use the stack to resolve rendering to camera target (screen or RT).
             // However when there are render passes executing after post we avoid resolving to screen so rendering continues (before sRGBConversion etc)
@@ -1470,7 +1601,9 @@ namespace UnityEngine.Rendering.Universal
             return supportsDepthCopy || msaaDepthResolve;
         }
 
-        internal override void SwapColorBuffer(CommandBuffer cmd)
+        // SLZ MODIFIED // Make internal method public
+        public override void SwapColorBuffer(CommandBuffer cmd)
+        // END SLZ MODIFIED
         {
             m_ColorBufferSystem.Swap();
 
@@ -1486,7 +1619,9 @@ namespace UnityEngine.Rendering.Universal
             cmd.SetGlobalTexture("_AfterPostProcessTexture", m_ActiveCameraColorAttachment.nameID);
         }
 
-        internal override RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
+        // SLZ MODIFIED // Make internal method public
+        public override RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
+        // END SLZ MODIFIED
         {
             return m_ColorBufferSystem.GetFrontBuffer(cmd);
         }
@@ -1496,7 +1631,9 @@ namespace UnityEngine.Rendering.Universal
             return m_ColorBufferSystem.GetBackBuffer(cmd);
         }
 
-        internal override void EnableSwapBufferMSAA(bool enable)
+        // SLZ MODIFIED // Make internal method public
+        public override void EnableSwapBufferMSAA(bool enable)
+        // END SLZ MODIFIED
         {
             m_ColorBufferSystem.EnableMSAA(enable);
         }

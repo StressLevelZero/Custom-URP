@@ -11,6 +11,10 @@ namespace UnityEditor.Rendering.Universal
     {
         UniversalRenderPipelineSerializedLight serializedLight { get; set; }
 
+        // SLZ MODIFIED
+        bool showvolume = false;
+        // END SLZ MODIFIED
+
         protected override void OnEnable()
         {
             serializedLight = new UniversalRenderPipelineSerializedLight(serializedObject, settings);

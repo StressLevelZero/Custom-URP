@@ -1,14 +1,14 @@
 {
   "name": "com.unity.render-pipelines.universal",
-  "description": "The Universal Render Pipeline (URP) is a prebuilt Scriptable Render Pipeline, made by Unity. URP provides artist-friendly workflows that let you quickly and easily create optimized graphics across a range of platforms, from mobile to high-end consoles and PCs.",
-  "version": "14.0.5",
-  "unity": "2022.2",
-  "displayName": "Universal RP",
+  "description": "SLZ's modified URP",
+  "version": "8148.0.2",
+  "unity": "2021.2",
+  "displayName": "SLZ Universal RP",
   "dependencies": {
     "com.unity.mathematics": "1.2.1",
-    "com.unity.burst": "1.8.2",
-    "com.unity.render-pipelines.core": "14.0.5",
-    "com.unity.shadergraph": "14.0.5"
+    "com.unity.burst": "1.5.0",
+    "com.unity.render-pipelines.core": "12.1.6",
+    "com.unity.shadergraph": "12.1.6"
   },
   "keywords": [
     "graphics",
@@ -18,11 +18,25 @@
     "render",
     "pipeline"
   ],
+    "repository": {
+    "type": "git",
+    "url": "https://github.com/StressLevelZero/Custom-URP.git"
+	},
+	  "author": {
+    "name": "StressLevelZero",
+    "email": "contact@stresslevelzero.com",
+    "url": "http://www.stresslevelzero.com/"
+  },
   "samples": [
     {
-      "displayName": "URP Package Samples",
-      "description": "Collection of scenes showcasing different features of the Universal Render Pipeline.",
-      "path": "Samples~/URPPackageSamples"
+      "displayName": "Amplify Shader Extentions",
+      "description": "Templates and functions needed to use Amplify Shader Editor",
+      "path": "Samples~/AmplifyShaderExtentions"
+    },
+	{
+      "displayName": "SLZ Bonelab Shaders",
+      "description": "A collection of shaders that are found in Bonelab",
+      "path": "Samples~/SLZShaders"
     }
   ]
 }

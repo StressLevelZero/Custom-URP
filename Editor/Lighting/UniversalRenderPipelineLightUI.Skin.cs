@@ -65,6 +65,12 @@ namespace UnityEditor.Rendering.Universal
             public static readonly GUIContent LightCookieOffset = EditorGUIUtility.TrTextContent("Cookie Offset", "Controls the offset of the cookie mask currently assigned to the light.");
             /// <summary>Title with "Rendering Layer"</summary>
             public static readonly GUIContent RenderingLayers = EditorGUIUtility.TrTextContent("Rendering Layers", "Select the Rendering Layers that the Light affects. This Light affects objects where at least one Rendering Layer value matches.");
+
+            // SLZ MODIFIED
+            public static readonly GUIContent VolumetricsHeader = new GUIContent("Volumetrics");
+            public static readonly GUIContent VolumetricsMultiplier = new GUIContent("Baked Volumetric Multiplier", "Should be set to 1. Multiply the light with this value for volumetric bake. ");
+            public static readonly GUIContent VolumetricStrength = EditorGUIUtility.TrTextContent("Volumetric controbution multiplier", "Controls how strong volumetrics are. Should be set to 1 majority of the time");
+            // END SLZ MODIFIED
         }
     }
 }

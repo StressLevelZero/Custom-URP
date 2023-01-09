@@ -1,0 +1,404 @@
+﻿///This is the realtime volumetric shader. It's the first froxel pass.
+#pragma use_dxc vulkan
+#pragma kernel Scatter
+
+#define M_PI 3.1415926535897932384626433832795		//Standard stored Pi.
+#define PI_x4 12.566370614359172953850573533118		//For inverse square.
+
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+
+Texture3D<float4> PreviousFrameLighting;
+RWTexture3D<float4> Result;
+
+//Texture2D<float4> BlueNoise;
+
+Texture2DArray<float4> LightProjectionTextureArray;
+
+//Currently only Supports spot lights
+struct LightObject 
+{
+	float4x4    LightProjectionMatrix;
+	float3      LightPosition;
+	float4		LightColor;
+	int			LightCookie;
+};
+
+StructuredBuffer<LightObject> LightObjects;
+
+//shared float4 _VolumePlaneSettings;
+shared float _GlobalExtinction;
+shared float _FogBaseHeight;
+shared float _FogMaxHeight;
+shared float _StaticLightMultiplier;
+float _ClipmapScale;
+float _ClipmapScale2;
+float3 _ClipmapPosition;
+
+CBUFFER_START(PerFrameCB)
+float4x4 _VBufferCoordToViewDirWS; // >_>
+float4x4 _PrevViewProjMatrix;
+float4x4 _ViewMatrix;
+float4x4 TransposedCameraProjectionMatrix;
+float4x4 CameraProjectionMatrix;
+float4 _VBufferDistanceEncodingParams;
+float4 _VBufferDistanceDecodingParams;
+float4 SeqOffset; //z offseter
+float4 CameraPosition; //current camera position
+float4 CameraMotionVector; //camera's motion per frame
+CBUFFER_END
+
+
+
+//shared float SeqOffsetPrv; //z offseter
+
+float _VBufferUnitDepthTexelSpacing;
+//shared float4 _VBufferSharedUvScaleAndLimit;
+//float4x4 PreviousFrameMatrix;
+
+SamplerState _LinearClamp;
+SamplerState _point_repeat;
+SamplerState Custom_trilinear_clamp_sampler;
+SamplerState s_linear_clamp_sampler;
+
+Texture3D<float4> _VolumetricClipmapTexture;
+Texture3D<float4> _VolumetricClipmapTexture2;
+
+shared TextureCube<float4> _SkyTexture;
+
+
+//float reprojectionAmount;
+shared float4 _MipFogParameters; //near, far, mix
+shared int _SkyMipCount;
+
+
+
+// Returns the forward (central) direction of the current view in the world space.
+float3 GetViewForwardDir()
+{
+	float4x4 viewMat = _ViewMatrix;
+	return -viewMat[2].xyz;
+}
+
+// Returns the forward (up) direction of the current view in the world space.
+float3 GetViewUpDir()
+{
+	float4x4 viewMat = _ViewMatrix;
+	return viewMat[1].xyz;
+}
+
+float3 GetFogColor(float3 V, float fragDist)
+{
+	float3 color = float3(1,1,1);
+		// Based on Uncharted 4 "Mip Sky Fog" trick: http://advances.realtimerendering.com/other/2016/naughty_dog/NaughtyDog_TechArt_Final.pdf
+		float mipLevel = (1.0 - _MipFogParameters.z * saturate((fragDist - _MipFogParameters.x) / (_MipFogParameters.y - _MipFogParameters.x))) * (_SkyMipCount - 1);
+		// For the atmospheric scattering, we use the GGX convoluted version of the cubemap. That matches the of the idnex 0
+		//color *= SampleSkyTexture(-V, mipLevel, 0).rgb; // '_FogColor' is the tint
+	    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb; // '_FogColor' is the tint
+
+
+	return color;
+}
+
+//Custom trilinear interpolation
+//Apparently you can't use a sampler with a RWtexture, but you can directly read the data. 
+//Do we need this? Can I do this in a sampler instead without requiring a CPU memory copy? Is it any faster to do it that way? //DOES IT WORK IN ANDROID???
+float4 TrilinearInterpolation(float3 UVW) {
+
+	float3 UVW_0 = floor(UVW); //Lowest corner 
+	float3 UVW_1 = ceil(UVW);	//Highest Corner
+
+	float3 PixelDifference = UVW - UVW_0; //vec3 distance
+	float3 PixelDifference_1minus = 1 - PixelDifference; 
+
+	//Sample ALL the points!
+
+	float4 value_000 = Result[UVW_0.xyz];
+	float4 value_100 = Result[int3(UVW_1.x, UVW_0.y, UVW_0.z)];
+	float4 value_010 = Result[int3(UVW_0.x, UVW_1.y, UVW_0.z)];
+	float4 value_110 = Result[int3(UVW_1.x, UVW_1.y, UVW_0.z)];
+
+	float4 value_001 = Result[int3(UVW_0.x, UVW_0.y, UVW_1.z)];
+	float4 value_101 = Result[int3(UVW_1.x, UVW_0.y, UVW_1.z)];
+	float4 value_011 = Result[int3(UVW_0.x, UVW_1.y, UVW_1.z)];
+	float4 value_111 = Result[UVW_1.xyz];
+
+	// Interpolate in 3 dimensions
+
+	float4 c00 = (value_000 * (PixelDifference_1minus.x)) + (value_100 * (PixelDifference.x));
+	float4 c01 = (value_001 * (PixelDifference_1minus.x)) + (value_101 * (PixelDifference.x));
+	float4 c10 = (value_010 * (PixelDifference_1minus.x)) + (value_110 * (PixelDifference.x));
+	float4 c11 = (value_011 * (PixelDifference_1minus.x)) + (value_111 * (PixelDifference.x));
+
+	float4 c0 = (c00 * (PixelDifference_1minus.y)) + (c10 * (PixelDifference.y));
+	float4 c1 = (c01 * (PixelDifference_1minus.y)) + (c11 * (PixelDifference.y));
+
+	return (c0 * PixelDifference_1minus.z) + (c1 * PixelDifference.z);
+};
+
+float ComputeHistoryWeight(float frameMulti)
+{
+	// Compute the exponential moving average over 'n' frames:
+	// X = (1 - a) * ValueAtFrame[n] + a * AverageOverPreviousFrames.
+	// We want each sample to be uniformly weighted by (1 / n):
+	// X = (1 / n) * Sum{i from 1 to n}{ValueAtFrame[i]}.
+	// Therefore, we get:
+	// (1 - a) = (1 / n) => a = (1 - 1 / n) = (n - 1) / n,
+	// X = (1 / n) * ValueAtFrame[n] + (1 - 1 / n) * AverageOverPreviousFrames.
+	// Why does it work? We need to make the following assumption:
+	// AverageOverPreviousFrames ≈ AverageOverFrames[n - 1].
+	// AverageOverFrames[n - 1] = (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+	// This implies that the reprojected (accumulated) value has mostly converged.
+	// X = (1 / n) * ValueAtFrame[n] + ((n - 1) / n) * (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+	// X = (1 / n) * ValueAtFrame[n] + (1 / n) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+	// X = Sum{i from 1 to n}{ValueAtFrame[i] / n}.
+	float numFrames = 7 * frameMulti;
+	float frameWeight = 1 / numFrames;
+	float historyWeight = 1 - frameWeight;
+
+	return historyWeight;
+}
+
+
+
+
+//Realtime spot evaluation
+float4 SpotLightLoop(float4 WS_coordinate) {
+
+	float4 accumLighting = float4(0,0,0,0);
+
+	uint count, stride;
+	LightObjects.GetDimensions(count, stride);
+
+	for (int i = 0; i < count; i++) {
+
+		///Realtime Spotlight projection matrix and cookie sampler
+		float4 lightWSPos = WS_coordinate - float4(LightObjects[i].LightPosition, 1); //world pos
+
+		lightWSPos = mul(LightObjects[i].LightProjectionMatrix, lightWSPos);
+
+		lightWSPos.xy = lightWSPos.xy / lightWSPos.w;
+
+		float lightDirection = lightWSPos.z;
+
+		lightWSPos.z = 1; //Setting which slice to sample https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-samplelevel
+
+		float4 spotlightTex = LightProjectionTextureArray.SampleLevel(Custom_trilinear_clamp_sampler, lightWSPos.xyz, 0, 0);
+
+		float LightRadius = distance(WS_coordinate.xyz, LightObjects[i].LightPosition.xyz); // Distance from light source
+
+		spotlightTex *= LightObjects[i].LightColor / (PI_x4 *  LightRadius*LightRadius);	// inverse square
+
+		accumLighting += spotlightTex * step(0,-lightDirection); // clip only to the front and add to the lightinbg
+	}	
+
+	return accumLighting;
+}
+
+
+
+///Main scattering pass. Integration is done separately so we can reproject this result for XR rather than do it twice.
+///We Would have to store a pre integration version anyways for temporal reprojection
+[numthreads(4,4,4)]
+void Scatter(uint3 id : SV_DispatchThreadID)
+{
+
+	///Get current RT resolution and convert it to 0 - 1 UVW space
+	float3 whd;
+	Result.GetDimensions(whd.x, whd.y, whd.z);
+
+//	float3 TemporalOffset = float3(0.5, 0.5, 0.5 + Jittery  * 0.5); //offsetting  
+//	float3 TemporalOffset = float3(0.5, 0.5, 0.5 ); //offsetting  
+	float4 UVW = float4( (id) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
+	float e1 = (id.z + 1) / whd.z; // (slice + 1) / sliceCount //Todo: Bake Rcp 
+//	float t1 = DecodeLogarithmicDepthGeneralized(e1, _VBufferDistanceDecodingParams);
+
+	// UVW.z = t1;
+	//TODO: replace this with the global baked bluenoise texture used elsewhere
+	// Perform per-pixel randomization by adding an offset and then sampling uniformly
+// (in the log space) in a vein similar to Stochastic Universal Sampling:
+// https://en.wikipedia.org/wiki/Stochastic_universal_sampling
+	float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
+
+	// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
+	// Each of them is the centroid of the interval of length 2/14.
+	float rndVal = frac(perPixelRandomOffset + SeqOffset.z);
+
+
+		/// Invert the assumed perspective projection from the UVW to World Space
+	//float4 WS_coordinate = mul(CameraProjectionMatrix, UVW); //inverse camera matrix
+	//WS_coordinate.xyz = WS_coordinate.xyz / WS_coordinate.w;	//tapper coord and flip around
+	//WS_coordinate += CameraPosition;
+	float2 centerCoord = id.xy + float2(0.5, 0.5);
+
+	// Compute a ray direction s.t. ViewSpace(rayDirWS).z = 1.
+	//float3 rayDirWS = mul(-float4(centerCoord, 1, 1), _VBufferCoordToViewDirWS[unity_StereoEyeIndex]).xyz;
+	float3 rayDirWS = normalize(mul(-float4(centerCoord , 1, 1), _VBufferCoordToViewDirWS)).xyz ;
+	float  rcpLenRayDir = rsqrt(dot(rayDirWS, rayDirWS));
+	//rayDirWS *= rcpLenRayDir; // Normalize
+
+	//JitteredRay ray;
+
+	//ray.originWS = GetCurrentViewPosition(); //WS pos of camera 
+	//ray.centerDirWS = rayDirWS * rcpLenRayDir; // Normalize
+	//float originWS = GetCurrentViewPosition(); //WS pos of camera 
+//	float3 originWS = CameraPosition.xyz; //WS pos of camera 
+
+	float3 F = GetViewForwardDir();
+	float3 U = GetViewUpDir();
+
+	float3 rightDirWS = cross(rayDirWS, U);
+	float  rcpLenRightDir = rsqrt(dot(rightDirWS, rightDirWS));
+
+//	ray.jitterDirWS = ray.centerDirWS;
+//	float de = 1 / whd.z;
+//	float e1 = (UVW.z + 1) / whd.z; //linearZ
+	//float  t = DecodeLogarithmicDepthGeneralized(e1 - 0.5 * de, _VBufferDistanceDecodingParams);
+	rndVal =  SeqOffset.z ;
+	float  t = DecodeLogarithmicDepthGeneralized(  ( e1 - (rndVal * (1/whd.z))  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	float  pt = DecodeLogarithmicDepthGeneralized(  ( e1 - (.5 * (1/whd.z))  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	
+	float3 centerDirWS = rayDirWS; // //jittered ray
+
+	float FdotD = dot(F, centerDirWS);
+	//float _VBufferUnitDepthTexelSpacing = .01; //TODO: make this smart
+	float unitDistFaceSize = _VBufferUnitDepthTexelSpacing * FdotD * rcpLenRayDir;
+
+	float3 xDirDerivWS = rightDirWS * (rcpLenRightDir * unitDistFaceSize); // Normalize & rescale
+	float3 yDirDerivWS = cross(xDirDerivWS, centerDirWS); // Will have the length of 'unitDistFaceSize' by construction
+
+	//SeqOffset.xy = 0;
+	//float3 jitterDirWS = normalize(centerDirWS + (SeqOffset.x * xDirDerivWS) + (SeqOffset.y * yDirDerivWS));
+	float3 jitterDirWS = normalize(centerDirWS);
+
+
+	//TODO: add the left right jitter too. Helps smooth out rough edges.
+	float3 centerWS =  CameraPosition.xyz + ( t * jitterDirWS); //Cast ray along direction and add cam pos to get WS pos
+	float3 centWSNJIT = CameraPosition.xyz + pt * centerDirWS ; //non-jittered version for reprojection
+
+	//RGB is total lighting, A is the total extinction
+	float4 accumLighting = float4(0,0,0,0);
+	//	
+	//centerWS *= .99;
+
+	//WS_coordinate = -WS_coordinate + CameraPosition; //move to postion.
+	float4 WS_coordinate = float4(centerWS,1);
+	///
+//	WS_coordinate.z += Noised;
+	/// Previous frame space
+
+
+////
+//REPROJECTION
+///
+
+	//float4 PreviousFrameProjection = WS_coordinate; // Catch WS relitive to the camera
+	//PreviousFrameProjection.xyz -= CameraMotionVector.xyz; //Move back previous frame's pos TODO: Add to matrix instead
+	//PreviousFrameProjection.w = 1;
+	//PreviousFrameProjection = mul(PreviousFrameMatrix, PreviousFrameProjection); // convert using previous matrix
+	//PreviousFrameProjection = PreviousFrameProjection /  PreviousFrameProjection.w; //Untapper coord
+/////
+//	PreviousFrameProjection.z = PreviousFrameProjection.z / (_VolumePlaneSettings.y - PreviousFrameProjection.z * _VolumePlaneSettings.z);
+//	PreviousFrameProjection.xy = (PreviousFrameProjection.xy + 1.0f) * 0.5f;
+
+
+	//float t0 = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
+	//	float de = _VBufferRcpSliceCount; // Log-encoded distance between slices
+
+	//float4 previousResult = TrilinearInterpolation( PreviousFrameProjection.xyz * whd.xyz - 0.5); //Custom trilinear interpolation of RW texture. can't use this on mobile because can't read a RW tex. 
+	//float4 previousResult = PreviousFrameLighting.SampleLevel(Custom_trilinear_clamp_sampler, id / UVW, 0 );
+
+	//half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
+
+	//ls = mul(ls, transpose(PreviousFrameMatrix));
+	//ls.xyz = ls.xyz / ls.w;
+
+	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
+	float3 ws_repro = centWSNJIT.xyz ;
+
+	float2	positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, _PrevViewProjMatrix);
+	float	vdistance = distance(ws_repro, prevPos);
+	float	W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+//	float	W = vdistance;
+
+	//half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
+	//ls = mul(ls, transpose(PreviousFrameMatrix));
+	//ls.xyz = ls.xyz / ls.w;
+	//float3 reprojection = float3(ls.xy, W);
+
+	float3 reprojection = float3(positionNDC, W);
+
+	//float clamper = step(reprojection.x,1) * step(0, reprojection.x) * 
+	//				step(reprojection.y, 1)* step(0, reprojection.y) *
+	//				step(reprojection.z, 1) * step(0, reprojection.z);
+	//clamper = saturate(clamper);
+
+	float4 previousResult = PreviousFrameLighting.SampleLevel(s_linear_clamp_sampler, reprojection, 0 ) ;
+	//float4 previousResult = PreviousFrameLighting[id];
+
+	/////
+	//Light loops
+	/////
+	//	accumLighting += SpotLightLoop(WS_coordinate);
+
+	/////
+	//Baked light volumes
+	/////
+
+	//Using combined clipmap instead of direct baked maps. Reduces the amount of 3d texture look-ups per frame.
+	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)	
+	float3 ClipmapUVW =  (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale *.5) )  ) / _ClipmapScale.xxx;
+	
+	float3 LargeClipmapUVW = (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale2 *.5) )  ) / (_ClipmapScale2.xxx);
+
+	//For clipping the clipmap. Isn't needed if the view volume is smaller than the clipmap
+	float Clipped =
+		step(ClipmapUVW.x, 1) * step(0, ClipmapUVW.x) *
+		step(ClipmapUVW.y, 1) * step(0, ClipmapUVW.y) *
+		step(ClipmapUVW.z, 1) * step(0, ClipmapUVW.z);
+	Clipped = saturate(Clipped);
+
+	//if (Clipped > 0) { //Android doesn't like ifs :/
+	//	accumLighting += float4(_VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0).xyz, 0);
+	//}
+	//else
+	//{
+	//	accumLighting += float4(_VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0).xyz, 0);
+	//}
+	accumLighting += _VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0) * Clipped;
+	accumLighting += _VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0) * (1- Clipped);
+	accumLighting.rgb *= _StaticLightMultiplier;
+	accumLighting.rgb += GetFogColor(centerDirWS,W)*W; //Base fog color from cubemap;
+	
+	// float3 lerpy = abs(dot(float3(0,0,1),rayDirWS)); //Directional tester
+	// accumLighting.rgb += lerpy*lerpy * float3(1,0.8,0.5)*W;
+	
+	//Take any precomputed extinction stored in the clipmap and add global variables
+	//Height density. Doing this here instead of the clipmap to smoothly interpolate between volumes
+	// float maxheight = 1;
+	// float baseheight = 0;
+		
+	//float heightDensity = lerp(_GlobalExtinction, REAL_EPS,saturate( (WS_coordinate.y / maxheight - baseheight)  ));
+	//float NewValue = (((WS_coordinate.y) * (maxheight - baseheight)) / (1 - 0)) + baseheight;
+	float HeightRemap = (WS_coordinate.y - _FogBaseHeight) / (_FogMaxHeight - _FogBaseHeight);
+	float heightDensity = lerp(_GlobalExtinction, .001,sqrt(saturate( HeightRemap)) ); 
+	//accumLighting.a += _GlobalExtinction;
+	
+	accumLighting.a += heightDensity;
+	//accumLighting.a += distance(WS_coordinate.xyz,0) > 3 ? 0:10 ;
+	
+	accumLighting.rgb *= accumLighting.a;
+
+//	accumLighting.rgb += max((float3(rndVal, frac(rndVal+.2), frac(rndVal+.5)) - 0.5) * 0.03,0);  //dithering
+
+	//Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount); // Temporal sampling ComputeHistoryWeight()
+	//Doing a simple curve based on depth so nearer slices take longer to converge. This is to get rid of the near flickering. There is likely something else to fix and this is just a bandaid solution.
+	Result[id.xyz] = lerp(accumLighting , previousResult, ComputeHistoryWeight((1 / (id.z * id.z + .4) + 1)) ); // Temporal sampling 
+	
+}
+
+///Initially did just matrix calculations. Worked fine, but the light scattering was less accurate on the edges. Implemented HDRP's method of casting rays

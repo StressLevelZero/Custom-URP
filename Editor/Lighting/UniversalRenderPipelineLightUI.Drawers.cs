@@ -20,7 +20,10 @@ namespace UnityEditor.Rendering.Universal
             Emission = 1 << 2,
             Rendering = 1 << 3,
             Shadows = 1 << 4,
-            LightCookie = 1 << 5
+            LightCookie = 1 << 5,
+            // SLZ MODIFIED
+            Volumetrics = 1 << 6
+            // END SLZ MODIFIED
         }
 
         static readonly ExpandedState<Expandable, Light> k_ExpandedState = new(~-1, "URP");
@@ -60,7 +63,10 @@ namespace UnityEditor.Rendering.Universal
                 Expandable.Emission,
                 k_ExpandedState,
                 CED.Group(
-                    LightUI.DrawColor,
+                    LightUI.DrawColor, 
+                    // SLZ MODIFIED
+                    DrawUVContent,
+                    // END SLZ MODIFIED
                     DrawEmissionContent)),
             CED.FoldoutGroup(LightUI.Styles.renderingHeader,
                 Expandable.Rendering,
@@ -69,7 +75,13 @@ namespace UnityEditor.Rendering.Universal
             CED.FoldoutGroup(LightUI.Styles.shadowHeader,
                 Expandable.Shadows,
                 k_ExpandedState,
-                DrawShadowsContent)
+                DrawShadowsContent),
+            // SLZ MODIFIED
+            CED.FoldoutGroup(Styles.VolumetricsHeader,
+                Expandable.Volumetrics,
+                k_ExpandedState,
+                DrawVolumetricsContent)
+            // END SLZ MODIFIED
         );
 
         static Func<int> s_SetGizmosDirty = SetGizmosDirty();
@@ -249,6 +261,16 @@ namespace UnityEditor.Rendering.Universal
             DrawLightCookieContent(serializedLight, owner);
         }
 
+        // SLZ MODIFIED
+        static void DrawUVContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
+        {
+            GUIContent UltravioletStyle = new GUIContent("Ultraviolet", "Ultraviolet light intensity. Used by fluorescent materials");
+            var light = (Light)owner.target;
+            light.color = new Color(light.color.r, light.color.g, light.color.b, EditorGUILayout.Slider(UltravioletStyle, light.color.a, 0f, 1f));
+        }
+
+        // END SLZ MODIFIED
+
         static void DrawRenderingContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
             serializedLight.settings.DrawRenderMode();
@@ -305,11 +327,17 @@ namespace UnityEditor.Rendering.Universal
 
                         EditorGUILayout.Slider(serializedLight.settings.shadowsStrength, 0f, 1f, Styles.ShadowStrength);
 
+
+                        // SLZ MODIFIED
+
                         // Bias
-                        DrawAdditionalShadowData(serializedLight, owner);
+                        // DrawAdditionalShadowData(serializedLight, owner);
 
                         // this min bound should match the calculation in SharedLightData::GetNearPlaneMinBound()
-                        float nearPlaneMinBound = Mathf.Min(0.01f * serializedLight.settings.range.floatValue, 0.1f);
+                        float nearPlaneMinBound = Mathf.Min(0.001f * serializedLight.settings.range.floatValue, 0.01f);
+
+                        // END SLZ MODIFIED
+
                         EditorGUILayout.Slider(serializedLight.settings.shadowsNearPlane, nearPlaneMinBound, 10.0f, Styles.ShadowNearPlane);
 
                         // Soft Shadow Quality
@@ -456,5 +484,43 @@ namespace UnityEditor.Rendering.Universal
                 }
             }
         }
+
+        // SLZ MODIFIED
+        static void DrawVolumetricsContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
+        {
+            var settings = serializedLight.settings;
+            var additionData = (settings.light).gameObject.GetComponent<UniversalAdditionalLightData>();
+            //if (additionData.customShadowLayers)
+            //    continue;
+
+            //settings.DrawCookie();
+
+            // Draw 2D cookie size for directional lights
+            bool isVolumetricsEnabled = additionData.useVolumetric;
+            //Realtime isn't implmented yet
+            if (isVolumetricsEnabled && serializedLight.settings.lightmapping.intValue != (int)LightmapBakeType.Realtime)
+            {
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
+                }
+                //EditorGUI.BeginChangeCheck();
+                //EditorGUILayout.PropertyField(serializedLight.lightCookieSizeProp, Styles.LightCookieSize);
+                //EditorGUILayout.PropertyField(serializedLight.lightCookieOffsetProp, Styles.LightCookieOffset);
+                //if (EditorGUI.EndChangeCheck())
+                //    Experimental.Lightmapping.SetLightDirty((UnityEngine.Light)serializedLight.serializedObject.targetObject);
+            }
+            else
+            {
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    GUI.enabled = false;
+                    additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
+                    GUI.enabled = true;
+                }
+            }
+        }
+
+        // END SLZ MODIFIED
     }
 }

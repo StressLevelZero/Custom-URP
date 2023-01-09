@@ -838,7 +838,19 @@ namespace UnityEngine.Rendering.Universal.Internal
         public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
         {
             ConfigureTarget(m_AdditionalLightsShadowmapHandle);
-            ConfigureClear(ClearFlag.All, Color.black);
+            // SLZ MODIFIED
+            // Don't clear if the shadowcaster pass isn't used.
+            //ConfigureClear(ClearFlag.All, Color.black);
+            if (m_CreateEmptyShadowmap)
+            {
+                ConfigureClear(ClearFlag.None, Color.black);
+            }
+            else
+            {
+                ConfigureClear(ClearFlag.All, Color.black);
+            }
+
+            // END SLZ MODIFIED
         }
 
         /// <inheritdoc/>
