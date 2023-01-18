@@ -1056,18 +1056,6 @@ namespace UnityEngine.Rendering.Universal
             cameraData.hdrColorBufferPrecision = asset ? asset.hdrColorBufferPrecision : HDRColorBufferPrecision._32Bits;
             cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, renderScale,
                 cameraData.isHdrEnabled, cameraData.hdrColorBufferPrecision, msaaSamples, needsAlphaChannel, cameraData.requiresOpaqueTexture);
-
-            // SLZ MODIFIED // Set additional values relating to SSR
-            bool enableSSR = asset.enableSSR && cameraData.postProcessEnabled;
-            cameraData.requiresColorPyramid = asset.supportsCameraOpaqueTexture && enableSSR;
-            cameraData.requiresDepthPyramid = asset.supportsCameraDepthTexture && enableSSR;
-            cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
-            cameraData.enableSSR = enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
-            cameraData.maxSSRSteps = asset.maxSsrSteps;
-            cameraData.SSRMinMip = asset.ssrMinMip;
-            cameraData.SSRHitRadius = asset.ssrHitRadius;
-            cameraData.SSRTemporalWeight = asset.ssrTemporalWeight;
-            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -1305,6 +1293,19 @@ namespace UnityEngine.Rendering.Universal
                 cameraData.volumetricsConstants = null;
             }
 
+            // END SLZ MODIFIED
+
+            // SLZ MODIFIED // Set additional values relating to SSR
+            bool enableSSR = asset.enableSSR && cameraData.postProcessEnabled;
+            //Debug.Log("cameraData.postProcessEnabled: " + cameraData.postProcessEnabled + "\nenableSSR: " + enableSSR);
+            cameraData.requiresColorPyramid = asset.supportsCameraOpaqueTexture && enableSSR;
+            cameraData.requiresDepthPyramid = asset.supportsCameraDepthTexture && enableSSR;
+            cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
+            cameraData.enableSSR = enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
+            cameraData.maxSSRSteps = asset.maxSsrSteps;
+            cameraData.SSRMinMip = asset.ssrMinMip;
+            cameraData.SSRHitRadius = asset.ssrHitRadius;
+            cameraData.SSRTemporalWeight = asset.ssrTemporalWeight;
             // END SLZ MODIFIED
         }
 

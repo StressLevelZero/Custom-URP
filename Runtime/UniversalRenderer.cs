@@ -107,6 +107,9 @@ namespace UnityEngine.Rendering.Universal
         FinalBlitPass m_FinalBlitPass;
         CapturePass m_CapturePass;
 #if ENABLE_VR && ENABLE_XR_MODULE
+        // SLZ MODIFIED // Pre depth-prepass occlusion mesh to optimize HBAO
+        XROcclusionMeshPass m_XROcclusionMeshPass_BeforeDepth;
+        // END SLZ MODIFIED
         XROcclusionMeshPass m_XROcclusionMeshPass;
         CopyDepthPass m_XRCopyDepthPass;
 #endif
@@ -276,7 +279,8 @@ namespace UnityEngine.Rendering.Universal
             m_AdditionalLightsShadowCasterPass = new AdditionalLightsShadowCasterPass(RenderPassEvent.BeforeRenderingShadows);
 
 #if ENABLE_VR && ENABLE_XR_MODULE
-            // SLZ MODIFIED
+            // SLZ MODIFIED // Add additional occlusion mesh pass before the depth-prepass, add bool parameter to tell pass to only write to depth and to clear color and depth 
+            m_XROcclusionMeshPass_BeforeDepth = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingPrePasses - 1, true);
             m_XROcclusionMeshPass = new XROcclusionMeshPass(RenderPassEvent.BeforeRenderingOpaques, false);
             // END SLZ MODIFIED
             // Schedule XR copydepth right after m_FinalBlitPass(AfterRendering + 1)
@@ -886,6 +890,7 @@ namespace UnityEngine.Rendering.Universal
                 RenderingUtils.ReAllocateIfNeeded(ref m_DepthTexture, depthDescriptor, FilterMode.Point, wrapMode: TextureWrapMode.Clamp, name: "_CameraDepthTexture");
 
                 // SLZ MODIFIED // Initialize Hi-Z RTHandle, and set it as a global
+                //cameraData.requiresDepthPyramid
                 if (cameraData.requiresDepthPyramid)
                 {
                     var hiZDesc = CopyDepthToHiZPass.GetHiZDescriptor(cameraTargetDescriptor, cameraData.requiresMinMaxDepthPyr);
@@ -966,6 +971,20 @@ namespace UnityEngine.Rendering.Universal
                 cmd.Clear();
             }
 
+            // SLZ MODIFIED // If in VR with depth-priming, run an XR occlusion mesh pass first.
+            // This is mainly to populate the depth texture with the XR mask to optimize the HBAO render feature.
+            // Probably doesn't save any pixel-fill cost for the depth-prepass since the shaders rendered are extremely simple.
+
+            bool occlusionMeshClearsDepth = false;
+#if ENABLE_VR && ENABLE_XR_MODULE
+            if (cameraData.xr.hasValidOcclusionMesh && requiresDepthPrepass)
+            {
+                occlusionMeshClearsDepth = true;
+                EnqueuePass(m_XROcclusionMeshPass_BeforeDepth);
+            }
+#endif
+            // END SLZ MODIFIED
+
             if (requiresDepthPrepass)
             {
                 if (renderPassInputs.requiresNormalsTexture)
@@ -991,10 +1010,12 @@ namespace UnityEngine.Rendering.Universal
                     }
                     else
                     {
+                        // SLZ MODIFIED // add bool paramater to tell pass to not clear depth if the first XR occlusion mesh pass already did
                         if (renderingLayerProvidesByDepthNormalPass)
-                            m_DepthNormalPrepass.Setup(m_DepthTexture, m_NormalsTexture, m_DecalLayersTexture);
+                            m_DepthNormalPrepass.Setup(m_DepthTexture, m_NormalsTexture, m_DecalLayersTexture, !occlusionMeshClearsDepth);
                         else
-                            m_DepthNormalPrepass.Setup(m_DepthTexture, m_NormalsTexture);
+                            m_DepthNormalPrepass.Setup(m_DepthTexture, m_NormalsTexture, !occlusionMeshClearsDepth);
+                        // END SLZ MODIFIED
                     }
 
                     EnqueuePass(m_DepthNormalPrepass);
@@ -1004,7 +1025,9 @@ namespace UnityEngine.Rendering.Universal
                     // Deferred renderer does not require a depth-prepass to generate samplable depth texture.
                     if (this.renderingModeActual != RenderingMode.Deferred)
                     {
-                        m_DepthPrepass.Setup(cameraTargetDescriptor, m_DepthTexture);
+                        // SLZ MODIFIED // add bool paramater to tell pass to not clear depth if the first XR occlusion mesh pass already did
+                        m_DepthPrepass.Setup(cameraTargetDescriptor, m_DepthTexture, !occlusionMeshClearsDepth);
+                        // END SLZ MODIFIED
                         EnqueuePass(m_DepthPrepass);
                     }
                 }

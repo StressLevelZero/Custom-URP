@@ -39,11 +39,19 @@ struct InputData
 {
     float3  positionWS;
     float4  positionCS;
-    float3  normalWS;
+    // SLZ MODIFIED // make normal a half instead of full float
+    half3  normalWS;
+    // END SLZ MODIFIED
     half3   viewDirectionWS;
     float4  shadowCoord;
     half    fogCoord;
+    // SLZ MODIFIED // make vertex lighting float4 if using fluorescence to store the UV in the alpha channel
+#if defined(_FLUORESCENCE) //Vertex fluorescence
+    half4   vertexLighting;
+#else
     half3   vertexLighting;
+#endif
+    // END SLZ MODIFIED
     half3   bakedGI;
     float2  normalizedScreenSpaceUV;
     half4   shadowMask;
@@ -72,6 +80,7 @@ struct InputData
     // z = desired on screen mip level
     // w = loaded mip level
     float4 mipInfo;
+
     #endif
 };
 

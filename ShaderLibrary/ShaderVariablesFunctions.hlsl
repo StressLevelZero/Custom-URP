@@ -337,6 +337,16 @@ half ComputeFogIntensity(half fogFactor)
     return fogIntensity;
 }
 
+// SLZ MODIFIED
+real3 DecodeHDREnvironment2(real4 encodedIrradiance, real4 decodeInstructions)
+{
+    // Take into account texture alpha if decodeInstructions.w is true(the alpha value affects the RGB channels)
+    real alpha = max(decodeInstructions.w * (encodedIrradiance.a - 1.0) + 1.0, 0.0);
+    // If Linear mode is not supported we can skip exponent part
+    return (decodeInstructions.x * PositivePow(alpha, decodeInstructions.y)) * encodedIrradiance.rgb;
+}
+// END SLZ MODIFIED
+
 // Force enable fog fragment shader evaluation
 #define _FOG_FRAGMENT 1
 real InitializeInputDataFog(float4 positionWS, real vertFogFactor)
@@ -396,6 +406,24 @@ float3 MixFogColor(float3 fragColor, float3 fogColor, float fogFactor)
     return fragColor;
 }
 
+// SLZ MODIFIED // Fog that blends with blurred versions of the sky, rather than just a solid color
+half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real fogFactor)
+{
+#if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+    real fogIntensity = ComputeFogIntensity(fogFactor);
+    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7);
+    fragColor = lerp(mipFog, fragColor, fogIntensity);
+#endif
+    return fragColor;
+}
+
+half3 MixFog(real3 fragColor, float3 viewDirectionWS, real fogFactor)
+{
+    return  (half4(MixFogColor(fragColor, unity_FogColor.rgb, viewDirectionWS, fogFactor), 1)).rgb;
+}
+
+// END SLZ MODIFIED
+
 half3 MixFog(half3 fragColor, half fogFactor)
 {
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
@@ -405,6 +433,7 @@ float3 MixFog(float3 fragColor, float fogFactor)
 {
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
 }
+
 
 // Linear depth buffer value between [0, 1] or [1, 0] to eye depth value between [near, far]
 half LinearDepthToEyeDepth(half rawDepth)

@@ -97,7 +97,7 @@ bool IsAdditionalLightsCookieAtlasTextureAlphaFormat()
 
 // Sampling
 
-// SLZ MODIFIED
+// SLZ MODIFIED // Change light cookie texture and atlas to use same default sampler
 
 real4 SampleMainLightCookieTexture(float2 uv)
 {

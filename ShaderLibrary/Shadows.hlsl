@@ -107,6 +107,16 @@ CBUFFER_END
     #endif
 #endif
 
+// SLZ MODIFIED // Obligatory Ignacio reference, better shadow bias calculations
+float2 GetShadowOffsets( float3 N, float3 L )
+{
+    // From: Ignacio Casta?o http://the-witness.net/news/2013/09/shadow-mapping-summary-part-1/
+    float cos_alpha = saturate( dot( N, L ) );
+    float offset_scale_N = sqrt( 1 - ( cos_alpha * cos_alpha ) ); // sin( acos( L?N ) )
+    float offset_scale_L = offset_scale_N / cos_alpha; // tan( acos( L?N ) )
+    return float2( offset_scale_N, min( 2.0, offset_scale_L ) );
+}
+// END SLZ MODIFIED
 
 float4 _ShadowBias; // x: depth bias, y: normal bias
 
@@ -400,6 +410,9 @@ half BakedShadow(half4 shadowMask, half4 occlusionProbeChannels)
     // This code is optimized for mobile platforms:
     // half bakedShadow = any(occlusionProbeChannels) ? dot(shadowMask, occlusionProbeChannels) : 1.0h;
     half bakedShadow = half(1.0) + dot(shadowMask - half(1.0), occlusionProbeChannels);
+    // SLZ MODIFIED // Saturate BakedShadow. I think we were running into an issue where the shadow value was somehow negative at one point.
+    bakedShadow = saturate(bakedShadow);
+    // END SLZ MODIFIED
     return bakedShadow;
 }
 
@@ -450,6 +463,7 @@ float4 GetShadowCoord(VertexPositionInputs vertexInput)
 #endif
 }
 
+//GARBAGE!
 float3 ApplyShadowBias(float3 positionWS, float3 normalWS, float3 lightDirection)
 {
     float invNdotL = 1.0 - saturate(dot(lightDirection, normalWS));
@@ -460,6 +474,16 @@ float3 ApplyShadowBias(float3 positionWS, float3 normalWS, float3 lightDirection
     positionWS = normalWS * scale.xxx + positionWS;
     return positionWS;
 }
+
+// SLZ MODIFIED // Much better shadow bias caclulation, offsets the mesh toward the light rather than expanding it along normals. Doesn't destroy silhouette or cause cracks along sharp edges like the default method
+float4 ApplySLZShadowBias(float3 positionWS, float3 normalWS, float3 lightDirection)
+{
+    float2 vShadowOffsets = GetShadowOffsets(normalWS, lightDirection);
+    //positionWS.xyz -= vShadowOffsets.x * normalWS.xyz * .003;
+    positionWS.xyz -= vShadowOffsets.y * lightDirection.xyz * 0.01; //_ShadowBias.x    
+    return TransformWorldToHClip(positionWS.xyz);
+}
+// END SLZ MODIFIED
 
 ///////////////////////////////////////////////////////////////////////////////
 // Deprecated                                                                 /

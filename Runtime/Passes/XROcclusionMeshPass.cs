@@ -10,7 +10,10 @@ namespace UnityEngine.Rendering.Universal
     public class XROcclusionMeshPass : ScriptableRenderPass
     {
         PassData m_PassData;
+        // SLZ MODIFIED // Parameter to tell XR pass whether it should render to just depth and clear the rendertarget or not.
+        // Used by the early XR mesh pass which runs before the depth prepass, and clears the target instead of the depth prepass.
         bool isDepth;
+        // END SLZ MODIFIED
         public XROcclusionMeshPass(RenderPassEvent evt, bool isDepth)
         {
             base.profilingSampler = new ProfilingSampler(nameof(XROcclusionMeshPass));
@@ -20,7 +23,7 @@ namespace UnityEngine.Rendering.Universal
             this.isDepth = isDepth;
         }
 
-        // SLZ MODIFIED
+        // SLZ MODIFIED // Add OnCameraSetup to configure whether the pass should clear or not. 
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
@@ -28,7 +31,6 @@ namespace UnityEngine.Rendering.Universal
             {
                 RenderTextureDescriptor desc = renderingData.cameraData.cameraTargetDescriptor;
 
-                // When depth priming is in use the camera target should not be overridden so the Camera's MSAA depth attachment is used.
                 if (renderingData.cameraData.renderer.useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth))
                 {
                     ConfigureTarget(renderingData.cameraData.renderer.cameraDepthTargetHandle);

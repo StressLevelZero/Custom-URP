@@ -55,13 +55,15 @@ Shader "Universal Render Pipeline/Unlit"
             // Unity defined keywords
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
-            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
-            #pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
-            #pragma multi_compile _ DEBUG_DISPLAY
-            #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
-            #pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
-
+            // SLZ MODIFIED // remove unused keywords, add volumetric keyword
+            //#pragma multi_compile _ DOTS_INSTANCING_ON
+            //#pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            //#pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
+            //#pragma multi_compile _ DEBUG_DISPLAY
+            //#pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
+            //#pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
+            #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
+            //END SLZ MODIFIED
             #pragma vertex UnlitPassVertex
             #pragma fragment UnlitPassFragment
 
@@ -91,12 +93,12 @@ Shader "Universal Render Pipeline/Unlit"
 
             // -------------------------------------
             // Unity defined keywords
-            #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
+            //#pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
+            //#pragma multi_compile _ DOTS_INSTANCING_ON
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
@@ -123,14 +125,14 @@ Shader "Universal Render Pipeline/Unlit"
 
             // -------------------------------------
             // Universal Pipeline keywords
-            #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT // forward-only variant
-            #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
-            #pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
+            // #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT // forward-only variant
+            // #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
+            // #pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            #pragma multi_compile _ DOTS_INSTANCING_ON
+            //#pragma multi_compile _ DOTS_INSTANCING_ON
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitDepthNormalsPass.hlsl"

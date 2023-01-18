@@ -1769,7 +1769,9 @@ namespace UnityEngine.Rendering.Universal
         }
 
         /// <inheritdoc/>
-        public override string renderPipelineShaderTag => UniversalRenderPipeline.k_ShaderTagName;
+        // SLZ MODIFIED // TODO: Was an override, but on 2022.2.0f1 RenderPipelineAsset doesn't have renderPipelineShaderTag
+        public string renderPipelineShaderTag => UniversalRenderPipeline.k_ShaderTagName;
+        // END SLZ MODIFIED
 #endif
 
         /// <summary>Names used for display of rendering layer masks.</summary>

@@ -6,6 +6,10 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RealtimeLights.hlsl"
 
+// SLZ MODIFIED
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
+// END SLZ MODIFIED
+
 #if USE_FORWARD_PLUS
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #endif
@@ -67,6 +71,36 @@ half3 SampleSHPixel(half3 L2Term, half3 normalWS)
     return SampleSH(normalWS);
 }
 
+// SLZ MODIFIED // Modified SH for toon shader
+
+// SH Pixel Evaluation. Depending on target SH sampling might be done
+// mixed or fully in pixel. See SampleSHVertex
+half3 SampleSHPixelDir(half3 L2Term, half3 normalWS, half3 viewDir)
+{
+#if defined(ANIME)
+    half3 shL1sum = unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz;
+    float shL1Len2 = max(float(dot(shL1sum, shL1sum)), REAL_MIN);
+    half3 shL1Dir = float3(shL1sum)*rsqrt(shL1Len2);
+    half NoL = dot(normalWS, shL1Dir);
+    normalWS = NoL > -0.75 ? shL1Dir : -shL1Dir;
+#endif
+
+#if defined(EVALUATE_SH_VERTEX)
+    return L2Term;
+#elif defined(EVALUATE_SH_MIXED)
+    half3 res = SHEvalLinearL0L1(normalWS, unity_SHAr, unity_SHAg, unity_SHAb) + L2Term;
+#ifdef UNITY_COLORSPACE_GAMMA
+    res = LinearToSRGB(res);
+#endif
+    return max(half3(0, 0, 0), res);
+#endif
+
+    // Default: Evaluate SH fully per-pixel
+    return SampleSH(normalWS);
+}
+
+// END SLZ MODIFIED
+
 #if defined(UNITY_DOTS_INSTANCING_ENABLED)
 #define LIGHTMAP_NAME unity_Lightmaps
 #define LIGHTMAP_INDIRECTION_NAME unity_LightmapsInd
@@ -117,6 +151,36 @@ half3 SampleLightmap(float2 staticLightmapUV, float2 dynamicLightmapUV, half3 no
     return diffuseLighting;
 }
 
+// SLZ MODIFIED // Copy of SampleLightmap that additionally takes viewDir, and uses the SampleDirectionalLightmapSLZ function when sampling a directional lightmap
+
+half4 SampleLightmapDir(float2 lightmapUV, float2 dynamicLightmapUV, half3 normalWS, half smoothness, float3 viewDirWS)
+{
+#ifdef UNITY_LIGHTMAP_FULL_HDR
+    bool encodedLightmap = false;
+#else
+    bool encodedLightmap = true;
+#endif
+
+    half4 decodeInstructions = half4(LIGHTMAP_HDR_MULTIPLIER, LIGHTMAP_HDR_EXPONENT, 0.0h, 0.0h);
+
+    // The shader library sample lightmap functions transform the lightmap uv coords to apply bias and scale.
+    // However, universal pipeline already transformed those coords in vertex. We pass half4(1, 1, 0, 0) and
+    // the compiler will optimize the transform away.
+    half4 transformCoords = half4(1, 1, 0, 0);
+
+#ifdef DIRLIGHTMAP_COMBINED
+    return SampleDirectionalLightmapSLZ(TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap),
+        TEXTURE2D_ARGS(unity_LightmapInd, samplerunity_Lightmap),
+        lightmapUV, transformCoords, normalWS, smoothness, viewDirWS, encodedLightmap, decodeInstructions);
+#elif defined(LIGHTMAP_ON)
+    return SampleSingleLightmap(TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap), lightmapUV, transformCoords, encodedLightmap, decodeInstructions).rgbb;
+#else
+    return half4(0.0, 0.0, 0.0, 0.0);
+#endif
+}
+
+// END SLZ MODIFIED
+
 // Legacy version of SampleLightmap where Realtime GI is not supported.
 half3 SampleLightmap(float2 staticLightmapUV, half3 normalWS)
 {
@@ -137,6 +201,20 @@ half3 SampleLightmap(float2 staticLightmapUV, half3 normalWS)
 #else
 #define SAMPLE_GI(staticLmName, shName, normalWSName) SampleSHPixel(shName, normalWSName)
 #endif
+
+// SLZ MODIFIED // Copies of the above macros using the directional equivalents
+
+#if defined(LIGHTMAP_ON) && defined(DYNAMICLIGHTMAP_ON)
+#define SAMPLE_GI_DIR(staticLmName, dynamicLmName, shName, normalWSName, smoothness, viewDirWS) SampleLightmapDir(staticLmName, dynamicLmName, normalWSName, smoothness, viewDirWS)
+#elif defined(DYNAMICLIGHTMAP_ON)
+#define SAMPLE_GI_DIR(staticLmName, dynamicLmName, shName, normalWSName, smoothness, viewDirWS) SampleLightmap(0, dynamicLmName, normalWSName)
+#elif defined(LIGHTMAP_ON)
+#define SAMPLE_GI_DIR(staticLmName, shName, normalWSName, smoothness, viewDirWS) SampleLightmapDir(staticLmName, 0, normalWSName, smoothness, viewDirWS)
+#else
+#define SAMPLE_GI_DIR(staticLmName, shName, normalWSName, smoothness, viewDirWS) SampleSHPixelDir(shName, normalWSName,viewDirWS)
+#endif
+
+// END SLZ MODIFIED
 
 half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4 cubemapPositionWS, float4 boxMin, float4 boxMax)
 {
@@ -339,7 +417,7 @@ half3 SubtractDirectMainLightFromLightmap(Light mainLight, half3 normalWS, half3
     // We only subtract the main direction light. This is accounted in the contribution term below.
     half shadowStrength = GetMainLightShadowStrength();
     half contributionTerm = saturate(dot(mainLight.direction, normalWS));
-    half3 lambert = mainLight.color * contributionTerm;
+    half3 lambert = mainLight.color.rgb * contributionTerm; // SLZ MODIFIED // PS5 can't implicitly cast float4 to float3, explicitly specify rgb
     half3 estimatedLightContributionMaskedByInverseOfShadow = lambert * (1.0 - mainLight.shadowAttenuation);
     half3 subtractedLightmap = bakedGI - estimatedLightContributionMaskedByInverseOfShadow;
 
@@ -351,8 +429,9 @@ half3 SubtractDirectMainLightFromLightmap(Light mainLight, half3 normalWS, half3
     return min(bakedGI, realtimeShadow);
 }
 
+
 half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float clearCoatMask,
-    half3 bakedGI, half occlusion, float3 positionWS,
+    half3 bakedGI, half4 occlusion, float3 positionWS, // SLZ MODIFIED // made occlusion float4, not sure why? Colored occlusion?
     half3 normalWS, half3 viewDirectionWS, float2 normalizedScreenSpaceUV)
 {
     half3 reflectVector = reflect(-viewDirectionWS, normalWS);
@@ -363,6 +442,10 @@ half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float cl
     half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, 1.0h, normalizedScreenSpaceUV);
 
     half3 color = EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
+
+    // SLZ MODIFIED // Add fluorescence calculation
+    BlendFluorescence(color, half4(bakedGI, 0), brdfData);
+    // END SLZ MODIFIED
 
     if (IsOnlyAOLightingFeatureEnabled())
     {

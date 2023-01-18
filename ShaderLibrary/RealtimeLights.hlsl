@@ -12,7 +12,9 @@
 struct Light
 {
     half3   direction;
-    half3   color;
+    // SLZ MODIFIED // Add alpha channel for fluorescence
+    half4   color;
+    // END SLZ MODIFIED
     float   distanceAttenuation; // full-float precision required on some platforms
     half    shadowAttenuation;
     uint    layerMask;
@@ -108,7 +110,10 @@ Light GetMainLight()
     light.distanceAttenuation = unity_LightData.z; // unity_LightData.z is 1 when not culled by the culling mask, otherwise 0.
 #endif
     light.shadowAttenuation = 1.0;
-    light.color = _MainLightColor.rgb;
+
+    // SLZ MODIFIED // switch to full RGBA for fluorescence
+    light.color = _MainLightColor.rgba;
+    //END SLZ MODIFIED
 
     light.layerMask = _MainLightLayerMask;
 
@@ -129,7 +134,9 @@ Light GetMainLight(float4 shadowCoord, float3 positionWS, half4 shadowMask)
 
     #if defined(_LIGHT_COOKIES)
         real3 cookieColor = SampleMainLightCookie(positionWS);
-        light.color *= cookieColor;
+        // SLZ MODIFIED // Light.color is now a half4 for fluorescence, cookie atlas is only rgb so use blue channel as multiplier for alpha
+        light.color *= cookieColor.rgbb;
+        // END SLZ MODIFIED
     #endif
 
     return light;
@@ -155,13 +162,13 @@ Light GetAdditionalPerObjectLight(int perObjectLightIndex, float3 positionWS)
     // Abstraction over Light input constants
 #if USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA
     float4 lightPositionWS = _AdditionalLightsBuffer[perObjectLightIndex].position;
-    half3 color = _AdditionalLightsBuffer[perObjectLightIndex].color.rgb;
+    half4 color = _AdditionalLightsBuffer[perObjectLightIndex].color.rgba;
     half4 distanceAndSpotAttenuation = _AdditionalLightsBuffer[perObjectLightIndex].attenuation;
     half4 spotDirection = _AdditionalLightsBuffer[perObjectLightIndex].spotDirection;
     uint lightLayerMask = _AdditionalLightsBuffer[perObjectLightIndex].layerMask;
 #else
     float4 lightPositionWS = _AdditionalLightsPosition[perObjectLightIndex];
-    half3 color = _AdditionalLightsColor[perObjectLightIndex].rgb;
+    half4 color = _AdditionalLightsColor[perObjectLightIndex].rgba;
     half4 distanceAndSpotAttenuation = _AdditionalLightsAttenuation[perObjectLightIndex];
     half4 spotDirection = _AdditionalLightsSpotDir[perObjectLightIndex];
     uint lightLayerMask = asuint(_AdditionalLightsLayerMasks[perObjectLightIndex]);

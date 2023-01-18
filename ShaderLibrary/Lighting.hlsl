@@ -8,6 +8,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/AmbientOcclusion.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 
+// SLZ MODIFIED
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
+// END SLZ MODIFIED
+
 #if defined(LIGHTMAP_ON)
     #define DECLARE_LIGHTMAP_OR_SH(lmName, shName, index) float2 lmName : TEXCOORD##index
     #define OUTPUT_LIGHTMAP_UV(lightmapUV, lightmapScaleOffset, OUT) OUT.xy = lightmapUV.xy * lightmapScaleOffset.xy + lightmapScaleOffset.zw;
@@ -21,29 +25,66 @@
 ///////////////////////////////////////////////////////////////////////////////
 //                      Lighting Functions                                   //
 ///////////////////////////////////////////////////////////////////////////////
-half3 LightingLambert(half3 lightColor, half3 lightDir, half3 normal)
+
+// SLZ MODIFIED // make "type" to switch between fluorescent variants using half4 for their lighting calculations ( alpha channel is UV) and normal variants using half3
+#if defined(_FLUORESCENCE)
+    #define half3or4_fl half4
+#else
+    #define half3or4_fl half3
+#endif
+
+
+half3or4_fl LightingLambert(half3or4_fl lightColor, half3 lightDir, half3 normal)
 {
+    // SLZ MODIFIED // Change behavior when using a BDRF lookup texture to sample the texture rather than doing lambert diffuse
+#if defined(_BRDFMAP)
+    half NormNdotL = ((dot(normal, lightDir)) + 1) * 0.5;
+    // float flNDotV = saturate(dot(normalWS,viewDirectionWS));
+    half3or4_fl BRDFMap = (half3or4_fl)SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(NormNdotL, 1), 0);//*(lightAttenuation+.5),
+    return lightColor * (BRDFMap);
+
+    half NdotL2 = saturate(dot(normal, lightDir));
+    return half4(0, 0, 1, 0);//lightColor * NdotL2 > 0.25 ? 1:0;
+
+#endif
+    // END SLZ MODIFIED
     half NdotL = saturate(dot(normal, lightDir));
     return lightColor * NdotL;
 }
 
-half3 LightingSpecular(half3 lightColor, half3 lightDir, half3 normal, half3 viewDir, half4 specular, half smoothness)
+// SLZ MODIFIED // Use half3or4_fl to allow fluorescent variants to calculate specular for the alpha channel
+half3or4_fl LightingSpecular(half3or4_fl lightColor, half3 lightDir, half3 normal, half3 viewDir, half4 specular, half smoothness)
 {
     float3 halfVec = SafeNormalize(float3(lightDir) + float3(viewDir));
     half NdotH = half(saturate(dot(normal, halfVec)));
     half modifier = pow(NdotH, smoothness);
-    half3 specularReflection = specular.rgb * modifier;
+    half3or4_fl specularReflection = (half3or4_fl)specular * modifier;
     return lightColor * specularReflection;
 }
+// END SLZ MODIFIED
 
+// SLZ MODIFIED // pass the entire light struct into the function instead of individual light values, calculating the light attenuation in the function itself instead of in the caller
 half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
-    half3 lightColor, half3 lightDirectionWS, half lightAttenuation,
+    Light light,
     half3 normalWS, half3 viewDirectionWS,
     half clearCoatMask, bool specularHighlightsOff)
 {
-    half NdotL = saturate(dot(normalWS, lightDirectionWS));
-    half3 radiance = lightColor * (lightAttenuation * NdotL);
+    half3or4_fl lightColor = (half3or4_fl)light.color;
+    half3 lightDirectionWS = light.direction;
 
+    // SLZ MODIFIED // handle BDRF lookup table lighting, and calculate light attenuation from light struct insead of using a parameter passed to the function
+#if defined(_BRDFMAP)
+    half NormNdotL = saturate(((dot(normalWS, lightDirectionWS)) + 1) * 0.5);
+    float flNDotV = saturate(dot(normalWS, viewDirectionWS));
+    half3or4_fl BRDFMap = (half3or4_fl)SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(min(NormNdotL, light.shadowAttenuation), flNDotV), 0);//*(lightAttenuation+.5),
+    half3or4_fl radiance = lightColor * BRDFMap * light.distanceAttenuation;
+#else
+    half NdotL = saturate(dot(normalWS, lightDirectionWS));
+    half3or4_fl radiance = lightColor * (light.shadowAttenuation * light.distanceAttenuation * NdotL);
+#endif
+    // END SLZ MODIFIED
+
+     //diffuse, albdeo, and brdf are not interchangeable terms. Yet albedo is stored in the diffuse of brdfData and labeled here simply as brdf. Likely because it's being combined, but Confusing AF. 
     half3 brdf = brdfData.diffuse;
 #ifndef _SPECULARHIGHLIGHTS_OFF
     [branch] if (!specularHighlightsOff)
@@ -68,13 +109,22 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     }
 #endif // _SPECULARHIGHLIGHTS_OFF
 
-    return brdf * radiance;
+    // SLZ MODIFIED // blend fluroescence
+    brdf *= radiance.rgb;
+#if defined(_FLUORESCENCE)
+    BlendFluorescence(brdf, radiance, brdfData);
+#endif
+    return brdf;
+    // END SLZ MODIFIED
 }
 
-half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat, Light light, half3 normalWS, half3 viewDirectionWS, half clearCoatMask, bool specularHighlightsOff)
-{
-    return LightingPhysicallyBased(brdfData, brdfDataClearCoat, light.color, light.direction, light.distanceAttenuation * light.shadowAttenuation, normalWS, viewDirectionWS, clearCoatMask, specularHighlightsOff);
-}
+// SLZ MODIFIED // Main function now takes light struct, no need for overload
+// This is insane. Why combine the attenuation with shadows here and send it to another function? Just do it in the function and stop conflating things!
+//half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat, Light light, half3 normalWS, half3 viewDirectionWS, half clearCoatMask, bool specularHighlightsOff)
+//{
+//    return LightingPhysicallyBased(brdfData, brdfDataClearCoat, light.color, light.direction, light.distanceAttenuation * light.shadowAttenuation, normalWS, viewDirectionWS, clearCoatMask, specularHighlightsOff);
+//}
+// END SLZ MODIFIED
 
 // Backwards compatibility
 half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, half3 viewDirectionWS)
@@ -88,7 +138,9 @@ half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, ha
     return LightingPhysicallyBased(brdfData, noClearCoat, light, normalWS, viewDirectionWS, 0.0, specularHighlightsOff);
 }
 
-half3 LightingPhysicallyBased(BRDFData brdfData, half3 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS)
+// SLZ MODIFIED // lightColor is now a half4 to handle fluorescence
+half3 LightingPhysicallyBased(BRDFData brdfData, half4 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS)
+// END SLZ MODIFIED
 {
     Light light;
     light.color = lightColor;
@@ -98,13 +150,16 @@ half3 LightingPhysicallyBased(BRDFData brdfData, half3 lightColor, half3 lightDi
     return LightingPhysicallyBased(brdfData, light, normalWS, viewDirectionWS);
 }
 
+
 half3 LightingPhysicallyBased(BRDFData brdfData, Light light, half3 normalWS, half3 viewDirectionWS, bool specularHighlightsOff)
 {
     const BRDFData noClearCoat = (BRDFData)0;
     return LightingPhysicallyBased(brdfData, noClearCoat, light, normalWS, viewDirectionWS, 0.0, specularHighlightsOff);
 }
 
-half3 LightingPhysicallyBased(BRDFData brdfData, half3 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS, bool specularHighlightsOff)
+// SLZ MODIFIED // lightColor is now a half4 to handle fluorescence
+half3 LightingPhysicallyBased(BRDFData brdfData, half4 lightColor, half3 lightDirectionWS, half lightAttenuation, half3 normalWS, half3 viewDirectionWS, bool specularHighlightsOff)
+// END SLZ MODIFIED
 {
     Light light;
     light.color = lightColor;
@@ -122,7 +177,9 @@ half3 VertexLighting(float3 positionWS, half3 normalWS)
     uint lightsCount = GetAdditionalLightsCount();
     LIGHT_LOOP_BEGIN(lightsCount)
         Light light = GetAdditionalLight(lightIndex, positionWS);
-        half3 lightColor = light.color * light.distanceAttenuation;
+        // SLZ MODIFIED // Light.color is a half4, cast to half3 if not fluorescent
+        half3or4_fl lightColor = (half3or4_fl)light.color * light.distanceAttenuation;
+        // END SLZ MODIFIED
         vertexLightColor += LightingLambert(lightColor, light.direction, normalWS);
     LIGHT_LOOP_END
 #endif
@@ -219,8 +276,8 @@ LightingData CreateLightingData(InputData inputData, SurfaceData surfaceData)
 
 half3 CalculateBlinnPhong(Light light, InputData inputData, SurfaceData surfaceData)
 {
-    half3 attenuatedLightColor = light.color * (light.distanceAttenuation * light.shadowAttenuation);
-    half3 lightDiffuseColor = LightingLambert(attenuatedLightColor, light.direction, inputData.normalWS);
+    half3or4_fl attenuatedLightColor = (half3or4_fl)light.color * (light.distanceAttenuation * light.shadowAttenuation);
+    half3 lightDiffuseColor = LightingLambert(attenuatedLightColor, light.direction, inputData.normalWS).rgb;
 
     half3 lightSpecularColor = half3(0,0,0);
     #if defined(_SPECGLOSSMAP) || defined(_SPECULAR_COLOR)
@@ -240,6 +297,23 @@ half3 CalculateBlinnPhong(Light light, InputData inputData, SurfaceData surfaceD
 //                      Fragment Functions                                   //
 //       Used by ShaderGraph and others builtin renderers                    //
 ///////////////////////////////////////////////////////////////////////////////
+
+// SLZ MODIFIED // Function to calculate a fake specular highlight from the L1 spherical harmonic's average direction
+half3 SLZSHSpecular(BRDFData brdfData, half3 normalWS, half3 viewDirectionWS, half3 shL1Color)
+{
+#if !defined(LIGHTMAP_ON) && !defined(DYNAMICLIGHTMAP_ON) && !defined(_SH_HIGHLIGHTS_OFF) && !defined(_SPECULARHIGHLIGHTS_OFF)
+    half3 shL1sum = unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz;
+    float shL1Len2 = max(float(dot(shL1sum, shL1sum)), REAL_MIN);
+    half3 shL1Dir = float3(shL1sum)*rsqrt(shL1Len2);
+    half NoL = saturate(dot(normalWS, shL1Dir));
+    half falloff = SLZFakeSpecularFalloff(NoL);
+    realor4 shL1Spec = DirectBRDFSpecular(brdfData, normalWS, shL1Dir, viewDirectionWS);
+    return falloff * shL1Spec * brdfData.specular * max(0, shL1Color);
+#else
+    return half3(0, 0, 0);
+#endif
+}
+// END SLZ MODIFIED
 
 ////////////////////////////////////////////////////////////////////////////////
 /// PBR lighting...
@@ -280,6 +354,12 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
     lightingData.giColor = GlobalIllumination(brdfData, brdfDataClearCoat, surfaceData.clearCoatMask,
                                               inputData.bakedGI, aoFactor.indirectAmbientOcclusion, inputData.positionWS,
                                               inputData.normalWS, inputData.viewDirectionWS, inputData.normalizedScreenSpaceUV);
+    // SLZ MODIFIED // Add artificial specular highlight from spherical harmonics
+#if !defined(LIGHTMAP_ON)
+    lightingData.giColor += SLZSHSpecular(brdfData, inputData.normalWS, inputData.viewDirectionWS, inputData.bakedGI) * aoFactor.directAmbientOcclusion;
+#endif
+    // END SLZ MODIFIED
+
 #ifdef _LIGHT_LAYERS
     if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
 #endif
@@ -327,6 +407,9 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
 
     #if defined(_ADDITIONAL_LIGHTS_VERTEX)
     lightingData.vertexLightingColor += inputData.vertexLighting * brdfData.diffuse;
+    // SLZ MODIFIED // Add fluorescence from vertex lighting
+    BlendFluorescence(lightingData.vertexLightingColor, inputData.vertexLighting, brdfData);
+    // END SLZ MODIFIED
     #endif
 
     return CalculateFinalColor(lightingData, surfaceData.alpha);

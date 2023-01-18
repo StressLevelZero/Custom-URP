@@ -72,7 +72,11 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             // SLZ MODIFIED
 
             //materialEditor.TexturePropertySingleLine(Styles.detailMaskText, properties.detailMask);
-            materialEditor.TexturePropertySingleLine(Styles.detailAlbedoMapText, properties.detailMap);
+
+            if (materialEditor != null)
+            {
+                materialEditor.TexturePropertySingleLine(Styles.detailAlbedoMapText, properties.detailMap);
+            }
             //if (properties.detailAlbedoMapScale.floatValue != 1.0f)
             //{
             //    EditorGUILayout.HelpBox(Styles.detailAlbedoMapScaleInfo.text, MessageType.Info, true);
@@ -81,20 +85,20 @@ namespace UnityEditor.Rendering.Universal.ShaderGUI
             //    properties.detailNormalMap.textureValue != null ? properties.detailNormalMapScale : null);
             //materialEditor.TextureScaleOffsetProperty(properties.detailAlbedoMap);
 
-            if (properties.detailMap.textureValue != null)
-            {
-                materialEditor.RangeProperty(properties.detailNormalMapScale, "Bump Scale");
-                materialEditor.RangeProperty(properties.detailSmoothnessMapScale, "Smoothness Scale");
-                materialEditor.TextureScaleOffsetProperty(properties.detailMap);
-            }
+            //if (properties.detailMap.textureValue != null)
+            //{
+            //    materialEditor.RangeProperty(properties.detailNormalMapScale, "Bump Scale");
+            //    materialEditor.RangeProperty(properties.detailSmoothnessMapScale, "Smoothness Scale");
+            //    materialEditor.TextureScaleOffsetProperty(properties.detailMap);
+            //}
 
             // END SLZ MODIFIED
 
-            var detailAlbedoTexture = properties.detailMap.textureValue as Texture2D;
-            if (detailAlbedoTexture != null && GraphicsFormatUtility.IsSRGBFormat(detailAlbedoTexture.graphicsFormat))
-            {
-                EditorGUILayout.HelpBox(Styles.detailAlbedoMapFormatError.text, MessageType.Warning, true);
-            }
+            //var detailAlbedoTexture = properties.detailMap.textureValue as Texture2D;
+            //if (detailAlbedoTexture != null && GraphicsFormatUtility.IsSRGBFormat(detailAlbedoTexture.graphicsFormat))
+            //{
+            //    EditorGUILayout.HelpBox(Styles.detailAlbedoMapFormatError.text, MessageType.Warning, true);
+            //}
 
         }
 

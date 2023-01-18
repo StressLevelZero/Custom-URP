@@ -23,6 +23,10 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static readonly RTHandle[] k_ColorAttachment1 = new RTHandle[1];
         private static readonly RTHandle[] k_ColorAttachment2 = new RTHandle[2];
 
+        // SLZ MODIFIED // toggle to control if this pass clears the screen or not. We added an XR occlusion mesh pass that renders before this depth prepass, so don't clear if in VR
+        private bool m_ClearTarget = true;
+        // END SLZ MODIFIED
+
         /// <summary>
         /// Creates a new <c>DepthNormalOnlyPass</c> instance.
         /// </summary>
@@ -48,12 +52,20 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <returns>The GraphicsFormat to use with the Normals texture.</returns>
         public static GraphicsFormat GetGraphicsFormat()
         {
-            if (RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R8G8B8A8_SNorm, FormatUsage.Render))
-                return GraphicsFormat.R8G8B8A8_SNorm; // Preferred format
-            else if (RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R16G16B16A16_SFloat, FormatUsage.Render))
-                return GraphicsFormat.R16G16B16A16_SFloat; // fallback
+            // SLZ MODIFIED // Use RG format texture if we can, normals packed into hemi-oct format instead of full RGB vector
+            GraphicsFormat normalsFormat;
+            if (RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R8G8_SNorm, FormatUsage.Render))
+                normalsFormat = GraphicsFormat.R8G8_SNorm; // Preferred format
+            else if (RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R16G16_SFloat, FormatUsage.Render))
+                normalsFormat = GraphicsFormat.R16G16_SFloat; // fallback
+            else if (RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R8G8B8A8_SNorm, FormatUsage.Render))
+                normalsFormat = GraphicsFormat.R8G8B8A8_SNorm; // fallback
+            else if (RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R32G32_SFloat, FormatUsage.Render))
+                normalsFormat = GraphicsFormat.R32G32_SFloat; // fallback
             else
-                return GraphicsFormat.R32G32B32A32_SFloat; // fallback
+                normalsFormat = GraphicsFormat.R32G32B32A32_SFloat; // fallback
+            return normalsFormat;
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -62,11 +74,14 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <param name="depthHandle">The <c>RTHandle</c> used to render depth to.</param>
         /// <param name="normalHandle">The <c>RTHandle</c> used to render normals.</param>
         /// <seealso cref="RTHandle"/>
-        public void Setup(RTHandle depthHandle, RTHandle normalHandle)
+        public void Setup(RTHandle depthHandle, RTHandle normalHandle, bool clearTarget = true)
         {
             this.depthHandle = depthHandle;
             this.normalHandle = normalHandle;
             this.enableRenderingLayers = false;
+            // SLZ MODIFIED // Set if pass will clear the render target's depth
+            m_ClearTarget = clearTarget;
+            // END SLZ MODIFIED
         }
 
         /// <summary>
@@ -76,9 +91,9 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <param name="normalHandle">The <c>RTHandle</c> used to render normals.</param>
         /// <param name="decalLayerHandle">The <c>RTHandle</c> used to render decals.</param>
         /// <seealso cref="RTHandle"/>
-        public void Setup(RTHandle depthHandle, RTHandle normalHandle, RTHandle decalLayerHandle)
+        public void Setup(RTHandle depthHandle, RTHandle normalHandle, RTHandle decalLayerHandle, bool clearTarget = true)
         {
-            Setup(depthHandle, normalHandle);
+            Setup(depthHandle, normalHandle, clearTarget);
             this.renderingLayersHandle = decalLayerHandle;
             this.enableRenderingLayers = true;
         }
@@ -105,7 +120,15 @@ namespace UnityEngine.Rendering.Universal.Internal
             else
                 ConfigureTarget(colorHandles, depthHandle);
 
-            ConfigureClear(ClearFlag.All, Color.black);
+            // SLZ MODIFIED // Only clear everything if m_ClearTarget is true, otherwise only clear color and stencil. m_ClearTarget should be false when the early XR occlusion mesh pass runs before
+            if (m_ClearTarget)
+            {
+                ConfigureClear(ClearFlag.All, Color.black);
+            }
+            else
+            {
+                ConfigureClear(ClearFlag.ColorStencil, Color.black);
+            }
         }
 
         private static void ExecutePass(ScriptableRenderContext context, PassData passData, ref RenderingData renderingData)

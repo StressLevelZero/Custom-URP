@@ -26,11 +26,11 @@ struct Varyings
     float2 uv : TEXCOORD0;
     float fogCoord : TEXCOORD1;
     float4 positionCS : SV_POSITION;
+    float3 positionWS : TEXCOORD2;
+    float3 viewDirWS : TEXCOORD4;
 
     #if defined(DEBUG_DISPLAY)
-    float3 positionWS : TEXCOORD2;
     float3 normalWS : TEXCOORD3;
-    float3 viewDirWS : TEXCOORD4;
     #endif
 
     UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -40,15 +40,14 @@ struct Varyings
 void InitializeInputData(Varyings input, out InputData inputData)
 {
     inputData = (InputData)0;
-
-    #if defined(DEBUG_DISPLAY)
     inputData.positionWS = input.positionWS;
-    inputData.normalWS = input.normalWS;
     inputData.viewDirectionWS = input.viewDirWS;
-    #else
-    inputData.positionWS = float3(0, 0, 0);
-    inputData.normalWS = half3(0, 0, 1);
-    inputData.viewDirectionWS = half3(0, 0, 1);
+    #if defined(DEBUG_DISPLAY)
+    inputData.normalWS = input.normalWS;
+    //#else
+    //inputData.positionWS = float3(0, 0, 0);
+    //inputData.normalWS = half3(0, 0, 1);
+    //inputData.viewDirectionWS = half3(0, 0, 1);
     #endif
     inputData.shadowCoord = 0;
     inputData.fogCoord = 0;
@@ -81,13 +80,14 @@ Varyings UnlitPassVertex(Attributes input)
     // this is required to avoid skewing the direction during interpolation
     // also required for per-vertex lighting and SH evaluation
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
-    half3 viewDirWS = GetWorldSpaceViewDir(vertexInput.positionWS);
-
     // already normalized from normal transform to WS.
-    output.positionWS = vertexInput.positionWS;
     output.normalWS = normalInput.normalWS;
-    output.viewDirWS = viewDirWS;
     #endif
+    half3 viewDirWS = GetWorldSpaceViewDir(vertexInput.positionWS);
+    output.positionWS = vertexInput.positionWS;
+   
+    output.viewDirWS = viewDirWS;
+
 
     return output;
 }
@@ -144,7 +144,8 @@ void UnlitPassFragment(
 #endif
     finalColor.rgb = MixFog(finalColor.rgb, fogFactor);
     finalColor.a = OutputAlpha(finalColor.a, IsSurfaceTypeTransparent(_Surface));
-
+    finalColor.rgb = MixFog(finalColor.rgb, -input.viewDirWS, fogFactor);
+    finalColor = Volumetrics(finalColor, input.positionWS);
     outColor = finalColor;
 
 #ifdef _WRITE_RENDERING_LAYERS

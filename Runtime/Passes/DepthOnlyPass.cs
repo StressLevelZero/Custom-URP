@@ -21,6 +21,10 @@ namespace UnityEngine.Rendering.Universal.Internal
         private PassData m_PassData;
         FilteringSettings m_FilteringSettings;
 
+        // SLZ MODIFIED // toggle to control if this pass clears the screen or not. We added an XR occlusion mesh pass that renders before this depth prepass, so don't clear if in VR
+        private bool m_ClearTarget = true;
+        // END SLZ MODIFIED
+
         /// <summary>
         /// Creates a new <c>DepthOnlyPass</c> instance.
         /// </summary>
@@ -38,6 +42,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             renderPassEvent = evt;
             useNativeRenderPass = false;
             this.shaderTagId = k_ShaderTagId;
+           
         }
 
         /// <summary>
@@ -50,10 +55,17 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <seealso cref="GraphicsFormat"/>
         public void Setup(
             RenderTextureDescriptor baseDescriptor,
-            RTHandle depthAttachmentHandle)
+            RTHandle depthAttachmentHandle,
+            // SLZ MODIFIED
+            bool clearTarget = true
+            // END SLZ MODIFIED
+            )
         {
             this.destination = depthAttachmentHandle;
             this.depthStencilFormat = baseDescriptor.depthStencilFormat;
+            // SLZ MODIFIED
+            m_ClearTarget = clearTarget;
+            // END SLZ MODIFIED
         }
 
         /// <inheritdoc />
@@ -66,7 +78,16 @@ namespace UnityEngine.Rendering.Universal.Internal
             {
                 ConfigureTarget(renderingData.cameraData.renderer.cameraDepthTargetHandle);
                 // Only clear depth here so we don't clear any bound color target. It might be unused by this pass but that doesn't mean we can just clear it. (e.g. in case of overlay cameras + depth priming)
-                ConfigureClear(ClearFlag.Depth, Color.black);
+                // SLZ MODIFIED // Only clear depth if told to do so
+                if (m_ClearTarget)
+                {
+                    ConfigureClear(ClearFlag.Depth, Color.black);
+                }
+                else
+                {
+                    ConfigureClear(ClearFlag.Stencil, Color.black); // We have to clear something, configuring the clear flag to none caused some bug I can't quite remember.
+                }
+                // END SLZ MODIFIED
             }
             // When not using depth priming the camera target should be set to our non MSAA depth target.
             else

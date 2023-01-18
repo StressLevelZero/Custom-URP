@@ -6,6 +6,10 @@
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
 #endif
 
+// SLZ MODIFIED // Function for encoding normals for screen normals texture
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
+// END SLZ MODIFIED
+
 struct Attributes
 {
     float3 normal       : NORMAL;
@@ -59,7 +63,7 @@ void DepthNormalsFragment(
         half3 packedNormalWS = half3(PackFloat2To888(remappedOctNormalWS)); // values between [ 0,  1]
         outNormalWS = half4(packedNormalWS, 0.0);
     #else
-        outNormalWS = half4(NormalizeNormalPerPixel(input.normalWS), 0.0);
+        outNormalWS = half4(EncodeWSNormalForNormalsTex(NormalizeNormalPerPixel(input.normalWS)), 0.0);
     #endif
 
     #ifdef _WRITE_RENDERING_LAYERS

@@ -14,6 +14,10 @@ struct SurfaceData
     half  alpha;
     half  clearCoatMask;
     half  clearCoatSmoothness;
+#if defined(_FLUORESCENCE)
+    half4 absorbance;
+    half4 fluorescence;
+#endif
 };
 
 #endif
