@@ -1,18 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-7780512281772590835
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 73bb0c28b25f48d4ea2f38b3e2010651, type: 3}
-  m_Name: AutoExposureRenderFeature
-  m_EditorClassIdentifier: 
-  m_Active: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -30,8 +17,7 @@ MonoBehaviour:
       type: 3}
   m_RendererFeatures:
   - {fileID: 3137130856118801803}
-  - {fileID: -7780512281772590835}
-  m_RendererFeatureMap: 8bd5e074e453892b6b29d100f28a9dd3ca4723a0c5343f370d79617a4d11069487fac3c3b8c3a72c
+  m_RendererFeatureMap: 8bd5e074e453892bca4723a0c5343f370d79617a4d11069487fac3c3b8c3a72c
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
