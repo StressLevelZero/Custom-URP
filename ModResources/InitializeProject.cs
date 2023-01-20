@@ -26,7 +26,8 @@ namespace SLZ.URPModResources
             {
                 string version = urp.version;
                 Debug.Log("SLZ URP version " + version + " installed");
-                OverrideQualitySettings();
+                PlatformQualitySetter.OverrideQualitySettings(EditorUserBuildSettings.activeBuildTarget);
+                ExtractAssets.ExtractShaders(true);
             }
             else
             {
@@ -35,21 +36,12 @@ namespace SLZ.URPModResources
                 {
                     string version = urp2.version;
                     Debug.Log("SLZ URP updated to version " + version);
-                    OverrideQualitySettings();
+                    PlatformQualitySetter.OverrideQualitySettings(EditorUserBuildSettings.activeBuildTarget);
                     URPModUpdateShaderUI.ShowWindow();
+
                 }
             }
             //Events.registeredPackages -= CheckPkgForURPInstall;
-        }
-
-       // [MenuItem("Stress Level Zero/Force Bonelab Quality Settings")]
-        public static void OverrideQualitySettings()
-        {
-            const string OldQualitySettingsPath = "ProjectSettings/QualitySettings.asset";
-            const string NewQualitySettingsPath = "Packages/com.unity.render-pipelines.universal/ModResources/QualitySettings/QualitySettings.asset";
-            Object oldQS = AssetDatabase.LoadAllAssetsAtPath(OldQualitySettingsPath)[0];
-            Object newQS = AssetDatabase.LoadAllAssetsAtPath(NewQualitySettingsPath)[0];
-            EditorUtility.CopySerialized(newQS, oldQS);
         }
 
        // [MenuItem("Stress Level Zero/Add default shaders to project")]
@@ -70,6 +62,36 @@ namespace SLZ.URPModResources
             if (!Directory.Exists(assetsPath))
             {
                 CopyShadersToProject();
+            }
+        }
+
+        static bool DeleteOldShaderSamples()
+        {
+            string oldShaderPath = Path.Combine(Application.dataPath, "Samples/SLZ Universal RP/8148.0.2/SLZ Bonelab Shaders");
+            if (Directory.Exists(oldShaderPath))
+            {
+                Directory.Delete(oldShaderPath, true);
+                File.Delete(oldShaderPath + ".meta");
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        static bool DeleteOldAmplifySamples()
+        {
+            string oldShaderPath = Path.Combine(Application.dataPath, "Samples/SLZ Universal RP/8148.0.2/Amplify Shader Extentions");
+            if (Directory.Exists(oldShaderPath))
+            {
+                Directory.Delete(oldShaderPath, true);
+                File.Delete(oldShaderPath + ".meta");
+                return true;
+            }
+            else
+            {
+                return false;
             }
         }
 

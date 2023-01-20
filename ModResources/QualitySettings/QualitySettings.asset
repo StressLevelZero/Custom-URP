@@ -31,7 +31,7 @@ QualitySettings:
     maximumLODLevel: 0
     streamingMipmapsActive: 1
     streamingMipmapsAddAllCameras: 0
-    streamingMipmapsMemoryBudget: 1024
+    streamingMipmapsMemoryBudget: 3072
     streamingMipmapsRenderersPerFrame: 512
     streamingMipmapsMaxLevelReduction: 5
     streamingMipmapsMaxFileIORequests: 1024
@@ -70,7 +70,7 @@ QualitySettings:
     maximumLODLevel: 0
     streamingMipmapsActive: 1
     streamingMipmapsAddAllCameras: 0
-    streamingMipmapsMemoryBudget: 1024
+    streamingMipmapsMemoryBudget: 3072
     streamingMipmapsRenderersPerFrame: 512
     streamingMipmapsMaxLevelReduction: 5
     streamingMipmapsMaxFileIORequests: 1024
@@ -109,7 +109,7 @@ QualitySettings:
     maximumLODLevel: 0
     streamingMipmapsActive: 1
     streamingMipmapsAddAllCameras: 0
-    streamingMipmapsMemoryBudget: 1024
+    streamingMipmapsMemoryBudget: 3072
     streamingMipmapsRenderersPerFrame: 512
     streamingMipmapsMaxLevelReduction: 5
     streamingMipmapsMaxFileIORequests: 1024

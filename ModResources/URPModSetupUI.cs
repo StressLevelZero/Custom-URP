@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
+using System.IO;
 
 #if !MARROW_PROJECT || SLZ_RENDERPIPELINE_DEV
 namespace SLZ.URPModResources
@@ -15,8 +16,8 @@ namespace SLZ.URPModResources
         {
             var window = GetWindow<URPModSetupUI>();
             window.titleContent = new GUIContent("Custom URP Setup For Mod Projects");
-            window.minSize = new Vector2(280, 120);
-            window.maxSize = new Vector2(280, 120);
+            window.minSize = new Vector2(280, 150);
+            window.maxSize = new Vector2(280, 150);
         }
 
         private void CreateGUI()
@@ -25,34 +26,44 @@ namespace SLZ.URPModResources
             root.style.alignContent = Align.Center;
             root.style.alignItems = Align.Center;
             
-            // Creates our button and sets its Text property.
-            Button btnGraphicsSettings = new Button() { text = "Set Graphics Settings for Bonelab Mods" };
-            Button btnShaders = new Button() { text = "Copy Bonelab Shaders to Project" };
+            Button btnGraphicsSettings = new Button() { text = "Reset Graphics Settings" };
+            Button btnShaders = new Button() { text = "Install Bonelab Shaders" };
+            Button btnAmplify = new Button() { text = "Install Amplify Extensions" };
 
-            // Give it some style.
             btnGraphicsSettings.style.width = 260;
-            btnGraphicsSettings.style.height = 30;
-
             btnShaders.style.width = 260;
+            btnAmplify.style.width = 260;
+
+            btnGraphicsSettings.style.height = 30;
             btnShaders.style.height = 30;
+            btnAmplify.style.height = 30;
+
 
             btnGraphicsSettings.RegisterCallback<ClickEvent>(e =>
             {
-                InitializeProject.OverrideQualitySettings();
+                PlatformQualitySetter.OverrideQualitySettings(EditorUserBuildSettings.activeBuildTarget);
             });
 
             btnShaders.RegisterCallback<ClickEvent>(e =>
             {
-                InitializeProject.CopyShadersToProject();
+                ExtractAssets.ExtractShaders(true);
             });
-            // Adds it to the root.
+
+            btnAmplify.RegisterCallback<ClickEvent>(e =>
+            {
+                ExtractAssets.ExtractAmplify(true);
+            });
+
             root.Add(btnGraphicsSettings);
             root.Add(btnShaders);
+            root.Add(btnAmplify);
         }
     }
 
     public class URPModUpdateShaderUI : EditorWindow
     {
+        private int numButtons = 1;
+
 #if SLZ_RENDERPIPELINE_DEV
         [MenuItem("Stress Level Zero/Graphics Update")]
 #endif
@@ -60,8 +71,8 @@ namespace SLZ.URPModResources
         {
             var window = GetWindow<URPModUpdateShaderUI>();
             window.titleContent = new GUIContent("Update Bonelab Shaders");
-            window.minSize = new Vector2(320, 160);
-            window.maxSize = new Vector2(320, 160);
+            window.minSize = new Vector2(360, 300);
+            window.maxSize = new Vector2(360, 300);
         }
 
         private void CreateGUI()
@@ -69,29 +80,73 @@ namespace SLZ.URPModResources
             var root = rootVisualElement;
             root.style.alignContent = Align.Center;
             root.style.alignItems = Align.Center;
-            // root.style.flexWrap = Wrap.Wrap;
-            // Creates our button and sets its Text property.
-            Label warn = new Label() { text = "\nSLZ Custom URP updated, the included Bonelab shaders for mod projects (SLZShaders folder) may have updated as well. This can be updated later from the menu \"Stress Level Zero/Mod Graphics Setup\" Click below to update the shaders now. Any changes you have made to the included shaders will be overwritten!\n" };
+
+            string ShaderPath = Path.Combine(Application.dataPath, "SLZShaders");
+            bool hasShaders = Directory.Exists(ShaderPath);
+
+            string updateText =
+                "\nSLZ Custom URP package updated. The package may include updated versions of the essential Bonelab shaders (SLZShaders folder) in your project. Click below to update the shaders now.\n\n" +
+                "Note: It is highly recommended to avoid modifying the included files, as any updates to this package will overwrite the files and delete your changes.\n\n" +
+                "These shaders can be updated/installed later from the menu \"Stress Level Zero/Mod Graphics Setup\".\n";
+            string installText =
+                "\nSLZ Custom URP package updated. The package includes some of Bonelab's core shaders for your use. In order to use them, they must be installed into your project directly. Click below to install the shaders\n\n" +
+                "Note: It is highly recommended to avoid modifying the included files, as any updates to this package will overwrite the files and delete your changes.\n\n" +
+                "These shaders can be updated/installed later from the menu \"Stress Level Zero/Mod Graphics Setup\".\n";
+            Label warn = new Label() { text = hasShaders ? updateText : installText
+            };
             warn.style.flexWrap = Wrap.Wrap;
-            warn.style.width = 304;
+            warn.style.width = 334;
             warn.style.whiteSpace = WhiteSpace.Normal;
             warn.style.paddingLeft = 8;
             warn.style.paddingRight = 8;
-            Button btnShaders = new Button() { text = "Update SLZShaders Folder in Project" };
 
-            // Give it some style.
+
+
+            Button btnShaders = new Button() { text = hasShaders ? "Update Bonelab Shaders" : "Install Bonelab Shaders" };
+
             btnShaders.style.width = 304;
             btnShaders.style.height = 30;
             btnShaders.style.paddingLeft = 8;
             btnShaders.style.paddingRight = 8;
+
             btnShaders.RegisterCallback<ClickEvent>(e =>
             {
-                InitializeProject.CopyShadersToProject();
-                Close();
+                ExtractAssets.ExtractShaders(true);
+                numButtons--;
+                if (numButtons < 1)
+                {
+                    Close();
+                }
             });
-            // Adds it to the root.
+
             root.Add(warn);
             root.Add(btnShaders);
+
+            string AmplifyPath = Path.Combine(Application.dataPath, "AmplifyShaderEditor");
+            bool hasAmplify = Directory.Exists(AmplifyPath);
+
+            Button btnAmplify = new Button() { text = "Update Amplify Extensions" };
+
+            btnAmplify.style.width = 304;
+            btnAmplify.style.height = 30;
+            btnAmplify.style.paddingLeft = 8;
+            btnAmplify.style.paddingRight = 8;
+
+            if (hasAmplify)
+            {
+                numButtons++;
+                root.Add(btnAmplify);
+            }
+
+            btnAmplify.RegisterCallback<ClickEvent>(e =>
+            {
+                ExtractAssets.ExtractAmplify(true);
+                numButtons--;
+                if (numButtons < 1)
+                {
+                    Close();
+                }
+            });
         }
     }
 }
