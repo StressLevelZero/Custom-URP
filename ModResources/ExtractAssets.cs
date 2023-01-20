@@ -69,7 +69,7 @@ namespace SLZ.URPModResources
         static void NukeOldFiles(string GUIDListPath)
         {
             string projectPath = Path.GetDirectoryName(Application.dataPath);
-            
+            List<string> deletePaths = new List<string>(); 
             using (StreamReader sr = new StreamReader(GUIDListPath))
             {
                 string guid;
@@ -77,13 +77,17 @@ namespace SLZ.URPModResources
                 {
                     guid = guid.Substring(0, 32);
                     string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    if (!string.IsNullOrEmpty(assetPath) && !assetPath.StartsWith("Packages"))
+                    if (!string.IsNullOrEmpty(assetPath) && File.Exists(Path.Combine(projectPath, assetPath)) && !assetPath.StartsWith("Packages"))
                     {
-                        File.Delete(Path.Combine(projectPath, assetPath));
-                        File.Delete(Path.Combine(projectPath, assetPath + ".meta"));
+                        deletePaths.Add(assetPath);
+                        //AssetDatabase.DeleteAsset(assetPath);
+                        //File.Delete(Path.Combine(projectPath, assetPath));
+                        //File.Delete(Path.Combine(projectPath, assetPath + ".meta"));
                     }
                 }
             }
+            List<string> failedPaths = new List<string>();
+            AssetDatabase.DeleteAssets(deletePaths.ToArray(), failedPaths);
         }
 
         /// <summary>
