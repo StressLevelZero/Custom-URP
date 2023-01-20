@@ -28,6 +28,7 @@ namespace SLZ.URPModResources
                 Debug.Log("SLZ URP version " + version + " installed");
                 PlatformQualitySetter.OverrideQualitySettings(EditorUserBuildSettings.activeBuildTarget);
                 ExtractAssets.ExtractShaders(true);
+                URPModUpdateShaderUI.ShowWindow();
             }
             else
             {
@@ -38,7 +39,6 @@ namespace SLZ.URPModResources
                     Debug.Log("SLZ URP updated to version " + version);
                     PlatformQualitySetter.OverrideQualitySettings(EditorUserBuildSettings.activeBuildTarget);
                     URPModUpdateShaderUI.ShowWindow();
-
                 }
             }
             //Events.registeredPackages -= CheckPkgForURPInstall;

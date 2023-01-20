@@ -11,11 +11,11 @@ namespace SLZ.URPModResources
 {
     public class URPModSetupUI : EditorWindow
     {
-        [MenuItem("Stress Level Zero/Mod Graphics Setup")]
+        [MenuItem("Stress Level Zero/URP Additional Asset Manager",priority = 2)]
         public static void ShowWindow()
         {
             var window = GetWindow<URPModSetupUI>();
-            window.titleContent = new GUIContent("Custom URP Setup For Mod Projects");
+            window.titleContent = new GUIContent("Custom URP Assets For Mod Projects");
             window.minSize = new Vector2(280, 150);
             window.maxSize = new Vector2(280, 150);
         }
@@ -87,11 +87,11 @@ namespace SLZ.URPModResources
             string updateText =
                 "\nSLZ Custom URP package updated. The package may include updated versions of the essential Bonelab shaders (SLZShaders folder) in your project. Click below to update the shaders now.\n\n" +
                 "Note: It is highly recommended to avoid modifying the included files, as any updates to this package will overwrite the files and delete your changes.\n\n" +
-                "These shaders can be updated/installed later from the menu \"Stress Level Zero/Mod Graphics Setup\".\n";
+                "These shaders can be updated/installed later from the menu \"Stress Level Zero/URP Additional Asset Manager\".\n";
             string installText =
                 "\nSLZ Custom URP package updated. The package includes some of Bonelab's core shaders for your use. In order to use them, they must be installed into your project directly. Click below to install the shaders\n\n" +
                 "Note: It is highly recommended to avoid modifying the included files, as any updates to this package will overwrite the files and delete your changes.\n\n" +
-                "These shaders can be updated/installed later from the menu \"Stress Level Zero/Mod Graphics Setup\".\n";
+                "These shaders can be updated/installed later from the menu \"Stress Level Zero/URP Additional Asset Manager\".\n";
             Label warn = new Label() { text = hasShaders ? updateText : installText
             };
             warn.style.flexWrap = Wrap.Wrap;
