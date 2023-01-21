@@ -152,7 +152,7 @@ namespace SLZ.URPModResources
             }
             if (pkgFromGit)
             {
-                bool pkgUpdate = !string.Equals(json.dependencies[packageName].hash, hash);
+                bool pkgUpdate = !string.Equals(json.dependencies[packageName].hash.ToString(), hash);
                 if (pkgUpdate)
                 {
                     json.dependencies[packageName].hash = hash;
