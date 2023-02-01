@@ -7,6 +7,10 @@
 #endif
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RealtimeLights.hlsl"
 
+// SLZ MODIFIED // Function for encoding normals for screen normals texture
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
+// END SLZ MODIFIED
+
 struct Attributes
 {
     float4 positionOS     : POSITION;
@@ -64,7 +68,7 @@ void DepthNormalsFragment(
     half3 packedNormalWS = PackFloat2To888(remappedOctNormalWS);      // values between [ 0,  1]
     outNormalWS = half4(packedNormalWS, 0.0);
     #else
-    float3 normalWS = NormalizeNormalPerPixel(input.normalWS);
+    float3 normalWS = EncodeWSNormalForNormalsTex(NormalizeNormalPerPixel(input.normalWS));
     outNormalWS = half4(normalWS, 0.0);
     #endif
 

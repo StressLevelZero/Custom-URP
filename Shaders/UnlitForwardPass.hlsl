@@ -142,7 +142,7 @@ void UnlitPassFragment(
 #else
     half fogFactor = input.fogCoord;
 #endif
-    finalColor.rgb = MixFog(finalColor.rgb, fogFactor);
+    //finalColor.rgb = MixFog(finalColor.rgb, fogFactor);
     finalColor.a = OutputAlpha(finalColor.a, IsSurfaceTypeTransparent(_Surface));
     finalColor.rgb = MixFog(finalColor.rgb, -input.viewDirWS, fogFactor);
     finalColor = Volumetrics(finalColor, input.positionWS);

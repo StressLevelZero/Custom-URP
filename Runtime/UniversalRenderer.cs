@@ -961,6 +961,7 @@ namespace UnityEngine.Rendering.Universal
                     normalDescriptor.graphicsFormat = m_DeferredLights.GetGBufferFormat(m_DeferredLights.GBufferNormalSmoothnessIndex); // the one used by the gbuffer.
                 else
                     normalDescriptor.graphicsFormat = DepthNormalOnlyPass.GetGraphicsFormat();
+                //normalDescriptor.sRGB = false;
 
                 RenderingUtils.ReAllocateIfNeeded(ref normalsTexture, normalDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: normalsTextureName);
 

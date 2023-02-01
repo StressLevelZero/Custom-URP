@@ -129,7 +129,7 @@ void DepthNormalsFragment(
             float3 normalWS = input.normalWS;
         #endif
 
-        outNormalWS = half4(NormalizeNormalPerPixel(normalWS), 0.0);
+        outNormalWS = half4(EncodeWSNormalForNormalsTex(NormalizeNormalPerPixel(normalWS)), 0.0);
     #endif
 
     #ifdef _WRITE_RENDERING_LAYERS
