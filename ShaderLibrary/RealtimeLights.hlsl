@@ -280,7 +280,7 @@ Light GetAdditionalLight(uint i, float3 positionWS, half4 shadowMask)
     light.shadowAttenuation = AdditionalLightShadow(lightIndex, positionWS, light.direction, shadowMask, occlusionProbeChannels);
 #if defined(_LIGHT_COOKIES)
     real3 cookieColor = SampleAdditionalLightCookie(lightIndex, positionWS);
-    light.color *= cookieColor;
+    light.color *= cookieColor.rgbb;
 #endif
 
     return light;
