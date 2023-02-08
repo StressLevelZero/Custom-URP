@@ -3,6 +3,8 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DefaultSamplers.hlsl"
+
 
 TEXTURECUBE(_SkyTexture);
 SAMPLER(sampler_SkyTexture);
@@ -17,7 +19,7 @@ float3 _VolCameraPos;
 CBUFFER_END
 
 
-TEXTURE3D(_VolumetricResult); SAMPLER(sampler_linear_clamp);
+TEXTURE3D(_VolumetricResult);
 //float4 _VolumePlaneSettings; // Not used
 
 half4 GetVolumetricColor(float3 positionWS)

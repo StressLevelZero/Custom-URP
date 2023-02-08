@@ -7,6 +7,14 @@
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
 #endif
 
+// SLZ MODIFIED // Handle dynamic and non-dynamic cases for keywords
+
+#if !defined (DYNAMIC_CASTING_PUNCTUAL_LIGHT_SHADOW) && !defined(_CASTING_PUNCTUAL_LIGHT_SHADOW)
+	#define _CASTING_PUNCTUAL_LIGHT_SHADOW false
+#endif
+
+// END SLZ MODIFIED
+
 // Shadow Casting Light geometric parameters. These variables are used when applying the shadow Normal Bias and are set by UnityEngine.Rendering.Universal.ShadowUtils.SetupShadowCasterConstantBuffer in com.unity.render-pipelines.universal/Runtime/ShadowUtils.cs
 // For Directional lights, _LightDirection is used when applying shadow Normal Bias.
 // For Spot lights and Point lights, _LightPosition is used to compute the actual light direction because it is different at each shadow caster geometry vertex.
@@ -32,11 +40,15 @@ float4 GetShadowPositionHClip(Attributes input)
     float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
     float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
 
-#if _CASTING_PUNCTUAL_LIGHT_SHADOW
-    float3 lightDirectionWS = normalize(_LightPosition - positionWS);
-#else
-    float3 lightDirectionWS = _LightDirection;
-#endif
+	float3 lightDirectionWS;
+	if (_CASTING_PUNCTUAL_LIGHT_SHADOW)
+	{
+		lightDirectionWS = normalize(_LightPosition - positionWS);
+	}
+	else
+	{
+		lightDirectionWS = _LightDirection;
+	}
     // SLZ MODIFIED
     //float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
     float2 vShadowOffsets = GetShadowOffsets(normalWS, lightDirectionWS);

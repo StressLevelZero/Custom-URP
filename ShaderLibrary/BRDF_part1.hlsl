@@ -6,6 +6,14 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Deprecated.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceData.hlsl"
 
+
+// Handle non-dynamic versions of keywords
+
+#if !defined(DYNAMIC_ALPHAPREMULTIPLY_ON) && !defined(_ALPHAPREMULTIPLY_ON)
+	#define _ALPHAPREMULTIPLY_ON false
+#endif
+
+
 #define kDielectricSpec half4(0.04, 0.04, 0.04, 1.0 - 0.04) // standard dielectric reflectivity coef at incident angle (= 4%)
 
 #if defined(_BRDFMAP)
@@ -79,10 +87,11 @@ inline void InitializeBRDFDataDirect(half3 albedo, half3 diffuse, half3 specular
     outBRDFData.normalizationTerm = outBRDFData.roughness * half(4.0) + half(2.0);
     outBRDFData.roughness2MinusOne = outBRDFData.roughness2 - half(1.0);
 
-#ifdef _ALPHAPREMULTIPLY_ON
-    outBRDFData.diffuse *= alpha;
-    alpha = alpha * oneMinusReflectivity + reflectivity; // NOTE: alpha modified and propagated up.
-#endif
+	UNITY_BRANCH if (_ALPHAPREMULTIPLY_ON)
+	{
+		outBRDFData.diffuse *= alpha;
+		alpha = alpha * oneMinusReflectivity + reflectivity; // NOTE: alpha modified and propagated up.
+	}
 }
 
 // Legacy: do not call, will not correctly initialize albedo property.

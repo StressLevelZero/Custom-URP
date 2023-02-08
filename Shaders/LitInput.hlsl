@@ -11,6 +11,14 @@
 #define _DETAIL
 #endif
 
+// SLZ MODIFIED // Handle non-dynamic branch version of dynamic keywords
+
+#if !defined(DYNAMIC_METALLICSPECGLOSSMAP) && !defined(_METALLICSPECGLOSSMAP)
+	#define _METALLICSPECGLOSSMAP false
+#endif
+
+// END SLZ MODIFIED
+
 // NOTE: Do not ifdef the properties here as SRP batcher can not handle different layouts.
 CBUFFER_START(UnityPerMaterial)
 float4 _BaseMap_ST;
@@ -88,26 +96,29 @@ half4 SampleMetallicSpecGloss(float2 uv, half albedoAlpha)
 {
     half4 specGloss;
 
-#ifdef _METALLICSPECGLOSSMAP
-    specGloss = half4(SAMPLE_METALLICSPECULAR(uv));
-    #ifdef _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-        specGloss.a = albedoAlpha * _Smoothness;
-    #else
-        specGloss.a *= _Smoothness;
-    #endif
-#else // _METALLICSPECGLOSSMAP
-    #if _SPECULAR_SETUP
-        specGloss.rgb = _SpecColor.rgb;
-    #else
-        specGloss.rgb = _Metallic.rrr;
-    #endif
-
-    #ifdef _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-        specGloss.a = albedoAlpha * _Smoothness;
-    #else
-        specGloss.a = _Smoothness;
-    #endif
-#endif
+	if (_METALLICSPECGLOSSMAP)
+	{
+		specGloss = half4(SAMPLE_METALLICSPECULAR(uv));
+		#ifdef _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+			specGloss.a = albedoAlpha * _Smoothness;
+		#else
+			specGloss.a *= _Smoothness;
+		#endif
+	}
+	else // _METALLICSPECGLOSSMAP
+	{
+		#if _SPECULAR_SETUP
+			specGloss.rgb = _SpecColor.rgb;
+		#else
+			specGloss.rgb = _Metallic.rrr;
+		#endif
+	
+		#ifdef _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+			specGloss.a = albedoAlpha * _Smoothness;
+		#else
+			specGloss.a = _Smoothness;
+		#endif
+	}
 
     return specGloss;
 }

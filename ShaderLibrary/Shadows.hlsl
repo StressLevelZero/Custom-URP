@@ -16,9 +16,17 @@
         #endif
     #endif
 
-    #if defined(_ADDITIONAL_LIGHT_SHADOWS)
-        #define ADDITIONAL_LIGHT_CALCULATE_SHADOWS
+    #if defined(DYNAMIC_ADDITIONAL_LIGHT_SHADOWS)
+        #define ADDITIONAL_LIGHT_CALCULATE_SHADOWS _ADDITIONAL_LIGHT_SHADOWS
+    #else
+        #if defined (_ADDITIONAL_LIGHT_SHADOWS)
+            #define ADDITIONAL_LIGHT_CALCULATE_SHADOWS true
+        #else
+            #define ADDITIONAL_LIGHT_CALCULATE_SHADOWS false
+        #endif
     #endif
+#else
+    #define ADDITIONAL_LIGHT_CALCULATE_SHADOWS false
 #endif
 
 #if defined(UNITY_DOTS_INSTANCING_ENABLED)
@@ -75,7 +83,7 @@ float4      _MainLightShadowmapSize;  // (xy: 1/width and 1/height, zw: width an
 CBUFFER_END
 #endif
 
-#if defined(ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
+//#if !defined(_RECEIVE_SHADOWS_OFF)
     #if USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA
         StructuredBuffer<float4>   _AdditionalShadowParams_SSBO;        // Per-light data - TODO: test if splitting _AdditionalShadowParams_SSBO[lightIndex].w into a separate StructuredBuffer<int> buffer is faster
         StructuredBuffer<float4x4> _AdditionalLightsWorldToShadow_SSBO; // Per-shadow-slice-data - A shadow casting light can have 6 shadow slices (if it's a point light)
@@ -105,7 +113,7 @@ CBUFFER_END
         CBUFFER_END
         #endif
     #endif
-#endif
+//#endif
 
 // SLZ MODIFIED // Obligatory Ignacio reference, better shadow bias calculations
 float2 GetShadowOffsets( float3 N, float3 L )
@@ -184,16 +192,20 @@ half4 GetMainLightShadowParams()
 // w: first shadow slice index for this light, there can be 6 in case of point lights. (-1 for non-shadow-casting-lights)
 half4 GetAdditionalLightShadowParams(int lightIndex)
 {
-    #if defined(ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
-        #if USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA
-            return _AdditionalShadowParams_SSBO[lightIndex];
-        #else
-            return _AdditionalShadowParams[lightIndex];
-        #endif
-    #else
+    // SLZ MODIFIED // Use dynamic branch
+    UNITY_BRANCH if (ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
+    {
+#if USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA
+        return _AdditionalShadowParams_SSBO[lightIndex];
+#else
+        return _AdditionalShadowParams[lightIndex];
+#endif
+    }
+    else 
+    {
         // Same defaults as set in AdditionalLightsShadowCasterPass.cs
         return half4(0, 0, 0, -1);
-    #endif
+    }
 }
 
 half SampleScreenSpaceShadowmap(float4 shadowCoord)
@@ -341,7 +353,9 @@ half MainLightRealtimeShadow(float4 shadowCoord)
 // returns 1.0 if position is in light
 half AdditionalLightRealtimeShadow(int lightIndex, float3 positionWS, half3 lightDirection)
 {
-    #if defined(ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
+    // SLZ MODIFIED // Use dynamic branch
+    UNITY_BRANCH if (ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
+    {
         ShadowSamplingData shadowSamplingData = GetAdditionalLightShadowSamplingData(lightIndex);
 
         half4 shadowParams = GetAdditionalLightShadowParams(lightIndex);
@@ -352,7 +366,7 @@ half AdditionalLightRealtimeShadow(int lightIndex, float3 positionWS, half3 ligh
 
         half isPointLight = shadowParams.z;
 
-        UNITY_BRANCH
+
         if (isPointLight)
         {
             // This is a point light, we have to find out which shadow slice to sample from
@@ -360,16 +374,18 @@ half AdditionalLightRealtimeShadow(int lightIndex, float3 positionWS, half3 ligh
             shadowSliceIndex += cubemapFaceId;
         }
 
-        #if USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA
-            float4 shadowCoord = mul(_AdditionalLightsWorldToShadow_SSBO[shadowSliceIndex], float4(positionWS, 1.0));
-        #else
-            float4 shadowCoord = mul(_AdditionalLightsWorldToShadow[shadowSliceIndex], float4(positionWS, 1.0));
-        #endif
+#if USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA
+        float4 shadowCoord = mul(_AdditionalLightsWorldToShadow_SSBO[shadowSliceIndex], float4(positionWS, 1.0));
+#else
+        float4 shadowCoord = mul(_AdditionalLightsWorldToShadow[shadowSliceIndex], float4(positionWS, 1.0));
+#endif
 
         return SampleShadowmap(TEXTURE2D_ARGS(_AdditionalLightsShadowmapTexture, sampler_AdditionalLightsShadowmapTexture), shadowCoord, shadowSamplingData, shadowParams, true);
-    #else
+    }
+    else
+    {
         return half(1.0);
-    #endif
+    }
 }
 
 half GetMainLightShadowFade(float3 positionWS)
@@ -383,15 +399,19 @@ half GetMainLightShadowFade(float3 positionWS)
 
 half GetAdditionalLightShadowFade(float3 positionWS)
 {
-    #if defined(ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
+    // SLZ MODIFIED // Use dynamic branch
+    UNITY_BRANCH if (ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
+    {
         float3 camToPixel = positionWS - _WorldSpaceCameraPos;
         float distanceCamToPixel2 = dot(camToPixel, camToPixel);
 
         float fade = saturate(distanceCamToPixel2 * float(_AdditionalShadowFadeParams.x) + float(_AdditionalShadowFadeParams.y));
         return half(fade);
-    #else
+    }
+    else
+    {
         return half(1.0);
-    #endif
+    }
 }
 
 half MixRealtimeAndBakedShadows(half realtimeShadow, half bakedShadow, half shadowFade)
@@ -445,11 +465,17 @@ half AdditionalLightShadow(int lightIndex, float3 positionWS, half3 lightDirecti
     half bakedShadow = half(1.0);
 #endif
 
-#ifdef ADDITIONAL_LIGHT_CALCULATE_SHADOWS
-    half shadowFade = GetAdditionalLightShadowFade(positionWS);
-#else
-    half shadowFade = half(1.0);
-#endif
+    half shadowFade;
+
+    // SLZ MODIFIED // Use dynamic branch
+    UNITY_BRANCH if (ADDITIONAL_LIGHT_CALCULATE_SHADOWS)
+    {
+        shadowFade = GetAdditionalLightShadowFade(positionWS);
+    }
+    else
+    {
+        shadowFade = half(1.0);
+    }
 
     return MixRealtimeAndBakedShadows(realtimeShadow, bakedShadow, shadowFade);
 }

@@ -102,10 +102,11 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
     SSRColor *= SSR.a * SSRLerp;
 #endif
 
-#if defined(_SCREEN_SPACE_OCCLUSION)
-    reflectionProbe *= indSSAO;
-    SSRColor.rgb *= indSSAO;
-#endif
+	if (_SCREEN_SPACE_OCCLUSION)
+	{
+		reflectionProbe *= indSSAO;
+		SSRColor.rgb *= indSSAO;
+	}
 
     real surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
     real3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
@@ -127,14 +128,14 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-#if defined(_SCREEN_SPACE_OCCLUSION)
-    AmbientOcclusionFactor ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
-    surfData.occlusion = 1.0h; // we are already multiplying by the AO in the intermediate steps, don't do it at the end like normal
-#else
-    AmbientOcclusionFactor ao;
+	AmbientOcclusionFactor ao;
     ao.indirectAmbientOcclusion = 1.0h;
     ao.directAmbientOcclusion = 1.0h;
-#endif
+	if (_SCREEN_SPACE_OCCLUSION)
+	{
+		AmbientOcclusionFactor ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
+		surfData.occlusion = 1.0h; // we are already multiplying by the AO in the intermediate steps, don't do it at the end like normal
+	}
 
 #if defined(LIGHTMAP_ON) 
     //-------------------------------------------------------------------------------------------------
@@ -155,10 +156,11 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
 
     //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting) 
-#if defined(_SCREEN_SPACE_OCCLUSION)
-    diffuse *= ao.indirectAmbientOcclusion;
-    specular *= ao.indirectAmbientOcclusion;
-#endif
+	if (_SCREEN_SPACE_OCCLUSION)
+	{
+		diffuse *= ao.indirectAmbientOcclusion;
+		specular *= ao.indirectAmbientOcclusion;
+	}
 
     //-------------------------------------------------------------------------------------------------
     // Realtime light calculations

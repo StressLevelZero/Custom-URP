@@ -1,7 +1,7 @@
 #if !defined(SLZ_SSR_GLOBALS)
 #define SLZ_SSR_GLOBALS
 
-
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DefaultSamplers.hlsl"
 
 
 CBUFFER_START(SSRConstants)
@@ -17,6 +17,6 @@ CBUFFER_END
 #define _SSRMinMip asuint(_SSRVariables.w)
 #define _SSRDistScale _SSRVariables2.x
 
-SamplerState sampler_trilinear_clamp;
+//SamplerState sampler_trilinear_clamp;
 
 #endif

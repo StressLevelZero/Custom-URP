@@ -22,6 +22,16 @@
     #define OUTPUT_SH(normalWS, OUT) OUT.xyz = SampleSHVertex(normalWS)
 #endif
 
+// SLZ MODIFIED // handle shaders that don't use dynamic branching for certain keywords
+
+#if !defined (DYNAMIC_ADDITIONAL_LIGHTS)
+	#if !defined(_ADDITIONAL_LIGHTS)
+		#define _ADDITIONAL_LIGHTS false
+	#endif
+#endif
+
+// END SLZ MODIFIED
+
 ///////////////////////////////////////////////////////////////////////////////
 //                      Lighting Functions                                   //
 ///////////////////////////////////////////////////////////////////////////////
@@ -286,11 +296,11 @@ half3 CalculateBlinnPhong(Light light, InputData inputData, SurfaceData surfaceD
     lightSpecularColor += LightingSpecular(attenuatedLightColor, light.direction, inputData.normalWS, inputData.viewDirectionWS, half4(surfaceData.specular, 1), smoothness);
     #endif
 
-#if _ALPHAPREMULTIPLY_ON
-    return lightDiffuseColor * surfaceData.albedo * surfaceData.alpha + lightSpecularColor;
-#else
-    return lightDiffuseColor * surfaceData.albedo + lightSpecularColor;
-#endif
+	half3 output = lightDiffuseColor * surfaceData.albedo;
+
+    output = _ALPHAPREMULTIPLY_ON ? output * surfaceData.alpha : output;
+	
+    return output + lightSpecularColor;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -370,40 +380,41 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
                                                               surfaceData.clearCoatMask, specularHighlightsOff);
     }
 
-    #if defined(_ADDITIONAL_LIGHTS)
-    uint pixelLightCount = GetAdditionalLightsCount();
-
-    #if USE_FORWARD_PLUS
-    for (uint lightIndex = 0; lightIndex < min(URP_FP_DIRECTIONAL_LIGHTS_COUNT, MAX_VISIBLE_LIGHTS); lightIndex++)
-    {
-        FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
-
-        Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
-
-#ifdef _LIGHT_LAYERS
-        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
-#endif
-        {
-            lightingData.additionalLightsColor += LightingPhysicallyBased(brdfData, brdfDataClearCoat, light,
-                                                                          inputData.normalWS, inputData.viewDirectionWS,
-                                                                          surfaceData.clearCoatMask, specularHighlightsOff);
-        }
+    if (_ADDITIONAL_LIGHTS)
+	{
+		uint pixelLightCount = GetAdditionalLightsCount();
+	
+		#if USE_FORWARD_PLUS
+		for (uint lightIndex = 0; lightIndex < min(URP_FP_DIRECTIONAL_LIGHTS_COUNT, MAX_VISIBLE_LIGHTS); lightIndex++)
+		{
+			FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+	
+			Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
+	
+	#ifdef _LIGHT_LAYERS
+			if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+	#endif
+			{
+				lightingData.additionalLightsColor += LightingPhysicallyBased(brdfData, brdfDataClearCoat, light,
+																			inputData.normalWS, inputData.viewDirectionWS,
+																			surfaceData.clearCoatMask, specularHighlightsOff);
+			}
+		}
+		#endif
+	
+		LIGHT_LOOP_BEGIN(pixelLightCount)
+			Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
+	
+	#ifdef _LIGHT_LAYERS
+			if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+	#endif
+			{
+				lightingData.additionalLightsColor += LightingPhysicallyBased(brdfData, brdfDataClearCoat, light,
+																			inputData.normalWS, inputData.viewDirectionWS,
+																			surfaceData.clearCoatMask, specularHighlightsOff);
+			}
+		LIGHT_LOOP_END
     }
-    #endif
-
-    LIGHT_LOOP_BEGIN(pixelLightCount)
-        Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
-
-#ifdef _LIGHT_LAYERS
-        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
-#endif
-        {
-            lightingData.additionalLightsColor += LightingPhysicallyBased(brdfData, brdfDataClearCoat, light,
-                                                                          inputData.normalWS, inputData.viewDirectionWS,
-                                                                          surfaceData.clearCoatMask, specularHighlightsOff);
-        }
-    LIGHT_LOOP_END
-    #endif
 
     #if defined(_ADDITIONAL_LIGHTS_VERTEX)
     lightingData.vertexLightingColor += inputData.vertexLighting * brdfData.diffuse;
@@ -466,34 +477,35 @@ half4 UniversalFragmentBlinnPhong(InputData inputData, SurfaceData surfaceData)
         lightingData.mainLightColor += CalculateBlinnPhong(mainLight, inputData, surfaceData);
     }
 
-    #if defined(_ADDITIONAL_LIGHTS)
-    uint pixelLightCount = GetAdditionalLightsCount();
-
-    #if USE_FORWARD_PLUS
-    for (uint lightIndex = 0; lightIndex < min(URP_FP_DIRECTIONAL_LIGHTS_COUNT, MAX_VISIBLE_LIGHTS); lightIndex++)
-    {
-        FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
-
-        Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
-#ifdef _LIGHT_LAYERS
-        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
-#endif
-        {
-            lightingData.additionalLightsColor += CalculateBlinnPhong(light, inputData, surfaceData);
-        }
+    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+	{
+		uint pixelLightCount = GetAdditionalLightsCount();
+	
+		#if USE_FORWARD_PLUS
+		for (uint lightIndex = 0; lightIndex < min(URP_FP_DIRECTIONAL_LIGHTS_COUNT, MAX_VISIBLE_LIGHTS); lightIndex++)
+		{
+			FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+	
+			Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
+	#ifdef _LIGHT_LAYERS
+			if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+	#endif
+			{
+				lightingData.additionalLightsColor += CalculateBlinnPhong(light, inputData, surfaceData);
+			}
+		}
+		#endif
+	
+		LIGHT_LOOP_BEGIN(pixelLightCount)
+			Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
+	#ifdef _LIGHT_LAYERS
+			if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+	#endif
+			{
+				lightingData.additionalLightsColor += CalculateBlinnPhong(light, inputData, surfaceData);
+			}
+		LIGHT_LOOP_END
     }
-    #endif
-
-    LIGHT_LOOP_BEGIN(pixelLightCount)
-        Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
-#ifdef _LIGHT_LAYERS
-        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
-#endif
-        {
-            lightingData.additionalLightsColor += CalculateBlinnPhong(light, inputData, surfaceData);
-        }
-    LIGHT_LOOP_END
-    #endif
 
     #if defined(_ADDITIONAL_LIGHTS_VERTEX)
     lightingData.vertexLightingColor += inputData.vertexLighting * surfaceData.albedo;

@@ -4,6 +4,14 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderVariablesFunctions.deprecated.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Debug/DebuggingCommon.hlsl"
 
+#if !defined(DYNAMIC_ALPHAPREMULTIPLY_ON) && !defined(_ALPHAPREMULTIPLY_ON)
+	#define _ALPHAPREMULTIPLY_ON false
+#endif
+
+#if !defined(DYNAMIC_ALPHAMODULATE_ON) && !defined(_ALPHAMODULATE_ON)
+	#define _ALPHAMODULATE_ON false
+#endif
+
 VertexPositionInputs GetVertexPositionInputs(float3 positionOS)
 {
     VertexPositionInputs input;
@@ -244,11 +252,14 @@ half3 AlphaModulate(half3 albedo, half alpha)
     // Manual adjustment for "lighter" multiply effect (similar to "premultiplied alpha")
     // would be painting whiter pixels in the texture.
     // This emulates that procedure in shader, so it should be applied to the base/source color.
-#if defined(_ALPHAMODULATE_ON)
-    return lerp(half3(1.0, 1.0, 1.0), albedo, alpha);
-#else
-    return albedo;
-#endif
+	if (_ALPHAMODULATE_ON)
+	{
+		return lerp(half3(1.0, 1.0, 1.0), albedo, alpha);
+	}
+	else
+	{
+		return albedo;
+	}
 }
 
 half3 AlphaPremultiply(half3 albedo, half alpha)
@@ -257,10 +268,8 @@ half3 AlphaPremultiply(half3 albedo, half alpha)
     // Preserve Specular material (glass like) has different alpha for diffuse and specular lighting.
     // Logically this is "variable" Alpha blending.
     // (HW blend mode is premultiply, but with alpha multiply in shader.)
-#if defined(_ALPHAPREMULTIPLY_ON)
-    return albedo * alpha;
-#endif
-    return albedo;
+	
+    return _ALPHAPREMULTIPLY_ON ? albedo * alpha : albedo;
 }
 
 // Normalization used to depend on SHADER_QUALITY

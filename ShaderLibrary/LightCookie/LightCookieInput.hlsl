@@ -2,6 +2,7 @@
 #define UNIVERSAL_LIGHT_COOKIE_INPUT_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LightCookie/LightCookieTypes.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DefaultSamplers.hlsl"
 
 // Textures
 TEXTURE2D(_MainLightCookieTexture);
@@ -10,7 +11,7 @@ TEXTURE2D(_AdditionalLightsCookieAtlasTexture);
 // SLZ MODIFIED
 
 // Samplers
-SamplerState cookie_linear_repeat_sampler;
+//SamplerState cookie_linear_repeat_sampler;
 // SAMPLER(sampler_MainLightCookieTexture);
 // SAMPLER(sampler_AdditionalLightsCookieAtlasTexture);
 
@@ -101,12 +102,12 @@ bool IsAdditionalLightsCookieAtlasTextureAlphaFormat()
 
 real4 SampleMainLightCookieTexture(float2 uv)
 {
-    return SAMPLE_TEXTURE2D(_MainLightCookieTexture, cookie_linear_repeat_sampler, uv);
+    return SAMPLE_TEXTURE2D(_MainLightCookieTexture, sampler_linear_repeat, uv);
 }
 
 real4 SampleAdditionalLightsCookieAtlasTexture(float2 uv)
 {
-    return SAMPLE_TEXTURE2D(_AdditionalLightsCookieAtlasTexture, cookie_linear_repeat_sampler, uv);
+    return SAMPLE_TEXTURE2D(_AdditionalLightsCookieAtlasTexture, sampler_linear_repeat, uv);
 }
 
 // END SLZ MODIFIED

@@ -4,6 +4,16 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceData.hlsl"
 
+// SLZ MODIFIED // Handle shaders with non-dynamic _SCREEN_SPACE_OCCLUSION
+
+#if !defined(DYNAMIC_SCREEN_SPACE_OCCLUSION)
+	#if !defined(_SCREEN_SPACE_OCCLUSION)
+		#define _SCREEN_SPACE_OCCLUSION false
+	#endif
+#endif
+
+// END SLZ MODIFIED
+
 // Ambient occlusion
 TEXTURE2D_X(_ScreenSpaceOcclusionTexture);
 SAMPLER(sampler_ScreenSpaceOcclusionTexture);
@@ -23,15 +33,16 @@ half SampleAmbientOcclusion(float2 normalizedScreenSpaceUV)
 AmbientOcclusionFactor GetScreenSpaceAmbientOcclusion(float2 normalizedScreenSpaceUV)
 {
     AmbientOcclusionFactor aoFactor;
-
-    #if defined(_SCREEN_SPACE_OCCLUSION) && !defined(_SURFACE_TYPE_TRANSPARENT)
-    float ssao = SampleAmbientOcclusion(normalizedScreenSpaceUV);
-
-    aoFactor.indirectAmbientOcclusion = ssao;
-    aoFactor.directAmbientOcclusion = lerp(half(1.0), ssao, _AmbientOcclusionParam.w);
-    #else
-    aoFactor.directAmbientOcclusion = 1;
+	aoFactor.directAmbientOcclusion = 1;
     aoFactor.indirectAmbientOcclusion = 1;
+    #if !defined(_SURFACE_TYPE_TRANSPARENT)
+	UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+	{
+		float ssao = SampleAmbientOcclusion(normalizedScreenSpaceUV);
+	
+		aoFactor.indirectAmbientOcclusion = ssao;
+		aoFactor.directAmbientOcclusion = lerp(half(1.0), ssao, _AmbientOcclusionParam.w);
+	}
     #endif
 
     #if defined(DEBUG_DISPLAY)

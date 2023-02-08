@@ -15,6 +15,14 @@ SAMPLER(sampler_BumpMap);
 TEXTURE2D(_EmissionMap);
 SAMPLER(sampler_EmissionMap);
 
+// SLZ MODIFIED // handle keywords being either dynamic or non-dynamic 
+
+#if !defined(DYNAMIC_EMISSION) && !defined(_EMISSION)
+	#define _EMISSION false
+#endif
+
+// END SLZ MODIFIED
+
 ///////////////////////////////////////////////////////////////////////////////
 //                      Material Property Helpers                            //
 ///////////////////////////////////////////////////////////////////////////////
@@ -52,11 +60,14 @@ half3 SampleNormal(float2 uv, TEXTURE2D_PARAM(bumpMap, sampler_bumpMap), half sc
 
 half3 SampleEmission(float2 uv, half3 emissionColor, TEXTURE2D_PARAM(emissionMap, sampler_emissionMap))
 {
-#ifndef _EMISSION
-    return 0;
-#else
-    return SAMPLE_TEXTURE2D(emissionMap, sampler_emissionMap, uv).rgb * emissionColor;
-#endif
+	if (_EMISSION)
+	{
+		return SAMPLE_TEXTURE2D(emissionMap, sampler_emissionMap, uv).rgb * emissionColor;
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 #endif
