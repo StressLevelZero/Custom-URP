@@ -130,7 +130,13 @@ half4 ParticlesLitFragment(VaryingsParticle input) : SV_Target
 
     half4 color = UniversalFragmentBlinnPhong(inputData, diffuse, specularGloss, specularGloss.a, emission, alpha, normalTS);
 
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+#ifdef _NORMALMAP
+    color.rgb = MixFog(color.rgb, -half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w), inputData.fogCoord);
+#else
+    color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
+#endif
+    color.rgb = Volumetrics(color, input.positionWS.xyz).rgb;
+
     color.a = OutputAlpha(color.a, IsSurfaceTypeTransparent(_Surface));
 
     return color;

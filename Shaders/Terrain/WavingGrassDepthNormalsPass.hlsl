@@ -1,6 +1,8 @@
 #ifndef UNIVERSAL_WAVING_GRASS_DEPTH_NORMAL_PASSE_INCLUDED
 #define UNIVERSAL_WAVING_GRASS_DEPTH_NORMAL_PASSE_INCLUDED
 
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
+
 struct GrassVertexDepthNormalInput
 {
     float4 vertex       : POSITION;
@@ -54,7 +56,7 @@ half4 DepthNormalOnlyFragment(GrassVertexDepthNormalOutput input) : SV_TARGET
         return half4(packedNormalWS, 0.0);
     #else
         half3 normalWS = half3(normalize(cross(ddy(input.viewDirWS), ddx(input.viewDirWS))));
-        return half4(normalWS, 0.0);
+        return half4(EncodeWSNormalForNormalsTex(normalWS), 0.0);
     #endif
 }
 

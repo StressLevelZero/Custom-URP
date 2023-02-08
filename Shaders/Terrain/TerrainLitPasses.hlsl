@@ -213,6 +213,22 @@ void HeightBasedSplatModify(inout half4 splatControl, in half4 masks[4])
 }
 #endif
 
+// SLZ MODIFIED // Added overload that calculates fog
+void SplatmapFinalColor(inout half4 color, half fogCoord, half3 viewDirectionWS)
+{
+    color.rgb *= color.a;
+
+#ifndef TERRAIN_GBUFFER // Technically we don't need fogCoord, but it is still passed from the vertex shader.
+
+#ifdef TERRAIN_SPLAT_ADDPASS
+    color.rgb = MixFogColor(color.rgb, half3(0, 0, 0), fogCoord);
+#else
+    color.rgb = MixFog(color.rgb, viewDirectionWS, fogCoord);
+#endif
+
+#endif
+}
+
 void SplatmapFinalColor(inout half4 color, half fogCoord)
 {
     color.rgb *= color.a;
@@ -424,7 +440,8 @@ void SplatmapFragment(
 
     half4 color = UniversalFragmentPBR(inputData, albedo, metallic, /* specular */ half3(0.0h, 0.0h, 0.0h), smoothness, occlusion, /* emission */ half3(0, 0, 0), alpha);
 
-    SplatmapFinalColor(color, inputData.fogCoord);
+    SplatmapFinalColor(color, inputData.fogCoord, -inputData.viewDirectionWS);
+    color = Volumetrics(color, inputData.positionWS);
 
     outColor = half4(color.rgb, 1.0h);
 
@@ -473,7 +490,8 @@ VaryingsLean ShadowPassVertex(AttributesLean v)
     float3 lightDirectionWS = _LightDirection;
 #endif
 
-    float4 clipPos = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+    //float4 clipPos = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+    float4 clipPos = ApplySLZShadowBias(positionWS, normalWS, lightDirectionWS);
 
 #if UNITY_REVERSED_Z
     clipPos.z = min(clipPos.z, UNITY_NEAR_CLIP_VALUE);

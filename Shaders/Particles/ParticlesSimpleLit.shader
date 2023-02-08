@@ -119,19 +119,17 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 
             // -------------------------------------
             // Universal Pipeline keywords
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
-            #pragma multi_compile_fragment _ _LIGHT_COOKIES
-            #pragma multi_compile _ _FORWARD_PLUS
+            #define _DISABLE_LIGHTMAPS
+            #define _DISABLE_SSAO // transparent objects should NOT sample AO! Technically, you could have fully opaque particles, but that's really rare. Since I can't tell the blend mode, just don't do SSAO 
+            #pragma multi_compile_fog
+            #pragma multi_compile _ _VOLUMETRICS_ENABLED
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
             // -------------------------------------
             // Unity defined keywords
-            #pragma multi_compile_fog
+            
             #pragma multi_compile_instancing
-            #pragma multi_compile_fragment _ DEBUG_DISPLAY
+            //#pragma multi_compile_fragment _ DEBUG_DISPLAY
             #pragma instancing_options procedural:ParticleInstancingSetup
 
             #pragma vertex ParticlesLitVertex
@@ -145,60 +143,60 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 
         // ------------------------------------------------------------------
         //  GBuffer pass.
-        Pass
-        {
-            // Lightmode matches the ShaderPassName set in UniversalRenderPipeline.cs. SRPDefaultUnlit and passes with
-            // no LightMode tag are also rendered by Universal Render Pipeline
-            Name "GBuffer"
-            Tags{"LightMode" = "UniversalGBuffer"}
-
-            ZWrite[_ZWrite]
-            Cull[_Cull]
-
-            HLSLPROGRAM
-            #pragma exclude_renderers gles
-            #pragma target 2.0
-
-            // -------------------------------------
-            // Material Keywords
-            #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local_fragment _EMISSION
-            #pragma shader_feature_local_fragment _ _SPECGLOSSMAP _SPECULAR_COLOR
-            #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
-            #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
-
-            // -------------------------------------
-            // Particle Keywords
-            //#pragma shader_feature _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
-            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
-            //#pragma shader_feature _SOFTPARTICLES_ON
-            //#pragma shader_feature _FADING_ON
-            //#pragma shader_feature _DISTORTION_ON
-
-            // -------------------------------------
-            // Universal Pipeline keywords
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-            //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            //#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
-            #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
-
-            // -------------------------------------
-            // Unity defined keywords
-            #pragma multi_compile_instancing
-            #pragma instancing_options procedural:ParticleInstancingSetup
-
-            #pragma vertex ParticlesLitGBufferVertex
-            #pragma fragment ParticlesLitGBufferFragment
-            #define BUMP_SCALE_NOT_SUPPORTED 1
-
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitGBufferPass.hlsl"
-            ENDHLSL
-        }
+        //Pass
+        //{
+        //    // Lightmode matches the ShaderPassName set in UniversalRenderPipeline.cs. SRPDefaultUnlit and passes with
+        //    // no LightMode tag are also rendered by Universal Render Pipeline
+        //    Name "GBuffer"
+        //    Tags{"LightMode" = "UniversalGBuffer"}
+        //
+        //    ZWrite[_ZWrite]
+        //    Cull[_Cull]
+        //
+        //    HLSLPROGRAM
+        //    #pragma exclude_renderers gles
+        //    #pragma target 2.0
+        //
+        //    // -------------------------------------
+        //    // Material Keywords
+        //    #pragma shader_feature_local _NORMALMAP
+        //    #pragma shader_feature_local_fragment _EMISSION
+        //    #pragma shader_feature_local_fragment _ _SPECGLOSSMAP _SPECULAR_COLOR
+        //    #pragma shader_feature_local_fragment _GLOSSINESS_FROM_BASE_ALPHA
+        //    #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
+        //
+        //    // -------------------------------------
+        //    // Particle Keywords
+        //    //#pragma shader_feature _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
+        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
+        //    #pragma shader_feature_local_fragment _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
+        //    #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+        //    //#pragma shader_feature _SOFTPARTICLES_ON
+        //    //#pragma shader_feature _FADING_ON
+        //    //#pragma shader_feature _DISTORTION_ON
+        //
+        //    // -------------------------------------
+        //    // Universal Pipeline keywords
+        //    #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+        //    //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+        //    //#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+        //    #pragma multi_compile_fragment _ _SHADOWS_SOFT
+        //    #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
+        //    #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
+        //
+        //    // -------------------------------------
+        //    // Unity defined keywords
+        //    #pragma multi_compile_instancing
+        //    #pragma instancing_options procedural:ParticleInstancingSetup
+        //
+        //    #pragma vertex ParticlesLitGBufferVertex
+        //    #pragma fragment ParticlesLitGBufferFragment
+        //    #define BUMP_SCALE_NOT_SUPPORTED 1
+        //
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitGBufferPass.hlsl"
+        //    ENDHLSL
+        //}
 
         // ------------------------------------------------------------------
         //  Depth Only pass.
@@ -265,95 +263,95 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
         }
         // ------------------------------------------------------------------
         //  Scene view outline pass.
-        Pass
-        {
-            Name "SceneSelectionPass"
-            Tags { "LightMode" = "SceneSelectionPass" }
-
-            BlendOp Add
-            Blend One Zero
-            ZWrite On
-            Cull Off
-
-            HLSLPROGRAM
-            #define PARTICLES_EDITOR_META_PASS
-            #pragma target 2.0
-
-            // -------------------------------------
-            // Particle Keywords
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
-
-            // -------------------------------------
-            // Unity defined keywords
-            #pragma multi_compile_instancing
-            #pragma instancing_options procedural:ParticleInstancingSetup
-
-            #pragma vertex vertParticleEditor
-            #pragma fragment fragParticleSceneHighlight
-
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
-
-            ENDHLSL
-        }
+        //Pass
+        //{
+        //    Name "SceneSelectionPass"
+        //    Tags { "LightMode" = "SceneSelectionPass" }
+        //
+        //    BlendOp Add
+        //    Blend One Zero
+        //    ZWrite On
+        //    Cull Off
+        //
+        //    HLSLPROGRAM
+        //    #define PARTICLES_EDITOR_META_PASS
+        //    #pragma target 2.0
+        //
+        //    // -------------------------------------
+        //    // Particle Keywords
+        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
+        //    #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+        //
+        //    // -------------------------------------
+        //    // Unity defined keywords
+        //    #pragma multi_compile_instancing
+        //    #pragma instancing_options procedural:ParticleInstancingSetup
+        //
+        //    #pragma vertex vertParticleEditor
+        //    #pragma fragment fragParticleSceneHighlight
+        //
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
+        //
+        //    ENDHLSL
+        //}
 
         // ------------------------------------------------------------------
         //  Scene picking buffer pass.
-        Pass
-        {
-            Name "ScenePickingPass"
-            Tags{ "LightMode" = "Picking" }
-
-            BlendOp Add
-            Blend One Zero
-            ZWrite On
-            Cull Off
-
-            HLSLPROGRAM
-            #define PARTICLES_EDITOR_META_PASS
-            #pragma target 2.0
-
-            // -------------------------------------
-            // Particle Keywords
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
-
-            // -------------------------------------
-            // Unity defined keywords
-            #pragma multi_compile_instancing
-            #pragma instancing_options procedural:ParticleInstancingSetup
-
-            #pragma vertex vertParticleEditor
-            #pragma fragment fragParticleScenePicking
-
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
-
-            ENDHLSL
-        }
-
-        Pass
-        {
-            Name "Universal2D"
-            Tags{ "LightMode" = "Universal2D" }
-
-            Blend[_SrcBlend][_DstBlend]
-            ZWrite[_ZWrite]
-            Cull[_Cull]
-
-            HLSLPROGRAM
-            #pragma target 2.0
-
-            #pragma vertex vert
-            #pragma fragment frag
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
-
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Universal2D.hlsl"
-            ENDHLSL
-        }
+        //Pass
+        //{
+        //    Name "ScenePickingPass"
+        //    Tags{ "LightMode" = "Picking" }
+        //
+        //    BlendOp Add
+        //    Blend One Zero
+        //    ZWrite On
+        //    Cull Off
+        //
+        //    HLSLPROGRAM
+        //    #define PARTICLES_EDITOR_META_PASS
+        //    #pragma target 2.0
+        //
+        //    // -------------------------------------
+        //    // Particle Keywords
+        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
+        //    #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+        //
+        //    // -------------------------------------
+        //    // Unity defined keywords
+        //    #pragma multi_compile_instancing
+        //    #pragma instancing_options procedural:ParticleInstancingSetup
+        //
+        //    #pragma vertex vertParticleEditor
+        //    #pragma fragment fragParticleScenePicking
+        //
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
+        //
+        //    ENDHLSL
+        //}
+        //
+        //Pass
+        //{
+        //    Name "Universal2D"
+        //    Tags{ "LightMode" = "Universal2D" }
+        //
+        //    Blend[_SrcBlend][_DstBlend]
+        //    ZWrite[_ZWrite]
+        //    Cull[_Cull]
+        //
+        //    HLSLPROGRAM
+        //    #pragma target 2.0
+        //
+        //    #pragma vertex vert
+        //    #pragma fragment frag
+        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
+        //    #pragma shader_feature_local_fragment _ALPHAPREMULTIPLY_ON
+        //
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Universal2D.hlsl"
+        //    ENDHLSL
+        //}
     }
 
     Fallback "Universal Render Pipeline/Particles/Unlit"

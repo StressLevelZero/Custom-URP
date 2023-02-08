@@ -30,12 +30,13 @@ half _Cutoff;
 half _Smoothness;
 half _Metallic;
 half _BumpScale;
-half _Parallax;
-half _OcclusionStrength;
+//half _Parallax;
+//half _OcclusionStrength;
 half _ClearCoatMask;
 half _ClearCoatSmoothness;
 half _DetailAlbedoMapScale;
 half _DetailNormalMapScale;
+half _DetailSmoothnessMapScale;
 half _Surface;
 CBUFFER_END
 
@@ -52,12 +53,13 @@ UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
     UNITY_DOTS_INSTANCED_PROP(float , _Smoothness)
     UNITY_DOTS_INSTANCED_PROP(float , _Metallic)
     UNITY_DOTS_INSTANCED_PROP(float , _BumpScale)
-    UNITY_DOTS_INSTANCED_PROP(float , _Parallax)
-    UNITY_DOTS_INSTANCED_PROP(float , _OcclusionStrength)
+    //UNITY_DOTS_INSTANCED_PROP(float , _Parallax)
+    //UNITY_DOTS_INSTANCED_PROP(float , _OcclusionStrength)
     UNITY_DOTS_INSTANCED_PROP(float , _ClearCoatMask)
     UNITY_DOTS_INSTANCED_PROP(float , _ClearCoatSmoothness)
     UNITY_DOTS_INSTANCED_PROP(float , _DetailAlbedoMapScale)
     UNITY_DOTS_INSTANCED_PROP(float , _DetailNormalMapScale)
+    UNITY_DOTS_INSTANCED_PROP(float, _DetailSmoothnessMapScale)
     UNITY_DOTS_INSTANCED_PROP(float , _Surface)
 UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 
@@ -68,20 +70,21 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 #define _Smoothness             UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Smoothness)
 #define _Metallic               UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Metallic)
 #define _BumpScale              UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _BumpScale)
-#define _Parallax               UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Parallax)
-#define _OcclusionStrength      UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _OcclusionStrength)
+//#define _Parallax               UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Parallax)
+//#define _OcclusionStrength      UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _OcclusionStrength)
 #define _ClearCoatMask          UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _ClearCoatMask)
 #define _ClearCoatSmoothness    UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _ClearCoatSmoothness)
 #define _DetailAlbedoMapScale   UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _DetailAlbedoMapScale)
 #define _DetailNormalMapScale   UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _DetailNormalMapScale)
+#define _DetaiSmoothnessMapScale   UNITY_ACCESS_DOTS_INSTANCED_PROP_FROM_MACRO(float  , Metadata_DetailSmoothnessMapScale)
 #define _Surface                UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Surface)
 #endif
 
-TEXTURE2D(_ParallaxMap);        SAMPLER(sampler_ParallaxMap);
-TEXTURE2D(_OcclusionMap);       SAMPLER(sampler_OcclusionMap);
-TEXTURE2D(_DetailMask);         SAMPLER(sampler_DetailMask);
-TEXTURE2D(_DetailAlbedoMap);    SAMPLER(sampler_DetailAlbedoMap);
-TEXTURE2D(_DetailNormalMap);    SAMPLER(sampler_DetailNormalMap);
+//TEXTURE2D(_ParallaxMap);        SAMPLER(sampler_ParallaxMap);
+//TEXTURE2D(_OcclusionMap);       SAMPLER(sampler_OcclusionMap);
+TEXTURE2D(_DetailMap);         SAMPLER(sampler_DetailMap);
+//TEXTURE2D(_DetailAlbedoMap);    SAMPLER(sampler_DetailAlbedoMap);
+//TEXTURE2D(_DetailNormalMap);    SAMPLER(sampler_DetailNormalMap);
 TEXTURE2D(_MetallicGlossMap);   SAMPLER(sampler_MetallicGlossMap);
 TEXTURE2D(_SpecGlossMap);       SAMPLER(sampler_SpecGlossMap);
 TEXTURE2D(_ClearCoatMap);       SAMPLER(sampler_ClearCoatMap);
@@ -110,7 +113,8 @@ half4 SampleMetallicSpecGloss(float2 uv, half albedoAlpha)
 		#if _SPECULAR_SETUP
 			specGloss.rgb = _SpecColor.rgb;
 		#else
-			specGloss.rgb = _Metallic.rrr;
+			specGloss.r = _Metallic.r;
+            specGloss.gb = 1;
 		#endif
 	
 		#ifdef _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
@@ -125,12 +129,12 @@ half4 SampleMetallicSpecGloss(float2 uv, half albedoAlpha)
 
 half SampleOcclusion(float2 uv)
 {
-    #ifdef _OCCLUSIONMAP
-        half occ = SAMPLE_TEXTURE2D(_OcclusionMap, sampler_OcclusionMap, uv).g;
-        return LerpWhiteTo(occ, _OcclusionStrength);
-    #else
+   // #ifdef _OCCLUSIONMAP
+   //     half occ = SAMPLE_TEXTURE2D(_OcclusionMap, sampler_OcclusionMap, uv).g;
+   //     return LerpWhiteTo(occ, _OcclusionStrength);
+   // #else
         return half(1.0);
-    #endif
+   // #endif
 }
 
 
@@ -154,9 +158,9 @@ half2 SampleClearCoat(float2 uv)
 
 void ApplyPerPixelDisplacement(half3 viewDirTS, inout float2 uv)
 {
-#if defined(_PARALLAXMAP)
-    uv += ParallaxMapping(TEXTURE2D_ARGS(_ParallaxMap, sampler_ParallaxMap), viewDirTS, _Parallax, uv);
-#endif
+//#if defined(_PARALLAXMAP)
+//    uv += ParallaxMapping(TEXTURE2D_ARGS(_ParallaxMap, sampler_ParallaxMap), viewDirTS, _Parallax, uv);
+//#endif
 }
 
 // Used for scaling detail albedo. Main features:
@@ -176,7 +180,7 @@ half3 ScaleDetailAlbedo(half3 detailAlbedo, half scale)
 half3 ApplyDetailAlbedo(float2 detailUv, half3 albedo, half detailMask)
 {
 #if defined(_DETAIL)
-    half3 detailAlbedo = SAMPLE_TEXTURE2D(_DetailAlbedoMap, sampler_DetailAlbedoMap, detailUv).rgb;
+    half3 detailAlbedo = 1;// SAMPLE_TEXTURE2D(_DetailAlbedoMap, sampler_DetailAlbedoMap, detailUv).rgb;
 
     // In order to have same performance as builtin, we do scaling only if scale is not 1.0 (Scaled version has 6 additional instructions)
 #if defined(_DETAIL_SCALED)
@@ -193,20 +197,56 @@ half3 ApplyDetailAlbedo(float2 detailUv, half3 albedo, half detailMask)
 
 half3 ApplyDetailNormal(float2 detailUv, half3 normalTS, half detailMask)
 {
-#if defined(_DETAIL)
-#if BUMP_SCALE_NOT_SUPPORTED
-    half3 detailNormalTS = UnpackNormal(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv));
-#else
-    half3 detailNormalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv), _DetailNormalMapScale);
-#endif
-
-    // With UNITY_NO_DXT5nm unpacked vector is not normalized for BlendNormalRNM
-    // For visual consistancy we going to do in all cases
-    detailNormalTS = normalize(detailNormalTS);
-
-    return lerp(normalTS, BlendNormalRNM(normalTS, detailNormalTS), detailMask); // todo: detailMask should lerp the angle of the quaternion rotation, not the normals
-#else
+//#if defined(_DETAIL)
+//#if BUMP_SCALE_NOT_SUPPORTED
+//    half3 detailNormalTS = UnpackNormal(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv));
+//#else
+//    half3 detailNormalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv), _DetailNormalMapScale);
+//#endif
+//
+//    // With UNITY_NO_DXT5nm unpacked vector is not normalized for BlendNormalRNM
+//    // For visual consistancy we going to do in all cases
+//    detailNormalTS = normalize(detailNormalTS);
+//
+//    return lerp(normalTS, BlendNormalRNM(normalTS, detailNormalTS), detailMask); // todo: detailMask should lerp the angle of the quaternion rotation, not the normals
+//#else
     return normalTS;
+//#endif
+}
+
+half3 UnpackDetailNormal(half2 details)
+{
+    return (half3(details, 1) * 2) - 1;
+}
+
+//Combining all the detail calculations into one function and doing a single sample
+void ApplyDetails(half2 detailUv, inout SurfaceData surfaceData, half detailMask) {
+#if defined(_DETAIL)
+
+    half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, detailUv);
+
+    //Albedo
+    half3 detailAlbedo = detailMap.rrr;
+    // In order to have same performance as builtin, we do scaling only if scale is not 1.0 (Scaled version has 6 additional instructions)
+#if defined(_DETAIL_SCALED)
+    detailAlbedo = ScaleDetailAlbedo(detailAlbedo, _DetailAlbedoMapScale);
+#else
+    detailAlbedo = half(2.0) * detailAlbedo;
+#endif
+    surfaceData.albedo = surfaceData.albedo * LerpWhiteTo(detailAlbedo, detailMask);
+    //
+
+    //Normal
+    half3 detailNormalTS = UnpackDetailNormal(detailMap.ag); //Assuming the packing of the detail normals
+    detailNormalTS = normalize(detailNormalTS);
+    //Likely better to scale the normal rather than multipling the lerp :P
+    surfaceData.normalTS = lerp(surfaceData.normalTS, BlendNormalRNM(surfaceData.normalTS, detailNormalTS), detailMask * _DetailNormalMapScale); // todo: detailMask should lerp the angle of the quaternion rotation, not the normals
+    //
+
+    //Smoothness
+    half detailSmoothness = half(2.0) * detailMap.b;
+    surfaceData.smoothness = surfaceData.smoothness * LerpWhiteTo(detailSmoothness, detailMask * _DetailSmoothnessMapScale);
+    //
 #endif
 }
 
@@ -219,17 +259,17 @@ inline void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData outSurfa
     outSurfaceData.albedo = albedoAlpha.rgb * _BaseColor.rgb;
     outSurfaceData.albedo = AlphaModulate(outSurfaceData.albedo, outSurfaceData.alpha);
 
-#if _SPECULAR_SETUP
-    outSurfaceData.metallic = half(1.0);
-    outSurfaceData.specular = specGloss.rgb;
-#else
+//#if _SPECULAR_SETUP
+//    outSurfaceData.metallic = half(1.0);
+//    outSurfaceData.specular = specGloss.rgb;
+//#else
     outSurfaceData.metallic = specGloss.r;
     outSurfaceData.specular = half3(0.0, 0.0, 0.0);
-#endif
+//#endif
 
     outSurfaceData.smoothness = specGloss.a;
     outSurfaceData.normalTS = SampleNormal(uv, TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
-    outSurfaceData.occlusion = SampleOcclusion(uv);
+    outSurfaceData.occlusion = specGloss.g;
     outSurfaceData.emission = SampleEmission(uv, _EmissionColor.rgb, TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap));
 
 #if defined(_CLEARCOAT) || defined(_CLEARCOATMAP)
@@ -244,8 +284,9 @@ inline void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData outSurfa
 #if defined(_DETAIL)
     half detailMask = SAMPLE_TEXTURE2D(_DetailMask, sampler_DetailMask, uv).a;
     float2 detailUv = uv * _DetailAlbedoMap_ST.xy + _DetailAlbedoMap_ST.zw;
-    outSurfaceData.albedo = ApplyDetailAlbedo(detailUv, outSurfaceData.albedo, detailMask);
-    outSurfaceData.normalTS = ApplyDetailNormal(detailUv, outSurfaceData.normalTS, detailMask);
+    ApplyDetails(detailUv, outSurfaceData, detailMask);
+    //outSurfaceData.albedo = ApplyDetailAlbedo(detailUv, outSurfaceData.albedo, detailMask);
+    //outSurfaceData.normalTS = ApplyDetailNormal(detailUv, outSurfaceData.normalTS, detailMask);
 #endif
 }
 

@@ -48,7 +48,11 @@ void InitializeInputData(Varyings input, out InputData inputData)
 
     inputData.fogCoord = input.LightingFog.a;
     inputData.vertexLighting = input.LightingFog.rgb;
-    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, input.NormalWS.xyz);
+#if defined(DYNAMICLIGHTMAP_ON)
+    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.dynamicLightmapUV.xy, input.vertexSH, inputData.normalWS.xyz);
+#else
+    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS.xyz);
+#endif
     inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.PositionCS);
     inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
     inputData.positionWS = input.PositionWS;
@@ -133,7 +137,7 @@ Varyings TerrainLitVertex(Attributes input)
     half3 NormalWS = input.NormalOS;
     OUTPUT_SH(NormalWS, output.vertexSH);
     Light mainLight = GetMainLight();
-    half3 attenuatedLightColor = mainLight.color * mainLight.distanceAttenuation;
+    half3 attenuatedLightColor = mainLight.color.rgb * mainLight.distanceAttenuation;
     half3 diffuseColor = half3(0, 0, 0);
 
     if (IsLightingFeatureEnabled(DEBUGLIGHTINGFEATUREFLAGS_MAIN_LIGHT))
@@ -148,7 +152,7 @@ Varyings TerrainLitVertex(Attributes input)
         for (int i = 0; i < pixelLightCount; ++i)
         {
             Light light = GetAdditionalLight(i, vertexInput.positionWS);
-            half3 attenuatedLightColor = light.color * light.distanceAttenuation;
+            half3 attenuatedLightColor = light.color.rgb * light.distanceAttenuation;
             diffuseColor += LightingLambert(attenuatedLightColor, light.direction, NormalWS);
         }
     }

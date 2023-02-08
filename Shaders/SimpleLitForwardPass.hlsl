@@ -135,8 +135,8 @@ Varyings LitPassVertexSimple(Attributes input)
     output.positionWS.xyz = vertexInput.positionWS;
     output.positionCS = vertexInput.positionCS;
 
-#ifdef _NORMALMAP
     half3 viewDirWS = GetWorldSpaceViewDir(vertexInput.positionWS);
+#ifdef _NORMALMAP
     output.normalWS = half4(normalInput.normalWS, viewDirWS.x);
     output.tangentWS = half4(normalInput.tangentWS, viewDirWS.y);
     output.bitangentWS = half4(normalInput.bitangentWS, viewDirWS.z);
@@ -192,7 +192,8 @@ void LitPassFragmentSimple(
 #endif
 
     half4 color = UniversalFragmentBlinnPhong(inputData, surfaceData);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    color.rgb = MixFog(color.rgb, -inputData.viewDirectionWS, inputData.fogCoord);
+    color = Volumetrics(color, input.positionWS);
     color.a = OutputAlpha(color.a, IsSurfaceTypeTransparent(_Surface));
 
     outColor = color;

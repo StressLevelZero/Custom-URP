@@ -3,7 +3,7 @@ Shader "Universal Render Pipeline/Particles/Unlit"
     Properties
     {
         [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
-        [MainColor] _BaseColor("Base Color", Color) = (1,1,1,1)
+        [MainColor] [HDR] _BaseColor("Base Color", Color) = (1,1,1,1)
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
         _BumpMap("Normal Map", 2D) = "bump" {}
         [HDR] _EmissionColor("Color", Color) = (0,0,0)
@@ -99,7 +99,8 @@ Shader "Universal Render Pipeline/Particles/Unlit"
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
-            #pragma multi_compile_fragment _ DEBUG_DISPLAY
+            //#pragma multi_compile_fragment _ DEBUG_DISPLAY
+            #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
             #pragma instancing_options procedural:ParticleInstancingSetup
 
             #pragma vertex vertParticleUnlit
@@ -180,73 +181,73 @@ Shader "Universal Render Pipeline/Particles/Unlit"
         }
         // ------------------------------------------------------------------
         //  Scene view outline pass.
-        Pass
-        {
-            Name "SceneSelectionPass"
-            Tags { "LightMode" = "SceneSelectionPass" }
-
-            BlendOp Add
-            Blend One Zero
-            ZWrite On
-            Cull Off
-
-            HLSLPROGRAM
-            #define PARTICLES_EDITOR_META_PASS
-            #pragma target 2.0
-
-            // -------------------------------------
-            // Particle Keywords
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
-
-            // -------------------------------------
-            // Unity defined keywords
-            #pragma multi_compile_instancing
-            #pragma instancing_options procedural:ParticleInstancingSetup
-
-            #pragma vertex vertParticleEditor
-            #pragma fragment fragParticleSceneHighlight
-
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesUnlitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
-
-            ENDHLSL
-        }
-
-        // ------------------------------------------------------------------
-        //  Scene picking buffer pass.
-        Pass
-        {
-            Name "ScenePickingPass"
-            Tags{ "LightMode" = "Picking" }
-
-            BlendOp Add
-            Blend One Zero
-            ZWrite On
-            Cull Off
-
-            HLSLPROGRAM
-            #define PARTICLES_EDITOR_META_PASS
-            #pragma target 2.0
-
-            // -------------------------------------
-            // Particle Keywords
-            #pragma shader_feature_local_fragment _ALPHATEST_ON
-            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
-
-            // -------------------------------------
-            // Unity defined keywords
-            #pragma multi_compile_instancing
-            #pragma instancing_options procedural:ParticleInstancingSetup
-
-            #pragma vertex vertParticleEditor
-            #pragma fragment fragParticleScenePicking
-
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesUnlitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
-
-            ENDHLSL
-        }
+        //Pass
+        //{
+        //    Name "SceneSelectionPass"
+        //    Tags { "LightMode" = "SceneSelectionPass" }
+        //
+        //    BlendOp Add
+        //    Blend One Zero
+        //    ZWrite On
+        //    Cull Off
+        //
+        //    HLSLPROGRAM
+        //    #define PARTICLES_EDITOR_META_PASS
+        //    #pragma target 2.0
+        //
+        //    // -------------------------------------
+        //    // Particle Keywords
+        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
+        //    #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+        //
+        //    // -------------------------------------
+        //    // Unity defined keywords
+        //    #pragma multi_compile_instancing
+        //    #pragma instancing_options procedural:ParticleInstancingSetup
+        //
+        //    #pragma vertex vertParticleEditor
+        //    #pragma fragment fragParticleSceneHighlight
+        //
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesUnlitInput.hlsl"
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
+        //
+        //    ENDHLSL
+        //}
+        //
+        //// ------------------------------------------------------------------
+        ////  Scene picking buffer pass.
+        //Pass
+        //{
+        //    Name "ScenePickingPass"
+        //    Tags{ "LightMode" = "Picking" }
+        //
+        //    BlendOp Add
+        //    Blend One Zero
+        //    ZWrite On
+        //    Cull Off
+        //
+        //    HLSLPROGRAM
+        //    #define PARTICLES_EDITOR_META_PASS
+        //    #pragma target 2.0
+        //
+        //    // -------------------------------------
+        //    // Particle Keywords
+        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
+        //    #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+        //
+        //    // -------------------------------------
+        //    // Unity defined keywords
+        //    #pragma multi_compile_instancing
+        //    #pragma instancing_options procedural:ParticleInstancingSetup
+        //
+        //    #pragma vertex vertParticleEditor
+        //    #pragma fragment fragParticleScenePicking
+        //
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesUnlitInput.hlsl"
+        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
+        //
+        //    ENDHLSL
+        //}
     }
 
     FallBack "Hidden/Universal Render Pipeline/FallbackError"

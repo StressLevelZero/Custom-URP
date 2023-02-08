@@ -5,6 +5,7 @@
 #if defined(LOD_FADE_CROSSFADE)
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
 #endif
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 
 struct Attributes
 {
@@ -91,7 +92,7 @@ void DepthNormalsFragment(
         #endif
 
         normalWS = NormalizeNormalPerPixel(normalWS);
-        outNormalWS = half4(normalWS, 0.0);
+        outNormalWS = half4(EncodeWSNormalForNormalsTex(normalWS), 0.0);
     #endif
 
     #ifdef _WRITE_RENDERING_LAYERS

@@ -1,7 +1,7 @@
 {
   "name": "com.unity.render-pipelines.universal",
   "description": "SLZ's modified URP",
-  "version": "8148.0.2",
+  "version": "8148.0.4",
   "unity": "2021.2",
   "displayName": "SLZ Universal RP",
   "dependencies": {
@@ -18,11 +18,11 @@
     "render",
     "pipeline"
   ],
-    "repository": {
+  "repository": {
     "type": "git",
     "url": "https://github.com/StressLevelZero/Custom-URP.git"
-	},
-	  "author": {
+  },
+  "author": {
     "name": "StressLevelZero",
     "email": "contact@stresslevelzero.com",
     "url": "http://www.stresslevelzero.com/"
@@ -33,7 +33,7 @@
       "description": "Templates and functions needed to use Amplify Shader Editor",
       "path": "Samples~/AmplifyShaderExtentions"
     },
-	{
+    {
       "displayName": "SLZ Bonelab Shaders",
       "description": "A collection of shaders that are found in Bonelab",
       "path": "Samples~/SLZShaders"

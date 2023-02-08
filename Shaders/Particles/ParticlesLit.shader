@@ -133,6 +133,7 @@ Shader "Universal Render Pipeline/Particles/Lit"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #define _DISABLE_LIGHTMAPS
             #define _DISABLE_SSAO // transparent objects should NOT sample AO! Technically, you could have fully opaque particles, but that's really rare. Since I can't tell the blend mode, just don't do SSAO 
+            #pragma multi_compile _ _VOLUMETRICS_ENABLED
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
             //#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS

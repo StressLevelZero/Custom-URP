@@ -126,6 +126,83 @@ void InitializeInputData(Varyings input, half3 normalTS, out InputData inputData
     #endif
 }
 
+// SLZ MODIFIED // Specular from directional lightmap/probes
+
+//Directional variation
+void InitializeInputDataDir(Varyings input, half3 normalTS, half3 smoothness, out InputData inputData, out float BakedSpecular)
+{
+    inputData = (InputData)0;
+
+#if defined(REQUIRES_WORLD_SPACE_POS_INTERPOLATOR)
+    inputData.positionWS = input.positionWS;
+#endif
+
+    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+#if defined(_NORMALMAP) || defined(_DETAIL)
+    float sgn = input.tangentWS.w;      // should be either +1 or -1
+    float3 bitangent = sgn * cross(input.normalWS.xyz, input.tangentWS.xyz);
+    half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, bitangent.xyz, input.normalWS.xyz);
+
+#if defined(_NORMALMAP)
+    inputData.tangentToWorld = tangentToWorld;
+#endif
+    inputData.normalWS = TransformTangentToWorld(normalTS, tangentToWorld);
+#else
+    inputData.normalWS = input.normalWS;
+#endif
+
+    inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
+    inputData.viewDirectionWS = viewDirWS;
+
+#if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+    inputData.shadowCoord = input.shadowCoord;
+#elif defined(MAIN_LIGHT_CALCULATE_SHADOWS)
+    inputData.shadowCoord = TransformWorldToShadowCoord(inputData.positionWS);
+#else
+    inputData.shadowCoord = float4(0, 0, 0, 0);
+#endif
+#ifdef _ADDITIONAL_LIGHTS_VERTEX
+    inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactorAndVertexLight.x);
+    inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
+#else
+    inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactor);
+#endif
+
+#if defined(DYNAMICLIGHTMAP_ON)
+#if LIGHTMAP_ON
+    float4 encodedGI = SAMPLE_GI_DIR(input.staticLightmapUV, input.dynamicLightmapUV, input.vertexSH, inputData.normalWS, smoothness, viewDirWS);
+    inputData.bakedGI = encodedGI.rgb;
+    BakedSpecular = encodedGI.w;
+#else
+    //  inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
+#endif
+#else
+#if LIGHTMAP_ON
+    float4 encodedGI = SAMPLE_GI_DIR(input.staticLightmapUV, input.vertexSH, inputData.normalWS, smoothness, viewDirWS);
+    inputData.bakedGI = encodedGI.rgb;
+    BakedSpecular = encodedGI.w;
+#else
+    //  inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
+#endif
+#endif
+
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+    inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
+
+#if defined(DEBUG_DISPLAY)
+#if defined(DYNAMICLIGHTMAP_ON)
+    inputData.dynamicLightmapUV = input.dynamicLightmapUV;
+#endif
+#if defined(LIGHTMAP_ON)
+    inputData.staticLightmapUV = input.staticLightmapUV;
+#else
+    inputData.vertexSH = input.vertexSH;
+#endif
+#endif
+}
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 //                  Vertex and Fragment functions                            //
 ///////////////////////////////////////////////////////////////////////////////
@@ -206,12 +283,13 @@ void LitPassFragment(
 {
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+    // SLZ MODIFIED // always calculate viewDir for fog
 
+    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
 #if defined(_PARALLAXMAP)
 #if defined(REQUIRES_TANGENT_SPACE_VIEW_DIR_INTERPOLATOR)
     half3 viewDirTS = input.viewDirTS;
 #else
-    half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
     half3 viewDirTS = GetViewDirectionTangentSpace(input.tangentWS, input.normalWS, viewDirWS);
 #endif
     ApplyPerPixelDisplacement(viewDirTS, input.uv);
@@ -225,7 +303,16 @@ void LitPassFragment(
 #endif
 
     InputData inputData;
+
+// SLZ MODIFIED // Cacluate specular highlight from directional map
+#ifdef LIGHTMAP_ON
+    float BakedSpecular = 0;
+    InitializeInputDataDir(input, surfaceData.normalTS, surfaceData.smoothness, inputData, BakedSpecular);
+#else
     InitializeInputData(input, surfaceData.normalTS, inputData);
+#endif 
+// END SLZ MODIFIED
+
     SETUP_DEBUG_TEXTURE_DATA(inputData, input.uv, _BaseMap);
 
 #ifdef _DBUFFER
@@ -233,7 +320,18 @@ void LitPassFragment(
 #endif
 
     half4 color = UniversalFragmentPBR(inputData, surfaceData);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    
+    // SLZ MODIFIED // Apply fake baked specular, mix fog and volumetrics
+#ifdef LIGHTMAP_ON
+    float3 MetalSpec = lerp(kDieletricSpec.rgb, surfaceData.albedo, surfaceData.metallic);
+    color.rgb += BakedSpecular * surfaceData.occlusion * MetalSpec * inputData.bakedGI.rgb;
+#endif    
+
+
+    color.rgb = MixFog(color.rgb, -viewDirWS, inputData.fogCoord);
+    color = Volumetrics(color, input.positionWS);
+    // END SLZ MODIFIED
+
     color.a = OutputAlpha(color.a, IsSurfaceTypeTransparent(_Surface));
 
     outColor = color;

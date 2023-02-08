@@ -211,7 +211,8 @@ half4 LitPassFragmentGrass(GrassVertexOutput input) : SV_Target
     return SurfaceDataToGbuffer(surfaceData, inputData, color.rgb, kLightingSimpleLit);
 #else
     half4 color = UniversalFragmentBlinnPhong(inputData, surfaceData);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    color.rgb = MixFog(color.rgb, -inputData.viewDirectionWS, inputData.fogCoord);
+    color = Volumetrics(color, inputData.positionWS);
     return half4(color.rgb, OutputAlpha(surfaceData.alpha, IsSurfaceTypeTransparent(_Surface)));
 #endif
 };

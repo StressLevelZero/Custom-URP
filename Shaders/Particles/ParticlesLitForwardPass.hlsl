@@ -119,7 +119,12 @@ half4 ParticlesLitFragment(VaryingsParticle input) : SV_Target
     SETUP_DEBUG_TEXTURE_DATA(inputData, input.texcoord, _BaseMap);
 
     half4 color = UniversalFragmentPBR(inputData, surfaceData);
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+#ifdef _NORMALMAP
+    color.rgb = MixFog(color.rgb, -half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w), inputData.fogCoord);
+#else
+    color.rgb = MixFog(color.rgb, -input.viewDirWS, inputData.fogCoord);
+#endif
+    color.rgb = Volumetrics(color, input.positionWS.xyz).rgb;
     color.a = OutputAlpha(color.a, IsSurfaceTypeTransparent(_Surface));
 
     return color;
