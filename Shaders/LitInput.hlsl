@@ -282,7 +282,7 @@ inline void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData outSurfa
 #endif
 
 #if defined(_DETAIL)
-    half detailMask = SAMPLE_TEXTURE2D(_DetailMask, sampler_DetailMask, uv).a;
+    half detailMask = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv).a;
     float2 detailUv = uv * _DetailAlbedoMap_ST.xy + _DetailAlbedoMap_ST.zw;
     ApplyDetails(detailUv, outSurfaceData, detailMask);
     //outSurfaceData.albedo = ApplyDetailAlbedo(detailUv, outSurfaceData.albedo, detailMask);
