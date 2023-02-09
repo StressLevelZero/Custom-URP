@@ -12,9 +12,17 @@
 
 	#if !defined(_DISABLE_ADDLIGHTS)
 		#define DYNAMIC_ADDITIONAL_LIGHTS
-		#pragma dynamic_branch_fragment _ADDITIONAL_LIGHTS
+		#pragma multi_compile DUMMY _ADDITIONAL_LIGHTS
+		#pragma skip_variants DUMMY
+		#pragma dynamic_branch _ADDITIONAL_LIGHTS
+		//#pragma skip_variants _ADDITIONAL_LIGHTS
+
 		#define DYNAMIC_ADDITIONAL_LIGHT_SHADOWS
-		#pragma dynamic_branch_fragment _ADDITIONAL_LIGHT_SHADOWS
+		#pragma multi_compile DUMMY _ADDITIONAL_LIGHT_SHADOWS
+		#pragma skip_variants DUMMY
+		#pragma dynamic_branch _ADDITIONAL_LIGHT_SHADOWS
+		//#pragma skip_variants _ADDITIONAL_LIGHT_SHADOWS
+
 	#endif
 
 	
@@ -23,8 +31,12 @@
 
 	
 	#if !defined(_DISABLE_SSAO)
+
 		#define DYNAMIC_SCREEN_SPACE_OCCLUSION
+		#pragma multi_compile DUMMY _SCREEN_SPACE_OCCLUSION
+		#pragma skip_variants DUMMY
 		#pragma dynamic_branch_fragment _SCREEN_SPACE_OCCLUSION
+		//#pragma skip_variants _SCREEN_SPACE_OCCLUSION
 	#endif
 
 #endif

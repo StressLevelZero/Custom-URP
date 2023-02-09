@@ -74,7 +74,10 @@ Shader "Universal Render Pipeline/Simple Lit"
             // Material Keywords
             #define _NORMALMAP
             #define DYNAMIC_EMISSION
+            #pragma multi_compile DUMMY _EMISSION
+            #pragma skip_variants DUMMY
             #pragma dynamic_branch_local_fragment _EMISSION
+
             #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
             #pragma shader_feature_local_fragment _ALPHATEST_ON
@@ -303,6 +306,8 @@ Shader "Universal Render Pipeline/Simple Lit"
             #pragma shader_feature EDITOR_VISUALIZATION
 
             #define DYNAMIC_EMISSION
+            #pragma multi_compile DUMMY _EMISSION
+            #pragma skip_variants DUMMY
             #pragma dynamic_branch_local_fragment _EMISSION
             #pragma shader_feature_local_fragment _SPECGLOSSMAP
 

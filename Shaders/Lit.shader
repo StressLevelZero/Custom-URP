@@ -118,16 +118,25 @@ ENDHLSL
             #pragma shader_feature_local_fragment _ALPHATEST_ON
 
             #define DYNAMIC_ALPHAPREMULTIPLY_ON
-            #pragma dynamic_branch_local_fragment _ALPHAPREMULTIPLY_ON
+            #pragma multi_compile DUMMY _ALPHAPREMULTIPLY_ON
+            #pragma skip_variants DUMMY
+            #pragma dynamic_branch _ALPHAPREMULTIPLY_ON
 
             #define DYNAMIC_ALPHAMODULATE_ON
-            #pragma dynamic_branch_local_fragment _ALPHAMODULATE_ON
+            #pragma multi_compile DUMMY _ALPHAMODULATE_ON
+            #pragma skip_variants DUMMY
+            #pragma dynamic_branch _ALPHAMODULATE_ON
             
             #define DYNAMIC_EMISSION
-            #pragma dynamic_branch_local_fragment _EMISSION
+            #pragma multi_compile DUMMY _EMISSION
+            #pragma skip_variants DUMMY
+            #pragma dynamic_branch _EMISSION
+          
             
             #define DYNAMIC_METALLICSPECGLOSSMAP
-            #pragma dynamic_branch_local_fragment _METALLICSPECGLOSSMAP
+            #pragma multi_compile DUMMY _METALLICSPECGLOSSMAP
+            #pragma skip_variants DUMMY
+            #pragma dynamic_branch  _METALLICSPECGLOSSMAP
             // #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
             // #pragma shader_feature_local_fragment _OCCLUSIONMAP
             // #pragma shader_feature_local_fragment _SPECULARHIGHLIGHTS_OFF
@@ -151,7 +160,7 @@ ENDHLSL
 
             //--------------------------------------
             // GPU Instancing
-            #pragma multi_compile_instancing
+            //#pragma multi_compile_instancing
             //#pragma instancing_options renderinglayer
             //#pragma multi_compile _ DOTS_INSTANCING_ON
 
@@ -184,7 +193,7 @@ ENDHLSL
 
             //--------------------------------------
             // GPU Instancing
-            #pragma multi_compile_instancing
+            //#pragma multi_compile_instancing
             //#pragma multi_compile _ DOTS_INSTANCING_ON
 
             // -------------------------------------
@@ -192,6 +201,8 @@ ENDHLSL
 
             // This is used during shadow map generation to differentiate between directional and punctual light shadows, as they use different formulas to apply Normal Bias
             #define DYNAMIC_CASTING_PUNCTUAL_LIGHT_SHADOW
+            #pragma multi_compile DUMMY _CASTING_PUNCTUAL_LIGHT_SHADOW
+            #pragma skip_variants DUMMY
             #pragma dynamic_branch_vertex _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #pragma vertex ShadowPassVertex
@@ -293,7 +304,7 @@ ENDHLSL
 
             //--------------------------------------
             // GPU Instancing
-            #pragma multi_compile_instancing
+            //#pragma multi_compile_instancing
             //#pragma multi_compile _ DOTS_INSTANCING_ON
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
@@ -328,7 +339,7 @@ ENDHLSL
 
             //--------------------------------------
             // GPU Instancing
-            #pragma multi_compile_instancing
+            //#pragma multi_compile_instancing
             //#pragma multi_compile _ DOTS_INSTANCING_ON
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
@@ -354,9 +365,13 @@ ENDHLSL
             #pragma shader_feature EDITOR_VISUALIZATION
             // #pragma shader_feature_local_fragment _SPECULAR_SETUP
             #define DYNAMIC_EMISSION
+            #pragma multi_compile DUMMY _EMISSION
+            #pragma skip_variants DUMMY
             #pragma dynamic_branch_local_fragment _EMISSION
 
             #define DYNAMIC_METALLICSPECGLOSSMAP
+            #pragma multi_compile DUMMY _METALLICSPECGLOSSMAP
+            #pragma skip_variants DUMMY
             #pragma dynamic_branch_fragment _METALLICSPECGLOSSMAP
 
             #pragma shader_feature_local_fragment _ALPHATEST_ON
