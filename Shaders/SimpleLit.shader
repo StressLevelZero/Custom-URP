@@ -74,9 +74,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             // Material Keywords
             #define _NORMALMAP
             #define DYNAMIC_EMISSION
-            #pragma multi_compile DUMMY _EMISSION
-            #pragma skip_variants DUMMY
-            #pragma dynamic_branch_local_fragment _EMISSION
+            #pragma dynamic_branch_local _EMISSION
 
             #pragma shader_feature_local _RECEIVE_SHADOWS_OFF
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
@@ -148,7 +146,7 @@ Shader "Universal Render Pipeline/Simple Lit"
 
             // This is used during shadow map generation to differentiate between directional and punctual light shadows, as they use different formulas to apply Normal Bias
             #define DYNAMIC_CASTING_PUNCTUAL_LIGHT_SHADOW
-            #pragma dynamic_branch_vertex _CASTING_PUNCTUAL_LIGHT_SHADOW
+            #pragma dynamic_branch _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #pragma vertex ShadowPassVertex
             #pragma fragment ShadowPassFragment
@@ -308,7 +306,7 @@ Shader "Universal Render Pipeline/Simple Lit"
             #define DYNAMIC_EMISSION
             #pragma multi_compile DUMMY _EMISSION
             #pragma skip_variants DUMMY
-            #pragma dynamic_branch_local_fragment _EMISSION
+            #pragma dynamic_branch_local _EMISSION
             #pragma shader_feature_local_fragment _SPECGLOSSMAP
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/SimpleLitInput.hlsl"
