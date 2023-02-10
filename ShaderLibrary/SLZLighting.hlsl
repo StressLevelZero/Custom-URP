@@ -14,7 +14,9 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/GlobalIllumination.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
-
+#if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
+#define _ADDITIONAL_LIGHTS false
+#endif
 
 #if !defined(UNITY_COMMON_INCLUDED) //Get my IDE to recognize real, this won't ever get compiled since I just included Common.hlsl 
     #define real half
@@ -1044,14 +1046,15 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
     SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion); 
     
-    #if defined(_ADDITIONAL_LIGHTS)
-    uint pixelLightCount = GetAdditionalLightsCount();
-    
-    LIGHT_LOOP_BEGIN(pixelLightCount)
-        Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
+    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    {
+        uint pixelLightCount = GetAdditionalLightsCount();
+
+        LIGHT_LOOP_BEGIN(pixelLightCount)
+            Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
         SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
-    LIGHT_LOOP_END
-    #endif
+        LIGHT_LOOP_END
+    }
     
 
 

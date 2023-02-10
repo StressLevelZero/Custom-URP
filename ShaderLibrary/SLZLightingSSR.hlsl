@@ -9,6 +9,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSR.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSRGlobals.hlsl"
 
+#if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
+#define _ADDITIONAL_LIGHTS false
+#endif
+
 half4 CalcFogFactors(real3 viewDirectionWS, real fogFactor)
 {
     half4 fogFactors = half4(0, 0, 0, 0);
@@ -170,14 +174,15 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
     SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion);
 
-#if defined(_ADDITIONAL_LIGHTS)
-    uint pixelLightCount = GetAdditionalLightsCount();
+    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    {
+        uint pixelLightCount = GetAdditionalLightsCount();
 
-    LIGHT_LOOP_BEGIN(pixelLightCount)
-        Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
-    SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
-    LIGHT_LOOP_END
-#endif
+        LIGHT_LOOP_BEGIN(pixelLightCount)
+            Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
+        SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
+        LIGHT_LOOP_END
+    }
 
 
 

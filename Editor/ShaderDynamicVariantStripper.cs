@@ -16,11 +16,11 @@ namespace SLZ.SLZEditorTools
 
         public int callbackOrder { get { return 0; } }
 
-        MethodInfo SetKW;
-        public DynamicVariantStripper()
-        {
-            SetKW = typeof(ShaderKeywordSet).GetMethod("EnableKeywordName", BindingFlags.Static | BindingFlags.NonPublic);
-        }
+        //MethodInfo SetKW;
+        //public DynamicVariantStripper()
+        //{
+        //    SetKW = typeof(ShaderKeywordSet).GetMethod("EnableKeywordName", BindingFlags.Static | BindingFlags.NonPublic);
+        //}
 
         public void OnProcessShader(Shader shader, ShaderSnippetData snippet, IList<ShaderCompilerData> data)
         {
@@ -45,15 +45,15 @@ namespace SLZ.SLZEditorTools
 
                 for (int j = 0; j < numDynamic; ++j)
                 {
-                    isDynVariant = isDynVariant && !data[i].shaderKeywordSet.IsEnabled(dynamicKW[j]);
+                    isDynVariant = isDynVariant && data[i].shaderKeywordSet.IsEnabled(dynamicKW[j]);
                 }
 
                 if (isDynVariant)
                 {
-                    for (int j = 0; j < numDynamic; ++j)
-                    {
-                        SetKW.Invoke(null, new object[] { data[i].shaderKeywordSet, dynamicKW[j].name });
-                    }
+                    //for (int j = 0; j < numDynamic; ++j)
+                    //{
+                    //    SetKW.Invoke(null, new object[] { data[i].shaderKeywordSet, dynamicKW[j].name });
+                    //}
 
                     data[currentSize] = data[i];
                     currentSize++;
