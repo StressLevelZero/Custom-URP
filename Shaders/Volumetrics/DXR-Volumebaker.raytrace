@@ -1,11 +1,11 @@
-#include "UnityShaderVariables.cginc"
+//#include "UnityShaderVariables.cginc"
 //#include "Noise.cginc"
-//#pragma only_renderers d3d12
+#pragma only_renderers d3d12
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Macros.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Macros.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Sampling/Sampling.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
+//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Sampling/Sampling.hlsl"
 
 #pragma max_recursion_depth 1
 

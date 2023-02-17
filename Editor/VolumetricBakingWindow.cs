@@ -688,7 +688,7 @@ public class VolumetricBaking : EditorWindow
 
     Color ColorExtraction(Light light)
     {
-        Color colorModulation = light.color;
+        Color colorModulation = light.color.linear;
         if (light.useColorTemperature) colorModulation *= Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
         colorModulation *= light.intensity;
         colorModulation *= light.gameObject.GetComponent<UniversalAdditionalLightData>().volumetricDimmer;
@@ -700,7 +700,7 @@ public class VolumetricBaking : EditorWindow
 
         System.DateTime startTime = System.DateTime.Now;
         UpdateStatus("Baking " + SceneManager.GetActiveScene().name);
-        ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
+        //ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
 
         RayTracingShader rtshader = AssetDatabase.LoadAssetAtPath<RayTracingShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/DXR-Volumebaker.raytrace");
         rtshader.SetShaderPass("BakedRaytrace");
