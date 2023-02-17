@@ -688,7 +688,7 @@ public class VolumetricBaking : EditorWindow
 
     Color ColorExtraction(Light light)
     {
-        Color colorModulation = light.color;
+        Color colorModulation = light.color.linear;
         if (light.useColorTemperature) colorModulation *= Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
         colorModulation *= light.intensity;
         colorModulation *= light.gameObject.GetComponent<UniversalAdditionalLightData>().volumetricDimmer;
