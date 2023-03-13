@@ -45,12 +45,26 @@ namespace UnityEngine.Rendering.Universal
         private ComputeBuffer SSRGlobalCB;
 
         private double extraSmoothedDT = 0.01111;
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4, Size = 32)]
+        struct SSRBufferData
+        {
+            public float _SSRHitRadius;
+            public float _SSRTemporalWeight;
+            public float _SSRSteps;
+            public int _SSRMinMip;
+            
+            public float _SSRDistScale;
+            public float empty1;
+            public float empty2;
+            public float empty3;
+        }
         private SLZGlobals()
         {
             BlueNoiseCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
             BlueNoiseDim = new float[4];
             hasSetBNTextures = false;
-            SSRGlobalCB = new ComputeBuffer(2, 4*sizeof(float), ComputeBufferType.Constant);
+            SSRGlobalCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
             HiZDimBuffer = new ComputeBuffer(15, Marshal.SizeOf<Vector4>());
             SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
@@ -96,22 +110,23 @@ namespace UnityEngine.Rendering.Universal
              * 2 int _SSRSteps;
              * 3 none
              */
-            float[] SSRGlobalArray = new float[8];
+            SSRBufferData SSRGlobalArray = new SSRBufferData();
             //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
             //SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
-            SSRGlobalArray[0] = hitRadius;
+            SSRGlobalArray._SSRHitRadius = hitRadius;
             extraSmoothedDT = 0.95 * extraSmoothedDT + 0.05 * Time.smoothDeltaTime;
             float framerateConst = 1.0f / (float)extraSmoothedDT * (1.0f / 90.0f);
             float expConst = Mathf.Exp(-framerateConst);
             float FRTemporal = (Mathf.Exp(-framerateConst * temporalWeight) - expConst) * (1.0f / (1.0f - expConst));
             //Debug.Log(FRTemporal);
-            SSRGlobalArray[1] = Mathf.Clamp(1.0f - temporalWeight, 0.0078f, 1.0f); //Mathf.Clamp(FRTemporal, 0.0078f, 1.0f); 
-            SSRGlobalArray[2] = maxSteps;
-            SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
+            SSRGlobalArray._SSRTemporalWeight = Mathf.Clamp(1.0f - temporalWeight, 0.0078f, 1.0f); //Mathf.Clamp(FRTemporal, 0.0078f, 1.0f); 
+            SSRGlobalArray._SSRSteps = maxSteps;
+            SSRGlobalArray._SSRMinMip = minMip;
             float halfTan = Mathf.Tan(Mathf.Deg2Rad * (fov * 0.5f));
-            SSRGlobalArray[4] = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
-            SSRGlobalCB.SetData(SSRGlobalArray);
-            Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, 16);
+            SSRGlobalArray._SSRDistScale = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
+            //Debug.Log("SSR scale: " + SSRGlobalArray[4]);
+            SSRGlobalCB.SetData<SSRBufferData>(new List<SSRBufferData>() { SSRGlobalArray });
+            Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, SSRGlobalCB.count * SSRGlobalCB.stride);
         }
 
         public void SetSSRGlobalsCmd(ref CommandBuffer cmd, int maxSteps, int minMip, float hitRadius, float cameraNear, float cameraFar)
@@ -129,7 +144,8 @@ namespace UnityEngine.Rendering.Universal
             SSRGlobalArray[2] = maxSteps;
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
             SSRGlobalCB.SetData(SSRGlobalArray);
-            cmd.SetGlobalConstantBuffer(SSRGlobalCB, SSRConstantsID, 0, 16);
+            //Debug.Log("SSR scale: " + SSRGlobalArray[3]);
+            cmd.SetGlobalConstantBuffer(SSRGlobalCB, SSRConstantsID, 0, SSRGlobalCB.count * SSRGlobalCB.stride);
         }
 
 
@@ -162,7 +178,7 @@ namespace UnityEngine.Rendering.Universal
                 if (BlueNoiseCB != null)
                 {
                     BlueNoiseCB.SetData(BlueNoiseDim);
-                    Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, 16);
+                    Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, BlueNoiseCB.count * BlueNoiseCB.stride);
                 }
                 if (!hasSetBNTextures)
                 {
@@ -189,7 +205,7 @@ namespace UnityEngine.Rendering.Universal
                     BlueNoiseDim[3] = (int)((Time.timeSinceLevelLoadAsDouble * Screen.currentResolution.refreshRate) % depth);
                 }
                 BlueNoiseCB.SetData(BlueNoiseDim);
-                Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, 16);
+                Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, BlueNoiseCB.count * BlueNoiseCB.stride);
             }
         }
 
