@@ -90,7 +90,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
     half3or4_fl radiance = lightColor * BRDFMap * light.distanceAttenuation;
 #else
     half NdotL = saturate(dot(normalWS, lightDirectionWS));
-    half3or4_fl radiance = lightColor * (light.shadowAttenuation * light.distanceAttenuation * NdotL);
+    half3or4_fl radiance = (light.shadowAttenuation * light.distanceAttenuation * NdotL) * lightColor;
 #endif
     // END SLZ MODIFIED
 
@@ -120,7 +120,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
 #endif // _SPECULARHIGHLIGHTS_OFF
 
     // SLZ MODIFIED // blend fluroescence
-    brdf *= radiance.rgb;
+    brdf *=radiance.rgb;
 #if defined(_FLUORESCENCE)
     BlendFluorescence(brdf, radiance, brdfData);
 #endif

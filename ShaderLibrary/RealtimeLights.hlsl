@@ -294,13 +294,13 @@ Light GetAdditionalLight(uint i, InputData inputData, half4 shadowMask, AmbientO
     Light light = GetAdditionalLight(i, inputData.positionWS, shadowMask);
 
     #if !defined(_SURFACE_TYPE_TRANSPARENT)
-	UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
-	{
-		if (IsLightingFeatureEnabled(DEBUGLIGHTINGFEATUREFLAGS_AMBIENT_OCCLUSION))
-		{
+	// UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+	// {
+	// 	if (IsLightingFeatureEnabled(DEBUGLIGHTINGFEATUREFLAGS_AMBIENT_OCCLUSION))
+	// 	{
 			light.color *= aoFactor.directAmbientOcclusion;
-		}
-	}
+	// }
+	//}
     #endif
 
     return light;
