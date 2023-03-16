@@ -5,10 +5,13 @@ Texture2DArray<float4> _BlueNoiseRGBA;
 Texture2DArray<float> _BlueNoiseR;
 
 CBUFFER_START(BlueNoiseDim)
-float3 _BlueNoise_Dim;
-float _BlueNoise_Frame;
-float2 _BlueNoise_RandomOffset;
+float4 _BlueNoise_0;
+float4 _BlueNoise_1;
 CBUFFER_END
+
+#define _BlueNoise_Dim _BlueNoise_0.xyz
+#define _BlueNoise_Frame _BlueNoise_0.w
+#define _BlueNoise_RandomOffset _BlueNoise_1.xy
 
 half GetScreenNoiseR(float2 screenUV)
 {

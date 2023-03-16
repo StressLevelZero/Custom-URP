@@ -24,6 +24,10 @@ namespace SLZ.SLZEditorTools
 
         public void OnProcessShader(Shader shader, ShaderSnippetData snippet, IList<ShaderCompilerData> data)
         {
+            if (snippet.shaderType == ShaderType.RayTracing)
+            {
+                return;
+            }
 
             List<LocalKeyword> dynamicKW = new List<LocalKeyword>();
             LocalKeyword[] localKW = ShaderUtil.GetPassKeywords(shader, snippet.pass, snippet.shaderType);
