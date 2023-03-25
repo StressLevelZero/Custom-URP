@@ -1,7 +1,7 @@
 #if !defined(SLZ_SSR_GLOBALS)
 #define SLZ_SSR_GLOBALS
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DefaultSamplers.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 
 CBUFFER_START(SSRConstants)

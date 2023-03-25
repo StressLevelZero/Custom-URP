@@ -17,8 +17,14 @@ SAMPLER(sampler_EmissionMap);
 
 // SLZ MODIFIED // handle keywords being either dynamic or non-dynamic 
 
-#if !defined(DYNAMIC_EMISSION) && !defined(_EMISSION)
-	#define _EMISSION false
+#if defined(DYNAMIC_EMISSION)
+	#define BRANCH_EMISSION _EMISSION
+#else
+	#ifndef _EMISSION
+		#define BRANCH_EMISSION false
+	#else
+		#define BRANCH_EMISSION true
+	#endif
 #endif
 
 // END SLZ MODIFIED
@@ -60,14 +66,16 @@ half3 SampleNormal(float2 uv, TEXTURE2D_PARAM(bumpMap, sampler_bumpMap), half sc
 
 half3 SampleEmission(float2 uv, half3 emissionColor, TEXTURE2D_PARAM(emissionMap, sampler_emissionMap))
 {
-	if (_EMISSION)
+	if (BRANCH_EMISSION)
 	{
 		return SAMPLE_TEXTURE2D(emissionMap, sampler_emissionMap, uv).rgb * emissionColor;
 	}
 	else
 	{
-		return 0;
+		return half3(0,0,0);
 	}
 }
+
+#undef BRANCH_EMISSION
 
 #endif

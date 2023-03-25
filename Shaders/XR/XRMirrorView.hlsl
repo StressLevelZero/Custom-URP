@@ -8,7 +8,7 @@ TEXTURE2D_ARRAY(_SourceTex);
 TEXTURE2D(_SourceTex);
 #endif
 
-SamplerState sampler_LinearClamp;
+//SamplerState sampler_LinearClamp;
 uniform uint _SourceTexArraySlice;
 uniform uint _SRGBRead;
 uniform uint _SRGBWrite;

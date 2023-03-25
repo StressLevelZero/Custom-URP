@@ -3,8 +3,7 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DefaultSamplers.hlsl"
-
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 TEXTURECUBE(_SkyTexture);
 SAMPLER(sampler_SkyTexture);
@@ -52,7 +51,7 @@ half4 GetVolumetricColor(float3 positionWS)
     //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
 
 //    float random = GenerateHashedRandomFloat(DoubleUV * 4000) * 0.003;
-    return SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_linear_clamp, DoubleUV, 0);
+    return SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, DoubleUV, 0);
 }
 
 
