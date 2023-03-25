@@ -148,7 +148,6 @@ ENDHLSL
             //_MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
 
-
             // -------------------------------------
             // Unity defined keywords
             
