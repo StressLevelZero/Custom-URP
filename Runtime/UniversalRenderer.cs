@@ -46,6 +46,13 @@ namespace UnityEngine.Rendering.Universal
         const int k_DepthBufferBits = 32;
         #endif
 
+        // SLZ MODIFIED // Hacky-ass-bullshit flag that the VRS render feature can set to make passes that should have VRS use an array of rendertagets containing the actual render target duplicated twice
+                        // This is necessary for the vulkan plugin, so that A) during framebuffer object creation I can tell if a framebuffer should have the VRS texture, B) Unity doesn't use a cached
+                        // framebuffer not containing the VRS texture for a renderpass that needs it
+
+        public static bool s_IsUsingVkVRS = false;
+        // END SLZ MODIFIED
+
         static readonly List<ShaderTagId> k_DepthNormalsOnly = new List<ShaderTagId> { new ShaderTagId("DepthNormalsOnly") };
 
         private static class Profiling
@@ -388,6 +395,7 @@ namespace UnityEngine.Rendering.Universal
             // SLZ MODIFIED
             SLZGlobals.instance.SetBlueNoiseGlobals(data.textures.blueNoiseRGBA, data.textures.blueNoiseR);
             // END SLZ MODIFIED
+
         }
 
         /// <inheritdoc />
@@ -537,8 +545,9 @@ namespace UnityEngine.Rendering.Universal
         /// <inheritdoc />
         public override void Setup(ScriptableRenderContext context, ref RenderingData renderingData)
         {
+            
             m_ForwardLights.PreSetup(ref renderingData);
-
+           
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
@@ -556,6 +565,17 @@ namespace UnityEngine.Rendering.Universal
             //SLZ - Enable "motion vector data" (prev obj to world matricies) for SSR so we can get prev frame's pixel pos for temporal accumulation
             m_RenderOpaqueForwardPass.useMotionVectorData = renderingData.cameraData.enableSSR;
 
+            // Bullshit hacks go! Turn on render target duplication to signal to the Vulkan VRS plugin that framebuffer objects created for these passes need VRS attachments
+            if (s_IsUsingVkVRS)
+            {
+                m_RenderOpaqueForwardPass.testMRT = true;
+                m_RenderTransparentForwardPass.testMRT = true;
+            }
+            else
+            {
+                m_RenderOpaqueForwardPass.testMRT = false;
+                m_RenderTransparentForwardPass.testMRT = false;
+            }
             //TODO: This should probably happen in the SLZGlobals pass, not here
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
             SLZGlobals.instance.UpdateBlueNoiseFrame();
@@ -580,6 +600,7 @@ namespace UnityEngine.Rendering.Universal
                     return;
 #endif
                 EnqueuePass(m_RenderTransparentForwardPass);
+
                 return;
             }
 
@@ -767,11 +788,11 @@ namespace UnityEngine.Rendering.Universal
                     m_XRTargetHandleAlias?.Release();
                     m_XRTargetHandleAlias = RTHandles.Alloc(targetId);
                 }
-
+                //LogOnce.Instance.Print("Begin intermediateRenderTexture", 2);
                 // Doesn't create texture for Overlay cameras as they are already overlaying on top of created textures.
                 if (intermediateRenderTexture)
                     CreateCameraRenderTarget(context, ref cameraTargetDescriptor, useDepthPriming, cmd, ref cameraData);
-
+                //LogOnce.Instance.Print("End intermediateRenderTexture", 3);
                 m_ActiveCameraColorAttachment = createColorTexture ? m_ColorBufferSystem.PeekBackBuffer() : m_XRTargetHandleAlias;
                 m_ActiveCameraDepthAttachment = createDepthTexture ? m_CameraDepthAttachment : m_XRTargetHandleAlias;
             }
@@ -788,9 +809,12 @@ namespace UnityEngine.Rendering.Universal
                 m_ActiveCameraDepthAttachment = baseRenderer.m_ActiveCameraDepthAttachment;
                 m_XRTargetHandleAlias = baseRenderer.m_XRTargetHandleAlias;
             }
-
             if (rendererFeatures.Count != 0 && !isPreviewCamera)
                 ConfigureCameraColorTarget(m_ColorBufferSystem.PeekBackBuffer());
+            m_RenderOpaqueForwardPass.depthTarget = m_ActiveCameraDepthAttachment;
+            m_RenderOpaqueForwardPass.colorTarget = m_ActiveCameraColorAttachment;
+            m_RenderTransparentForwardPass.depthTarget = m_ActiveCameraDepthAttachment;
+            m_RenderTransparentForwardPass.colorTarget = m_ActiveCameraColorAttachment;
 
             bool copyColorPass = renderingData.cameraData.requiresOpaqueTexture || renderPassInputs.requiresColorTexture;
             // Check the createColorTexture logic above: intermediate color texture is not available for preview cameras.
@@ -799,6 +823,7 @@ namespace UnityEngine.Rendering.Universal
 
             // Assign camera targets (color and depth)
             ConfigureCameraTarget(m_ActiveCameraColorAttachment, m_ActiveCameraDepthAttachment);
+
 
             bool hasPassesAfterPostProcessing = activeRenderPassQueue.Find(x => x.renderPassEvent == RenderPassEvent.AfterRenderingPostProcessing) != null;
 
@@ -968,7 +993,7 @@ namespace UnityEngine.Rendering.Universal
             // SLZ MODIFIED // If in VR with depth-priming, run an XR occlusion mesh pass first.
             // This is mainly to populate the depth texture with the XR mask to optimize the HBAO render feature.
             // Probably doesn't save any pixel-fill cost for the depth-prepass since the shaders rendered are extremely simple.
-
+            
             bool occlusionMeshClearsDepth = false;
 #if ENABLE_VR && ENABLE_XR_MODULE
             if (cameraData.xr.hasValidOcclusionMesh && requiresDepthPrepass)
@@ -1011,7 +1036,6 @@ namespace UnityEngine.Rendering.Universal
                             m_DepthNormalPrepass.Setup(m_DepthTexture, m_NormalsTexture, !occlusionMeshClearsDepth);
                         // END SLZ MODIFIED
                     }
-
                     EnqueuePass(m_DepthNormalPrepass);
                 }
                 else
@@ -1342,6 +1366,7 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_FinalDepthCopyPass);
             }
 #endif
+            s_IsUsingVkVRS = false; // Unset every frame, so if the VRS render feature gets disabled this isn't stuck on
         }
 
         /// <inheritdoc />

@@ -59,6 +59,9 @@ namespace UnityEngine.Rendering.Universal.Internal
         string m_ProfilerTag;
         ProfilingSampler m_ProfilingSampler;
         bool m_IsOpaque;
+        public bool testMRT = false;
+        public RTHandle colorTarget;
+        public RTHandle depthTarget;
 
         /// <summary>
         /// Used to indicate whether transparent objects should receive shadows or not.
@@ -136,6 +139,21 @@ namespace UnityEngine.Rendering.Universal.Internal
             : this(profileId.GetType().Name, opaque, evt, renderQueueRange, layerMask, stencilState, stencilReference)
         {
             m_ProfilingSampler = ProfilingSampler.Get(profileId);
+        }
+
+        //SLZ MODIFIED // Added Configure, used to signal to the vulkan VRS plugin that this passes framebuffer needs a VRS attachment, and to prevent reuse of cached framebuffers without the VRS attachment
+        public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
+        {
+            if (testMRT)
+            {
+                // Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
+                ConfigureTarget(new RTHandle[] { colorTarget, colorTarget }, depthTarget); 
+            }
+            else
+            {
+                // if VRS was enabled previously, then the target will remain until reset
+                ResetTarget();
+            }
         }
 
         /// <inheritdoc/>
