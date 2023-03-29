@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 //using Unity.Mathematics;
@@ -116,12 +117,26 @@ public class VolumetricRendering : MonoBehaviour
 
     Vector3 ClipmapTransform; //Have this follow the camera and resample when the camera moves enough 
     Vector3 ClipmapCurrentPos; //chached location of previous sample point
+    
+    private ComputeBuffer participatingMediaSphereBuffer;
+    
+    [StructLayout(LayoutKind.Sequential)]
+    struct MediaSphere
+    {
+        public Vector3 CenterPosition;
+        public float LocalExtinction;
+        public float LocalFalloff;
+        public float LocalRange;
+    }
 
+    private const int MediaSphereStride = (3 + 1 + 1 + 1) * sizeof(float);
+    
     //public Matrix4x4 randomatrix;
 
     //Required shaders
     [SerializeField, HideInInspector] ComputeShader FroxelFogCompute;
     [SerializeField, HideInInspector] ComputeShader FroxelIntegrationCompute;
+    [SerializeField, HideInInspector] ComputeShader FroxelLocalFogCompute;
     [SerializeField, HideInInspector] ComputeShader ClipmapCompute;
     [SerializeField, HideInInspector] ComputeShader BlurCompute;
 
@@ -204,23 +219,22 @@ public class VolumetricRendering : MonoBehaviour
     // float CamFieldOfView = XRSettings.vi
 
 
+    //Unity implemented their own cookie method, so we'll just tie into that system instead. This is no longer needed. 
     /// Dynamic Light Projection///      
-    [SerializeField, HideInInspector] List<Light> Lights; // TODO: Make this a smart dynamic list not living here
-    public struct LightObject
-    {
-        public Matrix4x4 LightProjectionMatrix;
-        public Vector3 LightPosition;
-        public Vector4 LightColor;
-        public int LightCookie; //TODO: Add general light cookie system to render engine
-    }
+    // [SerializeField, HideInInspector] List<Light> Lights; // TODO: Make this a smart dynamic list not living here
+    // public struct LightObject
+    // {
+    //     public Matrix4x4 LightProjectionMatrix;
+    //     public Vector3 LightPosition;
+    //     public Vector4 LightColor;
+    //     public int LightCookie; //TODO: Add general light cookie system to render engine
+    // }
 
     //Figure out how much data is in the struct above
-    int LightObjectStride = sizeof(float) * 4 * 4 + sizeof(float) * 3 + sizeof(float) * 4 + sizeof(int);
-
-    Texture2DArray LightProjectionTextures; // TODO: Make this a smart dynamic list pulling from light cookies
-
-    private static List<LightObject> LightObjects;
-    ComputeBuffer LightBuffer;
+    // int LightObjectStride = sizeof(float) * 4 * 4 + sizeof(float) * 3 + sizeof(float) * 4 + sizeof(int);
+    // Texture2DArray LightProjectionTextures; // TODO: Make this a smart dynamic list pulling from light cookies
+    // private static List<LightObject> LightObjects;
+    // ComputeBuffer LightBuffer;
 
     /// END Dynamic Light Projection/// 
     /// 
@@ -277,6 +291,9 @@ public class VolumetricRendering : MonoBehaviour
     int ID_VolumeWorldSize = Shader.PropertyToID("VolumeWorldSize");
     int ID_VolumeWorldPosition = Shader.PropertyToID("VolumeWorldPosition");
 
+    private int ID_media_sphere_buffer_length = Shader.PropertyToID("media_sphere_buffer_length");
+    private int ID_media_sphere_buffer = Shader.PropertyToID("media_sphere_buffer");
+
     int ID_ClipMapGenKern;
     int ID_ClipMapClearKern;
     int ID_ClipMapHeightKern;
@@ -298,7 +315,7 @@ public class VolumetricRendering : MonoBehaviour
     int ClipmapScaleID = Shader.PropertyToID("_ClipmapScale");
     int ClipmapTransformID = Shader.PropertyToID("_ClipmapPosition");
 
-    int LightObjectsID = Shader.PropertyToID("LightObjects");
+    // int LightObjectsID = Shader.PropertyToID("LightObjects");
 
     //Temp Jitter stuff
     int tempjitter = 0; //TEMP jitter switcher thing 
@@ -420,16 +437,16 @@ public class VolumetricRendering : MonoBehaviour
 //#endif
     }
 
-    bool createdLightProjectionTexture = false;
-    void CheckCookieList()
-    {
-        if (LightProjectionTextures != null) return;
-        LightProjectionTextures = new Texture2DArray(1, 1, 1, TextureFormat.RGBA32, false);
-        LightProjectionTextures.hideFlags = HideFlags.DontSave;
-        LightProjectionTextures.name = activeCam.name + " Volumetric Light Cookies";
-        createdLightProjectionTexture = true;
-        //Debug.Log("Made blank cookie sheet");
-    }
+    // bool createdLightProjectionTexture = false;
+    // void CheckCookieList()
+    // {
+    //     if (LightProjectionTextures != null) return;
+    //     LightProjectionTextures = new Texture2DArray(1, 1, 1, TextureFormat.RGBA32, false);
+    //     LightProjectionTextures.hideFlags = HideFlags.DontSave;
+    //     LightProjectionTextures.name = activeCam.name + " Volumetric Light Cookies";
+    //     createdLightProjectionTexture = true;
+    //     //Debug.Log("Made blank cookie sheet");
+    // }
 
     //void dedbugRTC()
     //{
@@ -586,7 +603,7 @@ public class VolumetricRendering : MonoBehaviour
 
         if (FroxelBlur == BlurType.Gaussian) IntializeBlur(rtdiscrpt);
 
-        LightObjects = new List<LightObject>();
+        // LightObjects = new List<LightObject>();
 
         ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
 
@@ -681,8 +698,8 @@ public class VolumetricRendering : MonoBehaviour
             //FroxelFogCompute.SetFloat(ID_GlobalExtinction, Extinction);
             //FroxelFogCompute.SetFloat(ID_StaticLightMultiplier, StaticLightMultiplier);
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_Result, FroxelBufferA);
-            CheckCookieList();
-            FroxelFogCompute.SetTexture(ScatteringKernel, ID_LightProjectionTextureArray, LightProjectionTextures);
+            // CheckCookieList();
+            // FroxelFogCompute.SetTexture(ScatteringKernel, ID_LightProjectionTextureArray, LightProjectionTextures);
             FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
             lastFroxelFog = this;
         }
@@ -748,30 +765,32 @@ public class VolumetricRendering : MonoBehaviour
         Clear3DTexture(IntegrationBuffer);
     }
 
-    void UpdateLights()
-    {
-        LightObjects.Clear(); //clear and rebuild for now. TODO: Make a smarter constructor
-        if (LightBuffer != null) LightBuffer.Release();
-
-        for (int i = 0; i < Lights.Count; i++)
-        {
-            LightObject lightObject = new LightObject();
-            lightObject.LightPosition = Lights[i].transform.position;
-            lightObject.LightColor = new Color(
-                Lights[i].color.r * Lights[i].intensity,
-                Lights[i].color.g * Lights[i].intensity,
-                Lights[i].color.b * Lights[i].intensity,
-                Lights[i].color.a);
-            lightObject.LightProjectionMatrix = matScaleBias
-                * Matrix4x4.Perspective(Lights[i].spotAngle, 1, 0.1f, Lights[i].range)
-                * Matrix4x4.Rotate(Lights[i].transform.rotation).inverse;
-
-            LightObjects.Add(lightObject);
-        }
-        LightBuffer = new ComputeBuffer(LightObjects.Count, LightObjectStride);
-        LightBuffer.SetData(LightObjects);
-        FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); 
-    }
+    // void UpdateLights()
+    // {
+    //     LightObjects.Clear(); //clear and rebuild for now. TODO: Make a smarter constructor
+    //     if (LightBuffer != null) LightBuffer.Release();
+    //
+    //     for (int i = 0; i < Lights.Count; i++)
+    //     {
+    //         LightObject lightObject = new LightObject();
+    //         lightObject.LightPosition = Lights[i].transform.position;
+    //         lightObject.LightColor = new Color(
+    //             Lights[i].color.r * Lights[i].intensity,
+    //             Lights[i].color.g * Lights[i].intensity,
+    //             Lights[i].color.b * Lights[i].intensity,
+    //             Lights[i].color.a);
+    //         lightObject.LightProjectionMatrix = matScaleBias
+    //             * Matrix4x4.Perspective(Lights[i].spotAngle, 1, 0.1f, Lights[i].range)
+    //             * Matrix4x4.Rotate(Lights[i].transform.rotation).inverse;
+    //
+    //         LightObjects.Add(lightObject);
+    //     }
+    //     LightBuffer = new ComputeBuffer(LightObjects.Count, LightObjectStride);
+    //     LightBuffer.SetData(LightObjects);
+    //     FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); 
+    // }
+    
+    
 #region Clipmap funtions
     void SetupClipmap()
     {
@@ -1017,6 +1036,7 @@ public class VolumetricRendering : MonoBehaviour
     Matrix4x4 PrevViewProjMatrix = Matrix4x4.identity;
 
 
+
     public void SetVariables()
     {
         //Global multiplier for static lights
@@ -1175,7 +1195,38 @@ public class VolumetricRendering : MonoBehaviour
         ComputePerFrameConstantBuffer.SetData(VolScatteringCB);
         FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, ComputePerFrameConstantBuffer, 0, ScatterPerFrameCount * sizeof(float));
 
-
+        int MediaCount = VolumetricRegisters.VolumetricMediaEntities.Count;
+        int maxCount = Math.Max(MediaCount, 1);
+        
+        // if (participatingMediaSphereBuffer == null && MediaCount != 0)
+        // {
+            participatingMediaSphereBuffer = new ComputeBuffer(maxCount, MediaSphereStride, ComputeBufferType.Structured);
+       //     Debug.Log("Created New Compute Buffer");
+     //   }
+        MediaSphere[] mediadata = new MediaSphere[maxCount];
+        
+        if (MediaCount< 1)
+        {
+            // mediadata[0].CenterPosition = Vector3.zero;
+            // mediadata[0].LocalExtinction = 0;
+            // mediadata[0].LocalRange = 0; 
+            // mediadata[0].LocalFalloff = 0;
+        }
+        else
+        {
+            for (int i = 0; i < mediadata.Length; i++)
+            {        
+                //TODO: generalize the strut between the classes so we don't have to recast it here 
+                mediadata[i].CenterPosition = VolumetricRegisters.VolumetricMediaEntities[i].gameObject.transform.position;
+                mediadata[i].LocalExtinction = VolumetricRegisters.VolumetricMediaEntities[i].LocalExtinction();
+                mediadata[i].LocalRange = VolumetricRegisters.VolumetricMediaEntities[i].Scale.magnitude; // temp mag
+                mediadata[i].LocalFalloff = VolumetricRegisters.VolumetricMediaEntities[i].falloffDistance;
+            }
+        }
+        
+        participatingMediaSphereBuffer.SetData(mediadata);
+        FroxelFogCompute.SetBuffer(ScatteringKernel, ID_media_sphere_buffer,participatingMediaSphereBuffer);
+        FroxelFogCompute.SetFloat(ID_media_sphere_buffer_length, MediaCount);
         /*
         if (VolumetricConstantBuffer != null && projectionMatrix != null && activeCam != null && vbuff.depthEncodingParams != null)
         {
@@ -1215,7 +1266,6 @@ public class VolumetricRendering : MonoBehaviour
          */
         SetCameraData();
     }
-
 
 
     //Coping the parms from HDRP to get the log encoded depth.
@@ -1417,7 +1467,7 @@ public class VolumetricRendering : MonoBehaviour
         BlurBuffer.Clear();
         BlurBufferB.Clear();
         
-        if (createdLightProjectionTexture && LightProjectionTextures != null) { CoreUtils.Destroy(LightProjectionTextures); }
+       // if (createdLightProjectionTexture && LightProjectionTextures != null) { CoreUtils.Destroy(LightProjectionTextures); }
     }
 
 
@@ -1444,6 +1494,53 @@ public class VolumetricRendering : MonoBehaviour
     {
 
 
+    }
+    
+    void SetComputeBuffer(string name, ComputeShader shader, int kernel, ComputeBuffer buffer)
+    {
+        //   Debug.Log("Setting buffer");
+        if (buffer != null)
+        {
+            shader.SetBuffer(kernel, name, buffer);
+
+            //     Debug.Log(name + " set");
+        }
+    }
+    
+    private static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, List<T> data, int stride)
+        where T : struct
+    {
+        //Debug.Log("Making computebuffer ");
+        //buffer = new ComputeBuffer(data.Count, stride);
+
+        // Do we already have a compute buffer?
+        if (buffer != null && data != null && stride != null)
+        {
+            // If no data or buffer doesn't match the given criteria, release it
+            if (data.Count == 0 || buffer.count != data.Count || buffer.stride != stride)
+            {
+                //    Debug.Log("Buffer count = " + buffer.count);
+
+                buffer.Release();
+                buffer = null;
+            }
+        }
+
+        if (data.Count != 0)
+        {
+            // If the buffer has been released or wasn't there to
+            // begin with, create it
+            if (buffer == null)
+            {
+                buffer = new ComputeBuffer(data.Count, stride);
+
+                //        Debug.Log("Buffer count = " + buffer.count);
+
+            }
+
+            // Set data on the buffer
+            buffer.SetData(data);
+        }
     }
 
     /// <summary>
@@ -1540,6 +1637,8 @@ public class VolumetricRendering : MonoBehaviour
         
         //cam = GetComponentInChildren<Camera>();
         //Get shaders and seri
+        if (FroxelFogCompute == null)
+            FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
         if (FroxelFogCompute == null)
             FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
         if (FroxelIntegrationCompute == null)
