@@ -16,6 +16,11 @@ float4 _VRSRadii;
 #define vrsInnerRadiusU _VRSRadii.z
 #define vrsInnerRadiusV _VRSRadii.w
 
+#define vrsOuterRadiusMinor _VRSRadii.x
+#define vrsOuterRadiusMajor _VRSRadii.y
+#define vrsInnerRadiusMinor _VRSRadii.z
+#define vrsInnerRadiusMajor _VRSRadii.w
+
 // Each pair of numbers represents a shading rate width, height for a given
 // integer value from the shading rate lookup table. Packed into float4's
 // so index 0 contains the values for 0 and 1, 1 contains 2 and 3, and so on
