@@ -6,6 +6,7 @@ using System.Linq;
 using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
+using Unity.Mathematics;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -121,7 +122,9 @@ namespace UnityEngine.Rendering.Universal
             //Debug.Log(FRTemporal);
             SSRGlobalArray._SSRTemporalWeight = Mathf.Clamp(1.0f - temporalWeight, 0.0078f, 1.0f); //Mathf.Clamp(FRTemporal, 0.0078f, 1.0f); 
             SSRGlobalArray._SSRSteps = maxSteps;
-            SSRGlobalArray._SSRMinMip = minMip;
+            float SSRRes = 1024;
+            int dynamicMinMip = (int)math.round(math.log2(((float)screenHeight) / SSRRes));
+            SSRGlobalArray._SSRMinMip = math.max(dynamicMinMip + minMip, 0);
             float halfTan = Mathf.Tan(Mathf.Deg2Rad * (fov * 0.5f));
             SSRGlobalArray._SSRDistScale = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
             //Debug.Log("SSR scale: " + SSRGlobalArray[4]);

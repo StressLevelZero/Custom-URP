@@ -147,7 +147,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             if (testMRT)
             {
                 // Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
-                ConfigureTarget(new RTHandle[] { colorTarget, colorTarget }, depthTarget); 
+                ConfigureTarget(new RTHandle[] { colorTarget, colorTarget }, depthTarget);
+                ConfigureColorStoreAction(RenderBufferStoreAction.DontCare, 1);
             }
             else
             {

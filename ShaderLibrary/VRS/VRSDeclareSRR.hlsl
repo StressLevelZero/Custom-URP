@@ -45,8 +45,13 @@ float2 GetShadingRate(uint shadingRateIndex)
 
 float2 GetShadingRateFromCoords(uint2 screenCoords)
 {
+#if SHADER_API_VULKAN
+	int shadingRateIndex = (int)GetShadingIndex(screenCoords);
+	return rcp(float2(1<<((shadingRateIndex >> 2) & 3), 1 << (shadingRateIndex & 3)));
+#else
 	uint shadingRateIndex = GetShadingIndex(screenCoords);
 	return GetShadingRate(shadingRateIndex);
+#endif
 }
 
 float2 GetShadingRateNormalizedUV(float2 normalizedScreenUVs)

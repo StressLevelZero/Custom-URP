@@ -454,7 +454,7 @@ float4 getSSRColor(SSRData data)
 	
 	float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
 	//uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
-	float blur = log2(_CameraOpaqueTexture_Dim.y * roughRatio);
+	float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
 	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 	//reflection *= _ProjectionParams.z;
 	//reflection.a *= smoothness*reflStr*fade;
