@@ -23,8 +23,13 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static readonly RTHandle[] k_ColorAttachment1 = new RTHandle[1];
         private static readonly RTHandle[] k_ColorAttachment2 = new RTHandle[2];
 
-        // SLZ MODIFIED // toggle to control if this pass clears the screen or not. We added an XR occlusion mesh pass that renders before this depth prepass, so don't clear if in VR
+        // SLZ MODIFIED 
+        
+        // toggle to control if this pass clears the screen or not. We added an XR occlusion mesh pass that renders before this depth prepass, so don't clear if in VR
         private bool m_ClearTarget = true;
+
+        // VK VRS HACK. Makes the pass's 1st and 2nd color attachment the same to tell VkCreateFrameBuffer that it needs to add the Shading rate texture to the framebuffer
+        public bool VkVRSHackOn = false;
         // END SLZ MODIFIED
 
         /// <summary>
@@ -111,8 +116,17 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             else
             {
-                k_ColorAttachment1[0] = normalHandle;
-                colorHandles = k_ColorAttachment1;
+                if (VkVRSHackOn)
+                {
+                    k_ColorAttachment2[0] = normalHandle;
+                    k_ColorAttachment2[1] = normalHandle;
+                    colorHandles = k_ColorAttachment2;
+                }
+                else
+                {
+                    k_ColorAttachment1[0] = normalHandle;
+                    colorHandles = k_ColorAttachment1;
+                }
             }
 
             if (renderingData.cameraData.renderer.useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth))

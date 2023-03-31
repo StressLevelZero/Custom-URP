@@ -570,6 +570,7 @@ namespace UnityEngine.Rendering.Universal
             {
                 m_RenderOpaqueForwardPass.testMRT = true;
                 m_RenderTransparentForwardPass.testMRT = true;
+                m_DepthNormalPrepass.VkVRSHackOn = true;
             }
             else
             {
