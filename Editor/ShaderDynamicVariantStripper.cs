@@ -31,8 +31,8 @@ namespace SLZ.SLZEditorTools
                 return;
             }
 
-            List<LocalKeyword> dynamicKW = new List<LocalKeyword>();
             LocalKeyword[] localKW = ShaderUtil.GetPassKeywords(shader, snippet.pass, snippet.shaderType);
+            List<LocalKeyword> dynamicKW = new List<LocalKeyword>(localKW.Length);
 
             for (int i = 0; i < localKW.Length; i++)
             {

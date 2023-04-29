@@ -148,7 +148,7 @@ namespace UnityEngine.Rendering.Universal
         RTHandle m_MotionVectorDepth;
 
         // SLZ MODIFIED
-
+        BufferedRTHandleSystem m_OpaqueBufferSystem;
         RTHandle m_DepthHiZTexture;
         RTPermanentHandle m_PrevHiZ0Texture;
 
@@ -557,8 +557,8 @@ namespace UnityEngine.Rendering.Universal
 
             // SLZ MODIFIED // Set up SLZGlobals pass which sets a bunch of random global shader variables. Also set motion vectors on Opaque pass, update blue noise, and set previous frame globals
 
-            SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
-                renderingData.cameraData.SSRTemporalWeight, camera.fieldOfView, cameraTargetDescriptor.height);
+            //SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
+            //    renderingData.cameraData.SSRTemporalWeight, camera.fieldOfView, cameraTargetDescriptor.height);
             m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
             EnqueuePass(m_SLZGlobalsSetPass);
 
