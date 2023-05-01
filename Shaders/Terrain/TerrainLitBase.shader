@@ -44,7 +44,7 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
             #pragma multi_compile_instancing
-            #pragma instancing_options norenderinglayer assumeuniformscaling nomatrices nolightprobe nolightmap
+            #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
             #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
             #pragma vertex SplatmapVert
@@ -88,16 +88,19 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)"
         //{
         //    Name "GBuffer"
         //    Tags{"LightMode" = "UniversalGBuffer"}
-        //
+				//
         //    HLSLPROGRAM
-        //    #pragma exclude_renderers gles
-        //    #pragma target 2.0
-        //
+        //    #pragma target 4.5
+				//
+        //    // Deferred Rendering Path does not support the OpenGL-based graphics API:
+        //    // Desktop OpenGL, OpenGL ES 3.0, WebGL 2.0.
+        //    #pragma exclude_renderers gles3 glcore
+				//
         //    // -------------------------------------
         //    // Material Keywords
         //    #define _METALLICSPECGLOSSMAP 1
         //    #define _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A 1
-        //
+				//
         //    // -------------------------------------
         //    // Universal Pipeline keywords
         //    #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
@@ -106,8 +109,8 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)"
         //    #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
         //    #pragma multi_compile_fragment _ _SHADOWS_SOFT
         //    #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
-        //    #pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
-        //
+        //    #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
+				//
         //    // -------------------------------------
         //    // Unity defined keywords
         //    #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
@@ -117,24 +120,25 @@ Shader "Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)"
         //    #pragma multi_compile _ DYNAMICLIGHTMAP_ON
         //    #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
         //    #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
-        //
+				//
         //    #pragma multi_compile_instancing
-        //    #pragma instancing_options norenderinglayer assumeuniformscaling nomatrices nolightprobe nolightmap
-        //
+        //    #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
+				//
         //    #pragma vertex SplatmapVert
         //    #pragma fragment SplatmapFragment
-        //
+				//
         //    #pragma shader_feature_local _NORMALMAP
         //    // Sample normal in pixel shader when doing instancing
         //    #pragma shader_feature_local _TERRAIN_INSTANCED_PERPIXEL_NORMAL
         //    #define TERRAIN_SPLAT_BASEPASS 1
         //    #define TERRAIN_GBUFFER 1
-        //
+				//
         //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitInput.hlsl"
         //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitPasses.hlsl"
         //    ENDHLSL
         //}
-        //
+
+
         Pass
         {
             Name "DepthOnly"

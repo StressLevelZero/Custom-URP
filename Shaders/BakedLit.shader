@@ -30,9 +30,16 @@ Shader "Universal Render Pipeline/Baked Lit"
 
     SubShader
     {
-        Tags { "RenderType" = "Opaque" "IgnoreProjector" = "True" "RenderPipeline" = "UniversalPipeline" "ShaderModel"="4.5"}
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "IgnoreProjector" = "True"
+            "RenderPipeline" = "UniversalPipeline"
+        }
         LOD 100
 
+        // -------------------------------------
+        // Render State Commands
         Blend [_SrcBlend][_DstBlend], [_SrcBlendAlpha][_DstBlendAlpha]
         ZWrite [_ZWrite]
         Cull [_Cull]
@@ -40,14 +47,22 @@ Shader "Universal Render Pipeline/Baked Lit"
         Pass
         {
             Name "BakedLit"
-            Tags{ "LightMode" = "UniversalForwardOnly" }
+            Tags
+            {
+                "LightMode" = "UniversalForwardOnly"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             AlphaToMask[_AlphaToMask]
 
             HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
+            #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex BakedLitForwardPassVertex
+            #pragma fragment BakedLitForwardPassFragment
 
             // -------------------------------------
             // Material Keywords
@@ -58,8 +73,12 @@ Shader "Universal Render Pipeline/Baked Lit"
 
             // -------------------------------------
             // Universal Pipeline keywords
-           
+
             #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
+
+
+            //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
+
             #pragma multi_compile_fog
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
@@ -69,9 +88,10 @@ Shader "Universal Render Pipeline/Baked Lit"
             // GPU Instancing
             #pragma multi_compile_instancing
 
-            #pragma vertex BakedLitForwardPassVertex
-            #pragma fragment BakedLitForwardPassFragment
+            //include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 
+            // -------------------------------------
+            // Includes
             // Lighting include is needed because of GI
             #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitForwardPass.hlsl"
@@ -80,15 +100,21 @@ Shader "Universal Render Pipeline/Baked Lit"
 
         Pass
         {
-            Tags{"LightMode" = "DepthOnly"}
+            Tags
+            {
+                "LightMode" = "DepthOnly"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             ZWrite On
             ColorMask R
 
             HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
+            #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
             #pragma vertex DepthOnlyVertex
             #pragma fragment DepthOnlyFragment
 
@@ -98,13 +124,17 @@ Shader "Universal Render Pipeline/Baked Lit"
 
             // -------------------------------------
             // Unity defined keywords
-            #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
+            // #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            //#pragma multi_compile _ DOTS_INSTANCING_ON
 
+            //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+
+
+            // -------------------------------------
+            // Includes
             #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
             ENDHLSL
@@ -114,15 +144,21 @@ Shader "Universal Render Pipeline/Baked Lit"
         Pass
         {
             Name "DepthNormalsOnly"
-            Tags{"LightMode" = "DepthNormalsOnly"}
+            Tags
+            {
+                "LightMode" = "DepthNormalsOnly"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             ZWrite On
             Cull[_Cull]
 
             HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
+            #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
             #pragma vertex DepthNormalsVertex
             #pragma fragment DepthNormalsFragment
 
@@ -133,41 +169,59 @@ Shader "Universal Render Pipeline/Baked Lit"
 
             // -------------------------------------
             // Universal Pipeline keywords
+
             //#pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT // forward-only variant
            // #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
-            //#pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
+            //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
+
 
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            //#pragma multi_compile _ DOTS_INSTANCING_ON
 
+            //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+
+            // -------------------------------------
+            // Includes
             #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitDepthNormalsPass.hlsl"
             ENDHLSL
         }
+
         // This pass it not used during regular rendering, only for lightmap baking.
         Pass
         {
             Name "Meta"
-            Tags{"LightMode" = "Meta"}
+            Tags
+            {
+                "LightMode" = "Meta"
+            }
 
+            // -------------------------------------
+            // Render State Commands
             Cull Off
 
             HLSLPROGRAM
-            #pragma exclude_renderers gles gles3 glcore
-            #pragma target 4.5
+            #pragma target 2.0
 
+            // -------------------------------------
+            // Shader Stages
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaUnlit
+
+            // -------------------------------------
+            // Unity defined keywords
             #pragma shader_feature EDITOR_VISUALIZATION
 
+            // -------------------------------------
+            // Includes
             #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/BakedLitMetaPass.hlsl"
 
             ENDHLSL
         }
     }
+
     FallBack "Universal Render Pipeline/Unlit"
     CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.BakedLitShader"
 }
