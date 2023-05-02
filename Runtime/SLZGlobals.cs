@@ -273,7 +273,7 @@ namespace UnityEngine.Rendering.Universal
 		private int opaqueMipLevels;
 		private float cameraNear;
 		private float cameraFar;
-		int opaqueTexSizeFrac;
+		int opaqueTexSizeFrac = 1;
 		private Camera camera;
 		private RTPermanentHandle prevOpaque;
 		private RTPermanentHandle prevHiZ;
@@ -298,6 +298,10 @@ namespace UnityEngine.Rendering.Universal
 			else if (downsamplingMethod == Downsampling._4xBox || downsamplingMethod == Downsampling._4xBilinear)
 			{
 				opaqueTexSizeFrac = 4;
+			}
+			else
+			{
+				opaqueTexSizeFrac = 1;
 			}
 			//ConfigureTarget(new RenderTargetIdentifier(BuiltinRenderTextureType.None), new RenderTargetIdentifier(BuiltinRenderTextureType.None));
 			//Debug.Log("Setup for " + camData.camera.name);
