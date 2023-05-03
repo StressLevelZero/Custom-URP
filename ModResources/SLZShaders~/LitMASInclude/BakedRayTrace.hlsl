@@ -4,7 +4,7 @@
 #include "UnityRaytracingMeshUtils.cginc"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #define _EMISSION
-#pragma raytracing test
+#pragma raytracing BakeHit
 
 struct RayPayload
 {
@@ -46,7 +46,7 @@ void MyClosestHit(inout RayPayload payload, AttributeData attributes : SV_Inters
 	payload.dir = float3(1,0,0);
 
     //#if _EMISSION_ON  
-    uint2 launchIdx = DispatchRaysIndex();
+    //uint2 launchIdx = DispatchRaysIndex();
     //    ShadingData shade = getShadingData( PrimitiveIndex(), attribs );
 
     uint primitiveIndex = PrimitiveIndex();
@@ -77,7 +77,7 @@ void MyClosestHit(inout RayPayload payload, AttributeData attributes : SV_Inters
 
     emission.rgb *= lerp(albedo.rgb, 1, emission.a);
 
-    payload.color = emission * _BakedMutiplier;
+    payload.color.rgb = emission.rgb * _BakedMutiplier;
 
     // #else
     //     payload.color = float4(0,0,0,1);
