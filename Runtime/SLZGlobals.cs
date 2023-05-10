@@ -47,7 +47,7 @@ namespace UnityEngine.Rendering.Universal
         private SLZGlobals()
         {
             BlueNoiseCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
-            BlueNoiseDim = new float[4];
+            BlueNoiseDim = new float[8];
             hasSetBNTextures = false;
             SSRGlobalCB = new ComputeBuffer(2, 4*sizeof(float), ComputeBufferType.Constant);
             HiZDimBuffer = new ComputeBuffer(15, Marshal.SizeOf<Vector4>());
@@ -95,7 +95,7 @@ namespace UnityEngine.Rendering.Universal
              * 2 int _SSRSteps;
              * 3 none
              */
-            float[] SSRGlobalArray = new float[8];
+            Span<float> SSRGlobalArray = stackalloc float[8];
             //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
             //SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
             SSRGlobalArray[0] = hitRadius;
@@ -109,7 +109,7 @@ namespace UnityEngine.Rendering.Universal
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
             float halfTan = Mathf.Tan(Mathf.Deg2Rad * (fov * 0.5f));
             SSRGlobalArray[4] = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
-            SSRGlobalCB.SetData(SSRGlobalArray);
+			ComputeBufferExtensions.SetData<float>(SSRGlobalCB, SSRGlobalArray);
             Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, 16);
         }
 
@@ -121,13 +121,13 @@ namespace UnityEngine.Rendering.Universal
              * 2 int _SSRSteps;
              * 3 none
              */
-            float[] SSRGlobalArray = new float[4];
+            Span<float> SSRGlobalArray = stackalloc float[4];
             //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
             SSRGlobalArray[0] = hitRadius;
             SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
             SSRGlobalArray[2] = maxSteps;
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
-            SSRGlobalCB.SetData(SSRGlobalArray);
+			ComputeBufferExtensions.SetData<float>(SSRGlobalCB, SSRGlobalArray);
             cmd.SetGlobalConstantBuffer(SSRGlobalCB, SSRConstantsID, 0, 16);
         }
 
@@ -136,7 +136,6 @@ namespace UnityEngine.Rendering.Universal
         {
             if (BlueNoiseRGBA != null)
             {
-                BlueNoiseDim = new float[8];
                 BlueNoiseDim[0] = BlueNoiseRGBA.width;
                 BlueNoiseDim[1] = BlueNoiseRGBA.height;
                 BlueNoiseDim[2] = BlueNoiseRGBA.depth;
