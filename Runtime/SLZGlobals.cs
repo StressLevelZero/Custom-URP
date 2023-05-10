@@ -109,7 +109,7 @@ namespace UnityEngine.Rendering.Universal
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
             float halfTan = Mathf.Tan(Mathf.Deg2Rad * (fov * 0.5f));
             SSRGlobalArray[4] = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
-			ComputeBufferExtensions.SetData<float>(SSRGlobalCB, SSRGlobalArray);
+			SSRGlobalCB.SetData<float>(SSRGlobalArray);
             Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, 16);
         }
 
@@ -127,7 +127,7 @@ namespace UnityEngine.Rendering.Universal
             SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
             SSRGlobalArray[2] = maxSteps;
             SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
-			ComputeBufferExtensions.SetData<float>(SSRGlobalCB, SSRGlobalArray);
+			SSRGlobalCB.SetData<float>(SSRGlobalArray);
             cmd.SetGlobalConstantBuffer(SSRGlobalCB, SSRConstantsID, 0, 16);
         }
 
