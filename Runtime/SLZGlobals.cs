@@ -110,25 +110,27 @@ namespace UnityEngine.Rendering.Universal
             float halfTan = Mathf.Tan(Mathf.Deg2Rad * (fov * 0.5f));
             SSRGlobalArray[4] = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
 			SSRGlobalCB.SetData<float>(SSRGlobalArray);
-            Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, 16);
+            Shader.SetGlobalConstantBuffer(SSRConstantsID, SSRGlobalCB, 0, 8 * sizeof(float));
         }
 
-        public void SetSSRGlobalsCmd(ref CommandBuffer cmd, int maxSteps, int minMip, float hitRadius, float cameraNear, float cameraFar)
+        public void SetSSRGlobalsCmd(ref CommandBuffer cmd, int maxSteps, int minMip, float hitRadius, float temporalWeight, float fov, int screenHeight)
         {
-            /*
-             * 0 float _SSRHitRadius;
-             * 1 float _SSREdgeFade;
-             * 2 int _SSRSteps;
-             * 3 none
-             */
-            Span<float> SSRGlobalArray = stackalloc float[4];
-            //SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
-            SSRGlobalArray[0] = hitRadius;
-            SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
-            SSRGlobalArray[2] = maxSteps;
-            SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
-			SSRGlobalCB.SetData<float>(SSRGlobalArray);
-            cmd.SetGlobalConstantBuffer(SSRGlobalCB, SSRConstantsID, 0, 16);
+
+			Span<float> SSRGlobalArray = stackalloc float[8];
+			//SSRGlobalArray[0] = 1.0f / (1.0f + hitRadius);//hitRadius;
+			//SSRGlobalArray[1] = -cameraNear / (cameraFar - cameraNear) * (hitRadius * SSRGlobalArray[0]);
+			SSRGlobalArray[0] = hitRadius;
+			extraSmoothedDT = 0.95 * extraSmoothedDT + 0.05 * Time.smoothDeltaTime;
+			float framerateConst = 1.0f / (float)extraSmoothedDT * (1.0f / 90.0f);
+			float expConst = Mathf.Exp(-framerateConst);
+			float FRTemporal = (Mathf.Exp(-framerateConst * temporalWeight) - expConst) * (1.0f / (1.0f - expConst));
+			//Debug.Log(FRTemporal);
+			SSRGlobalArray[1] = Mathf.Clamp(1.0f - temporalWeight, 0.0078f, 1.0f); //Mathf.Clamp(FRTemporal, 0.0078f, 1.0f); 
+			SSRGlobalArray[2] = maxSteps;
+			SSRGlobalArray[3] = BitConverter.Int32BitsToSingle(minMip);
+			float halfTan = Mathf.Tan(Mathf.Deg2Rad * (fov * 0.5f));
+			SSRGlobalArray[4] = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
+			cmd.SetGlobalConstantBuffer(SSRGlobalCB, SSRConstantsID, 0, 8 * sizeof(float));
         }
 
 
