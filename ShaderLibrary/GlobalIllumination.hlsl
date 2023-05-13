@@ -430,6 +430,7 @@ half3 SubtractDirectMainLightFromLightmap(Light mainLight, half3 normalWS, half3
 }
 
 
+
 half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float clearCoatMask,
     half3 bakedGI, half4 occlusion, float3 positionWS, // SLZ MODIFIED // made occlusion float4, not sure why? Colored occlusion?
     half3 normalWS, half3 viewDirectionWS, float2 normalizedScreenSpaceUV)
@@ -439,18 +440,23 @@ half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float cl
     half fresnelTerm = Pow4(1.0 - NoV);
 
     half3 indirectDiffuse = bakedGI;
-    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, 1.0h, normalizedScreenSpaceUV);
+    // SLZ MODIFIED // Specular occlusion. Adding a some hacky methods of using AO for spec occlusion. Not perfect, but helps a lot in shadowed areas.    
+    half3 gimul = saturate(bakedGI*PI_x4);
+    half giao =  Max3(gimul.x,gimul.y,gimul.z);
+    giao *= GetSpecularOcclusionFromAmbientOcclusion(NoV, occlusion, brdfData.roughness);
+    // END SLZ MODIFIED
+    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, giao, normalizedScreenSpaceUV) ;
 
     half3 color = EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
 
     // SLZ MODIFIED // Add fluorescence calculation
     BlendFluorescence(color, half4(bakedGI, 0), brdfData);
     // END SLZ MODIFIED
-
-    if (IsOnlyAOLightingFeatureEnabled())
-    {
-        color = half3(1,1,1); // "Base white" for AO debug lighting mode
-    }
+    // SLZ MODIFIED // This is in the function and does nothing unless this keyword is enabled
+    #if defined(DEBUG_DISPLAY) 
+    if (IsOnlyAOLightingFeatureEnabled()) color = half3(1,1,1); // "Base white" for AO debug lighting mode
+    #endif
+    // END SLZ MODIFIED
 
 #if defined(_CLEARCOAT) || defined(_CLEARCOATMAP)
     half3 coatIndirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfDataClearCoat.perceptualRoughness, 1.0h, normalizedScreenSpaceUV);

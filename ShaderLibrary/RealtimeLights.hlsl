@@ -147,13 +147,15 @@ Light GetMainLight(InputData inputData, half4 shadowMask, AmbientOcclusionFactor
     Light light = GetMainLight(inputData.shadowCoord, inputData.positionWS, shadowMask);
 
     #if !defined(_SURFACE_TYPE_TRANSPARENT)
-	UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
-	{
-		if (IsLightingFeatureEnabled(DEBUGLIGHTINGFEATUREFLAGS_AMBIENT_OCCLUSION))
-		{
-			light.color *= aoFactor.directAmbientOcclusion;
-		}
-	}
+    // SLZ MODIFIED  //Always applying direct AO because even direct light gets shadowed. Consider the case of a cavity with a hole and Blackbodies. black holes on a surface will look wildly incorrect without this.
+	// UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+	// {
+	// 	if (IsLightingFeatureEnabled(DEBUGLIGHTINGFEATUREFLAGS_AMBIENT_OCCLUSION))
+	// 	{
+	 		light.color *= aoFactor.directAmbientOcclusion;
+	// 	}
+	// }
+    // END SLZ MODIFIED
     #endif
 
     return light;

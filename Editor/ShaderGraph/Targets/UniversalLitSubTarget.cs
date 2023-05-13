@@ -866,6 +866,17 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
                 definition = KeywordDefinition.ShaderFeature,
                 scope = KeywordScope.Local,
             };
+            
+            // SLZ MODIFIED
+            public static readonly KeywordDescriptor Volumetrics = new KeywordDescriptor()
+            {
+                displayName = "Volumetrics",
+                referenceName = "_VOLUMETRICS_ENABLED",
+                type = KeywordType.Boolean,
+                definition = KeywordDefinition.MultiCompile,
+                scope = KeywordScope.Global,
+            };
+            // END SLZ MODIFIED
 
             public static readonly KeywordCollection Forward = new KeywordCollection
             {
@@ -918,16 +929,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
                 { CoreKeywordDescriptors.DebugDisplay },
             };
 
-            // SLZ MODIFIED
-            public static readonly KeywordDescriptor Volumetrics = new KeywordDescriptor()
-            {
-                displayName = "Volumetrics",
-                referenceName = "_VOLUMETRICS_ENABLED",
-                type = KeywordType.Boolean,
-                definition = KeywordDefinition.MultiCompile,
-                scope = KeywordScope.Global,
-            };
-            // END SLZ MODIFIED
+
         }
         #endregion
 

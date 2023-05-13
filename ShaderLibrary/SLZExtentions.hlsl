@@ -69,7 +69,7 @@ void BlendFluorescence(inout half3 Diffuse, half4 LightColors, BRDFData brdfData
 }
 
 
-//TEMP port of GGX until SRP replacement is implmented to BakeryDirectionalLightmapSpecular 
+//TEMP port of GGX until SRP replacement is implmented to DirectionalLightmapSpecular 
 float GGXTerm (half3 N, half3 H, half NdotH, half roughness)
 {
     half a2 = roughness * roughness;
@@ -143,11 +143,11 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
 
      real4 direction = SAMPLE_TEXTURE2D(lightmapDirTex, lightmapDirSampler, uv);
      // Remark: baked lightmap is RGBM for now, dynamic lightmap is RGB9E5
-     real3 illuminance = real3(0.0, 0.0, 0.0);
+     //real3 illuminance = real3(0.0, 0.0, 0.0);
      //if (encodedLightmap)
      //{
          real4 encodedIlluminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgba;
-         illuminance = encodedLightmap ? DecodeLightmap(encodedIlluminance, decodeInstructions) : encodedIlluminance.rgb;
+     real3 illuminance = encodedLightmap ? DecodeLightmap(encodedIlluminance, decodeInstructions) : encodedIlluminance.rgb;
      //}
      //else
      //{
