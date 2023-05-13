@@ -25,8 +25,10 @@
 
 #if defined(MIN_AND_MAX)
     #define float1or2 float2
+	#define OUTPUT_VECTOR(min, max) float2(min, max)
 #else
     #define float1or2 float
+	#define OUTPUT_VECTOR(min, max) min
 #endif
 
 #if defined(SRV_SOURCE)
@@ -128,7 +130,7 @@ void MipMin(uint3 id : SV_DispatchThreadID)
         #else
             float max4 = 0.0;
         #endif
-        _MipDest[COORD_DEPTH(id)] = float4(min4,max4,0,0);
+			_MipDest[COORD_DEPTH(id)] = OUTPUT_VECTOR(min4, max4);
 }
 
 
@@ -162,7 +164,7 @@ void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, u
 #else
     float maxLevel0 = 0.0;
 #endif
-    _MipDest[COORD_DEPTH(id)] = float4(minLevel0, maxLevel0, 0, 0);
+	_MipDest[COORD_DEPTH(id)] = OUTPUT_VECTOR(minLevel0, maxLevel0);
     
     uint2 miniGroupId = uint2(0u,0u);
 
@@ -196,7 +198,7 @@ void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, u
                 float r1 = 0;
             #endif
 
-            _MipDest2[COORD_DEPTH(uv2)] = float4(r0,r1,0,0);
+            _MipDest2[COORD_DEPTH(uv2)] = OUTPUT_VECTOR(r0,r1);
         }
     }
     
@@ -226,9 +228,9 @@ void MipMinOdd(uint3 id : SV_DispatchThreadID)
     if (data2.y == 1)
     {
         uint3 uv20 = uint3(min(srcPixelUV + uint2(2u, 0u), data1.zw), id.z);
-        float2 p20 = MIPSOURCE(COORD_DEPTH(uv20));
+		float1or2 p20 = MIPSOURCE(COORD_DEPTH(uv20));
         uint3 uv21 = uint3(min(srcPixelUV + uint2(2u, 1u), data1.zw), id.z);
-        float2 p21 = MIPSOURCE(COORD_DEPTH(uv21));
+		float1or2 p21 = MIPSOURCE(COORD_DEPTH(uv21));
         minLevel0 = MIN_DEPTH(MIN_DEPTH(p20.r, p21.r), minLevel0);
 #if defined(MIN_AND_MAX)
         maxLevel0 = MAX_DEPTH(MAX_DEPTH(p20.g, p21.g), maxLevel0);
@@ -238,9 +240,9 @@ void MipMinOdd(uint3 id : SV_DispatchThreadID)
     if (data2.z == 1)
     {
         uint3 uv02 = uint3(min(srcPixelUV + uint2(0u, 2u), data1.zw), id.z);
-        float2 p02 = MIPSOURCE(COORD_DEPTH(uv02));
+		float1or2 p02 = MIPSOURCE(COORD_DEPTH(uv02));
         uint3 uv12 = uint3(min(srcPixelUV + uint2(1u, 2u), data1.zw), id.z);
-        float2 p12 = MIPSOURCE(COORD_DEPTH(uv12));
+		float1or2 p12 = MIPSOURCE(COORD_DEPTH(uv12));
         minLevel0 = MIN_DEPTH(MIN_DEPTH(p02.r, p12.r), minLevel0);
 #if defined(MIN_AND_MAX)
         maxLevel0 = MAX_DEPTH(MAX_DEPTH(p02.g, p12.g), maxLevel0);
@@ -250,13 +252,13 @@ void MipMinOdd(uint3 id : SV_DispatchThreadID)
     if (data2.z == 1 && data2.y == 1)
     {
         uint3 uv22 = uint3(min(srcPixelUV + uint2(2u, 2u), data1.zw), id.z);
-        float2 p22 = MIPSOURCE(COORD_DEPTH(uv22));
+		float1or2 p22 = MIPSOURCE(COORD_DEPTH(uv22));
         minLevel0 = MIN_DEPTH(p22.r, minLevel0);
 #if defined(MIN_AND_MAX)
         maxLevel0 = MAX_DEPTH(p22.g, maxLevel0);
 #endif
     }
 
-    _MipDest[COORD_DEPTH(id)] = float4(minLevel0, maxLevel0, 0,0);
+    _MipDest[COORD_DEPTH(id)] = OUTPUT_VECTOR(minLevel0, maxLevel0);
     //}
 }

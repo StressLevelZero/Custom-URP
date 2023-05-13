@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 //using Unity.Mathematics;
@@ -1124,7 +1125,7 @@ public class VolumetricRendering : MonoBehaviour
         int sampleIndex = Time.renderedFrameCount % 7;
         Vector3 seqOffset = new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex]);
 
-        ShaderConstants[] shaderConsts = new ShaderConstants[1];
+        Span<ShaderConstants> shaderConsts = stackalloc ShaderConstants[1];
         shaderConsts[0].TransposedCameraProjectionMatrix = projectionMatrix.transpose;
         shaderConsts[0].CameraProjectionMatrix = projectionMatrix;
         shaderConsts[0]._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
@@ -1137,10 +1138,10 @@ public class VolumetricRendering : MonoBehaviour
             //Shader.SetGlobalConstantBuffer(ID_VolumetricsCB, ShaderConstantBuffer, 0, ShaderConstantsSize);
             //Debug.Log("Created New Compute Buffer");
         }
-        ShaderConstantBuffer.SetData(shaderConsts);
+        ShaderConstantBuffer.SetData<ShaderConstants>(shaderConsts);
         
 
-        StepAddPerFrameConstants[] stepAddConst = new StepAddPerFrameConstants[1];
+        Span<StepAddPerFrameConstants> stepAddConst = stackalloc StepAddPerFrameConstants[1];
         stepAddConst[0] = new StepAddPerFrameConstants();
         stepAddConst[0]._VBufferDistanceDecodingParams = vbuff.depthDecodingParams;
         stepAddConst[0].SeqOffset = seqOffset;
@@ -1150,9 +1151,9 @@ public class VolumetricRendering : MonoBehaviour
             //Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
             //Debug.Log("Created New Compute Buffer");
         }
-        StepAddPerFrameConstantBuffer.SetData(stepAddConst);
+        StepAddPerFrameConstantBuffer.SetData<StepAddPerFrameConstants>(stepAddConst);
        
-        ScatteringPerFrameConstants[] VolScatteringCB = new ScatteringPerFrameConstants[1];
+        Span<ScatteringPerFrameConstants> VolScatteringCB = stackalloc ScatteringPerFrameConstants[1];
         VolScatteringCB[0] = new ScatteringPerFrameConstants();
         VolScatteringCB[0]._VBufferCoordToViewDirWS = PixelCoordToViewDirWS;
         VolScatteringCB[0]._PrevViewProjMatrix = PrevViewProjMatrix;
@@ -1172,7 +1173,7 @@ public class VolumetricRendering : MonoBehaviour
             ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
             Debug.Log("Created New Compute Buffer");
         }
-        ComputePerFrameConstantBuffer.SetData(VolScatteringCB);
+        ComputePerFrameConstantBuffer.SetData<ScatteringPerFrameConstants>(VolScatteringCB);
         FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, ComputePerFrameConstantBuffer, 0, ScatterPerFrameCount * sizeof(float));
 
 

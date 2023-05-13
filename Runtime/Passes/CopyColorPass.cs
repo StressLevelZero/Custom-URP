@@ -3,6 +3,7 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 // SLZ MODIFIED
 using System.Collections.Generic;
+using Unity.Mathematics;
 // END SLZ MODIFIED
 
 namespace UnityEngine.Rendering.Universal.Internal
@@ -31,17 +32,18 @@ namespace UnityEngine.Rendering.Universal.Internal
 
 		// SLZ MODIFIED
 		const int mipTruncation = 3;
-		static int s_SizeID = Shader.PropertyToID("_Size");
-		static int s_SourceID = Shader.PropertyToID("_Source");
-		static int s_DestID = Shader.PropertyToID("_Destination");
-		static int s_OpaqueTextureDimID = Shader.PropertyToID("_CameraOpaqueTexture_Dim");
-		static int s_TempBufferID = Shader.PropertyToID("_TempBuffer");
+		readonly static int s_SizeID = Shader.PropertyToID("_Size");
+		readonly static int s_SourceID = Shader.PropertyToID("_Source");
+		readonly static int s_DestID = Shader.PropertyToID("_Destination");
+		readonly static int s_OpaqueTextureDimID = Shader.PropertyToID("_CameraOpaqueTexture_Dim");
+		readonly static int s_TempBufferID = Shader.PropertyToID("_TempBuffer");
 		static GlobalKeyword _RECONSTRUCT_VRS_TILES;
 
 		ComputeShader m_ColorPyramidCompute;
 		public bool m_RequiresMips;
 		private int m_MipLevels;
-		private int[] m_Size;
+		private MipSize m_Size;
+		private static int[] m_SizeArray = new int[4];
 		private int m_DownsampleKernelID;
 		private int m_GaussianKernelID;
 		private bool m_ReconstructTiles = false;
@@ -51,6 +53,12 @@ namespace UnityEngine.Rendering.Universal.Internal
 		private RTHandle m_TempBuffer { get; set; }
 		private RenderTextureDescriptor m_TempDescriptor;
 		// END SLZ MODIFIED
+
+		public struct MipSize
+		{
+			public int width;
+			public int height;
+		}
 
 
 		/// <summary>
@@ -98,7 +106,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 		/// <seealso cref="Downsampling"/>
 		/// <seealso cref="RenderTextureDescriptor"/>
 		/// <seealso cref="FilterMode"/>
-		public static void ConfigureDescriptor(Downsampling downsamplingMethod, ref RenderTextureDescriptor descriptor, bool requiresMips, out FilterMode filterMode, out int mipLevels, out int[] size)
+		public static void ConfigureDescriptor(Downsampling downsamplingMethod, ref RenderTextureDescriptor descriptor, bool requiresMips, out FilterMode filterMode, out int mipLevels, out MipSize size)
 		{
 			descriptor.msaaSamples = 1;
 			descriptor.depthBufferBits = 0;
@@ -130,7 +138,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 			{
 				mipLevels = 1;
 			}
-			size = new int[4] { descriptor.width, descriptor.height, 0, 0 };
+			size = new MipSize { width = descriptor.width, height = descriptor.height};
 		}
 
 		/// <summary>
@@ -217,7 +225,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 					descriptor.mipCount = m_MipLevels;
 				}
 				
-				m_Size = new int[4] { descriptor.width, descriptor.height, 0, 0 };
+				m_Size = new MipSize { width = descriptor.width, height = descriptor.height };
 
 				if (m_UseRT)
 				{
@@ -294,7 +302,6 @@ namespace UnityEngine.Rendering.Universal.Internal
 			var colorPyramidCompute = passData.colorPyramidCompute;
 			var requiresMips = passData.requiresMips;
 			var mipLevels = passData.mipLevels;
-			var size = passData.size;
 			var downsampleKernelID = passData.downsampleKernelID;
 			var gaussianKernelID = passData.gaussianKernelID;
 			var reconstructTiles = passData.reconstructTiles;
@@ -353,14 +360,18 @@ namespace UnityEngine.Rendering.Universal.Internal
 					slices = 2;
 				}
 #endif
-				
-				int[] mipSize = new int[4];
-				Array.Copy(size, mipSize, 4);
+
+				m_SizeArray[0] = passData.size.width;
+				m_SizeArray[1] = passData.size.height;
+				m_SizeArray[2] = 0;
+				m_SizeArray[3] = 0;
+
+
 				RenderTargetIdentifier tempID = new RenderTargetIdentifier(s_TempBufferID);
 				cmd.GetTemporaryRT(s_TempBufferID, tempDesc, FilterMode.Bilinear);
 				
-				cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, mipSize);
-
+				cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, m_SizeArray);
+		
 				cmd.SetComputeTextureParam(colorPyramidCompute, downsampleKernelID, s_DestID, tempID, 0);
 				cmd.SetComputeTextureParam(colorPyramidCompute, gaussianKernelID, s_SourceID, tempID, 0);
 				
@@ -369,16 +380,16 @@ namespace UnityEngine.Rendering.Universal.Internal
 					
 					cmd.SetComputeTextureParam(colorPyramidCompute, downsampleKernelID, s_SourceID, destination, i - 1);
 
-					mipSize[0] = Mathf.Max(mipSize[0] >> 1, 1);
-					mipSize[1] = Mathf.Max(mipSize[1] >> 1, 1);
-					cmd.DispatchCompute(colorPyramidCompute, downsampleKernelID, Mathf.CeilToInt((float)mipSize[0] / 8.0f + 0.00001f),
-																				   Mathf.CeilToInt((float)mipSize[1] / 8.0f + 0.00001f), slices); ;
+					m_SizeArray[0] = math.max(m_SizeArray[0] >> 1, 1);
+					m_SizeArray[1] = math.max(m_SizeArray[1] >> 1, 1);
+					cmd.DispatchCompute(colorPyramidCompute, downsampleKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.00001f),
+					                                                             (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.00001f), slices);
 
-					cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, mipSize);
+					cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, m_SizeArray);
 					
 					cmd.SetComputeTextureParam(colorPyramidCompute, gaussianKernelID, s_DestID, destination, i);
-					cmd.DispatchCompute(colorPyramidCompute, gaussianKernelID, Mathf.CeilToInt((float)mipSize[0] / 8.0f + 0.0001f),
-																				 Mathf.CeilToInt((float)mipSize[1] / 8.0f + 0.0001f), slices);
+					cmd.DispatchCompute(colorPyramidCompute, gaussianKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.0001f),
+					                                                           (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.0001f), slices);
 
 				}
 				
@@ -412,7 +423,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 			public ComputeShader colorPyramidCompute;
 			public bool requiresMips;
 			public int mipLevels;
-			public int[] size;
+			public MipSize size;
 			public int downsampleKernelID;
 			public int gaussianKernelID;
 			public bool reconstructTiles;

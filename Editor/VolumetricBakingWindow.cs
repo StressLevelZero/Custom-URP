@@ -7,6 +7,10 @@ using UnityEngine.SceneManagement;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal;
 using System.IO;
+using Unity.Collections;
+using SLZ.SLZEditorTools;
+using UnityEngine.Rendering;
+using static UnityEditor.Experimental.GraphView.GraphView;
 
 public class VolumetricBaking : EditorWindow
 {
@@ -300,8 +304,8 @@ public class VolumetricBaking : EditorWindow
             rtdiscrpt.width = Texels.x;
             rtdiscrpt.height = Texels.y;
             rtdiscrpt.volumeDepth = Texels.z;
-            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat; //R32G32B32A32_SFloat
-            rtdiscrpt.msaaSamples = 1;
+            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat; //R32G32B32A32_SFloat is excessive, the compressed formats won't befefit and even lightmaps are saved as 16 bit EXRs
+			rtdiscrpt.msaaSamples = 1;
 
             RenderTexture RT3d = new RenderTexture(rtdiscrpt);
             RT3d.Create();
@@ -420,10 +424,13 @@ public class VolumetricBaking : EditorWindow
 
             //Define path and save 3d texture
             string path = CheckDirectoryAndReturnPath() + j;
-            RT3d.SaveToTexture3D(path);
-            RT3d.Release();
+			//RT3d.SaveToTexture3D(path);
+			Texture3D ReadBackTex = ReadRT2Tex3D(RT3d);
+			RT3d.Release();
+			Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
+			AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
 
-            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D) AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D) );
+            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D) AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D) );
 
             MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
             propertyBlock.SetTexture("_3dTexture", VolumetricRegisters.volumetricAreas[j].bakedTexture);
@@ -442,6 +449,60 @@ public class VolumetricBaking : EditorWindow
 
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
     }
+
+
+	Texture3D ReadRT2Tex3D(RenderTexture rt)
+	{
+		GraphicsFormat gfmt = rt.graphicsFormat;
+		TextureFormat tfmt = GraphicsFormatUtility.GetTextureFormat(gfmt);
+		int width = rt.width;
+		int height = rt.height;
+		int depth = rt.volumeDepth;
+
+		Texture3D output = new Texture3D(width, height, depth, gfmt, TextureCreationFlags.None);
+		NativeArray<byte> outputRaw = output.GetPixelData<byte>(0);
+
+		AsyncGPUReadbackRequest request = AsyncGPUReadback.Request(rt, 0);
+		request.WaitForCompletion();
+		if (request.done)
+		{
+			int layers = request.layerCount;
+			if (layers != depth)
+			{
+				Debug.LogError("Unexpected number of layers: " + layers);
+			}
+			int currPtr = 0;
+			for (int i = 0; i < layers; i++)
+			{
+				NativeArray<byte> readBackRaw = request.GetData<byte>(i);
+				NativeArray<byte>.Copy(readBackRaw, 0, outputRaw, currPtr, readBackRaw.Length);
+				currPtr += readBackRaw.Length;
+				readBackRaw.Dispose();
+			}
+		}
+		else
+		{
+			Debug.LogError("Request never completed");
+		}
+		//Texture2D temp = new Texture2D(width, height, gfmt, TextureCreationFlags.None);
+		//Rect sliceRect = new Rect(0, 0, width, height);
+		//int sliceSize = width * height;
+		//RenderTexture oldActive = RenderTexture.active;
+		//RenderTexture.active = rt;
+		//int outputRawPtr = 0;
+		//for (int depthSlice = 0; depthSlice < depth; depthSlice++)
+		//{
+		//	Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, depthSlice);
+		//	temp.ReadPixels(sliceRect,0,0);
+		//	temp.Apply(false);
+		//	NativeArray<byte> tempNative = temp.GetPixelData<byte>(0);
+		//	NativeArray<byte>.Copy(tempNative, 0, outputRaw, outputRawPtr, tempNative.Length);
+		//	outputRawPtr += tempNative.Length;
+		//}
+		//Graphics.SetRenderTarget(oldActive, 0, CubemapFace.Unknown, 0);
+		//RenderTexture.active = oldActive;
+		return output;
+	}
     //////
 
     ComputeShader BakingShader;
@@ -468,7 +529,7 @@ public class VolumetricBaking : EditorWindow
             rtdiscrpt.width = Texels.x;
             rtdiscrpt.height = Texels.y;
             rtdiscrpt.volumeDepth = Texels.z;
-            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat; 
             rtdiscrpt.msaaSamples = 1;
 
             //Target buffer
@@ -578,15 +639,16 @@ public class VolumetricBaking : EditorWindow
             //}
 
             //Define path and save 3d texture
-            string path = CheckDirectoryAndReturnPath() + j; 
-            RT3d.SaveToTexture3D(path);
+            string path = CheckDirectoryAndReturnPath() + j;
+			Texture3D ReadBackTex = ReadRT2Tex3D(RT3d);
+			RT3d.Release();
+			Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
 
-            RT3d.Release();
             bucketBuffer.Release();
-
-            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
-         //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
-            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
+			AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
+			VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
+		 //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
+			UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
 
         }
 
@@ -627,7 +689,7 @@ public class VolumetricBaking : EditorWindow
         rtdiscrpt.width = Texels.x;
         rtdiscrpt.height = Texels.y;
         rtdiscrpt.volumeDepth = Texels.z;
-        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         rtdiscrpt.msaaSamples = 1;
 
         //Target buffer
@@ -854,9 +916,11 @@ public class VolumetricBaking : EditorWindow
             ///
 
             string path = CheckDirectoryAndReturnPath() + j;
-            RT3d.SaveToTexture3D(path);
-            RT3d.Release();
-            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
+			Texture3D ReadBackTex = ReadRT2Tex3D(RT3d);
+			RT3d.Release();
+			Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
+			AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
+			VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
             //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
 

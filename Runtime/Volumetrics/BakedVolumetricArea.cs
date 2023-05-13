@@ -52,14 +52,14 @@ public class BakedVolumetricArea : MonoBehaviour
         float Maxres = Mathf.Max(UnclampedResolution.x, UnclampedResolution.y, UnclampedResolution.z);
 
         float rescaler = Mathf.Min(1, 4096 / Maxres);
-
+		
         //   Debug.Log("Clamped resolution to " + Mathf.RoundToInt(UnclampedResolution.x * rescaler));
 
         Vector3Int tempTexelDensity = new Vector3Int
         {
-            x = Mathf.RoundToInt(UnclampedResolution.x * rescaler),
-            y = Mathf.RoundToInt(UnclampedResolution.y * rescaler),
-            z = Mathf.RoundToInt(UnclampedResolution.z * rescaler)
+            x = ((Mathf.RoundToInt(UnclampedResolution.x * rescaler) + 3) / 4 ) * 4,
+            y = ((Mathf.RoundToInt(UnclampedResolution.y * rescaler) + 3) / 4 ) * 4,
+            z = ((Mathf.RoundToInt(UnclampedResolution.z * rescaler) + 3) / 4 ) * 4,
         };     
 
         //if (tempTexelDensity.x > 8096 || tempTexelDensity.y > 8096 || tempTexelDensity.z > 8096)

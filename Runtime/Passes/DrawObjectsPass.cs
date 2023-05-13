@@ -61,7 +61,8 @@ namespace UnityEngine.Rendering.Universal.Internal
         bool m_IsOpaque;
         public bool testMRT = false;
         public RTHandle colorTarget;
-        public RTHandle depthTarget;
+		RTHandle[] vrsColorTargets = new RTHandle[2];
+		public RTHandle depthTarget;
 
         /// <summary>
         /// Used to indicate whether transparent objects should receive shadows or not.
@@ -146,9 +147,10 @@ namespace UnityEngine.Rendering.Universal.Internal
         {
             if (testMRT)
             {
-                // Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
-                ConfigureTarget(new RTHandle[] { colorTarget, colorTarget }, depthTarget);
-                ConfigureColorStoreAction(RenderBufferStoreAction.DontCare, 1);
+				// Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
+				vrsColorTargets[0] = vrsColorTargets[1] = colorTarget;
+				ConfigureTarget(vrsColorTargets, depthTarget);
+                //ConfigureColorStoreAction(RenderBufferStoreAction.DontCare, 1);
             }
             else
             {

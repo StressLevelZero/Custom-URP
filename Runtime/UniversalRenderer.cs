@@ -332,6 +332,7 @@ namespace UnityEngine.Rendering.Universal
 
             // SLZ MODIFIED
             m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2);
+			
             // END SLZ MODIFIED
 
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
@@ -558,10 +559,12 @@ namespace UnityEngine.Rendering.Universal
             return IsGLESDevice() || SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLCore;
         }
 
-        /// <inheritdoc />
-        public override void Setup(ScriptableRenderContext context, ref RenderingData renderingData)
-        {
-            
+		/// <inheritdoc />
+		public override void Setup(ScriptableRenderContext context, ref RenderingData renderingData)
+		{
+		//}
+		//public void dummy1(ScriptableRenderContext context, ref RenderingData renderingData)
+		//{ 
             m_ForwardLights.PreSetup(ref renderingData);
            
             ref CameraData cameraData = ref renderingData.cameraData;
