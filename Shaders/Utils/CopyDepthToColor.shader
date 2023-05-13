@@ -19,6 +19,7 @@ Shader "Hidden/Universal Render Pipeline/CopyDepthToColor"
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/CopyDepthToColorPass.hlsl"
 
+
             ENDHLSL
         }
     }

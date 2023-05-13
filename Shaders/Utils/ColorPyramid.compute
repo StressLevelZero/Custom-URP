@@ -39,6 +39,7 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 #if COPY_MIP_0
        TEXTURE2D_X(_Source);
@@ -57,7 +58,7 @@ RW_TEXTURE2D_X(float4, _Destination);
     #define UVINT uint2
 #endif
 
-SamplerState sampler_LinearClamp;
+//SamplerState sampler_LinearClamp;
 
 //CBUFFER_START(cb)
     int4 _Size;       // x: src width, y: src height, zw: unused
@@ -154,14 +155,15 @@ void MAIN_GAUSSIAN(uint3 groupId : SV_GroupID, uint2 groupThreadId : SV_GroupThr
     uint stereoEyeIndex = groupId.z;
 
     // Upper-left pixel coordinate of quad that this thread will read
-    int2 threadUL = (groupThreadId << 1) + (groupId.xy << 3) - 4;
+
+    int2 threadUL = (groupThreadId << 1) + (groupId.xy << 3) - int2(4,4);
     uint2 uthreadUL = uint2(max(0, threadUL));
 
-    uint2 size = uint2(_Size.xy) - 1u.xx;
-    float4 p00 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(0u, 0u), size))]);
-    float4 p10 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 0u), size))]);
-    float4 p11 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(1u, 1u), size))]);
-    float4 p01 = max(0.0, _Source[COORD_TEXTURE2D_X(min(uthreadUL + uint2(0u, 1u), size))]);
+    int2 size = int2(_Size.xy) - 1u.xx;
+    float4 p00 = max(0.0.xxxx, _Source[COORD_TEXTURE2D_X(min(uthreadUL + int2(0u, 0u), size))]);
+    float4 p10 = max(0.0.xxxx, _Source[COORD_TEXTURE2D_X(min(uthreadUL + int2(1u, 0u), size))]);
+    float4 p11 = max(0.0.xxxx, _Source[COORD_TEXTURE2D_X(min(uthreadUL + int2(1u, 1u), size))]);
+    float4 p01 = max(0.0.xxxx, _Source[COORD_TEXTURE2D_X(min(uthreadUL + int2(0u, 1u), size))]);
 
     // Store the 4 downsampled pixels in LDS
     uint destIdx = groupThreadId.x + (groupThreadId.y << 4u);

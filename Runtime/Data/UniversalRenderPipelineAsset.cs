@@ -389,11 +389,26 @@ namespace UnityEngine.Rendering.Universal
     }
 
     /// <summary>
+    /// The type of Spherical Harmonics lighting evaluation in a shader.
+    /// </summary>
+    public enum ShEvalMode
+    {
+        /// <summary>Unity selects a mode automatically.</summary>
+        Auto = 0,
+        /// <summary>Evaluate lighting per vertex.</summary>
+        PerVertex = 1,
+        /// <summary>Evaluate lighting partially per vertex, partially per pixel.</summary>
+        Mixed = 2,
+        /// <summary>Evaluate lighting per pixel.</summary>
+        PerPixel = 3,
+    }
+
+    /// <summary>
     /// The asset that contains the URP setting.
     /// You can use this asset as a graphics quality level.
+    /// </summary>
     /// <see cref="RenderPipelineAsset"/>
     /// <see cref="UniversalRenderPipeline"/>
-    /// </summary>
     [ExcludeFromPreset]
     [URPHelpURL("universalrp-asset")]
 #if UNITY_EDITOR
@@ -401,33 +416,6 @@ namespace UnityEngine.Rendering.Universal
 #endif
     public partial class UniversalRenderPipelineAsset : RenderPipelineAsset, ISerializationCallbackReceiver
     {
-#if UNITY_EDITOR
-        // Defaults for renderer features that are not dependent on other settings.
-        // These are the filter rules if no such renderer features are present.
-
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: ShaderKeywordStrings.ScreenSpaceOcclusion)]
-
-        // TODO: decal settings needs some rework before we can filter DBufferMRT/DecalNormalBlend.
-        // Atm the setup depends on the technique but settings are present for both at the same time.
-        //[ShaderKeywordFilter.RemoveIf(true, keywordNames: new string[] {ShaderKeywordStrings.DBufferMRT1, ShaderKeywordStrings.DBufferMRT2, ShaderKeywordStrings.DBufferMRT3})]
-        //[ShaderKeywordFilter.RemoveIf(true, keywordNames: new string[] {ShaderKeywordStrings.DecalNormalBlendLow, ShaderKeywordStrings.DecalNormalBlendMedium, ShaderKeywordStrings.DecalNormalBlendHigh})]
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: ShaderKeywordStrings.DecalLayers)]
-        private const bool k_RendererFeatureDefaults = true;
-
-        // Platform specific filtering overrides
-
-        [ShaderKeywordFilter.ApplyRulesIfGraphicsAPI(GraphicsDeviceType.OpenGLES2)]
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: ShaderKeywordStrings.LightLayers)]
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: ShaderKeywordStrings.RenderPassEnabled)]
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: new string[] {ShaderKeywordStrings.MainLightShadowCascades, ShaderKeywordStrings.MainLightShadowScreen})]
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: new string[] {ShaderKeywordStrings._DETAIL_MULX2, ShaderKeywordStrings._DETAIL_SCALED})]
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: new string[] {ShaderKeywordStrings._CLEARCOAT, ShaderKeywordStrings._CLEARCOATMAP})]
-        private const bool k_GLES2Defaults = true;
-
-        [ShaderKeywordFilter.ApplyRulesIfGraphicsAPI(GraphicsDeviceType.OpenGLES2, GraphicsDeviceType.OpenGLES3, GraphicsDeviceType.OpenGLCore)]
-        [ShaderKeywordFilter.RemoveIf(true, keywordNames: ShaderKeywordStrings.WriteRenderingLayers)]
-        private const bool k_CommonGLDefaults = true;
-#endif
         Shader m_DefaultShader;
         ScriptableRenderer[] m_Renderers = new ScriptableRenderer[1];
 
@@ -465,40 +453,27 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] float m_FsrSharpness = FSRUtils.kDefaultSharpnessLinear;
 
 #if UNITY_EDITOR // multi_compile_fragment _ LOD_FADE_CROSSFADE
-        // TODO: Add RenderPipelineGlobalSettings to filter data hierarchy and select both variants based on
-        // stripUnusedLODCrossFadeVariants. Then we can try removing here based on this setting.
-        // [ShaderKeywordFilter.RemoveIf(false, keywordNames: ShaderKeywordStrings.LOD_FADE_CROSSFADE)]
+        [ShaderKeywordFilter.RemoveIf(false, keywordNames: ShaderKeywordStrings.LOD_FADE_CROSSFADE)]
 #endif
         [SerializeField] bool m_EnableLODCrossFade = true;
         [SerializeField] LODCrossFadeDitheringType m_LODCrossFadeDitheringType = LODCrossFadeDitheringType.BlueNoise;
 
+        // ShEvalMode.Auto is handled in shader preprocessor.
+#if UNITY_EDITOR // multi_compile _ EVALUATE_SH_MIXED EVALUATE_SH_VERTEX
+        [ShaderKeywordFilter.RemoveIf(ShEvalMode.PerPixel,  keywordNames:  new [] { ShaderKeywordStrings.EVALUATE_SH_MIXED, ShaderKeywordStrings.EVALUATE_SH_VERTEX })]
+        [ShaderKeywordFilter.SelectIf(ShEvalMode.Mixed,     keywordNames:  new [] { ShaderKeywordStrings.EVALUATE_SH_MIXED })]
+        [ShaderKeywordFilter.SelectIf(ShEvalMode.PerVertex, keywordNames: new [] { ShaderKeywordStrings.EVALUATE_SH_VERTEX })]
+#endif
+        [SerializeField] ShEvalMode m_ShEvalMode = ShEvalMode.Auto;
+
         // Main directional light Settings
         [SerializeField] LightRenderingMode m_MainLightRenderingMode = LightRenderingMode.PerPixel;
-
-#if UNITY_EDITOR // multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-        // User can change cascade count at runtime so we have to include both MainLightShadows and MainLightShadowCascades.
-        // ScreenSpaceShadows renderer feature has separate filter attribute for keeping MainLightShadowScreen.
-        // NOTE: off variants are atm always removed when shadows are supported
-        [ShaderKeywordFilter.SelectIf(true, keywordNames: new string[] {ShaderKeywordStrings.MainLightShadows, ShaderKeywordStrings.MainLightShadowCascades})]
-        [ShaderKeywordFilter.RemoveIf(false, keywordNames: new string[] {ShaderKeywordStrings.MainLightShadows, ShaderKeywordStrings.MainLightShadowCascades, ShaderKeywordStrings.MainLightShadowScreen})]
-#endif
         [SerializeField] bool m_MainLightShadowsSupported = true;
         [SerializeField] ShadowResolution m_MainLightShadowmapResolution = ShadowResolution._2048;
 
         // Additional lights settings
-#if UNITY_EDITOR // multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-        // clustered renderer can override PerVertex/PerPixel to be disabled
-        // NOTE: off variants are atm always kept when additional lights are enabled due to XR perf reasons
-        [ShaderKeywordFilter.SelectIf(LightRenderingMode.PerVertex, keywordNames: new string[] {"", ShaderKeywordStrings.AdditionalLightsVertex})]
-        [ShaderKeywordFilter.RemoveIf(LightRenderingMode.PerVertex, keywordNames: ShaderKeywordStrings.AdditionalLightShadows)]
-        [ShaderKeywordFilter.SelectIf(LightRenderingMode.PerPixel, keywordNames: new string[] {"", ShaderKeywordStrings.AdditionalLightsPixel})]
-        [ShaderKeywordFilter.RemoveIf(LightRenderingMode.Disabled, keywordNames: new string[] {ShaderKeywordStrings.AdditionalLightsVertex, ShaderKeywordStrings.AdditionalLightsPixel})]
-#endif
         [SerializeField] LightRenderingMode m_AdditionalLightsRenderingMode = LightRenderingMode.PerPixel;
         [SerializeField] int m_AdditionalLightsPerObjectLimit = 4;
-#if UNITY_EDITOR // multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
-        [ShaderKeywordFilter.RemoveIf(false, keywordNames: ShaderKeywordStrings.AdditionalLightShadows)]
-#endif
         [SerializeField] bool m_AdditionalLightShadowsSupported = false;
         [SerializeField] ShadowResolution m_AdditionalLightsShadowmapResolution = ShadowResolution._2048;
 
@@ -558,8 +533,8 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] bool m_SupportsLightCookies = true;
 #if UNITY_EDITOR
         // multi_compile_fragment _ _LIGHT_LAYERS
+        [ShaderKeywordFilter.ApplyRulesIfNotGraphicsAPI(GraphicsDeviceType.OpenGLES2)]
         [ShaderKeywordFilter.SelectOrRemove(true, keywordNames: ShaderKeywordStrings.LightLayers)]
-        // TODO: Filtering WriteRenderingLayers requires different filter triggers for different passes (i.e. per-pass filter attributes)
 #endif
         [SerializeField] bool m_SupportsLightLayers = false;
         [SerializeField] [Obsolete] PipelineDebugLevel m_DebugLevel;
@@ -1169,6 +1144,15 @@ namespace UnityEngine.Rendering.Universal
         {
             get { return m_FsrSharpness; }
             set { m_FsrSharpness = value; }
+        }
+
+        /// <summary>
+        /// Defines the type of Spherical Harmonic (SH) evaluation in lighting.
+        /// </summary>
+        public ShEvalMode shEvalMode
+        {
+            get { return m_ShEvalMode; }
+            internal set { m_ShEvalMode = value; }
         }
 
         /// <summary>

@@ -1,6 +1,6 @@
 using System;
 using UnityEngine.Experimental.Rendering;
-
+using Unity.Mathematics;
 namespace UnityEngine.Rendering.Universal.Internal
 {
     /// <summary>
@@ -32,13 +32,19 @@ namespace UnityEngine.Rendering.Universal.Internal
         private GlobalKeyword m_StereoArrayKW;
         private LocalKeyword m_SRVSourceKW;
         private LocalKeyword m_MinMaxKW;
-        public CopyDepthToHiZPass(RenderPassEvent evt, Material copyDepthToColorMaterial)
+
+		// make temp array variables into fields to avoid heap garbage collection
+		int[] widthHeight = new int[4];
+		int[] data2 = new int[4];
+		public CopyDepthToHiZPass(RenderPassEvent evt, Material copyDepthToColorMaterial)
         {
             base.profilingSampler = new ProfilingSampler(nameof(CopyDepthPass));
             AllocateRT = true;
             m_CopyDepthToColorMaterial = copyDepthToColorMaterial;
             renderPassEvent = evt;
-        }
+			widthHeight = new int[4];
+			data2 = new int[4];
+		}
 
         /// <summary>
         /// Configure the pass with the source and destination to execute on.
@@ -100,8 +106,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                
                 int width = renderingData.cameraData.cameraTargetDescriptor.width;
                 int height = renderingData.cameraData.cameraTargetDescriptor.height;
-                int[] widthHeight = new int[4];
-                int[] data2 = new int[4];
+
                 widthHeight[0] = width;
                 widthHeight[1] = height;
                 int highestMip = mipLevels - 1;
@@ -193,7 +198,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                     }
                     else
                     {
-                        int processLevels = Mathf.Min(mipLevels - i - 1, 2);
+                        int processLevels = math.min(mipLevels - i - 1, 2);
                         data2[0] = processLevels;
                         DispatchEvenMultiLevel(ref cmd, src, dst, widthHeight, data2, i - 1, slices, inputSRV);
                         i += 2;
@@ -247,7 +252,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipSourceID, source1, currMipLevel);
             }
             cmd.SetComputeTextureParam(m_HiZMipCompute, kernel, computeMipDestID, dest1, currMipLevel + 1);
-            cmd.DispatchCompute(m_HiZMipCompute, kernel, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
+            cmd.DispatchCompute(m_HiZMipCompute, kernel, (int)math.ceil(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
         }
         void DispatchEvenMultiLevel(ref CommandBuffer cmd, RenderTargetIdentifier source1, RenderTargetIdentifier dest1,
             int[] widthHeight, int[] data2, int currMipLevel, int slices, bool inputSRV)
@@ -264,7 +269,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             cmd.SetComputeTextureParam(m_HiZMipCompute, 1, computeMipDestID, dest1, currMipLevel + 1);
             cmd.SetComputeTextureParam(m_HiZMipCompute, 1, computeMipDest2ID, dest1, data2[0] > 1 ? currMipLevel + 2 : currMipLevel + 1);
-            cmd.DispatchCompute(m_HiZMipCompute, 1, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
+            cmd.DispatchCompute(m_HiZMipCompute, 1, (int)math.ceil(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
         }
 
         void DispatchOdd(ref CommandBuffer cmd, RenderTargetIdentifier source1, RenderTargetIdentifier dest1,
@@ -281,7 +286,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 cmd.SetComputeTextureParam(m_HiZMipCompute, 2, computeMipSourceID, source1, currMipLevel);
             }
             cmd.SetComputeTextureParam(m_HiZMipCompute, 2, computeMipDestID, dest1, currMipLevel + 1);
-            cmd.DispatchCompute(m_HiZMipCompute, 2, Mathf.CeilToInt(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
+            cmd.DispatchCompute(m_HiZMipCompute, 2, (int)math.ceil(((float)widthHeight[0]) / 8.0f), Mathf.CeilToInt(((float)widthHeight[1]) / 8.0f), slices);
         }
 
         /// <inheritdoc/>

@@ -7,6 +7,7 @@
 #define M_PI  3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
 #define PI_R  0.31830988618f                        //Reciprocal
+#define PI_R_REAL real(0.318309886183790672)
 
 #if defined(_BRDFMAP)
 TEXTURE2D(g_tBRDFMap); SamplerState BRDF_linear_clamp_sampler; //Force sampler state to avoid wrapping issues 
@@ -69,15 +70,15 @@ void BlendFluorescence(inout half3 Diffuse, half4 LightColors, BRDFData brdfData
 }
 
 
-//TEMP port of GGX until SRP replacement is implmented to DirectionalLightmapSpecular 
 float GGXTerm (half3 N, half3 H, half NdotH, half roughness)
 {
-    half a2 = roughness * roughness;
      //float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
     half3 NxH = cross(N,H);
+	half NxH2 = dot(NxH, NxH);
     half a = NdotH * roughness;
-    half d = a2 + dot(NxH, NxH);
-    return PI_R * a2 / (d * d + REAL_MIN); // This function is not intended to be running on Mobile,
+    half d = roughness / max(a * a + NxH2, REAL_MIN);
+    half d2 = (d * d * PI_R_REAL);
+    return d2; // This function is not intended to be running on Mobile,
                                                 // therefore epsilon is smaller than what can be represented by half
 }
 

@@ -158,4 +158,81 @@ namespace UnityEngine.Rendering.Universal
         }
     }
 
+    public class SLZPerCameraBufferStorage : IDisposable
+    {
+        public Dictionary<Camera, ComputeBuffer> perCameraBuffers;
+
+        private int count;
+        private int stride;
+        private ComputeBufferMode mode;
+        private ComputeBufferType type;
+        public SLZPerCameraBufferStorage(int count, int stride, ComputeBufferMode mode, ComputeBufferType type)
+        {
+            this.count = count;
+            this.stride = stride;
+            this.mode = mode;
+            this.type = type;
+            perCameraBuffers = new Dictionary<Camera, ComputeBuffer>();
+        }
+
+        public void RemoveCamera(Camera cam)
+        {
+            ComputeBuffer buffer;
+            if (perCameraBuffers.TryGetValue(cam, out buffer))
+            {
+                buffer.Release();
+                perCameraBuffers.Remove(cam);
+            }
+
+        }
+        public ComputeBuffer GetBuffer(Camera cam)
+        {
+            ComputeBuffer buffer;
+            if (perCameraBuffers.TryGetValue(cam, out buffer))
+            {
+                return buffer;
+            }
+            else
+            {
+                buffer = new ComputeBuffer(count, stride, type, mode);
+                perCameraBuffers.Add(cam, buffer);
+                return buffer;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (perCameraBuffers != null)
+            {
+                //Debug.Log("Clearing RenderTextures");
+                foreach (ComputeBuffer b in perCameraBuffers.Values)
+                {
+                    b.Dispose();
+                }
+            }
+        }
+
+        public void RemoveAllNull()
+        {
+            List<Camera> removeList = new List<Camera>();
+            //Debug.Log("Count: " + perCameraRTHandle.Count);
+            foreach (var cam in perCameraBuffers)
+            {
+#if UNITY_EDITOR
+                if (cam.Key == null)
+#else
+                if (cam.Key == null || cam.Key.isActiveAndEnabled == false)
+#endif
+                {
+                    cam.Value.Dispose();
+                    removeList.Add(cam.Key);
+                    //Debug.Log("Removed RenderTexture");
+                }
+            }
+            for (int i = 0; i < removeList.Count; i++)
+            {
+                perCameraBuffers.Remove(removeList[i]);
+            }
+        }
+    }
 }

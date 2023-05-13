@@ -7,7 +7,9 @@
 // SLZ MODIFIED // Handle shaders with non-dynamic _SCREEN_SPACE_OCCLUSION
 
 #if !defined(DYNAMIC_SCREEN_SPACE_OCCLUSION)
-	#if !defined(_SCREEN_SPACE_OCCLUSION)
+	#if defined(_SCREEN_SPACE_OCCLUSION)
+		#define(_SCREEN_SPACE_OCCLUSION) true
+	#elif !defined(_SCREEN_SPACE_OCCLUSION)
 		#define _SCREEN_SPACE_OCCLUSION false
 	#endif
 #endif
@@ -27,7 +29,7 @@ struct AmbientOcclusionFactor
 half SampleAmbientOcclusion(float2 normalizedScreenSpaceUV)
 {
     float2 uv = UnityStereoTransformScreenSpaceTex(normalizedScreenSpaceUV);
-    return half(SAMPLE_TEXTURE2D_X(_ScreenSpaceOcclusionTexture, sampler_ScreenSpaceOcclusionTexture, uv).x);
+    return half(SAMPLE_TEXTURE2D_X_LOD(_ScreenSpaceOcclusionTexture, sampler_LinearClamp, uv, 0).x);
 }
 
 AmbientOcclusionFactor GetScreenSpaceAmbientOcclusion(float2 normalizedScreenSpaceUV)

@@ -24,13 +24,15 @@ namespace SLZ.SLZEditorTools
 
         public void OnProcessShader(Shader shader, ShaderSnippetData snippet, IList<ShaderCompilerData> data)
         {
-            if (snippet.shaderType == ShaderType.RayTracing)
+
+            if (snippet.shaderType == ShaderType.Surface || snippet.shaderType == ShaderType.RayTracing)
             {
+                //Debug.Log("Skipping Raytracing Stage");
                 return;
             }
 
-            List<LocalKeyword> dynamicKW = new List<LocalKeyword>();
             LocalKeyword[] localKW = ShaderUtil.GetPassKeywords(shader, snippet.pass, snippet.shaderType);
+            List<LocalKeyword> dynamicKW = new List<LocalKeyword>(localKW.Length);
 
             for (int i = 0; i < localKW.Length; i++)
             {

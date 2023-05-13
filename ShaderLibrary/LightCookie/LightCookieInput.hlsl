@@ -3,7 +3,7 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LightCookie/LightCookieTypes.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DefaultSamplers.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 // Textures
 TEXTURE2D(_MainLightCookieTexture);
@@ -29,7 +29,11 @@ CBUFFER_START(LightCookies)
     float _AdditionalLightsCookieEnableBits[(MAX_VISIBLE_LIGHTS + 31) / 32];
     float _MainLightCookieTextureFormat;
     float _AdditionalLightsCookieAtlasTextureFormat;
-//  float2   _Unused;
+#if !USE_STRUCTURED_BUFFER_FOR_LIGHT_DATA
+    float4x4 _AdditionalLightsWorldToLights[MAX_VISIBLE_LIGHTS];
+    float4 _AdditionalLightsCookieAtlasUVRects[MAX_VISIBLE_LIGHTS]; // (xy: uv size, zw: uv offset)
+    float _AdditionalLightsLightTypes[MAX_VISIBLE_LIGHTS];
+#endif
 #ifndef SHADER_API_GLES3
 CBUFFER_END
 #endif
@@ -38,16 +42,6 @@ CBUFFER_END
     StructuredBuffer<float4x4> _AdditionalLightsWorldToLightBuffer;
     StructuredBuffer<float4>   _AdditionalLightsCookieAtlasUVRectBuffer; // UV rect into light cookie atlas (xy: uv offset, zw: uv size)
     StructuredBuffer<float>    _AdditionalLightsLightTypeBuffer;
-#else
-    #ifndef SHADER_API_GLES3
-        CBUFFER_START(AdditionalLightsCookies)
-    #endif
-            float4x4 _AdditionalLightsWorldToLights[MAX_VISIBLE_LIGHTS];
-            float4 _AdditionalLightsCookieAtlasUVRects[MAX_VISIBLE_LIGHTS]; // (xy: uv size, zw: uv offset)
-            float _AdditionalLightsLightTypes[MAX_VISIBLE_LIGHTS];
-    #ifndef SHADER_API_GLES3
-        CBUFFER_END
-    #endif
 #endif
 
 // Data Getters

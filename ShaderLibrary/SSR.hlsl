@@ -454,8 +454,8 @@ float4 getSSRColor(SSRData data)
 	
 	float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
 	//uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
-	float blur = log2(_CameraOpaqueTexture_Dim.y * roughRatio);
-	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
+	float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
+	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 	//reflection *= _ProjectionParams.z;
 	//reflection.a *= smoothness*reflStr*fade;
 	//return 	totalDistance < 0.1 ? float4(1, 0, 1, 1) : float4(reflection.rgb, fade);
@@ -762,7 +762,7 @@ float4 getSSRColorNew(SSRData data)
 
 	float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPosWorld - _WorldSpaceCameraPos);
 	float blur = log2(_CameraOpaqueTexture_Dim.y * roughRatio);
-	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
+	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 	//reflection *= _ProjectionParams.z;
 	//reflection.a *= smoothness*reflStr*fade;
 	//return 	totalDistance < 0.1 ? float4(1, 0, 1, 1) : float4(reflection.rgb, fade);

@@ -3,11 +3,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
 TEXTURE2D_X_FLOAT(_CameraDepthTexture);
-SAMPLER(sampler_CameraDepthTexture);
 
 float SampleSceneDepth(float2 uv)
 {
-    return SAMPLE_TEXTURE2D_X(_CameraDepthTexture, sampler_CameraDepthTexture, UnityStereoTransformScreenSpaceTex(uv)).r;
+    return SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_PointClamp, UnityStereoTransformScreenSpaceTex(uv), 0).r;
 }
 
 float LoadSceneDepth(uint2 uv)

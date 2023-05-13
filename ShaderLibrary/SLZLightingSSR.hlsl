@@ -216,7 +216,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     else
     {
 
-        float3 oldColor = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_trilinear_clamp, UnityStereoTransformScreenSpaceTex(oldScreenUV), 0).rgb;
+        float3 oldColor = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, UnityStereoTransformScreenSpaceTex(oldScreenUV), 0).rgb;
 
 #if defined(_VOLUMETRICS_ENABLED)
         oldColor = (oldColor - volColor.rgb) / max(volColor.a, 0.0001);

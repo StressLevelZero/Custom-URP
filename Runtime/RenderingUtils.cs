@@ -245,15 +245,15 @@ namespace UnityEngine.Rendering.Universal
             if (isRenderToBackBufferTarget)
                 cmd.SetViewport(cameraData.pixelRect);
 
-            if (cameraData.isSceneViewCamera)
+            // cmd.Blit must be used in Scene View for wireframe mode to make the full screen draw with fill mode
+            // This branch of the if statement must be removed for render graph and the new command list with a novel way of using Blitter with fill mode
+            if (GL.wireframe && cameraData.isSceneViewCamera)
             {
-                cmd.SetGlobalTexture("_BlitTexture", source);
                 // This set render target is necessary so we change the LOAD state to DontCare.
                 cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget,
                     loadAction, storeAction, // color
                     RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
-                cmd.SetGlobalVector("_BlitScaleBias", scaleBias);
-                cmd.Blit(source.nameID, destination.nameID, material, passIndex);
+                cmd.Blit(source.nameID, destination.nameID);
             }
             else if (source.rt == null)
                 Blitter.BlitTexture(cmd, source.nameID, scaleBias, material, passIndex);  // Obsolete usage of RTHandle aliasing a RenderTargetIdentifier
@@ -567,6 +567,36 @@ namespace UnityEngine.Rendering.Universal
                 handle.rt.anisoLevel != anisoLevel ||
                 handle.rt.mipMapBias != mipMapBias ||
                 handle.name != name;
+        }
+
+        /// <summary>
+        /// Returns the RenderTargetIdentifier of the current camera target.
+        /// </summary>
+        /// <param name="renderingData"></param>
+        /// <returns></returns>
+        internal static RenderTargetIdentifier GetCameraTargetIdentifier(ref RenderingData renderingData)
+        {
+            // Note: We need to get the cameraData.targetTexture as this will get the targetTexture of the camera stack.
+            // Overlay cameras need to output to the target described in the base camera while doing camera stack.
+            ref CameraData cameraData = ref renderingData.cameraData;
+
+            RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : BuiltinRenderTextureType.CameraTarget;
+#if ENABLE_VR && ENABLE_XR_MODULE
+            if (cameraData.xr.enabled)
+            {
+                if (cameraData.xr.singlePassEnabled)
+                {
+                    cameraTarget = cameraData.xr.renderTarget;
+                }
+                else
+                {
+                    int depthSlice = cameraData.xr.GetTextureArraySlice();
+                    cameraTarget = new RenderTargetIdentifier(cameraData.xr.renderTarget, 0, CubemapFace.Unknown, depthSlice);
+                }
+            }
+#endif
+
+            return cameraTarget;
         }
 
         /// <summary>
