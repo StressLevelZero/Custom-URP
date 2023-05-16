@@ -161,6 +161,12 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
   //   return 0;
  }
 
+// Assuming occlusion from baked lighting. Not necessary accurate but removes glowing in shaded occluded areas
+real3 BakedLightingToSpecularOcclusion(real3 diffuse)
+{
+   return saturate(diffuse*PI_x4);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                          Dithering                                        //
 ///////////////////////////////////////////////////////////////////////////////
