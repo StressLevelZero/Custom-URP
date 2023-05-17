@@ -1,4 +1,4 @@
-// Force reimport: 1
+// Force reimport: 2
 Shader "SLZ/LitMAS/LitMAS Opaque"
 {
 	Properties
@@ -139,8 +139,8 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 			Name "BakedRaytrace"
 			Tags{ "LightMode" = "BakedRaytrace" }
 			HLSLPROGRAM
-
-			#include "LitMASInclude/BakedRayTrace.hlsl"
+			#pragma multi_compile _ _EMISSION_ON
+			#include "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
 
 			ENDHLSL
 		}

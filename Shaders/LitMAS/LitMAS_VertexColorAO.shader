@@ -140,7 +140,7 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             Tags{ "LightMode" = "BakedRaytrace" }
 			HLSLPROGRAM
 
-            #include "LitMASInclude/BakedRayTrace.hlsl"
+            #include "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
 
             ENDHLSL
         }

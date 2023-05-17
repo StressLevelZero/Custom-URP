@@ -145,7 +145,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			Tags{ "LightMode" = "BakedRaytrace" }
 			HLSLPROGRAM
 
-			#include "LitMASInclude/BakedRayTrace.hlsl"
+			#include "LitMASInclude/ShaderInjector/AudioLinkBakedRT.hlsl"
 
 			ENDHLSL
 		}

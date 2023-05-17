@@ -4,6 +4,8 @@
 #include "UnityRaytracingMeshUtils.cginc"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
+//#!INJECT_POINT INCLUDES
+
 #pragma raytracing BakeHit
 
 struct RayPayload
@@ -23,6 +25,14 @@ struct Vertex
     float3 normal;
 };
 
+//#!INJECT_POINT UNIFORMS
+
+CBUFFER_START( UnityPerMaterial )
+	float4 _BaseMap_ST;
+	half4 _BaseColor;
+	//#!INJECT_POINT MATERIAL_CBUFFER
+CBUFFER_END
+
 
   
 //https://coty.tips/raytracing-in-unity/
@@ -31,5 +41,7 @@ void MyClosestHit(inout RayPayload payload, AttributeData attributes : SV_Inters
 
 	payload.color = float4(0,0,0,1); //Intializing
 	payload.dir = float3(1,0,0);
+
+	//#!INJECT_POINT CLOSEST_HIT
 
 }
