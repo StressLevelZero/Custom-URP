@@ -9,7 +9,7 @@
 #if !defined(DYNAMIC_SCREEN_SPACE_OCCLUSION)
 	#if defined(_SCREEN_SPACE_OCCLUSION)
 		#define(_SCREEN_SPACE_OCCLUSION) true
-	#elif !defined(_SCREEN_SPACE_OCCLUSION)
+	#else
 		#define _SCREEN_SPACE_OCCLUSION false
 	#endif
 #endif
