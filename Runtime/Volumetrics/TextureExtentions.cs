@@ -20,6 +20,7 @@ using UnityEditor;
 //    public uint x;
 //    public uint y;
 //}
+
 [System.Serializable]
 public enum RGBA
 {
@@ -167,7 +168,7 @@ public static class TextureExtentions
 
     public static TextureFileExtension GetTextureExtension(this string path)
     {        
-        return (TextureFileExtension)System.Enum.Parse(typeof(TextureFileExtension), Path.GetExtension(path) );
+        return (TextureFileExtension)System.Enum.Parse(typeof(TextureFileExtension), Path.GetExtension(path).ToUpper().Replace(".", string.Empty) );
     }
 
 

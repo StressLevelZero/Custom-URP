@@ -70,8 +70,6 @@ void BlendFluorescence(inout half3 Diffuse, half4 LightColors, BRDFData brdfData
 }
 
 
-
-//TEMP port of GGX until SRP replacement is implemented to BakeryDirectionalLightmapSpecular 
 float GGXTerm (half3 N, half3 H, half NdotH, half roughness)
 {
      //float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
@@ -146,11 +144,11 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
 
      real4 direction = SAMPLE_TEXTURE2D(lightmapDirTex, lightmapDirSampler, uv);
      // Remark: baked lightmap is RGBM for now, dynamic lightmap is RGB9E5
-     real3 illuminance = real3(0.0, 0.0, 0.0);
+     //real3 illuminance = real3(0.0, 0.0, 0.0);
      //if (encodedLightmap)
      //{
          real4 encodedIlluminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgba;
-         illuminance = encodedLightmap ? DecodeLightmap(encodedIlluminance, decodeInstructions) : encodedIlluminance.rgb;
+     real3 illuminance = encodedLightmap ? DecodeLightmap(encodedIlluminance, decodeInstructions) : encodedIlluminance.rgb;
      //}
      //else
      //{
@@ -162,6 +160,12 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
      return real4(IndirectDiffuse.xyz, IndirectSpecular) ;
   //   return 0;
  }
+
+// Assuming occlusion from baked lighting. Not necessary accurate but removes glowing in shaded occluded areas
+real3 BakedLightingToSpecularOcclusion(real3 diffuse)
+{
+   return saturate(diffuse*PI_x4);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 //                          Dithering                                        //

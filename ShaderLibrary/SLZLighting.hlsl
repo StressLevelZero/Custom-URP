@@ -882,9 +882,11 @@ real3 SLZProbeReflectionDir(SLZFragData fragData, SLZSurfData surfData)
  * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
  * @param         indSSAO   Indirect screenspace ambient occlusion, not used if SSAO isn't enabled
  */
-void SLZImageBasedSpecular(inout real3 specular, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, half indSSAO)
+void SLZImageBasedSpecular(half3 diffuse, inout real3 specular, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, half indSSAO)
 {
-    real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, 1.0h);
+    half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(diffuse);
+    half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(fragData.NoV, surfData.occlusion, surfData.roughness);
+    real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion) * LitSpecularOcclusion;
 #if defined(SLZ_SSR)
 
 #endif
@@ -1054,7 +1056,7 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     // Image-based specular
     //-------------------------------------------------------------------------------------------------
     real3 reflectionDir = SLZProbeReflectionDir(fragData, surfData);
-    SLZImageBasedSpecular(specular, reflectionDir, fragData, surfData, ao.indirectAmbientOcclusion);
+    SLZImageBasedSpecular(diffuse,specular, reflectionDir, fragData, surfData, ao.indirectAmbientOcclusion);
     SLZSpecularHorizonOcclusion(specular, fragData.normal, reflectionDir);
     
     //-------------------------------------------------------------------------------------------------

@@ -239,9 +239,20 @@ half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4
 
 float CalculateProbeWeight(float3 positionWS, float4 probeBoxMin, float4 probeBoxMax)
 {
-    float blendDistance = probeBoxMax.w;
-    float3 weightDir = min(positionWS - probeBoxMin.xyz, probeBoxMax.xyz - positionWS) / blendDistance;
-    return saturate(min(weightDir.x, min(weightDir.y, weightDir.z)));
+    // SLZ MODIFIED // URP's blend distance is very stupid. This is mainly because it conflates blend distance and box projection.
+    // This is likely done to minimize variables needed for the shader, but it causes issues.
+    // The default behavior is that the box reflection direction is at the gizmo's edge, but the blend ENDs at that edge.
+    // This means that you have a probe with a perfectly lined up box with the room to get accurate reflections, the walls will go dark with any blend distance.
+    // So, do you just turn off blend distance? NO because that would cause harsh transition edges! >w<
+    // The best thing to do was have a minimal amount of blending (~0.2) and pushing out the walls a bit. Now you have wrong reflections and little blending. :/
+    // This lead to a juggle between two incorrect results of better reflections or better blending at design time. BAD, inconsistent, and hard to communicate best practices! 
+    // This change biases towards the center of the box walls and offsets the edge slightly so it doesn't falloff unnaturally. It also avoids the sharp falloff on the edges.
+    float blendDistance = probeBoxMax.w;    
+    float3 weightDir = max( (min(positionWS - probeBoxMin.xyz, probeBoxMax.xyz - positionWS) / blendDistance) + (blendDistance * .2f), 0);
+    //return saturate(min(weightDir.x, min(weightDir.y, weightDir.z))); //Yuck
+    return  saturate(weightDir.x * weightDir.y * weightDir.z);
+    // END SLZ MODIFIED
+
 }
 
 half CalculateProbeVolumeSqrMagnitude(float4 probeBoxMin, float4 probeBoxMax)
@@ -430,6 +441,7 @@ half3 SubtractDirectMainLightFromLightmap(Light mainLight, half3 normalWS, half3
 }
 
 
+
 half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float clearCoatMask,
     half3 bakedGI, half4 occlusion, float3 positionWS, // SLZ MODIFIED // made occlusion float4, not sure why? Colored occlusion?
     half3 normalWS, half3 viewDirectionWS, float2 normalizedScreenSpaceUV)
@@ -439,18 +451,22 @@ half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float cl
     half fresnelTerm = Pow4(1.0 - NoV);
 
     half3 indirectDiffuse = bakedGI;
-    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, 1.0h, normalizedScreenSpaceUV);
+    // SLZ MODIFIED // Specular occlusion. Adding a some hacky methods of using AO for spec occlusion. Not perfect, but helps a lot in shadowed areas.    
+    half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(bakedGI);
+    half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(NoV, occlusion, brdfData.roughness);
+    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, AOSpecularOcclusion, normalizedScreenSpaceUV)*LitSpecularOcclusion ;
+    // END SLZ MODIFIED
 
     half3 color = EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
 
     // SLZ MODIFIED // Add fluorescence calculation
     BlendFluorescence(color, half4(bakedGI, 0), brdfData);
     // END SLZ MODIFIED
-
-    if (IsOnlyAOLightingFeatureEnabled())
-    {
-        color = half3(1,1,1); // "Base white" for AO debug lighting mode
-    }
+    // SLZ MODIFIED // This is in the function and does nothing unless this keyword is enabled
+    #if defined(DEBUG_DISPLAY) 
+    if (IsOnlyAOLightingFeatureEnabled()) color = half3(1,1,1); // "Base white" for AO debug lighting mode
+    #endif
+    // END SLZ MODIFIED
 
 #if defined(_CLEARCOAT) || defined(_CLEARCOATMAP)
     half3 coatIndirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfDataClearCoat.perceptualRoughness, 1.0h, normalizedScreenSpaceUV);

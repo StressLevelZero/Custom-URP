@@ -155,6 +155,7 @@ void MAIN_GAUSSIAN(uint3 groupId : SV_GroupID, uint2 groupThreadId : SV_GroupThr
     uint stereoEyeIndex = groupId.z;
 
     // Upper-left pixel coordinate of quad that this thread will read
+
     int2 threadUL = (groupThreadId << 1) + (groupId.xy << 3) - int2(4,4);
     uint2 uthreadUL = uint2(max(0, threadUL));
 

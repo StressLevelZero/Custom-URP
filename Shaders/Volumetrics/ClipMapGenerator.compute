@@ -52,7 +52,7 @@ void ClipMapGen (uint3 id : SV_DispatchThreadID)
 		step(MapUVW.y, 1) * step(0, MapUVW.y) *
 		step(MapUVW.z, 1) * step(0, MapUVW.z);
 
-	float tempden = distance(WorldCoord.xyz,0) > 3 ? 0:10 ;
+	//float tempden = distance(WorldCoord.xyz,0) > 3 ? 0:10 ;
 
 	
 	//Sample baked volume and clip it off to its area
@@ -81,9 +81,9 @@ void ClipMapHeight(uint3 id : SV_DispatchThreadID)
 
 	float4 WorldCoord = UVW * ClipmapScale + ClipmapWorldPosition.xyzz;
 
-	float heightDens = WorldCoord.y > 0 ? 0:1;
+	//float heightDens = WorldCoord.y > 0 ? 0:1;
 
-	heightDens = _GlobalExtinction;
+	float heightDens = _GlobalExtinction;
 
 	Result[id.xyz] = max(PreResult[id.xyz].rgba,float4(0,0,0,heightDens));
 ;
