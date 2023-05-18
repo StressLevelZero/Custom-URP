@@ -34,7 +34,7 @@ public class VolumetricBaking : EditorWindow
     public bool SkyboxContribution = false;
     public Cubemap CustomEnvorment;
     public int EnvLightSamples = 2048;
-
+	public int RayChunkSize = 2048;
     public float VolExposure = 0.05f;
 
     //interal
@@ -49,8 +49,9 @@ public class VolumetricBaking : EditorWindow
         GUI.enabled = true;
         VolExposure = EditorGUILayout.Slider("Debug Exposure", RefreshExposure(VolExposure), 0, 2);
         DXRAcceletration = EditorGUILayout.Toggle("DXR Acceletration", DXRAcceletration);
+		RayChunkSize = EditorGUILayout.IntSlider("DXR Ray Chunk Size", RayChunkSize, 256, 8192);
 
-        EditorGUILayout.Space();
+		EditorGUILayout.Space();
         EditorGUILayout.LabelField("Light Settings", EditorStyles.boldLabel);
         AreaLightSamples = EditorGUILayout.IntSlider("Area Samples", AreaLightSamples, 1, 1024);
 
@@ -777,147 +778,160 @@ public class VolumetricBaking : EditorWindow
 
         Vector3Int threads = new Vector3Int();
 
-        for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
+
+		List<Light> PointLights, ConeLights, DirectionalLights, AreaLights;
+
+		Light[] Lights = GatherBakedLights();
+
+		PointLights = new List<Light>();
+		ConeLights = new List<Light>();
+		DirectionalLights = new List<Light>();
+		AreaLights = new List<Light>();
+
+		for (int i = 0; i < Lights.Length; i++)
+		{
+
+			switch (Lights[i].type)
+			{
+				case LightType.Point:
+					PointLights.Add(Lights[i]);
+					break;
+
+				case LightType.Spot:
+					ConeLights.Add(Lights[i]);
+					break;
+
+				case LightType.Directional:
+					DirectionalLights.Add(Lights[i]);
+					break;
+
+				case LightType.Area:
+					AreaLights.Add(Lights[i]);
+					break;
+
+				case LightType.Disc:
+					AreaLights.Add(Lights[i]); //Stacking area and disc
+					break;
+				default:
+
+					break;
+			}
+		}
+
+		Debug.Log(PointLights.Count + "Point Lights, " + ConeLights.Count + " Cone Lights, " + DirectionalLights.Count + " Dir Lights, " + AreaLights.Count + " area lights.");
+
+		//Set up buffers with data stride. Keeping a min count of 1 to keep buffer valid. Get's skipped in shader.
+		ComputeBuffer pointBuffer = new ComputeBuffer(Mathf.Max(PointLights.Count, 1), (3 + 4) * 4);
+		ComputeBuffer coneBuffer = new ComputeBuffer(Mathf.Max(ConeLights.Count, 1), (3 + 4 + 3 + 2) * 4);
+		ComputeBuffer dirBuffer = new ComputeBuffer(Mathf.Max(DirectionalLights.Count, 1), (3 + 4) * 4);
+		ComputeBuffer areaBuffer = new ComputeBuffer(Mathf.Max(AreaLights.Count, 1), (4 * 4 + 4 * 4 + 3 + 4 + 3) * 4);
+
+		PointLightData[] PointLDatas = new PointLightData[PointLights.Count];
+		ConeLightData[] ConeLDatas = new ConeLightData[ConeLights.Count];
+		DirLightData[] DirLDatas = new DirLightData[DirectionalLights.Count];
+		AreaLightData[] AreaLDatas = new AreaLightData[AreaLights.Count];
+
+		for (int i = 0; i < PointLights.Count; i++)
+		{
+			PointLDatas[i].PointLightsPos = PointLights[i].transform.position;
+			PointLDatas[i].PointLightsColors = ColorExtraction(PointLights[i]);
+		}
+
+		for (int i = 0; i < ConeLights.Count; i++)
+		{
+			ConeLDatas[i].ConeLightsWS = ConeLights[i].transform.position;
+			ConeLDatas[i].ConeLightsColors = ColorExtraction(ConeLights[i]);
+			ConeLDatas[i].ConeLightsDir = ConeLights[i].transform.forward;
+
+			float flPhiDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].spotAngle * 0.5f * Mathf.Deg2Rad)); // outer cone
+			float flThetaDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].innerSpotAngle * 0.5f * Mathf.Deg2Rad)); // inner cone
+
+			ConeLDatas[i].ConeLightsPram = new Vector4(flPhiDot, 1.0f / Mathf.Max(0.01f, flThetaDot - flPhiDot), 0, 0);
+		}
+
+		for (int i = 0; i < DirectionalLights.Count; i++)
+		{
+			DirLDatas[i].DirLightsDir = DirectionalLights[i].transform.forward;
+			DirLDatas[i].DirLightsColors = ColorExtraction(DirectionalLights[i]);
+		}
+
+		for (int i = 0; i < AreaLights.Count; i++)
+		{
+			AreaLDatas[i].AreaLightsPos = AreaLights[i].transform.position;
+			AreaLDatas[i].AreaLightsMatrix = Matrix4x4.TRS(AreaLights[i].transform.position, AreaLights[i].transform.rotation, Vector3.one);
+			AreaLDatas[i].AreaLightsMatrixInv = AreaLDatas[i].AreaLightsMatrix.inverse;
+			AreaLDatas[i].AreaLightsColors = ColorExtraction(AreaLights[i]);
+			AreaLDatas[i].AreaLightsSize = new Vector3(AreaLights[i].areaSize.x, AreaLights[i].areaSize.y, AreaLights[i].type == LightType.Disc ? 1 : 0); //Packing for area or disc logic
+		}
+
+		pointBuffer.SetData(PointLDatas);
+		coneBuffer.SetData(ConeLDatas);
+		dirBuffer.SetData(DirLDatas);
+		areaBuffer.SetData(AreaLDatas);
+
+		Texture skyTex = MakeEnvironmentalCubemap();
+		CommandBuffer cmd = CommandBufferPool.Get();
+
+		cmd.SetRayTracingIntParam(rtshader, "PointLightCount", PointLDatas.Length); //Add a stack overflow loop or computebuffer
+		cmd.SetRayTracingBufferParam(rtshader, "PLD", pointBuffer);
+
+		//Cone
+		cmd.SetRayTracingIntParam(rtshader, "ConeLightCount", ConeLDatas.Length); //Add a stack overflow loop or computebuffer
+		cmd.SetRayTracingBufferParam(rtshader, "CLD", coneBuffer);
+
+		//Directional
+		cmd.SetRayTracingIntParam(rtshader, "DirLightCount", DirLDatas.Length); //Add a stack overflow loop or computebuffer
+		cmd.SetRayTracingBufferParam(rtshader, "DLD", dirBuffer);
+
+		//Area
+		cmd.SetRayTracingIntParam(rtshader, "AreaLightCount", AreaLDatas.Length); //Add a stack overflow loop or computebuffer
+		cmd.SetRayTracingIntParam(rtshader, "AreaLightSamples", System.Convert.ToInt32(AreaLightSamples));
+		cmd.SetRayTracingBufferParam(rtshader, "ALD", areaBuffer);
+
+		//Env
+		rtshader.SetTexture("_SkyTexture", skyTex);
+		cmd.SetRayTracingIntParam(rtshader, "EnvLightSamples", System.Convert.ToInt32(EnvLightSamples));
+
+		int id_startIdx = Shader.PropertyToID("StartRayIdx");
+		cmd.SetRayTracingIntParam(rtshader, "PerDispatchRayCount", RayChunkSize);
+
+		Graphics.ExecuteCommandBuffer(cmd);
+		cmd.Clear();
+		for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
         {
-            threads = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+
+			threads = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
             RenderTexture RT3d = initializeVolume(j);
-            rtshader.SetTexture("g_Output", RT3d);
+			cmd.SetRayTracingTextureParam(rtshader, "g_Output", RT3d);
 
-            ///
-            /// 
-            /// 
+            cmd.SetRayTracingVectorParam(rtshader, "Size", VolumetricRegisters.volumetricAreas[j].NormalizedScale);
+			cmd.SetRayTracingVectorParam(rtshader, "WPosition", VolumetricRegisters.volumetricAreas[j].Corner);
+            cmd.SetRayTracingFloatParam(rtshader, "_Seed", (Random.Range(0.0f, 64.0f)));
+			Graphics.ExecuteCommandBuffer(cmd);
+			cmd.Clear();
+			//Point
 
-            List<Light> PointLights, ConeLights, DirectionalLights, AreaLights;
+			//Dispatching
+			int maxRays = PointLDatas.Length + ConeLDatas.Length + DirLDatas.Length + EnvLightSamples + (AreaLDatas.Length * AreaLightSamples);
+			Debug.Log("Max Rays: " + maxRays);
+			
+			for (int i = 0; i < maxRays; i += RayChunkSize)
+			{
+				cmd.SetRayTracingIntParam(rtshader, id_startIdx, i);
+				cmd.DispatchRays(rtshader, "MainRayGenShader", (uint)threads.x, (uint)threads.y, (uint)threads.z);
+				Graphics.ExecuteCommandBuffer(cmd);
+				cmd.Clear();
+			}
 
-            Light[] Lights = GatherBakedLights();
+			
+			///
+			/// 
+			///
 
-            PointLights = new List<Light>();
-            ConeLights = new List<Light>();
-            DirectionalLights = new List<Light>();
-            AreaLights = new List<Light>();
-
-            for (int i = 0; i < Lights.Length; i++)
-            {
-
-                switch (Lights[i].type)
-                {
-                    case LightType.Point:
-                        PointLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Spot:
-                        ConeLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Directional:
-                        DirectionalLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Area:
-                        AreaLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Disc:
-                        AreaLights.Add(Lights[i]); //Stacking area and disc
-                        break;
-                    default:
-
-                        break;
-                }
-            }
-
-            Debug.Log(PointLights.Count + "Point Lights, " + ConeLights.Count + " Cone Lights, " + DirectionalLights.Count + " Dir Lights, " + AreaLights.Count + " area lights.");
-
-            //Set up buffers with data stride. Keeping a min count of 1 to keep buffer valid. Get's skipped in shader.
-            ComputeBuffer pointBuffer = new ComputeBuffer(Mathf.Max(PointLights.Count,1), (3 + 4) * 4);
-            ComputeBuffer coneBuffer = new ComputeBuffer(Mathf.Max(ConeLights.Count,1), (3 + 4 + 3 + 2) * 4);
-            ComputeBuffer dirBuffer = new ComputeBuffer(Mathf.Max(DirectionalLights.Count,1), (3 + 4) * 4);
-            ComputeBuffer areaBuffer = new ComputeBuffer(Mathf.Max(AreaLights.Count,1), (4 * 4 + 4 * 4 + 3 + 4 + 3) * 4);
-
-            PointLightData[] PointLDatas = new PointLightData[PointLights.Count];
-            ConeLightData[] ConeLDatas =  new ConeLightData[ConeLights.Count] ;
-            DirLightData[] DirLDatas = new DirLightData[DirectionalLights.Count];
-            AreaLightData[] AreaLDatas = new AreaLightData[AreaLights.Count];
-
-            for (int i = 0; i < PointLights.Count; i++)
-            {
-                PointLDatas[i].PointLightsPos = PointLights[i].transform.position;
-                PointLDatas[i].PointLightsColors = ColorExtraction(PointLights[i]);
-            }
-
-            for (int i = 0; i < ConeLights.Count; i++)
-            {
-                ConeLDatas[i].ConeLightsWS = ConeLights[i].transform.position;
-                ConeLDatas[i].ConeLightsColors = ColorExtraction(ConeLights[i]);
-                ConeLDatas[i].ConeLightsDir = ConeLights[i].transform.forward;
-
-                float flPhiDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].spotAngle * 0.5f * Mathf.Deg2Rad)); // outer cone
-                float flThetaDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].innerSpotAngle * 0.5f * Mathf.Deg2Rad)); // inner cone
-
-                ConeLDatas[i].ConeLightsPram = new Vector4(flPhiDot, 1.0f / Mathf.Max(0.01f, flThetaDot - flPhiDot), 0, 0);
-            }
-
-            for (int i = 0; i < DirectionalLights.Count; i++)
-            {
-                DirLDatas[i].DirLightsDir = DirectionalLights[i].transform.forward;
-                DirLDatas[i].DirLightsColors = ColorExtraction(DirectionalLights[i]);
-            }
-
-            for (int i = 0; i < AreaLights.Count; i++)
-            {
-                AreaLDatas[i].AreaLightsPos = AreaLights[i].transform.position;
-                AreaLDatas[i].AreaLightsMatrix = Matrix4x4.TRS(AreaLights[i].transform.position, AreaLights[i].transform.rotation, Vector3.one);
-                AreaLDatas[i].AreaLightsMatrixInv = AreaLDatas[i].AreaLightsMatrix.inverse;
-                AreaLDatas[i].AreaLightsColors = ColorExtraction(AreaLights[i]);
-                AreaLDatas[i].AreaLightsSize = new Vector3(AreaLights[i].areaSize.x, AreaLights[i].areaSize.y, AreaLights[i].type == LightType.Disc ? 1 : 0); //Packing for area or disc logic
-            }
-
-            pointBuffer.SetData(PointLDatas);
-            coneBuffer.SetData(ConeLDatas);
-            dirBuffer.SetData(DirLDatas);
-            areaBuffer.SetData(AreaLDatas);
-
-
-            //General
-            rtshader.SetVector("Size", VolumetricRegisters.volumetricAreas[j].NormalizedScale);
-            rtshader.SetVector("WPosition", VolumetricRegisters.volumetricAreas[j].Corner);
-            rtshader.SetFloat("_Seed", (Random.Range(0.0f, 64.0f)));
-
-            //Point
-            rtshader.SetInt("PointLightCount", PointLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetBuffer("PLD", pointBuffer); ;
-
-            //Cone
-            rtshader.SetInt("ConeLightCount", ConeLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetBuffer("CLD", coneBuffer);
-
-            //Directional
-            rtshader.SetInt("DirLightCount", DirLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetBuffer("DLD", dirBuffer);
-
-            //Area
-            rtshader.SetInt("AreaLightCount", AreaLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetInt("AreaLightSamples", System.Convert.ToInt32(AreaLightSamples));
-            rtshader.SetBuffer("ALD", areaBuffer);
-
-            //Env
-            rtshader.SetTexture("_SkyTexture", MakeEnvironmentalCubemap());
-            rtshader.SetInt("EnvLightSamples", System.Convert.ToInt32(EnvLightSamples));
-
-            //Dispatching
-            rtshader.Dispatch("MainRayGenShader", threads.x, threads.y, threads.z);
-
-            pointBuffer.Release();
-            coneBuffer.Release();
-            dirBuffer.Release();
-            areaBuffer.Release();
-            ///
-            /// 
-            ///
-
-            string path = CheckDirectoryAndReturnPath() + j;
+			string path = CheckDirectoryAndReturnPath() + j;
 			Texture3D ReadBackTex = ReadRT2Tex3D(RT3d);
 			RT3d.Release();
+			DestroyImmediate(RT3d);
 			Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
 			AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
 			VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
@@ -925,10 +939,19 @@ public class VolumetricBaking : EditorWindow
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
 
         }
-
-        Running = false;
+		pointBuffer.Release();
+		coneBuffer.Release();
+		dirBuffer.Release();
+		areaBuffer.Release();
+		Running = false;
         EditorUtility.ClearProgressBar();
-
+		if (skyTex.GetType() == typeof(RenderTexture))
+		{
+			RenderTexture rtSky = skyTex as RenderTexture;
+			rtSky.DiscardContents(true, true);
+			rtSky.Release();
+			DestroyImmediate(rtSky);
+		}
         accelerationStructure.Dispose();
 
         System.DateTime endTime = System.DateTime.Now;

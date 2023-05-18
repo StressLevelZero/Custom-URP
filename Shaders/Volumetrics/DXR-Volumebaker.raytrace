@@ -22,6 +22,8 @@ uint	DirLightCount;
 uint	AreaLightCount;
 uint	AreaLightSamples;
 uint	EnvLightSamples;
+int	PerDispatchRayCount;
+int	StartRayIdx;
 
 struct PointLightData{
 float3	PointLightsWS;
@@ -212,7 +214,7 @@ float4 DirLightCast(float3 VoxelWS, uint Num){
 //Area Light
 //
 
-float4 AreaLightCast(float3 VoxelWS, uint Num){
+float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
   //  
     float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3], ALD[Num].AreaLightsMatrix[1][3],ALD[Num].AreaLightsMatrix[2][3]);
     float3 VoxelLS =  mul( float4(VoxelWS.xyz,1)-lsPos, ALD[Num].AreaLightsMatrix);
@@ -220,7 +222,7 @@ float4 AreaLightCast(float3 VoxelWS, uint Num){
     if (VoxelLS.z <= 0) return areaLightAccumulation; //Early out
     uint3 id =  DispatchRaysIndex().xyz; //redundent, oh well
 
-  for (int j = 0; j < AreaLightSamples; j++) 
+  for (int j = startIdx; j < endIdx; j++) 
   {
     //int loop64 = fmod(j + AreaLightSamples + id.x+id.y+id.z,64);
     float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz -lsPos , ALD[Num].AreaLightsMatrix).xyz ;
@@ -254,7 +256,7 @@ float4 AreaLightCast(float3 VoxelWS, uint Num){
 //Disk light
 //
 
-float4 DiscLightCast(float3 VoxelWS, uint Num){
+float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
   //  
     float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3], ALD[Num].AreaLightsMatrix[1][3],ALD[Num].AreaLightsMatrix[2][3]);
     float3 VoxelLS =  mul( float4(VoxelWS.xyz,1)-lsPos, ALD[Num].AreaLightsMatrix);
@@ -263,7 +265,7 @@ float4 DiscLightCast(float3 VoxelWS, uint Num){
     float4 areaLightAccumulation = float4(0,0,0,0);
     if (VoxelLS.z <= 0) return areaLightAccumulation;
 
-  for (int j = 0; j < AreaLightSamples; j++) 
+  for (int j = startIdx; j < endIdx; j++) 
   {
     float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz -lsPos , ALD[Num].AreaLightsMatrix).xyz ;
     //https://stackoverflow.com/questions/5837572/generate-a-random-point-within-a-circle-uniformly
@@ -304,11 +306,11 @@ float4 DiscLightCast(float3 VoxelWS, uint Num){
 }
 
 //Cast Ray from vox to env
-float4 EnvCast(float3 VoxelWS){
+float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx){
 
     float4 Accumulation = float4(0,0,0,0);
 
-       for (int j = 0; j < EnvLightSamples; j++) 
+       for (int j = startIdx; j < endIdx; j++) 
         {
             uint3 id =  DispatchRaysIndex().xyz;
             float3 rayDirection = sphericalFibonacci(j, EnvLightSamples) + ( normalize(float3(rand(id.xyz+j),rand(id.xyz+j+33) , rand(id.xyz+j+120)) -.5) * 2 * (4*M_PI / EnvLightSamples) )  ;
@@ -347,16 +349,45 @@ void MainRayGenShader()
     float3 launchDim = DispatchRaysDimensions().xyz; //whd
     float3 VoxelWorldPosition = WPosition +  ( (launchIndex + .5 )/(launchDim  / Size ) );
 
-	float4 LightAccumulation = float4(0,0,0,0);
+	float4 LightAccumulation = g_Output[launchIndex];
 
-	for (int i=0; i< PointLightCount; i++)  LightAccumulation += PointLightCast(VoxelWorldPosition, i) ; 
-	for (int i=0; i< ConeLightCount; i++)	LightAccumulation += ConeLightCast(VoxelWorldPosition, i) ; 
-	for (int i=0; i< DirLightCount; i++)	LightAccumulation += DirLightCast(VoxelWorldPosition, i) ; 
-	for (int i=0; i< AreaLightCount; i++){	
-      if (ALD[i].AreaLightsSize.z == 0)  LightAccumulation += AreaLightCast(VoxelWorldPosition, i) ; 
-      else  LightAccumulation += DiscLightCast(VoxelWorldPosition, i) ;
+	int start = StartRayIdx;
+	int end = StartRayIdx + PerDispatchRayCount;
+	int maxIter = min(PointLightCount, end);
+	for (int i = start; i < maxIter; i++) LightAccumulation += PointLightCast(VoxelWorldPosition, i);
+	
+	start = max(0, start - (int)PointLightCount);
+	end -= PointLightCount;
+	maxIter = min(ConeLightCount, end);
+	for (int i = start; i < maxIter; i++)  LightAccumulation += ConeLightCast(VoxelWorldPosition, i); 
+
+	start = max(0, start - (int)ConeLightCount);
+	end -= ConeLightCount;
+	maxIter = min(DirLightCount, end);
+	for (int i = start; i < maxIter; i++)   LightAccumulation += DirLightCast(VoxelWorldPosition, i);
+
+	start = max(0, start - (int)DirLightCount);
+	end -= (int)DirLightCount;
+	maxIter = min(EnvLightSamples, end);
+    LightAccumulation += EnvCast(VoxelWorldPosition, start, maxIter);
+
+	start = max(0, start - (int)EnvLightSamples);
+	end -= (int)EnvLightSamples;
+	maxIter = min(AreaLightSamples, end);
+	int light = 0;
+	while (end > 0)
+	{
+
+		if (ALD[light].AreaLightsSize.z == 0)  LightAccumulation += AreaLightCast(VoxelWorldPosition, light, start, maxIter); 
+		else  LightAccumulation += DiscLightCast(VoxelWorldPosition, light, start, maxIter);
+
+		start = max(0, start - (int)AreaLightSamples);
+		end -= (int)AreaLightSamples;
+		maxIter = min(AreaLightSamples, end);
+		light++;
     }
-    LightAccumulation += EnvCast(VoxelWorldPosition);
+
+
   //  LightAccumulation.a = 1; //filling alpha
     g_Output[launchIndex] = LightAccumulation;
 }
