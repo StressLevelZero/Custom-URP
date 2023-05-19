@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.SceneManagement;
@@ -899,14 +900,18 @@ public class VolumetricBaking : EditorWindow
 		cmd.Clear();
 		for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
         {
+			Vector3Int resolution = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+			threads = resolution;
+			Vector3 boxSize = VolumetricRegisters.volumetricAreas[j].BoxScale;
+			float maxVoxelSize = math.max(boxSize.x / (float)resolution.x, math.max(boxSize.y / (float)resolution.y, boxSize.z / (float)resolution.z));
 
-			threads = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
-            RenderTexture RT3d = initializeVolume(j);
+			RenderTexture RT3d = initializeVolume(j);
 			cmd.SetRayTracingTextureParam(rtshader, "g_Output", RT3d);
 
             cmd.SetRayTracingVectorParam(rtshader, "Size", VolumetricRegisters.volumetricAreas[j].NormalizedScale);
 			cmd.SetRayTracingVectorParam(rtshader, "WPosition", VolumetricRegisters.volumetricAreas[j].Corner);
-            cmd.SetRayTracingFloatParam(rtshader, "_Seed", (Random.Range(0.0f, 64.0f)));
+            cmd.SetRayTracingFloatParam(rtshader, "_Seed", (UnityEngine.Random.Range(0.0f, 64.0f)));
+			cmd.SetRayTracingFloatParam(rtshader, "HalfVoxelSize", maxVoxelSize * 0.5f);
 			Graphics.ExecuteCommandBuffer(cmd);
 			cmd.Clear();
 			//Point
@@ -1002,7 +1007,7 @@ public class VolumetricBaking : EditorWindow
                 BakingShader.SetFloat("AreaLightSamples", AreaLightSamples);
                 BakingShader.SetMatrix("AreaMatrix", Matrix4x4.Rotate(light.transform.rotation));
 
-                BakingShader.SetFloat("_Seed", Random.value);
+                BakingShader.SetFloat("_Seed", UnityEngine.Random.value);
 
                 break;
             case LightType.Disc:
@@ -1011,7 +1016,7 @@ public class VolumetricBaking : EditorWindow
                 BakingShader.SetFloat("AreaLightSamples", AreaLightSamples);
                 BakingShader.SetMatrix("AreaMatrix", Matrix4x4.Rotate(light.transform.rotation));
 
-                BakingShader.SetFloat("_Seed", Random.value);
+                BakingShader.SetFloat("_Seed", UnityEngine.Random.value);
                 break;
             default:
                 return;

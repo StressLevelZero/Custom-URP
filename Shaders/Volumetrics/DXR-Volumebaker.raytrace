@@ -24,6 +24,7 @@ uint	AreaLightSamples;
 uint	EnvLightSamples;
 int	PerDispatchRayCount;
 int	StartRayIdx;
+float HalfVoxelSize;
 
 struct PointLightData{
 float3	PointLightsWS;
@@ -147,7 +148,7 @@ float4 PointLightCast(float3 VoxelWS, uint Num){
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-	return (1-payload.color.a) * InverseSquare(LightRadius) * PLD[Num].PointLightsColor;
+	return (1-payload.color.a) * InverseSquare(max(LightRadius, HalfVoxelSize)) * PLD[Num].PointLightsColor;
 }
 
 ///
@@ -184,7 +185,7 @@ float4 ConeLightCast(float3 VoxelWS, uint Num){
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-	return  InverseSquare(LightRadius) * vSpotAtten * (1-payload.color.a) * CLD[Num].ConeLightsColor;
+	return  InverseSquare(max(LightRadius, HalfVoxelSize) ) * vSpotAtten * (1-payload.color.a) * CLD[Num].ConeLightsColor;
 }
 
 //
