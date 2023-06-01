@@ -10,7 +10,7 @@
 #define PI_R_REAL real(0.318309886183790672)
 
 #if defined(_BRDFMAP)
-TEXTURE2D(g_tBRDFMap); SamplerState BRDF_linear_clamp_sampler; //Force sampler state to avoid wrapping issues 
+TEXTURE2D(g_tBRDFMap); //Force sampler state to avoid wrapping issues 
 #endif
 
 //Extention Libary to add into pipeline. Should make future package upgrading simpler.

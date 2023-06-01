@@ -336,7 +336,7 @@ real3 SLZLambertDiffuse(const real3 attenLightColor, const real3 normal, const r
 
 real4 BDRFLUTSAMPLER(real2 UV){
     #if defined(_BRDFMAP)
-        return SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, UV, 0);
+        return SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, sampler_LinearClamp, UV, 0);
     #else
         return 0;
     #endif
@@ -677,7 +677,7 @@ real3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfDat
 
     #if defined(ANIME)
     #if defined(_BRDFMAP)
-        real3 bdrfTerm = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(specular.r, specInfo.NoH), 0).rgb;
+        real3 bdrfTerm = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, sampler_LinearClamp, float2(specular.r, specInfo.NoH), 0).rgb;
         specular += bdrfTerm;
     #endif
     #endif
