@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------------
 // SCREEN SPACE REFLECTIONS
 // 
-// Original shader by error.mdl, Toocanz, and Xiexe. Modified by error.mdl for Bonelab's custom render pipeline
+// Original shader by error.mdl, Toocanzs, and Xiexe. Modified by error.mdl for Bonelab's custom render pipeline
 // to work with the SRP and take advantage of having a hierarchical depth texture and mips of the screen color
 //
 //-----------------------------------------------------------------------------------
