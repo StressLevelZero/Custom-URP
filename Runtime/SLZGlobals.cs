@@ -13,6 +13,8 @@ namespace UnityEngine.Rendering.Universal
 {
     public class SLZGlobals
     {
+
+
         static SLZGlobals s_Instance;
         // Blue Noise
         private ComputeBuffer BlueNoiseCB;
@@ -44,6 +46,8 @@ namespace UnityEngine.Rendering.Universal
         private ComputeBuffer SSRGlobalCB;
 
         private double extraSmoothedDT = 0.01111;
+
+        
         private SLZGlobals()
         {
             BlueNoiseCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
@@ -193,12 +197,18 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
-      
 
+        int purgeCounter = 0;
+        const int maxCount = 900;
         public void RemoveTempRTStupid()
         {
-            PerCameraOpaque.RemoveAllNull();
-            PerCameraPrevHiZ.RemoveAllNull();
+            purgeCounter++;
+            if (purgeCounter > maxCount)
+            {
+                PerCameraOpaque.RemoveAllNull();
+                PerCameraPrevHiZ.RemoveAllNull();
+                purgeCounter = 0;
+            }
         }
 
         public static void Dispose()
