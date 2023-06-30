@@ -897,7 +897,7 @@ void SLZImageBasedSpecular(half3 diffuse, inout real3 specular, half3 reflection
     fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
     real3 IBSpec = real3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
     
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
         reflectionProbe *= indSSAO;
     }
@@ -946,7 +946,7 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
     Light mainLight = GetMainLight(fragData.shadowCoord, fragData.position, fragData.shadowMask);
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, mainLight);
 
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
         diffuseBRDF *= directSSAO;
     }
@@ -982,7 +982,7 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
 void SLZAddLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData, Light addLight, half directSSAO)
 {
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, addLight);
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
         diffuseBRDF *= directSSAO;
     }
@@ -1024,7 +1024,7 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     
     //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting) 
 	AmbientOcclusionFactor ao;
-	UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+	UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
 		ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
 		surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal

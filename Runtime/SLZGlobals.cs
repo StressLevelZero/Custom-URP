@@ -215,7 +215,7 @@ namespace UnityEngine.Rendering.Universal
 
 
 		int purgeCounter = 0;
-		const int maxCount = 360; 
+		const int maxCount = 900; 
 		public void RemoveTempRTStupid()
 		{
 			purgeCounter++;
