@@ -6,12 +6,6 @@
 //#!TEXCOORD float3 unskinnedObjPos 1
 //#!INJECT_END
 
-//#!INJECT_BEGIN MATERIAL_CBUFFER 0
-	float4x4 EllipsoidPosArray[HitArrayCount];
-	int _NumberOfHits;
-	float4 _HitColor;
-//#!INJECT_END
-
 //#!INJECT_BEGIN VERTEX_END 1
 	o.unskinnedObjPos = v.uv1.xyz;
 //#!INJECT_END

@@ -3,7 +3,7 @@
 //#!INJECT_END
 
 //#!INJECT_BEGIN MATERIAL_CBUFFER 0
-	float4x4 EllipsoidPosArray[HitArrayCount];
+	half4x4 EllipsoidPosArray[HitArrayCount];
 	int _NumberOfHits;
-	float4 _HitColor;
+	half4 _HitColor;
 //#!INJECT_END

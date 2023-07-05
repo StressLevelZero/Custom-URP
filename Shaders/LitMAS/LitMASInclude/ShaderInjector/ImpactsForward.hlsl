@@ -77,6 +77,9 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 
+// Begin Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
+#include "LitMASInclude/PosespaceImpacts.hlsl"
+// End Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection INCLUDES from Injection_Impacts.hlsl ----------------------------------------------------------
 #include "LitMASInclude/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts.hlsl ----------------------------------------------------------
@@ -145,11 +148,11 @@ float4 _DetailMap_ST;
 half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Impacts.hlsl ----------------------------------------------------------
-	float4x4 EllipsoidPosArray[HitArrayCount];
+// Begin Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
+	half4x4 EllipsoidPosArray[HitArrayCount];
 	int _NumberOfHits;
-	float4 _HitColor;
-// End Injection MATERIAL_CBUFFER from Injection_Impacts.hlsl ----------------------------------------------------------
+	half4 _HitColor;
+// End Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
 	half  _Emission;
 	half4 _EmissionColor;
