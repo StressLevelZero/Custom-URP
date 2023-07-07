@@ -71,7 +71,8 @@ AmbientOcclusionFactor GetScreenSpaceAmbientOcclusion(float2 normalizedScreenSpa
 AmbientOcclusionFactor GetScreenSpaceAmbientOcclusionDir(InputData inputData)
 {
 	AmbientOcclusionFactor aoFactor;
-
+	aoFactor.directAmbientOcclusion = 1;
+	aoFactor.indirectAmbientOcclusion = 1;
 	#if !defined(_SURFACE_TYPE_TRANSPARENT)
     
 	if (BRANCH_SCREEN_SPACE_OCCLUSION)
@@ -84,9 +85,7 @@ AmbientOcclusionFactor GetScreenSpaceAmbientOcclusionDir(InputData inputData)
         aoFactor.indirectAmbientOcclusion = ssao.x;
         aoFactor.directAmbientOcclusion = lerp(half(1.0), ssao.x, _AmbientOcclusionParam.w);
     }
-	#else
-	aoFactor.directAmbientOcclusion = 1;
-	aoFactor.indirectAmbientOcclusion = 1;
+
 	#endif
 
 	#if defined(DEBUG_DISPLAY)
