@@ -118,10 +118,13 @@ half4 frag(v2f i) : SV_Target
 	half4 emission = half4(0, 0, 0, 0);
 
 // Begin Injection EMISSION from Injection_Emission_Meta.hlsl ----------------------------------------------------------
-	half4 emissionDefault = _EmissionColor * SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, i.uv);
-	emissionDefault.rgb *= _BakedMutiplier * _Emission;
-	emissionDefault.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emissionDefault.a);
-	emission += emissionDefault;
+	if (_Emission)
+	{
+		half4 emissionDefault = _EmissionColor * SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, i.uv);
+		emissionDefault.rgb *= _BakedMutiplier * _Emission;
+		emissionDefault.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emissionDefault.a);
+		emission += emissionDefault;
+	}
 // End Injection EMISSION from Injection_Emission_Meta.hlsl ----------------------------------------------------------
 
 	metaInput.Emission = emission.rgb;

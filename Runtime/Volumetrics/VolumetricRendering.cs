@@ -1198,19 +1198,20 @@ public class VolumetricRendering : MonoBehaviour
         int MediaCount = VolumetricRegisters.VolumetricMediaEntities.Count;
         int maxCount = Math.Max(MediaCount, 1);
         
-        // if (participatingMediaSphereBuffer == null && MediaCount != 0)
-        // {
+        if (participatingMediaSphereBuffer == null)
+        {
             participatingMediaSphereBuffer = new ComputeBuffer(maxCount, MediaSphereStride, ComputeBufferType.Structured);
-       //     Debug.Log("Created New Compute Buffer");
-     //   }
+            //Debug.Log("Created New Compute Buffer");
+        }
+
         MediaSphere[] mediadata = new MediaSphere[maxCount];
         
         if (MediaCount< 1)
         {
-            // mediadata[0].CenterPosition = Vector3.zero;
-            // mediadata[0].LocalExtinction = 0;
-            // mediadata[0].LocalRange = 0; 
-            // mediadata[0].LocalFalloff = 0;
+            //mediadata[0].CenterPosition = Vector3.zero;
+            //mediadata[0].LocalExtinction = 0;
+            //mediadata[0].LocalRange = 0; 
+            //mediadata[0].LocalFalloff = 0;
         }
         else
         {
@@ -1602,6 +1603,10 @@ public class VolumetricRendering : MonoBehaviour
         {
             ShaderConstantBuffer.Dispose();
             ShaderConstantBuffer = null;
+        }
+        if (participatingMediaSphereBuffer != null)
+        {
+            participatingMediaSphereBuffer.Dispose();
         }
     }
 
