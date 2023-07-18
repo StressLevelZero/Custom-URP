@@ -130,6 +130,8 @@ public class VolumetricRendering : MonoBehaviour
     }
 
     private const int MediaSphereStride = (3 + 1 + 1 + 1) * sizeof(float);
+    int MediaCount;
+
     
     //public Matrix4x4 randomatrix;
 
@@ -546,6 +548,9 @@ public class VolumetricRendering : MonoBehaviour
         ShaderConstantBuffer = new ComputeBuffer(1, ShaderConstantsSize, ComputeBufferType.Constant);
         ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+        int mediaCount = VolumetricRegisters.VolumetricMediaEntities.Count;
+        MediaCount = Math.Max(mediaCount, 1);
+        participatingMediaSphereBuffer = new ComputeBuffer(MediaCount, MediaSphereStride, ComputeBufferType.Structured);
 
 
         //activeCameraState = activeCam.isActiveAndEnabled;
@@ -1195,18 +1200,24 @@ public class VolumetricRendering : MonoBehaviour
         ComputePerFrameConstantBuffer.SetData<ScatteringPerFrameConstants>(VolScatteringCB);
         FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, ComputePerFrameConstantBuffer, 0, ScatterPerFrameCount * sizeof(float));
 
-        int MediaCount = VolumetricRegisters.VolumetricMediaEntities.Count;
-        int maxCount = Math.Max(MediaCount, 1);
+        int mediaCount = VolumetricRegisters.VolumetricMediaEntities.Count;
+        int maxCount = Math.Max(mediaCount, 1);
         
-        if (participatingMediaSphereBuffer == null)
+        if (object.ReferenceEquals(participatingMediaSphereBuffer, null) || participatingMediaSphereBuffer == null)
         {
             participatingMediaSphereBuffer = new ComputeBuffer(maxCount, MediaSphereStride, ComputeBufferType.Structured);
             //Debug.Log("Created New Compute Buffer");
         }
+        else if (maxCount > MediaCount)
+        {
+            participatingMediaSphereBuffer.Release();
+            participatingMediaSphereBuffer = new ComputeBuffer(maxCount, MediaSphereStride, ComputeBufferType.Structured);
+            MediaCount = maxCount;
+        }
 
         MediaSphere[] mediadata = new MediaSphere[maxCount];
         
-        if (MediaCount< 1)
+        if (mediaCount < 1)
         {
             //mediadata[0].CenterPosition = Vector3.zero;
             //mediadata[0].LocalExtinction = 0;
@@ -1224,10 +1235,13 @@ public class VolumetricRendering : MonoBehaviour
                 mediadata[i].LocalFalloff = VolumetricRegisters.VolumetricMediaEntities[i].falloffDistance;
             }
         }
-        
-        participatingMediaSphereBuffer.SetData(mediadata);
-        FroxelFogCompute.SetBuffer(ScatteringKernel, ID_media_sphere_buffer,participatingMediaSphereBuffer);
-        FroxelFogCompute.SetFloat(ID_media_sphere_buffer_length, MediaCount);
+
+        if (participatingMediaSphereBuffer != null)
+        {
+            participatingMediaSphereBuffer.SetData(mediadata);
+            FroxelFogCompute.SetBuffer(ScatteringKernel, ID_media_sphere_buffer, participatingMediaSphereBuffer);
+            FroxelFogCompute.SetFloat(ID_media_sphere_buffer_length, mediaCount);
+        }
         /*
         if (VolumetricConstantBuffer != null && projectionMatrix != null && activeCam != null && vbuff.depthEncodingParams != null)
         {
@@ -1591,22 +1605,22 @@ public class VolumetricRendering : MonoBehaviour
 
         if (ComputePerFrameConstantBuffer != null)
         {
-            ComputePerFrameConstantBuffer.Dispose();
+            ComputePerFrameConstantBuffer.Release();
             ComputePerFrameConstantBuffer = null;
         }
         if (StepAddPerFrameConstantBuffer != null)
         { 
-            StepAddPerFrameConstantBuffer.Dispose();
+            StepAddPerFrameConstantBuffer.Release();
             StepAddPerFrameConstantBuffer = null;
         }
         if (ShaderConstantBuffer != null)
         {
-            ShaderConstantBuffer.Dispose();
+            ShaderConstantBuffer.Release();
             ShaderConstantBuffer = null;
         }
         if (participatingMediaSphereBuffer != null)
         {
-            participatingMediaSphereBuffer.Dispose();
+            participatingMediaSphereBuffer.Release();
         }
     }
 
