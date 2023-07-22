@@ -172,6 +172,7 @@ namespace UnityEngine.Rendering.Universal
 
         // Materials used in URP Scriptable Render Passes
         Material m_BlitMaterial = null;
+        Material m_CopyColorMaterial = null;
         Material m_BlitHDRMaterial = null;
         Material m_CopyDepthMaterial = null;
         Material m_SamplingMaterial = null;
@@ -205,6 +206,7 @@ namespace UnityEngine.Rendering.Universal
             Experimental.Rendering.XRSystem.Initialize(XRPassUniversal.Create, data.xrSystemData.shaders.xrOcclusionMeshPS, data.xrSystemData.shaders.xrMirrorViewPS);
 #endif
             m_BlitMaterial = CoreUtils.CreateEngineMaterial(data.shaders.coreBlitPS);
+            m_CopyColorMaterial = CoreUtils.CreateEngineMaterial(data.shaders.blitPS);
             m_BlitHDRMaterial = CoreUtils.CreateEngineMaterial(data.shaders.blitHDROverlay);
             m_CopyDepthMaterial = CoreUtils.CreateEngineMaterial(data.shaders.copyDepthPS);
             m_SamplingMaterial = CoreUtils.CreateEngineMaterial(data.shaders.samplingPS);
@@ -349,7 +351,7 @@ namespace UnityEngine.Rendering.Universal
 
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
             // SLZ MODIFIED
-            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial, true);
+            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_CopyColorMaterial, true);
             // END SLZ MODIFIED
 #if ADAPTIVE_PERFORMANCE_2_1_0_OR_NEWER
             if (needTransparencyPass)
@@ -427,6 +429,7 @@ namespace UnityEngine.Rendering.Universal
 
             DebugHandler?.Dispose();
             CoreUtils.Destroy(m_BlitMaterial);
+            CoreUtils.Destroy(m_CopyColorMaterial);
             CoreUtils.Destroy(m_BlitHDRMaterial);
             CoreUtils.Destroy(m_CopyDepthMaterial);
             CoreUtils.Destroy(m_SamplingMaterial);
