@@ -39,11 +39,12 @@ namespace UnityEngine.Rendering.Universal
     public sealed partial class UniversalRenderer : ScriptableRenderer
     {
         #if UNITY_SWITCH || UNITY_ANDROID
-        const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
-        const int k_DepthBufferBits = 24;
+        public const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
+        public const int k_DepthBufferBits = 24;
         #else
-        const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D32_SFloat_S8_UInt;
-        const int k_DepthBufferBits = 32;
+        public const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
+
+        public const int k_DepthBufferBits = 24;
         #endif
 
         // SLZ MODIFIED // Hacky-ass-bullshit flag that the VRS render feature can set to make passes that should have VRS use an array of rendertagets containing the actual render target duplicated twice
@@ -794,7 +795,8 @@ namespace UnityEngine.Rendering.Universal
             colorDescriptor.autoGenerateMips = false;
             colorDescriptor.depthBufferBits = (int)DepthBits.None;
             m_ColorBufferSystem.SetCameraSettings(colorDescriptor, FilterMode.Bilinear);
-
+            //colorDescriptor.depthBufferBits = k_DepthBufferBits;
+            colorDescriptor.depthStencilFormat = k_DepthStencilFormat;
             // Configure all settings require to start a new camera stack (base camera only)
             if (cameraData.renderType == CameraRenderType.Base)
             {
@@ -908,7 +910,8 @@ namespace UnityEngine.Rendering.Universal
                 {
                     depthDescriptor.graphicsFormat = GraphicsFormat.None;
                     depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                    depthDescriptor.depthBufferBits = k_DepthBufferBits;
+                    //depthDescriptor.depthBufferBits = k_DepthBufferBits;
+                    //Debug.Log("Supports 24 bit depth : " + (SystemInfo.IsFormatSupported(GraphicsFormat.D24_UNorm_S8_UInt, FormatUsage.Render)));
                 }
                 else
                 {

@@ -849,6 +849,12 @@ namespace UnityEditor
             //     shouldEmissionBeEnabled = material.GetFloat("_EmissionEnabled") >= 0.5f;
 
             CoreUtils.SetKeyword(material, ShaderKeywordStrings._EMISSION, shouldEmissionBeEnabled);
+			
+			// SLZ MODIFIED: Fix for pragma dynamic_branch breaking in meta passes
+			if (material.HasProperty("_EmissionMeta"))
+			{	
+                material.SetFloat("_EmissionMeta", shouldEmissionBeEnabled ? 1.0f : 0.0f);
+			}				
 
             // Normal Map
             if (material.HasProperty("_BumpMap"))

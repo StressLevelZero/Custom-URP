@@ -73,6 +73,10 @@ Shader "Universal Render Pipeline/Lit (PBR Workflow)"
 				[HideInInspector][NoScaleOffset]unity_Lightmaps("unity_Lightmaps", 2DArray) = "" {}
 				[HideInInspector][NoScaleOffset]unity_LightmapsInd("unity_LightmapsInd", 2DArray) = "" {}
 				[HideInInspector][NoScaleOffset]unity_ShadowMasks("unity_ShadowMasks", 2DArray) = "" {}
+
+				// SLZ MODIFIED: Fix for dynamic_branch crashing lightmapper
+				[HideInInspector] _EmissionMeta("WORKAROUND: Meta Pass Emission Toggle", Float) = 0
+				// END SLZ MODIFIED
 		}
 
 		SubShader
@@ -435,22 +439,37 @@ ENDHLSL
 						// Material Keywords
 						
 						// #pragma shader_feature_local_fragment _SPECULAR_SETUP
+						//#define DYNAMIC_ALPHAPREMULTIPLY_ON
+						//#pragma multi_compile DUMMY _ALPHAPREMULTIPLY_ON
+						//#pragma skip_variants DUMMY
+						//#pragma dynamic_branch_local _ALPHAPREMULTIPLY_ON
+
+						//#define DYNAMIC_ALPHAMODULATE_ON
+						//#pragma multi_compile DUMMY _ALPHAMODULATE_ON
+						//#pragma skip_variants DUMMY
+						//#pragma dynamic_branch_local _ALPHAMODULATE_ON
+						
+						
+						//#pragma multi_compile_local _ _EMISSION_META
+
 						#define DYNAMIC_EMISSION
-						#pragma dynamic_branch_local _EMISSION
+						#define _EMISSION _EmissionMeta
 
-						#define DYNAMIC_METALLICSPECGLOSSMAP
-						#pragma dynamic_branch_local _METALLICSPECGLOSSMAP
 
-						#pragma shader_feature_local_fragment _ALPHATEST_ON
-						// #pragma shader_feature_local_fragment _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
-						#pragma shader_feature_local _ _DETAIL_MULX2
+						
+						//#define DYNAMIC_METALLICSPECGLOSSMAP
+						//#pragma multi_compile DUMMY _METALLICSPECGLOSSMAP
+						//#pragma skip_variants DUMMY
+						//#pragma dynamic_branch_local  _METALLICSPECGLOSSMAP
+
 						//#pragma shader_feature_local_fragment _SPECGLOSSMAP
 						#pragma shader_feature EDITOR_VISUALIZATION
-
 
 						// -------------------------------------
 						// Includes
 						#include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+
+
 						#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMetaPass.hlsl"
 
 						ENDHLSL

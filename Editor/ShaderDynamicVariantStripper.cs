@@ -25,7 +25,7 @@ namespace SLZ.SLZEditorTools
         public void OnProcessShader(Shader shader, ShaderSnippetData snippet, IList<ShaderCompilerData> data)
         {
 
-            if (snippet.shaderType == ShaderType.Surface || snippet.shaderType == ShaderType.RayTracing)
+            if (snippet.shaderType == ShaderType.Surface || snippet.shaderType == ShaderType.RayTracing || snippet.passType == PassType.Meta)
             {
                 //Debug.Log("Skipping Raytracing Stage");
                 return;

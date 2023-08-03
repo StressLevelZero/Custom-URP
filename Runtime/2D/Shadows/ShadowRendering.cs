@@ -171,7 +171,8 @@ namespace UnityEngine.Rendering.Universal
             var descriptor = new RenderTextureDescriptor(width, height);
             descriptor.useMipMap = false;
             descriptor.autoGenerateMips = false;
-            descriptor.depthBufferBits = 24;
+            //descriptor.depthBufferBits = 24;
+            descriptor.depthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
             descriptor.graphicsFormat = GraphicsFormat.R8G8B8A8_UNorm;
             descriptor.msaaSamples = 1;
             descriptor.dimension = TextureDimension.Tex2D;

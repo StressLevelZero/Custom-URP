@@ -2,10 +2,6 @@
 #define UNIVERSAL_LIT_INPUT_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ParallaxMapping.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 
 #if defined(_DETAIL_MULX2) || defined(_DETAIL_SCALED)
 #define _DETAIL
@@ -38,7 +34,14 @@ half _DetailAlbedoMapScale;
 half _DetailNormalMapScale;
 half _DetailSmoothnessMapScale;
 half _Surface;
+float _EmissionMeta;
 CBUFFER_END
+
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ParallaxMapping.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 
 // NOTE: Do not ifdef the properties for dots instancing, but ifdef the actual usage.
 // Otherwise you might break CPU-side as property constant-buffer offsets change per variant.

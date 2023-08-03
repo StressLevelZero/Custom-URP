@@ -1369,7 +1369,8 @@ namespace UnityEngine.Rendering.Universal
                 desc.width = scaledWidth;
                 desc.height = scaledHeight;
                 desc.graphicsFormat = MakeRenderTextureGraphicsFormat(isHdrEnabled, requestHDRColorBufferPrecision, needsAlpha);
-                desc.depthBufferBits = 32;
+                //desc.depthBufferBits = 24;
+                desc.depthStencilFormat = UniversalRenderer.k_DepthStencilFormat;
                 desc.msaaSamples = msaaSamples;
                 desc.sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
             }

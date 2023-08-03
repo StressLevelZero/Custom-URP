@@ -220,7 +220,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 var depthDescriptor = renderingData.cameraData.cameraTargetDescriptor;
                 depthDescriptor.graphicsFormat = GraphicsFormat.None;
                 depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                depthDescriptor.depthBufferBits = k_DepthBufferBits;
+                //depthDescriptor.depthBufferBits = k_DepthBufferBits;
                 depthDescriptor.msaaSamples = 1;// Depth-Only pass don't use MSAA
                 cameraDepthTexture = UniversalRenderer.CreateRenderGraphTexture(renderGraph, depthDescriptor, "_CameraDepthTexture", true);
 

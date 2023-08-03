@@ -1050,8 +1050,9 @@ namespace UnityEngine.Rendering.Universal
             cameraData.hdrColorBufferPrecision = asset ? asset.hdrColorBufferPrecision : HDRColorBufferPrecision._32Bits;
             cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, cameraData.renderScale,
                 cameraData.isHdrEnabled, cameraData.hdrColorBufferPrecision, msaaSamples, needsAlphaChannel, cameraData.requiresOpaqueTexture);
+            if (cameraData.cameraTargetDescriptor.depthStencilFormat == GraphicsFormat.D32_SFloat_S8_UInt) cameraData.cameraTargetDescriptor.depthStencilFormat = UniversalRenderer.k_DepthStencilFormat;
         }
-
+     
         /// <summary>
         /// Initialize camera data settings common for all cameras in the stack. Overlay cameras will inherit
         /// settings from base camera.
