@@ -22,7 +22,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 // Begin Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-#include "LitMASInclude/PosespaceImpacts.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 
 struct appdata
