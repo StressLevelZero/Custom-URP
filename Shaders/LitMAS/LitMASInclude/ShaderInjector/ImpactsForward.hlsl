@@ -78,7 +78,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 
 // Begin Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-#include "LitMASInclude/PosespaceImpacts.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection INCLUDES from Injection_Impacts.hlsl ----------------------------------------------------------
 #include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
