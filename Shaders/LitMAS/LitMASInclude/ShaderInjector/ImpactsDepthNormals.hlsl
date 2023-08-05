@@ -62,9 +62,9 @@ half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-	float4x4 EllipsoidPosArray[HitArrayCount];
+	half4x4 EllipsoidPosArray[HitArrayCount];
 	int _NumberOfHits;
-	float4 _HitColor;
+	half4 _HitColor;
 // End Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
 	half  _Emission;

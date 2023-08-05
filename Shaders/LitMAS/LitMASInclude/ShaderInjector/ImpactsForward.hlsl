@@ -81,7 +81,7 @@
 #include "LitMASInclude/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection INCLUDES from Injection_Impacts.hlsl ----------------------------------------------------------
-#include "LitMASInclude/PosespaceImpacts.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts.hlsl ----------------------------------------------------------
 // Begin Injection INCLUDES from Injection_SSR.hlsl ----------------------------------------------------------
 #if !defined(SHADER_API_MOBILE)
