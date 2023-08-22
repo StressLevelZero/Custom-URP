@@ -47,7 +47,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 		private int m_DownsampleKernelID;
 		private int m_GaussianKernelID;
 		private bool m_ReconstructTiles = false;
-		private RTPermanentHandle m_PermanentDest { get; set; }
+		private PersistentRT m_PermanentDest { get; set; }
 		private RTHandle m_PermHandle;
 		private bool m_UseRT;
 		private RTHandle m_TempBuffer { get; set; }
@@ -158,7 +158,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 		}
 
 		[Obsolete("Use RTHandles for source and destination.")]
-		public void Setup(RenderTargetIdentifier source, RTPermanentHandle destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
+		public void Setup(RenderTargetIdentifier source, PersistentRT destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
 		{
 			this.source = RTHandles.Alloc(source);
 			this.m_PermanentDest = destination;
@@ -183,7 +183,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 			m_ReconstructTiles = reconstructTiles;
 		}
 
-		public void Setup(RTHandle source, RTPermanentHandle destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
+		public void Setup(RTHandle source, PersistentRT destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
 		{
 			this.source = source;
 			this.m_PermanentDest = destination;

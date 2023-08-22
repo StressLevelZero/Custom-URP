@@ -43,9 +43,9 @@ namespace UnityEngine.Rendering.Universal
 		public GlobalKeyword HiZMinMaxKW { get; private set; }
 		public GlobalKeyword SSREnabledKW { get; private set; }
 
-		public SLZPerCameraRTStorage PerCameraOpaque;
-		public SLZPerCameraRTStorage PerCameraPrevHiZ;
-		public SLZPerCameraBufferStorage PerCameraSSRGlobals;
+		//public SLZPerCameraRTStorage PerCameraOpaque;
+		//public SLZPerCameraRTStorage PerCameraPrevHiZ;
+
 		private uint PerCameraPrevHiZIter = 0;
 		private uint PerCameraOpaqueIter = 0;
 
@@ -76,8 +76,8 @@ namespace UnityEngine.Rendering.Universal
 			SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
 			HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
 			HiZMinMaxKW = GlobalKeyword.Create("_HIZ_MIN_MAX_ENABLED");
-			PerCameraOpaque = new SLZPerCameraRTStorage();
-			PerCameraPrevHiZ = new SLZPerCameraRTStorage();
+			//PerCameraOpaque = new SLZPerCameraRTStorage();
+			//PerCameraPrevHiZ = new SLZPerCameraRTStorage();
 			//PerCameraSSRGlobals = new SLZPerCameraBufferStorage(8, sizeof(float), ComputeBufferMode.Dynamic, ComputeBufferType.Constant);
 		}
 		public static SLZGlobals instance
@@ -197,17 +197,20 @@ namespace UnityEngine.Rendering.Universal
 		{
 			if (BlueNoiseCB != null)
 			{
-				long depth = (long)BlueNoiseDim[2];
 #if UNITY_EDITOR
 				if (!EditorApplication.isPlaying)
 				{
-					BlueNoiseDim[3] = (int)((Screen.currentResolution.refreshRate * EditorApplication.timeSinceStartup) % depth);
+                    long depth = (long)BlueNoiseDim[2];
+                    BlueNoiseDim[3] = (int)((Screen.currentResolution.refreshRateRatio.value * EditorApplication.timeSinceStartup) % depth);
 				}
 				else
 #endif
 				{
-					BlueNoiseDim[3] = (int)((Time.timeSinceLevelLoadAsDouble * Screen.currentResolution.refreshRate) % depth);
-				}
+                    int depth = (int)math.round(BlueNoiseDim[2]);
+                    BlueNoiseDim[3] = (Time.frameCount % depth + depth) % depth;
+                    //BlueNoiseDim[3] = (int)((Time.timeSinceLevelLoadAsDouble * Screen.currentResolution.refreshRate) % depth);
+                }
+				
 				BlueNoiseCB.SetData(BlueNoiseDim);
 				Shader.SetGlobalConstantBuffer("BlueNoiseDim", BlueNoiseCB, 0, BlueNoiseCB.count * BlueNoiseCB.stride);
 			}
@@ -221,8 +224,7 @@ namespace UnityEngine.Rendering.Universal
 			purgeCounter++;
 			if (purgeCounter > maxCount)
 			{
-				PerCameraOpaque.RemoveAllNull();
-				PerCameraPrevHiZ.RemoveAllNull();
+				PerCameraExtData.Instance.RemoveAllNull();
 				purgeCounter = 0;
 			}
 		}
@@ -246,16 +248,6 @@ namespace UnityEngine.Rendering.Universal
 					s_Instance.HiZDimBuffer.Dispose();
 					s_Instance.HiZDimBuffer = null;
 				}
-			   
-				if (s_Instance.PerCameraOpaque != null)
-				{
-					s_Instance.PerCameraOpaque.Dispose();
-				}
-				if (s_Instance.PerCameraPrevHiZ != null)
-				{
-					s_Instance.PerCameraPrevHiZ.Dispose();
-				}
-			   
 			}
 			s_Instance = null;
 		}
@@ -282,8 +274,8 @@ namespace UnityEngine.Rendering.Universal
 		private float cameraFar;
 		int opaqueTexSizeFrac = 1;
 		private Camera camera;
-		private RTPermanentHandle prevOpaque;
-		private RTPermanentHandle prevHiZ;
+		private PersistentRT prevOpaque;
+		private PersistentRT prevHiZ;
 
 		SLZGlobalsData passData;
 		public SLZGlobalsSetPass(RenderPassEvent evt)
@@ -291,14 +283,16 @@ namespace UnityEngine.Rendering.Universal
 			renderPassEvent = evt;
 			passData = new SLZGlobalsData();
 		}
-		public void Setup(CameraData camData)
+		public void Setup(CameraData camData, CameraDataExtSet camDataExtSet)
 		{
 
 			// Hack to tell unity to store previous frame object to world matrices...
 			// Not used by SRP to enable motion vectors or depth but somehow still necessary :(
 			if (camData.enableSSR)
 			{
-				camData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
+                prevOpaque = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.CAMERA_OPAQUE);
+                prevHiZ = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.HI_Z);
+                camData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
 			}
 			Downsampling downsamplingMethod = UniversalRenderPipeline.asset.opaqueDownsampling;
 			if (downsamplingMethod == Downsampling._2xBilinear)
@@ -313,25 +307,23 @@ namespace UnityEngine.Rendering.Universal
 			{
 				opaqueTexSizeFrac = 1;
 			}
-			
-			//ConfigureTarget(new RenderTargetIdentifier(BuiltinRenderTextureType.None), new RenderTargetIdentifier(BuiltinRenderTextureType.None));
-			//Debug.Log("Setup for " + camData.camera.name);
-		}
+
+            //ConfigureTarget(new RenderTargetIdentifier(BuiltinRenderTextureType.None), new RenderTargetIdentifier(BuiltinRenderTextureType.None));
+            //Debug.Log("Setup for " + camData.camera.name);
+        }
 
 
 		public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
 		{
 			CameraData camData = renderingData.cameraData;
 			ref RenderTextureDescriptor targetDesc = ref camData.cameraTargetDescriptor;
-			prevOpaque = SLZGlobals.instance.PerCameraOpaque.GetHandle(camData.camera);
-			prevHiZ = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camData.camera);
 			passData.cmd = renderingData.commandBuffer;
 			passData.cam = camData.camera;
 			passData.enableSSR = camData.enableSSR;
 			passData.requireHiZ = camData.requiresDepthPyramid;
 			passData.requireMinMax = camData.requiresMinMaxDepthPyr;
-			passData.opaqueTex = prevOpaque.handle;
-			passData.hiZTex = prevHiZ.handle;
+			passData.opaqueTex = camData.enableSSR ? prevOpaque.handle : null;
+			passData.hiZTex = camData.enableSSR ? prevHiZ.handle : null;
 			passData.opaqueID = SLZGlobals.CameraOpaqueTextureID;
 			passData.hiZID = SLZGlobals.PrevHiZ0TextureID;
 			passData.ssrEnabledKW = SLZGlobals.instance.SSREnabledKW;
@@ -417,11 +409,12 @@ namespace UnityEngine.Rendering.Universal
 		internal void Render(RenderGraph renderGraph, ref RenderingData renderingData)
 		{
 			CameraData camData = renderingData.cameraData;
-			prevOpaque = SLZGlobals.instance.PerCameraOpaque.GetHandle(camData.camera);
-			prevHiZ = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camData.camera);
-			// Hack to tell unity to store previous frame object to world vectors...
-			// Not used by SRP to enable motion vectors or depth but somehow still necessary :(
-			if (camData.enableSSR)
+			CameraDataExtSet camDataExtSet = PerCameraExtData.Instance.GetCameraDataSet(camera);
+			prevOpaque = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.CAMERA_OPAQUE);
+			prevHiZ = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.HI_Z);
+            // Hack to tell unity to store previous frame object to world vectors...
+            // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
+            if (camData.enableSSR)
 			{
 				camData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
 			}

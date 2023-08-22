@@ -574,7 +574,7 @@ namespace UnityEngine.Rendering.Universal
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
-
+            CameraDataExtSet cameraExtData = PerCameraExtData.Instance.GetCameraDataSet(camera);
             var cmd = renderingData.commandBuffer;
             DebugHandler?.Setup(context, ref renderingData);
 
@@ -582,7 +582,7 @@ namespace UnityEngine.Rendering.Universal
 
             //SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
             //    renderingData.cameraData.SSRTemporalWeight, camera.fieldOfView, cameraTargetDescriptor.height);
-            m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
+            m_SLZGlobalsSetPass.Setup(renderingData.cameraData, cameraExtData);
             EnqueuePass(m_SLZGlobalsSetPass);
 
             //SLZ - Enable "motion vector data" (prev obj to world matricies) for SSR so we can get prev frame's pixel pos for temporal accumulation
@@ -1223,9 +1223,10 @@ namespace UnityEngine.Rendering.Universal
                 // 
                 // RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueColor, descriptor, filterMode, TextureWrapMode.Clamp, name: "_CameraOpaqueTexture");
                 // m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, m_OpaqueColor, downsamplingMethod);
-
-                RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
-                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, opaqueHandle, downsamplingMethod, cameraData.requiresColorPyramid);
+                
+                PersistentRT opaqueRT = PersistentRT.TryGet(cameraExtData, (int)CamDataExtType.CAMERA_OPAQUE);
+                //RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
+                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, opaqueRT, downsamplingMethod, cameraData.requiresColorPyramid);
 
                 // END SLZ MODIFIED
 
@@ -1238,8 +1239,9 @@ namespace UnityEngine.Rendering.Universal
             {
                 //m_SetHiZ0GlobalPass.Setup(m_PrevHiZ0Texture.Identifier(), m_PrevHiZ0Texture.id);
                 //EnqueuePass(m_SetHiZ0GlobalPass);
-                m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
-                m_CopyHiZ0Pass.Setup(m_DepthHiZTexture, m_PrevHiZ0Texture);
+                //m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
+                PersistentRT prevHiZ0Texture = PersistentRT.TryGet(cameraExtData, (int)CamDataExtType.HI_Z);
+                m_CopyHiZ0Pass.Setup(m_DepthHiZTexture, prevHiZ0Texture);
                 EnqueuePass(m_CopyHiZ0Pass);
             }
 

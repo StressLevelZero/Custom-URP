@@ -237,6 +237,16 @@ half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4
     }
 }
 
+// Obligatory IQuilez SDF
+float sdRoundBox(float3 worldPos, float3 boxMin, float3 boxMax, float radius)
+{
+  float3 center = 0.5 * (boxMin + boxMax);
+  float3 relativePos = worldPos - center;
+  float3 boxSize = max(0, 0.5 *( boxMax - boxMin) - 0.75 * radius);
+  float3 q = abs(relativePos) - boxSize;
+  return (length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0));
+}
+
 float CalculateProbeWeight(float3 positionWS, float4 probeBoxMin, float4 probeBoxMax)
 {
     // SLZ MODIFIED // URP's blend distance is very stupid. This is mainly because it conflates blend distance and box projection.
@@ -247,10 +257,15 @@ float CalculateProbeWeight(float3 positionWS, float4 probeBoxMin, float4 probeBo
     // The best thing to do was have a minimal amount of blending (~0.2) and pushing out the walls a bit. Now you have wrong reflections and little blending. :/
     // This lead to a juggle between two incorrect results of better reflections or better blending at design time. BAD, inconsistent, and hard to communicate best practices! 
     // This change biases towards the center of the box walls and offsets the edge slightly so it doesn't falloff unnaturally. It also avoids the sharp falloff on the edges.
-    float blendDistance = probeBoxMax.w;    
-    float3 weightDir = max( (min(positionWS - probeBoxMin.xyz, probeBoxMax.xyz - positionWS) / blendDistance) + (blendDistance * .2f), 0);
+    
+	float blendDistance = probeBoxMax.w;    
+    //float3 weightDir = max( (min(positionWS - probeBoxMin.xyz, probeBoxMax.xyz - positionWS) / blendDistance) + (blendDistance * .2f), 0);
+	//return  saturate(weightDir.x * weightDir.y * weightDir.z);
+	
+	float sdBox = sdRoundBox(positionWS, probeBoxMin.xyz, probeBoxMax.xyz, blendDistance);
+	return 1.0 - saturate(sdBox / blendDistance);
     //return saturate(min(weightDir.x, min(weightDir.y, weightDir.z))); //Yuck
-    return  saturate(weightDir.x * weightDir.y * weightDir.z);
+    
     // END SLZ MODIFIED
 
 }
