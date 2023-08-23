@@ -140,6 +140,12 @@ namespace UnityEngine.Rendering.Universal
             public ComputeShader computeColorPyramid;
 
             // END SLZ MODIFIED
+
+            /// <summary>
+            /// Data Driven Lens Flare shader.
+            /// </summary>
+            [Reload("Shaders/PostProcessing/LensFlareDataDriven.shader")]
+            public Shader dataDrivenLensFlare;
         }
 
         // SLZ MODIFIED
