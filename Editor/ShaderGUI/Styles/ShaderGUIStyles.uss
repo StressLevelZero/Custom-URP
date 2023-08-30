@@ -1,0 +1,49 @@
+.headerTogglebar {
+    height: var(--unity-metrics-single_line_large-height);
+    background-color: var(--unity-colors-inspector_titlebar-background);
+    margin-left: 0px;
+    margin-right: 0px;
+    margin-bottom: 0px;
+    padding-bottom: 3px;
+}
+
+.headerContent {
+    border-top-color: var(--unity-colors-inspector_titlebar-border_accent);
+    border-top-width: 1px;
+    margin-left: 0px;
+    margin-right: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    padding-left: 20px;
+    padding-right: 5px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.headerRoot {
+    border-bottom-color: var(--unity-colors-inspector_titlebar-border);
+    border-bottom-width: 1px;
+    margin-left: -15px;
+    margin-right: -5px;
+    padding-bottom: 0px;
+}
+
+.textureFieldThumb {
+    border-bottom-color: var(--unity-colors-button-border_accent);
+    border-bottom-width: 1px;
+    border-top-color: var(--unity-colors-button-border_accent);
+    border-top-width: 1px;
+    border-left-color: var(--unity-colors-button-border_accent);
+    border-left-width: 1px;
+    border-right-color: var(--unity-colors-button-border_accent);
+    border-right-width: 1px;
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    padding-left: 0px;
+    padding-right: 0px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+
+}

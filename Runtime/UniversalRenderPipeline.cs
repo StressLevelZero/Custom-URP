@@ -353,8 +353,8 @@ namespace UnityEngine.Rendering.Universal
             }
 #endif
 
-            // SLZ MODIFED
-            SLZGlobals.instance.RemoveTempRTStupid();
+            // SLZ MODIFED // Run a period purge of extra resources generated for deleted cameras. 
+            CameraExtDataPool.Instance.PeriodicPurge();
             // END SLZ MODIFIED
 
 #if DEVELOPMENT_BUILD || UNITY_EDITOR

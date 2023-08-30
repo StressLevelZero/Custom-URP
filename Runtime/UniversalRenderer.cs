@@ -575,7 +575,7 @@ namespace UnityEngine.Rendering.Universal
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
-            CameraDataExtSet cameraExtData = PerCameraExtData.Instance.GetCameraDataSet(camera);
+            CameraDataExtSet cameraExtData = CameraExtDataPool.Instance.GetCameraDataSet(camera);
             var cmd = renderingData.commandBuffer;
             if (DebugHandler != null)
             {

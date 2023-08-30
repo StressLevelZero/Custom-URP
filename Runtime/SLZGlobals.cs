@@ -217,17 +217,7 @@ namespace UnityEngine.Rendering.Universal
 		}
 
 
-		int purgeCounter = 0;
-		const int maxCount = 900; 
-		public void RemoveTempRTStupid()
-		{
-			purgeCounter++;
-			if (purgeCounter > maxCount)
-			{
-				PerCameraExtData.Instance.RemoveAllNull();
-				purgeCounter = 0;
-			}
-		}
+
 
 		public static void Dispose()
 		{
@@ -409,7 +399,7 @@ namespace UnityEngine.Rendering.Universal
 		internal void Render(RenderGraph renderGraph, ref RenderingData renderingData)
 		{
 			CameraData camData = renderingData.cameraData;
-			CameraDataExtSet camDataExtSet = PerCameraExtData.Instance.GetCameraDataSet(camera);
+			CameraDataExtSet camDataExtSet = CameraExtDataPool.Instance.GetCameraDataSet(camera);
 			prevOpaque = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.CAMERA_OPAQUE);
 			prevHiZ = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.HI_Z);
             // Hack to tell unity to store previous frame object to world vectors...

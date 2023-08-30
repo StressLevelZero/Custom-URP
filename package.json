@@ -1,12 +1,7 @@
 {
   "name": "com.unity.render-pipelines.universal",
-<<<<<<< HEAD
   "description": "SLZ's modified URP",
-  "version": "8148.0.7",
-=======
-  "description": "The Universal Render Pipeline (URP) is a prebuilt Scriptable Render Pipeline, made by Unity. URP provides artist-friendly workflows that let you quickly and easily create optimized graphics across a range of platforms, from mobile to high-end consoles and PCs.",
-  "version": "14.0.8",
->>>>>>> upstream-urp
+  "version": "8148.0.8",
   "unity": "2022.2",
   "displayName": "SLZ Universal RP",
   "dependencies": {

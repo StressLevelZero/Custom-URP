@@ -45,6 +45,8 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 			#define LITMAS_FEATURE_EMISSION
 			#define LITMAS_FEATURE_SSR
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+			//#pragma require QuadShuffle
+			//#define _SM6_QUAD 1
 			#include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
 			//
 			ENDHLSL
@@ -145,6 +147,7 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 			ENDHLSL
 		}
 	}
+	//CustomEditor "LitMASGUI"
 	CustomEditor "UnityEditor.ShaderGraphLitGUI"
 	Fallback "Hidden/InternalErrorShader"
 }

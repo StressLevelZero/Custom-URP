@@ -88,29 +88,37 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
     {
         SSR = getSSRColor(ssrData);
     }
-    /*
+    
 #if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
     
-    real4 colorX = QuadReadAcrossX(SSRColor);
-    real4 colorY = QuadReadAcrossY(SSRColor);
-    real4 colorD = QuadReadAcrossDiagonal(SSRColor);
-    real alphaAvg = max(colorX.a + colorY.a + colorD.a, 1e-6);
-    real4 colorAvg = real4((colorX.a * colorX + colorY.a * colorY + colorD.a*colorD) / (alphaAvg));//, alphaAvg);
-    SSRColor = lerp(colorAvg, SSRColor,-SSRColor.a * saturate(2 * ssrData.perceptualRoughness) + SSRColor.a);
+    real4 colorX = QuadReadAcrossX(SSR);
+    real4 colorY = QuadReadAcrossY(SSR);
+    real4 colorD = QuadReadAcrossDiagonal(SSR);
+    float alphaConst = 0.4 * colorX.a + 0.4 * colorY.a + 0.2 * colorD.a;
+    float3 avgSSRColor = 
+        //0.5 * SSR.rgb * SSR.a + 
+        0.4 * colorX.rgb * colorX.a + 
+        0.4 * colorY.rgb * colorY.a + 
+        0.2 * colorD.rgb * colorD.a;
+    SSR = SSR.a > 1e-4 || alphaConst < 1e-4 ? SSR : float4(avgSSRColor / max(0.01,alphaConst), 1);
+   
+    //real alphaAvg = max(colorX.a + colorY.a + colorD.a, 1e-6);
+    //real4 colorAvg = real4((colorX.a * colorX + colorY.a * colorY + colorD.a*colorD) / (alphaAvg));//, alphaAvg);
+    //SSR = lerp(colorAvg, SSR,-SSR.a * saturate(2 * ssrData.perceptualRoughness) + SSR.a);
     
 #endif
-*/
+
     //reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
     SSRColor = SSR.rgb;
     reflectionProbe *= (1.0 - SSR.a * SSRLerp);
     SSRColor *= SSR.a * SSRLerp;
 #endif
 
-	UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
-	{
-		reflectionProbe *= indSSAO;
-		SSRColor.rgb *= indSSAO;
-	}
+    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    {
+        reflectionProbe *= indSSAO;
+        SSRColor.rgb *= indSSAO;
+    }
 
     real surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
     real3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
@@ -132,7 +140,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-	
+    
 
 
 #if defined(LIGHTMAP_ON) 
@@ -154,14 +162,14 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
 
     //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting)
-	AmbientOcclusionFactor ao;
-	UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
-	{
-		ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
-		surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal
-		diffuse *= ao.indirectAmbientOcclusion;
-		specular *= ao.indirectAmbientOcclusion;
-	}
+    AmbientOcclusionFactor ao;
+    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    {
+        ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
+        surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal
+        diffuse *= ao.indirectAmbientOcclusion;
+        specular *= ao.indirectAmbientOcclusion;
+    }
 
     //-------------------------------------------------------------------------------------------------
     // Realtime light calculations
@@ -206,7 +214,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     float4 volColor = GetVolumetricColor(fragData.position);
     float3 output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
 
-    UNITY_BRANCH if (ssrExtra.temporalWeight  == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
+    UNITY_BRANCH if (ssrExtra.temporalWeight == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
         output += surfData.occlusion * SSR.rgb;
     }

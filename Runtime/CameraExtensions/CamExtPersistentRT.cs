@@ -51,7 +51,10 @@ namespace UnityEngine.Rendering.Universal
                 if (desc.width == renderTexture.width &&
                     desc.height == renderTexture.height &&
                     desc.volumeDepth == renderTexture.volumeDepth &&
-                    desc.colorFormat == renderTexture.format)
+                    desc.graphicsFormat == renderTexture.graphicsFormat &&
+                    desc.depthStencilFormat == renderTexture.depthStencilFormat &&
+                    desc.msaaSamples == renderTexture.antiAliasing &&
+                    desc.enableRandomWrite == renderTexture.enableRandomWrite)
                 {
                     return;
                 }
