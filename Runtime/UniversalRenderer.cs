@@ -52,7 +52,7 @@ namespace UnityEngine.Rendering.Universal
                         // This is necessary for the vulkan plugin, so that A) during framebuffer object creation I can tell if a framebuffer should have the VRS texture, B) Unity doesn't use a cached
                         // framebuffer not containing the VRS texture for a renderpass that needs it
 
-        public static bool s_IsUsingVkVRS = false;
+        public bool s_IsUsingVkVRS = false;
         // END SLZ MODIFIED
 
         const int k_FinalBlitPassQueueOffset = 1;
@@ -336,7 +336,7 @@ namespace UnityEngine.Rendering.Universal
 
             // SLZ MODIFIED
             m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2);
-			
+            
             // END SLZ MODIFIED
 
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
@@ -564,12 +564,13 @@ namespace UnityEngine.Rendering.Universal
             return IsGLESDevice() || SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLCore;
         }
 
-		/// <inheritdoc />
-		public override void Setup(ScriptableRenderContext context, ref RenderingData renderingData)
-		{
-		//}
-		//public void dummy1(ScriptableRenderContext context, ref RenderingData renderingData)
-		//{ 
+        /// <inheritdoc />
+        public override void Setup(ScriptableRenderContext context, ref RenderingData renderingData)
+        {
+        //}
+        //public void dummy1(ScriptableRenderContext context, ref RenderingData renderingData)
+        //{ 
+            s_IsUsingVkVRS = false;
             m_ForwardLights.PreSetup(ref renderingData);
            
             ref CameraData cameraData = ref renderingData.cameraData;
@@ -613,17 +614,12 @@ namespace UnityEngine.Rendering.Universal
             m_RenderOpaqueForwardPass.useMotionVectorData = renderingData.cameraData.enableSSR;
 
             // Bullshit hacks go! Turn on render target duplication to signal to the Vulkan VRS plugin that framebuffer objects created for these passes need VRS attachments
-            if (s_IsUsingVkVRS)
-            {
-                m_RenderOpaqueForwardPass.testMRT = true;
-                m_RenderTransparentForwardPass.testMRT = true;
-                m_DepthNormalPrepass.VkVRSHackOn = true;
-            }
-            else
-            {
-                m_RenderOpaqueForwardPass.testMRT = false;
-                m_RenderTransparentForwardPass.testMRT = false;
-            }
+
+           
+            m_DepthNormalPrepass.vkVRSHackOn = true;
+            m_RenderOpaqueForwardPass.vkVRSHackOn = true;
+            m_RenderTransparentForwardPass.vkVRSHackOn = true;
+
             //TODO: This should probably happen in the SLZGlobals pass, not here
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
             SLZGlobals.instance.UpdateBlueNoiseFrame();
