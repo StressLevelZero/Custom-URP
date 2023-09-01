@@ -9,7 +9,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 {
     internal sealed class RenderTargetBufferSystem
     {
-        struct SwapBuffer
+        class SwapBuffer
         {
             public RTHandle rtMSAA;
             public RTHandle rtResolve;
@@ -23,11 +23,20 @@ namespace UnityEngine.Rendering.Universal.Internal
         FilterMode m_FilterMode;
         bool m_AllowMSAA = true;
 
+        // SLZ MODIFIED - Rendertarget pool hashes based on name. Allow setting the name to avoid pooling when necessary
+        string m_Name;
+        // END SLZ MODIFIED
+
         ref SwapBuffer backBuffer { get { return ref m_AisBackBuffer ? ref m_A : ref m_B; } }
         ref SwapBuffer frontBuffer { get { return ref m_AisBackBuffer ? ref m_B : ref m_A; } }
 
         public RenderTargetBufferSystem(string name)
         {
+            m_A = new SwapBuffer();
+            m_B = new SwapBuffer();
+            // SLZ MODIFIED - store the actual name since we'll need to reconstruct the names later
+            m_Name = name;
+            // END SLZ MODIFIED
             m_A.name = name + "A";
             m_B.name = name + "B";
         }
@@ -96,6 +105,28 @@ namespace UnityEngine.Rendering.Universal.Internal
             desc.depthBufferBits = 0;
             m_Desc = desc;
             m_FilterMode = filterMode;
+
+            // SLZ MODIFIED - Reset the name as it may have been modified
+            m_A.name = m_Name + "A";
+            m_B.name = m_Name + "B";
+            // END SLZ MODIFIED
+
+            m_A.msaa = m_Desc.msaaSamples;
+            m_B.msaa = m_Desc.msaaSamples;
+
+            if (m_Desc.msaaSamples > 1)
+                EnableMSAA(true);
+        }
+
+        public void SetCameraSettingsUnique(RenderTextureDescriptor desc, FilterMode filterMode, int cameraHashCode)
+        {
+            desc.depthBufferBits = 0;
+            m_Desc = desc;
+            m_FilterMode = filterMode;
+
+            m_A.name = m_Name + "A" + cameraHashCode.ToString();
+            m_B.name = m_Name + "B" + cameraHashCode.ToString();
+            // END SLZ MODIFIED
 
             m_A.msaa = m_Desc.msaaSamples;
             m_B.msaa = m_Desc.msaaSamples;

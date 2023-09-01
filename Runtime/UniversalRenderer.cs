@@ -53,6 +53,7 @@ namespace UnityEngine.Rendering.Universal
                         // framebuffer not containing the VRS texture for a renderpass that needs it
 
         public bool s_IsUsingVkVRS = false;
+        public bool m_dontPoolRTs; //Necessary because unity will reuse frambuffers with shading rate attachments on passes without attachments
         // END SLZ MODIFIED
 
         const int k_FinalBlitPassQueueOffset = 1;
@@ -825,7 +826,15 @@ namespace UnityEngine.Rendering.Universal
             colorDescriptor.useMipMap = false;
             colorDescriptor.autoGenerateMips = false;
             colorDescriptor.depthBufferBits = (int)DepthBits.None;
-            m_ColorBufferSystem.SetCameraSettings(colorDescriptor, FilterMode.Bilinear);
+            if (m_dontPoolRTs)
+            {
+                m_ColorBufferSystem.SetCameraSettingsUnique(colorDescriptor, FilterMode.Bilinear, camera.GetHashCode());
+            }
+            else
+            {
+                m_ColorBufferSystem.SetCameraSettings(colorDescriptor, FilterMode.Bilinear);
+            }
+           
             //colorDescriptor.depthBufferBits = k_DepthBufferBits;
             colorDescriptor.depthStencilFormat = k_DepthStencilFormat;
             // Configure all settings require to start a new camera stack (base camera only)
@@ -1046,7 +1055,7 @@ namespace UnityEngine.Rendering.Universal
                 }
                 else
                 {
-                    RenderingUtils.ReAllocateIfNeeded(ref normalsTexture, normalDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: normalsTextureName);
+                    RenderingUtils.ReAllocateIfNeeded(ref normalsTexture, normalDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: m_dontPoolRTs ? normalsTextureName + camera.GetHashCode() : normalsTextureName);
                 }
 
                 cmd.SetGlobalTexture(normalsTexture.name, normalsTexture.nameID);
@@ -1449,6 +1458,7 @@ namespace UnityEngine.Rendering.Universal
             }
 #endif
             s_IsUsingVkVRS = false; // Unset every frame, so if the VRS render feature gets disabled this isn't stuck on
+            m_dontPoolRTs = false;
         }
 
         /// <inheritdoc />
@@ -1638,7 +1648,8 @@ namespace UnityEngine.Rendering.Universal
 
                     depthDescriptor.graphicsFormat = GraphicsFormat.None;
                     depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                    RenderingUtils.ReAllocateIfNeeded(ref m_CameraDepthAttachment, depthDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: "_CameraDepthAttachment");
+                    string name0 = (m_dontPoolRTs) ? "_CameraDepthAttachment" : "_CameraDepthAttachment" + cameraData.camera.GetHashCode();
+                    RenderingUtils.ReAllocateIfNeeded(ref m_CameraDepthAttachment, depthDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: name0);
                     cmd.SetGlobalTexture(m_CameraDepthAttachment.name, m_CameraDepthAttachment.nameID);
                 }
             }
@@ -1754,6 +1765,9 @@ namespace UnityEngine.Rendering.Universal
         {
             return m_ColorBufferSystem.GetBackBuffer(cmd);
         }
+
+
+
 
         // SLZ MODIFIED // Make internal method public
         public override void EnableSwapBufferMSAA(bool enable)
