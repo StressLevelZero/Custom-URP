@@ -13,6 +13,7 @@ namespace UnityEngine.Rendering.Universal
         SSR, 
         VOLUMETRICS,
         VRS,
+        BUFFER_NAMES
     }
 
     /// <summary>
@@ -30,9 +31,14 @@ namespace UnityEngine.Rendering.Universal
     public class CameraDataExtSet : IDisposable
     {
         private bool disposing = false;
-
+        Camera m_Camera;
+        public Camera camera{ get { return m_Camera; } }
         Dictionary<int, CameraDataExtension> extensions = new Dictionary<int, CameraDataExtension>();
 
+        public CameraDataExtSet(Camera camera)
+        {
+            this.m_Camera = camera;
+        }
         public CameraDataExtension GetExtension(CamDataExtType extensionID)
         {
             return GetExtension((int) extensionID);
@@ -133,7 +139,7 @@ namespace UnityEngine.Rendering.Universal
             }
             else
             {
-                output = new CameraDataExtSet();
+                output = new CameraDataExtSet(camera);
                 extData.Add(camera, output);
                 cameraList.Add(camera);
                 extDataList.Add(output);

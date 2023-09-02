@@ -100,7 +100,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             descriptor.autoGenerateMips = false;
             descriptor.sRGB = false;
             descriptor.enableRandomWrite = false;
-            destination.UpdateRT(descriptor, renderingData.cameraData.camera.name, "PrevHiZ");
+            ref CameraData camData = ref renderingData.cameraData;
+            destination.UpdateRT(descriptor, camData.camera, "PrevHiZ");
             
             //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
         }

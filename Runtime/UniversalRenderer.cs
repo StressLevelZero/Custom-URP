@@ -826,9 +826,11 @@ namespace UnityEngine.Rendering.Universal
             colorDescriptor.useMipMap = false;
             colorDescriptor.autoGenerateMips = false;
             colorDescriptor.depthBufferBits = (int)DepthBits.None;
+            CamExtSwapBufferNames bufferNames;
+            bufferNames = CamExtSwapBufferNames.TryGet(cameraExtData, (int)CamDataExtType.BUFFER_NAMES);
             if (m_dontPoolRTs)
             {
-                m_ColorBufferSystem.SetCameraSettingsUnique(colorDescriptor, FilterMode.Bilinear, camera.GetHashCode());
+                m_ColorBufferSystem.SetCameraSettingsUnique(colorDescriptor, FilterMode.Bilinear, bufferNames.ColorBufferNameA, bufferNames.ColorBufferNameB);
             }
             else
             {
@@ -1055,7 +1057,7 @@ namespace UnityEngine.Rendering.Universal
                 }
                 else
                 {
-                    RenderingUtils.ReAllocateIfNeeded(ref normalsTexture, normalDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: m_dontPoolRTs ? normalsTextureName + camera.GetHashCode() : normalsTextureName);
+                    RenderingUtils.ReAllocateIfNeeded(ref normalsTexture, normalDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: m_dontPoolRTs ? bufferNames.NormalBufferName : normalsTextureName);
                 }
 
                 cmd.SetGlobalTexture(normalsTexture.name, normalsTexture.nameID);
@@ -1648,7 +1650,7 @@ namespace UnityEngine.Rendering.Universal
 
                     depthDescriptor.graphicsFormat = GraphicsFormat.None;
                     depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                    string name0 = (m_dontPoolRTs) ? "_CameraDepthAttachment" : "_CameraDepthAttachment" + cameraData.camera.GetHashCode();
+                    string name0 = "_CameraDepthAttachment";// (m_dontPoolRTs) ? "_CameraDepthAttachment" : "_CameraDepthAttachment" + cameraData.camera.GetHashCode();
                     RenderingUtils.ReAllocateIfNeeded(ref m_CameraDepthAttachment, depthDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: name0);
                     cmd.SetGlobalTexture(m_CameraDepthAttachment.name, m_CameraDepthAttachment.nameID);
                 }

@@ -1,6 +1,8 @@
 using System;
 using UnityEngine.Experimental.Rendering;
 using Unity.Mathematics;
+using Unity.Profiling;
+
 namespace UnityEngine.Rendering.Universal.Internal
 {
     /// <summary>
@@ -19,7 +21,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static int computeMipSourceID = Shader.PropertyToID("_MipSource");
         private static int computeMipDestID = Shader.PropertyToID("_MipDest");
         private static int computeMipDest2ID = Shader.PropertyToID("_MipDest2");
-        
+        static readonly ProfilerMarker s_CameraSetup = new ProfilerMarker("CopyDepthToHiZPass.OnCameraSetup");
         private RTHandle source { get; set; }
         private RTHandle destination { get; set; }
         internal bool AllocateRT { get; set; }
@@ -78,6 +80,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
+            //s_CameraSetup.Begin();
             var descriptor = GetHiZDescriptor(renderingData.cameraData.cameraTargetDescriptor, requiresMinMax);
            
             mipLevels = Mathf.FloorToInt(Mathf.Max(Mathf.Log(descriptor.width, 2), Mathf.Log(descriptor.height, 2))) + 1;
@@ -90,6 +93,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             // On Metal iOS, prevent camera attachments to be bound and cleared during this pass.
             ConfigureTarget(destination);
             ConfigureClear(ClearFlag.None, Color.black);
+            //s_CameraSetup.End();
         }
 
         /// <inheritdoc/>

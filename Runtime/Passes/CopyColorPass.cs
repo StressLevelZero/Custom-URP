@@ -1,6 +1,6 @@
 using System;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
-
+using Unity.Profiling;
 // SLZ MODIFIED
 using System.Collections.Generic;
 using Unity.Mathematics;
@@ -21,8 +21,9 @@ namespace UnityEngine.Rendering.Universal.Internal
 		Material m_SamplingMaterial;
 		Downsampling m_DownsamplingMethod;
 		Material m_CopyColorMaterial;
+        static readonly ProfilerMarker s_CameraSetup = new ProfilerMarker("CopyColorPass.OnCameraSetup");
 
-		private RTHandle source { get; set; }
+        private RTHandle source { get; set; }
 
 		private RTHandle destination { get; set; }
 
@@ -196,8 +197,9 @@ namespace UnityEngine.Rendering.Universal.Internal
 		/// <inheritdoc />
 		public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
 		{
-			//if (destination == null || destination.rt == null || m_UseRT)
-			{
+			//s_CameraSetup.Begin();
+            //if (destination == null || destination.rt == null || m_UseRT)
+            {
 				RenderTextureDescriptor descriptor = renderingData.cameraData.cameraTargetDescriptor;
 				descriptor.msaaSamples = 1;
 				descriptor.depthBufferBits = 0;
@@ -229,7 +231,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
 				if (m_UseRT)
 				{
-					destination = m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera.name, "Opaque");
+					destination = m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera, "Opaque");
 				}
 				else if (destination == null || destination.rt == null)
 				{
@@ -248,12 +250,13 @@ namespace UnityEngine.Rendering.Universal.Internal
 				// END SLZ MODIFIED
 
 			}
-			//else
-			//{
-			//    cmd.SetGlobalTexture(destination.name, destination.nameID);
-			//}
+			//s_CameraSetup.End();
+            //else
+            //{
+            //    cmd.SetGlobalTexture(destination.name, destination.nameID);
+            //}
 
-		}
+        }
 
 		/// <inheritdoc/>
 		public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -456,7 +459,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 				}
 				if (true)
 				{
-					destination = renderGraph.ImportTexture(m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera.name, "Opaque"));
+					destination = renderGraph.ImportTexture(m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera, "Opaque"));
 				}
 				else
 				{
