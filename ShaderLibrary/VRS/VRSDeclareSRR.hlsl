@@ -27,33 +27,68 @@ float4 _SRImageTileSize; // Tile width, tile height, 1/tile width, 1/tile height
 // integer value from the shading rate lookup table. Packed into float4's
 // so index 0 contains the values for 0 and 1, 1 contains 2 and 3, and so on
 CBUFFER_START(VRS_SRR_LUT)
-	float4 shadingRate[4]; 
+	float4 shadingRate[2]; 
 CBUFFER_END
 // MSAA limits the maximum shading rate, index of the max shading rate found in the last value of shadingRate
-#define _MaxShadingRateIndex shadingRate[3].w
+#define _MaxShadingRate shadingRate[1].w
 
 uint GetShadingIndex(uint2 screenCoords)
 {
 	return LOAD_TEXTURE2D_X_LOD(_SRRTexture, screenCoords, 0u).r;
 }
 
-float2 GetShadingRate(uint shadingRateIndex)
+float2 ShadingRateFromIndex(uint shadingRateIndex)
 {
-	uint indexDiv2 = shadingRateIndex >> 1u;
-	indexDiv2 = min(3u, indexDiv2); //Let the compiler know that our index is always less than 4
-	float2 shadingRateValue = shadingRateIndex & 1u ? shadingRate[indexDiv2].zw : shadingRate[indexDiv2].xy;
-	return shadingRateValue;
+	// Translate NVAPI table rates to vulkan bit-packed shading attachment rates. The NVAPI table was ordered such that the 
+	// integer value of the bit-packed attachment rate was the index of that rate in the NVAPI table. However, the largest 
+	// value possible is 10, and despite nvidia and vulkan claiming that the table can be as large as 16 it can only actually 
+	// have 8 entries. Therefore, I compacted the table, getting rid of gaps to bring the total number of entries to 7. 
+	// Thus the NVAPI table indices from the shading rate texture have to be shifted to get the correct attachment rate value 
+	// which can then be unpacked to get the x and y shading tile size
+#if !defined(VULKAN_ATTACHMENT_RATE)
+	shadingRateIndex = shadingRateIndex > 4 ? shadingRateIndex + 2 : shadingRateIndex;
+	shadingRateIndex = shadingRateIndex > 1 ? shadingRateIndex + 2 : shadingRateIndex;
+#endif
+	return float2(1<<((shadingRateIndex >> 2) & 3), 1 << (shadingRateIndex & 3));
 }
+
+uint PackedShadingRateToIndex(uint shadingRate)
+{
+	// Translate NVAPI table rates to vulkan bit-packed shading attachment rates. The NVAPI table was ordered such that the 
+	// integer value of the bit-packed attachment rate was the index of that rate in the NVAPI table. However, the largest 
+	// value possible is 10, and despite nvidia and vulkan claiming that the table can be as large as 16 it can only actually 
+	// have 8 entries. Therefore, I compacted the table, getting rid of gaps to bring the total number of entries to 7. 
+	// Thus the NVAPI table indices from the shading rate texture have to be shifted to get the correct attachment rate value 
+	// which can then be unpacked to get the x and y shading tile size
+#if !defined(VULKAN_ATTACHMENT_RATE)
+	shadingRate = shadingRate > 6 ? shadingRate - 2 : shadingRate;
+	shadingRate = shadingRate > 1 ? shadingRate - 2 : shadingRate;
+#endif
+	return shadingRate;
+}
+
+uint ShadingRateIndexToPacked(uint shadingRateIndex)
+{
+	// Translate NVAPI table rates to vulkan bit-packed shading attachment rates. The NVAPI table was ordered such that the 
+	// integer value of the bit-packed attachment rate was the index of that rate in the NVAPI table. However, the largest 
+	// value possible is 10, and despite nvidia and vulkan claiming that the table can be as large as 16 it can only actually 
+	// have 8 entries. Therefore, I compacted the table, getting rid of gaps to bring the total number of entries to 7. 
+	// Thus the NVAPI table indices from the shading rate texture have to be shifted to get the correct attachment rate value 
+	// which can then be unpacked to get the x and y shading tile size
+#if !defined(VULKAN_ATTACHMENT_RATE)
+	shadingRateIndex = shadingRateIndex > 4 ? shadingRateIndex + 2 : shadingRateIndex;
+	shadingRateIndex = shadingRateIndex > 1 ? shadingRateIndex + 2 : shadingRateIndex;
+#endif
+	return shadingRateIndex;
+}
+
+
 
 float2 GetShadingRateFromCoords(uint2 screenCoords)
 {
-#if SHADER_API_VULKAN
-	int shadingRateIndex = (int)GetShadingIndex(screenCoords);
-	return float2(1<<((shadingRateIndex >> 2) & 3), 1 << (shadingRateIndex & 3));
-#else
 	uint shadingRateIndex = GetShadingIndex(screenCoords);
-	return GetShadingRate(shadingRateIndex);
-#endif
+
+	return ShadingRateFromIndex(shadingRateIndex);
 }
 
 float2 GetShadingRateNormalizedUV(float2 normalizedScreenUVs)

@@ -25,8 +25,11 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static readonly RTHandle[] k_ColorAttachment1 = new RTHandle[1];
         private static readonly RTHandle[] k_ColorAttachment2 = new RTHandle[2];
 
+        static int s_NormalsID = Shader.PropertyToID("_CameraNormalsTexture");
+        //static int s_DepthID = Shader.PropertyToID("_CameraDepthTexture");
+
         // SLZ MODIFIED 
-        
+
         // toggle to control if this pass clears the screen or not. We added an XR occlusion mesh pass that renders before this depth prepass, so don't clear if in VR
         private bool m_ClearTarget = true;
 
@@ -146,7 +149,8 @@ namespace UnityEngine.Rendering.Universal.Internal
                     colorHandles = k_ColorAttachment1;
                 }
             }
-
+            cmd.SetGlobalTexture(s_NormalsID, normalHandle);
+           // cmd.SetGlobalTexture(s_DepthID, m_DepthHandle);
             ConfigureTarget(colorHandles, m_DepthHandle);
 
             if (m_ClearTarget)
@@ -185,13 +189,15 @@ namespace UnityEngine.Rendering.Universal.Internal
                 drawSettings.perObjectData = PerObjectData.None;
                 context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
+
                 // Clean up
                 if (passData.enableRenderingLayers)
                 {
                     CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);
-                    context.ExecuteCommandBuffer(cmd);
-                    cmd.Clear();
+
                 }
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
             }
         }
 

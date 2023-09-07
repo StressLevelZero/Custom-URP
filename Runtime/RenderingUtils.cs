@@ -622,7 +622,10 @@ namespace UnityEngine.Rendering.Universal
                 if (handle != null && handle.rt != null)
                 {
                     TextureDesc currentRTDesc = RTHandleResourcePool.CreateTextureDesc(handle.rt.descriptor, TextureSizeMode.Explicit, handle.rt.anisoLevel, handle.rt.mipMapBias, handle.rt.filterMode, handle.rt.wrapMode, handle.name);
-                    UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount);
+                    if (!UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount))
+                    {
+                        handle?.Release();
+                    }
                 }
 
                 if (UniversalRenderPipeline.s_RTHandlePool.TryGetResource(requestRTDesc, out handle))
@@ -669,7 +672,10 @@ namespace UnityEngine.Rendering.Universal
                 if (handle != null && handle.rt != null)
                 {
                     TextureDesc currentRTDesc = RTHandleResourcePool.CreateTextureDesc(handle.rt.descriptor, TextureSizeMode.Scale, handle.rt.anisoLevel, handle.rt.mipMapBias, handle.rt.filterMode, handle.rt.wrapMode);
-                    UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount);
+                    if (!UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount))
+                    {
+                        handle?.Release();
+                    }
                 }
 
                 if (UniversalRenderPipeline.s_RTHandlePool.TryGetResource(requestRTDesc, out handle))
@@ -716,7 +722,10 @@ namespace UnityEngine.Rendering.Universal
                 if (handle != null && handle.rt != null)
                 {
                     TextureDesc currentRTDesc = RTHandleResourcePool.CreateTextureDesc(handle.rt.descriptor, TextureSizeMode.Functor, handle.rt.anisoLevel, handle.rt.mipMapBias, handle.rt.filterMode, handle.rt.wrapMode);
-                    UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount);
+                    if (!UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount))
+                    {
+                        handle?.Release();
+                    }
                 }
 
                 if (UniversalRenderPipeline.s_RTHandlePool.TryGetResource(requestRTDesc, out handle))
