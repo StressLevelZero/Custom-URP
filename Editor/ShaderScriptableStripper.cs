@@ -177,13 +177,18 @@ namespace UnityEditor.Rendering.Universal
         LocalKeyword m_SHPerVertex;
         LocalKeyword m_SHMixed;
 
+        // SLZ MODIFIED -- Don't return a valid keyword if said keyword is dynamic. We don't want the stripper to remove dynamic variants as those must always be present!
+        LocalKeyword m_InvalidKeyword;
         private LocalKeyword TryGetLocalKeyword(Shader shader, string name)
         {
-            return shader.keywordSpace.FindKeyword(name);
+            LocalKeyword kw = shader.keywordSpace.FindKeyword(name);
+            return kw.isDynamic ? m_InvalidKeyword : kw; 
         }
+        // END SLZ MODIFIED
 
         private void InitializeLocalShaderKeywords([DisallowNull] Shader shader)
         {
+            m_InvalidKeyword = shader.keywordSpace.FindKeyword("//"); // There's no constant invalid keyword, so search for a keyword name that's literally impossible.
             m_MainLightShadows = TryGetLocalKeyword(shader, ShaderKeywordStrings.MainLightShadows);
             m_MainLightShadowsCascades = TryGetLocalKeyword(shader, ShaderKeywordStrings.MainLightShadowCascades);
             m_MainLightShadowsScreen = TryGetLocalKeyword(shader, ShaderKeywordStrings.MainLightShadowScreen);
@@ -357,12 +362,12 @@ namespace UnityEditor.Rendering.Universal
 
         internal bool StripUnusedFeatures_DebugDisplay(ref IShaderScriptableStrippingData strippingData)
         {
-            return strippingData.stripDebugDisplayShaders && strippingData.IsKeywordEnabled(m_DebugDisplay);
+            return strippingData.stripDebugDisplayShaders && strippingData.IsKeywordEnabled(m_DebugDisplay) && !m_DebugDisplay.isDynamic;
         }
 
         internal bool StripUnusedFeatures_ScreenCoordOverride(ref IShaderScriptableStrippingData strippingData)
         {
-            return strippingData.stripScreenCoordOverrideVariants && strippingData.IsKeywordEnabled(m_ScreenCoordOverride);
+            return strippingData.stripScreenCoordOverrideVariants && strippingData.IsKeywordEnabled(m_ScreenCoordOverride) && !m_ScreenCoordOverride.isDynamic;
         }
 
         internal bool StripUnusedFeatures_PunctualLightShadows(ref IShaderScriptableStrippingData strippingData)

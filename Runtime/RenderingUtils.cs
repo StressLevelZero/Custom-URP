@@ -624,6 +624,7 @@ namespace UnityEngine.Rendering.Universal
                     TextureDesc currentRTDesc = RTHandleResourcePool.CreateTextureDesc(handle.rt.descriptor, TextureSizeMode.Explicit, handle.rt.anisoLevel, handle.rt.mipMapBias, handle.rt.filterMode, handle.rt.wrapMode, handle.name);
                     if (!UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount))
                     {
+                        Debug.LogError("Failed to allocate new RenderTexture");
                         handle?.Release();
                     }
                 }
@@ -675,6 +676,7 @@ namespace UnityEngine.Rendering.Universal
                     if (!UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount))
                     {
                         handle?.Release();
+                        Debug.LogError("Failed to allocate new RenderTexture");
                     }
                 }
 
@@ -724,6 +726,7 @@ namespace UnityEngine.Rendering.Universal
                     TextureDesc currentRTDesc = RTHandleResourcePool.CreateTextureDesc(handle.rt.descriptor, TextureSizeMode.Functor, handle.rt.anisoLevel, handle.rt.mipMapBias, handle.rt.filterMode, handle.rt.wrapMode);
                     if (!UniversalRenderPipeline.s_RTHandlePool.AddResourceToPool(currentRTDesc, handle, Time.frameCount))
                     {
+                        Debug.LogError("Failed to allocate new RenderTexture");
                         handle?.Release();
                     }
                 }

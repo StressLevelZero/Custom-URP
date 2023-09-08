@@ -147,7 +147,7 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 			ENDHLSL
 		}
 	}
-	//CustomEditor "LitMASGUI"
+	CustomEditor "LitMASGUI"
 	CustomEditor "UnityEditor.ShaderGraphLitGUI"
-	Fallback "Hidden/InternalErrorShader"
+	//Fallback "Hidden/InternalErrorShader"
 }
