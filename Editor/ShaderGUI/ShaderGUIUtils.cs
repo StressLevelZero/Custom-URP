@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -8,6 +9,8 @@ using UnityEngine.Rendering;
 using UnityEngine.UIElements;
 using Unity.Collections;
 using Unity.Mathematics;
+using System.IO;
+using Object = UnityEngine.Object;
 
 namespace SLZ.SLZEditorTools
 {
@@ -112,6 +115,7 @@ namespace SLZ.SLZEditorTools
             }
             return propertyIdx;
         }
+
 
         /// <summary>
         /// Strip out unused texture references in materials to avoid unity bundling/loading them
@@ -231,5 +235,19 @@ namespace SLZ.SLZEditorTools
             icon16px.Add(key, tex);
             return tex;
         }
+
+
+        static Action<VisualElement, int> s_IncrementVersion;
+        public static void UpdateVisualElement(VisualElement v)
+        {
+            if (s_IncrementVersion == null)
+            {
+                MethodInfo mi = typeof(VisualElement).GetMethod("IncrementVersion", BindingFlags.NonPublic | BindingFlags.Instance);
+                s_IncrementVersion = (Action<VisualElement, int>) mi.CreateDelegate(typeof(Action<VisualElement, int>));
+            }
+            s_IncrementVersion.Invoke(v, 8 | 2048);
+        }
+
+       
     }
 }

@@ -6,9 +6,9 @@ using UnityEngine.UIElements;
 
 namespace UnityEditor.SLZMaterialUI
 {
-    public abstract class BaseMaterialField : VisualElement
+    public interface BaseMaterialField
     {
-        public int shaderPropIdx;
+        public int GetShaderPropIdx();
         public abstract void UpdateMaterialProperty(MaterialProperty boundProp);
     }
 }

@@ -1,20 +1,38 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEditor.UIElements;
 using static UnityEngine.UI.InputField;
 using Object = UnityEngine.Object;
 using System;
+using SLZ.SLZEditorTools;
+using UnityEngine.Rendering;
 
-namespace UnityEditor
+namespace UnityEditor.SLZMaterialUI
 {
-    public class TextureField : BindableElement, INotifyValueChanged<Object>
+    public class TextureField : VisualElement, BaseMaterialField
     {
+
         public MaterialProperty textureProperty;
+        public VisualElement leftAlignBox { get; private set; }
+        public VisualElement rightAlignBox { get; private set; }
+
+        public string tooltip2 { get { return texObjField.tooltip; } set { texObjField.tooltip = value; } }
+
         UnityEditor.UIElements.ObjectField texObjField;
-        Texture2D currentValue;
+        Texture currentValue;
+        Image thumbnail;
+        bool updateScheduled = false;
+        bool isNormalMap;
+        RenderTexture thumbnailRT;
+        UnityEngine.Rendering.TextureDimension textureType;
+
+        public int shaderPropertyIdx;
+        public int GetShaderPropIdx() { return shaderPropertyIdx; }
+
         static Action<ObjectField> s_updateObjDelegate;
         static Action<ObjectField> UpdateObjDelegate
         {
@@ -32,18 +50,44 @@ namespace UnityEditor
             }
 
         }
-        public TextureField(MaterialProperty textureProperty)
+        public TextureField(MaterialProperty textureProperty, int texturePropertyIdx, bool isNormalMap)
         {
-            this.RegisterCallback<AttachToPanelEvent>(evt => Undo.undoRedoPerformed += fixUndoNotUpdatingValue);
-            this.RegisterCallback<DetachFromPanelEvent>(evt => Undo.undoRedoPerformed -= fixUndoNotUpdatingValue);
             this.textureProperty = textureProperty;
-            this.currentValue = textureProperty.textureValue as Texture2D;
+            this.currentValue = textureProperty.textureValue;
+            this.shaderPropertyIdx = texturePropertyIdx;
+            this.isNormalMap = isNormalMap;
+            RegisterCallback<DetachFromPanelEvent>(evt => Dispose());
+            leftAlignBox = new VisualElement();
+            leftAlignBox.AddToClassList("materialGUILeftBox");
+            rightAlignBox = new VisualElement();
+            rightAlignBox.AddToClassList("materialGUIRightBox");
+
+
             style.flexDirection = FlexDirection.Row;
             texObjField = new UnityEditor.UIElements.ObjectField();
             //List<SearchProvider> providers = new List<SearchProvider>() { new SearchProvider("sfklahlkjhsa", "hello") };
             //textureField.searchContext = new SearchContext(providers, "t:Texture2D", SearchFlags.Default);
             //textureField.bindingPath = "m_SavedProperties.m_TexEnvs.Array.data[0].second.m_Texture";
-            texObjField.objectType = typeof(Texture2D);
+            textureType = textureProperty.textureDimension;
+            switch (textureProperty.textureDimension)
+            {
+                case (UnityEngine.Rendering.TextureDimension.Tex2D):
+                    texObjField.objectType = typeof(Texture2D);
+                    break;
+                case (UnityEngine.Rendering.TextureDimension.Tex3D):
+                    texObjField.objectType = typeof(Texture3D);
+                    break;
+                case (UnityEngine.Rendering.TextureDimension.Tex2DArray):
+                    texObjField.objectType = typeof(Texture2DArray);
+                    break;
+                case (UnityEngine.Rendering.TextureDimension.Cube):
+                    texObjField.objectType = typeof(Cubemap);
+                    break;
+                case (UnityEngine.Rendering.TextureDimension.CubeArray):
+                    texObjField.objectType = typeof(CubemapArray);
+                    break;
+            }
+
 
             VisualElement background = texObjField.ElementAt(0);
             background.style.backgroundColor = StyleKeyword.None;
@@ -61,46 +105,71 @@ namespace UnityEditor
             background.style.borderTopRightRadius = StyleKeyword.None;
             background.style.borderBottomLeftRadius = StyleKeyword.None;
             background.style.borderBottomRightRadius = StyleKeyword.None;
-
-
+            background.style.justifyContent = Justify.FlexStart;
+            background.style.flexWrap = Wrap.NoWrap;
+    
+            background.style.overflow = Overflow.Hidden;
             VisualElement contents = background.ElementAt(0);
-            VisualElement label = contents.ElementAt(1);
-            label.style.display = DisplayStyle.None;
-
-            VisualElement thumbnail = contents.ElementAt(0);
+            contents.style.flexShrink = 0;
+            contents.style.flexGrow = 1;
+            contents.style.overflow = Overflow.Hidden;
+            contents.style.flexBasis = StyleKeyword.Auto;
             
-            thumbnail.AddToClassList("textureFieldThumb");
-            thumbnail.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-            texObjField.RegisterValueChangedCallback(OnObjectFieldChanged);
-            //texObjField.RegisterCallback<ChangeEvent<Object>>(x =>
-            //{
-            //    Debug.Log("Changed Event");
-            //    Debug.Log("Undo Before texture change: " + Undo.GetCurrentGroup());
-            //    textureProperty.textureValue = x.newValue as Texture;
-            //    string currentUndoName = Undo.GetCurrentGroupName();
-            //    if (string.IsNullOrEmpty(currentUndoName))
-            //    {
-            //        Debug.Log("No Undo currently");
-            //    }
-            //    else
-            //    {
-            //        Debug.Log("Current Undo: " + currentUndoName + " " + Undo.GetCurrentGroup());
-            //    }
-            //});
+            VisualElement oldlabel = contents.ElementAt(1);
+            oldlabel.style.display = DisplayStyle.None;
 
-            if (textureProperty.hasMixedValue)
+            VisualElement searchButton = background.ElementAt(1);
+
+            searchButton.style.width = StyleKeyword.Auto;
+            searchButton.style.backgroundImage = StyleKeyword.None;
+            searchButton.style.flexDirection = FlexDirection.Row;
+            searchButton.style.overflow = Overflow.Hidden;
+            searchButton.style.flexBasis = StyleKeyword.Auto;
+            
+            VisualElement fakeRadial = new VisualElement();
+            fakeRadial.AddToClassList("unity-object-field__selector");
+            fakeRadial.pickingMode = PickingMode.Ignore;
+            fakeRadial.style.backgroundColor = Color.clear;
+
+            Label label = new Label(textureProperty.displayName);
+            label.pickingMode = PickingMode.Ignore;
+
+            label.style.textOverflow = TextOverflow.Ellipsis;
+            searchButton.Add(fakeRadial);
+            searchButton.Add(label);
+
+            Image oldThumbnail = contents.ElementAt(0) as Image;
+            oldThumbnail.style.display = DisplayStyle.None;
+
+            thumbnail = new Image();
+            thumbnail.AddToClassList("textureFieldThumb");
+            thumbnail.AddToClassList("unity-object-field-display__icon");
+            thumbnail.pickingMode = PickingMode.Ignore;
+            thumbnail.scaleMode = ScaleMode.StretchToFill;
+            thumbnail.tintColor = Color.white;
+            thumbnailRT = new RenderTexture((int)(16.0f * EditorGUIUtility.pixelsPerPoint), (int)(16.0f * EditorGUIUtility.pixelsPerPoint), 1, RenderTextureFormat.ARGB32, 1);
+            thumbnailRT.depth = 0;
+            thumbnailRT.Create();
+            thumbnail.image = thumbnailRT;
+            UpdateThumbnail();
+            contents.Insert(0, thumbnail);
+
+            texObjField.RegisterValueChangedCallback(OnObjectFieldChanged);
+
+
+            if (textureProperty.hasMixedValue || textureProperty.textureValue == null)
             {
                 texObjField.value = null;
+                texObjField.showMixedValue = false;
             }
             else
             {
                 texObjField.value = textureProperty.textureValue as Texture2D;
             }
-            //if (textureField.value == null)
-            //{
-            //    Debug.LogError("NULL Texture??????");
-            //}
-            Add(texObjField);
+
+            leftAlignBox.Add(texObjField);
+            Add(leftAlignBox);
+            Add(rightAlignBox);
         }
 
         void OnObjectFieldChanged(ChangeEvent<Object> evt)
@@ -110,12 +179,14 @@ namespace UnityEditor
 
         public void SetValueWithoutNotify(Object newValue)
         {
-            if (newValue == null || newValue is Texture2D)
+            if (newValue == null || newValue is Texture)
             {
-                currentValue = (Texture2D) newValue;
+                currentValue = (Texture) newValue;
+                UpdateThumbnail();
                 textureProperty.textureValue = currentValue;
                 texObjField.SetValueWithoutNotify(currentValue);
                 UpdateObjDelegate.Invoke(texObjField);
+                texObjField.showMixedValue = newValue == null;
             }
             else throw new System.ArgumentException($"Expected object of type {typeof(Texture2D)}");
         }
@@ -130,33 +201,147 @@ namespace UnityEditor
 
                 Object previous = currentValue;
                 SetValueWithoutNotify(value);
-
-                using (var evt = ChangeEvent<Object>.GetPooled(previous, value))
-                {
-                    evt.target = this;
-                    SendEvent(evt);
-                }
             }
         }
 
-
-
-        private void fixUndoNotUpdatingValue() 
+        void UpdateThumbnail()
         {
-            Debug.Log("Fired Undo");
-            if (texObjField.value != currentValue)
+            BlitTextureIcon(thumbnailRT, currentValue, textureType);
+        }
+
+        public void UpdateMaterialProperty(MaterialProperty boundProp)
+        {
+
+            textureProperty = boundProp;
+            currentValue = boundProp.textureValue;
+            UpdateThumbnail();
+            texObjField.SetValueWithoutNotify(currentValue);
+            if (boundProp.hasMixedValue || currentValue == null)
             {
-                currentValue = (Texture2D) textureProperty.textureValue;
-                texObjField.SetValueWithoutNotify(currentValue);
-                UpdateObjDelegate.Invoke(texObjField);
+                texObjField.showMixedValue = false;
             }
             else
             {
-                Debug.Log("currentValue was equal to textureValue " + texObjField.value.name + " : " + textureProperty.textureValue.name);
-                UpdateObjDelegate.Invoke(texObjField);
-                texObjField.MarkDirtyRepaint();
+                texObjField.showMixedValue = false;
             }
         }
 
+        void Dispose() 
+        {
+            if (thumbnailRT != null)
+            {
+                thumbnailRT.Clear();
+            }
+        }
+
+        static Material s_blitMaterial;
+        static LocalKeyword[] dimKeywords;
+        static LocalKeyword normalMapKeyword;
+        static int prop_Blit2D = Shader.PropertyToID("_Blit2D");
+        static int prop_Blit2DArray = Shader.PropertyToID("_Blit2DArray");
+        static int prop_BlitCube = Shader.PropertyToID("_BlitCube");
+        static int prop_BlitCubeArray = Shader.PropertyToID("_BlitCubeArray");
+        static int prop_Blit3D = Shader.PropertyToID("_Blit3D");
+        static int prop_BlitDim = Shader.PropertyToID("_BlitDim");
+
+        static void UpdateKeywords()
+        {
+            Shader blitShader = s_blitMaterial.shader;
+            dimKeywords[(int)TextureDimension.Tex2D - 2] = new LocalKeyword(blitShader, "DIM_2D");
+            dimKeywords[(int)TextureDimension.Tex2DArray - 2] = new LocalKeyword(blitShader, "DIM_2DARRAY");
+            dimKeywords[(int)TextureDimension.Cube - 2] = new LocalKeyword(blitShader, "DIM_CUBE");
+            dimKeywords[(int)TextureDimension.CubeArray - 2] = new LocalKeyword(blitShader, "DIM_CUBEARRAY");
+            dimKeywords[(int)TextureDimension.Tex3D - 2] = new LocalKeyword(blitShader, "DIM_3D");
+            normalMapKeyword = new LocalKeyword(blitShader, "NORMAL_MAP");
+        }
+        void BlitTextureIcon(RenderTexture icon, Texture tex, TextureDimension texType)
+        {
+            if (icon == null) return;
+            RenderTexture active = RenderTexture.active;
+            if (tex == null)
+            {
+               
+                RenderTexture.active = icon;
+                GL.Clear(false, true, Color.clear, 0);
+                RenderTexture.active = active;
+                return;
+            }
+            if (s_blitMaterial == null || s_blitMaterial.shader == null || dimKeywords == null) 
+            {
+                Shader blitShader = Shader.Find("Hidden/ShaderGUITextureIconBlit");
+                if (blitShader == null)
+                {
+                    Debug.LogError("Could not find Blit_ShaderGUI.shader (Hidden/ShaderGUITextureIconBlit), cannot generate material thumbnails");
+                    return;
+                }
+                s_blitMaterial = new Material(blitShader);
+                dimKeywords = new LocalKeyword[5];
+               
+            }
+          
+            UpdateKeywords();
+
+
+            int offsetDimEnum = (int)texType - 2;
+            for (int i = 0; i < 5; i++)
+            {
+                if (i == offsetDimEnum)
+                    s_blitMaterial.EnableKeyword(dimKeywords[i]);
+                else
+                    s_blitMaterial.DisableKeyword(dimKeywords[i]);
+            }
+            switch (texType) 
+            { 
+                case TextureDimension.Tex2D:
+                    s_blitMaterial.SetTexture(prop_Blit2D, tex);
+                    break;
+                case TextureDimension.Tex2DArray:
+                    s_blitMaterial.SetTexture(prop_Blit2DArray, tex);
+                    break;
+                case TextureDimension.Cube:
+                    s_blitMaterial.SetTexture(prop_BlitCube, tex);
+                    s_blitMaterial.SetVector(prop_BlitDim, new Vector4(tex.width, tex.height, 0, 0));
+                    break;
+                case TextureDimension.CubeArray:
+                    s_blitMaterial.SetTexture(prop_BlitCubeArray, tex);
+                    s_blitMaterial.SetVector(prop_BlitDim, new Vector4(tex.width, tex.height, 0, 0));
+                    break;
+                case TextureDimension.Tex3D:
+                    s_blitMaterial.SetTexture(prop_Blit3D, tex);
+                    s_blitMaterial.SetVector(prop_BlitDim, new Vector4(tex.width, tex.height, 0, 0));
+                    break;
+                default:
+                    Debug.LogError("Shader GUI Icon Blitter: Unknown texture dimension " +  texType);
+                    return;
+            }
+            if (isNormalMap)
+            {
+                s_blitMaterial.EnableKeyword(normalMapKeyword);
+            }
+            Graphics.Blit(tex, icon, s_blitMaterial);
+            RenderTexture.active = active;
+            if (isNormalMap)
+            {
+                s_blitMaterial.DisableKeyword(normalMapKeyword);
+            }
+            switch (texType)
+            {
+                case TextureDimension.Tex2D:
+                    s_blitMaterial.SetTexture(prop_Blit2D, null);
+                    break;
+                case TextureDimension.Tex2DArray:
+                    s_blitMaterial.SetTexture(prop_Blit2DArray, null);
+                    break;
+                case TextureDimension.Cube:
+                    s_blitMaterial.SetTexture(prop_BlitCube, null);
+                    break;
+                case TextureDimension.CubeArray:
+                    s_blitMaterial.SetTexture(prop_BlitCubeArray, null);
+                    break;
+                case TextureDimension.Tex3D:
+                    s_blitMaterial.SetTexture(prop_Blit3D, null);
+                    break;
+            }
+        }
     }
 }

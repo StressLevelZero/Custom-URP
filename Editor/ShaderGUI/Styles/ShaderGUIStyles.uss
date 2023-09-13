@@ -23,8 +23,8 @@
 .headerRoot {
     border-bottom-color: var(--unity-colors-inspector_titlebar-border);
     border-bottom-width: 1px;
-    margin-left: -15px;
-    margin-right: -5px;
+    margin-left: 0px;
+    margin-right: 0px;
     padding-bottom: 0px;
 }
 
@@ -37,13 +37,54 @@
     border-left-width: 1px;
     border-right-color: var(--unity-colors-button-border_accent);
     border-right-width: 1px;
-    min-width: 32px;
-    min-height: 32px;
-    max-width: 32px;
-    max-height: 32px;
+    min-width: 18px;
+    min-height: 18px;
+    max-width: 18px;
+    max-height: 18px;
     padding-left: 0px;
     padding-right: 0px;
     padding-top: 0px;
     padding-bottom: 0px;
+    margin-left: 0px;
+    margin-right: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
 
+.textureFieldThumbOld {
+    border-bottom-width: 0px;
+    border-top-width: 0px;
+    border-left-width: 0px;
+    border-right-width: 0px;
+    width: 18px;
+    height: 18px;
+    padding-left: 0px;
+    padding-right: 0px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    margin-left: 0px;
+    margin-right: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+.materialGUILeftBox
+{
+    flex-basis: 40%;
+    flex-direction: row;
+    flex-shrink: 0.4;
+    flex-grow: 0.4;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.materialGUIRightBox
+{
+    flex-basis: 60%;
+    flex-direction: row;
+    flex-shrink: 0.6;
+    flex-grow: 0.6;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }

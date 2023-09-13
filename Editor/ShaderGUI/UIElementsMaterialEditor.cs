@@ -12,10 +12,12 @@ namespace UnityEditor.SLZMaterialUI
 {
     public abstract class UIElementsMaterialEditor : MaterialEditor
     {
+
         public Shader shader;
         public BaseMaterialField[] materialFields;
         public virtual void UpdateUI()
         {
+            //Debug.Log("Called Update UI");
             MaterialProperty[] materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
             int[] shaderProp2MatProp = ShaderGUIUtils.GetShaderIdxToMaterialProp(materialProperties, shader);
             if (materialFields == null)
@@ -25,9 +27,18 @@ namespace UnityEditor.SLZMaterialUI
             int numFields = materialFields.Length;
             for (int fIdx = 0; fIdx < numFields; fIdx++)
             {
-                int propIndex = shaderProp2MatProp[materialFields[fIdx].shaderPropIdx];
-                materialFields[fIdx].UpdateMaterialProperty(materialProperties[propIndex]);
+                if (materialFields[fIdx] != null)
+                {
+                    int propIndex = shaderProp2MatProp[materialFields[fIdx].GetShaderPropIdx()];
+                    //Debug.Log("Updating with indices: " + materialFields[fIdx].GetShaderPropIdx() + " " + propIndex);
+                    materialFields[fIdx].UpdateMaterialProperty(materialProperties[propIndex]);
+                }
             }
+        }
+
+        public override bool UseDefaultMargins()
+        {
+            return false;
         }
 
         /// <summary>
@@ -36,7 +47,7 @@ namespace UnityEditor.SLZMaterialUI
         /// But I don't trust unity, so check to make sure that they're all the same and not null.
         /// </summary>
         /// <returns>true on success, false on failure</returns>
-        public bool Initialize()
+        public bool Initialize(VisualElement root)
         {
             SerializedProperty serializedShader = serializedObject.FindProperty("m_Shader");
             if (serializedShader.hasMultipleDifferentValues || serializedShader.objectReferenceValue == null)
@@ -50,6 +61,10 @@ namespace UnityEditor.SLZMaterialUI
                 Debug.LogError("SLZ Material Inspector: attempted to draw custom inspector for material with null shader");
                 return false;
             }
+
+            root.RegisterCallback<AttachToPanelEvent>(evt => Undo.undoRedoPerformed += UpdateUI);
+            root.RegisterCallback<DetachFromPanelEvent>(evt => Undo.undoRedoPerformed -= UpdateUI);
+
             return true;
         }
     }
