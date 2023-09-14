@@ -147,25 +147,30 @@ namespace UnityEditor.SLZMaterialUI
             thumbnail.pickingMode = PickingMode.Ignore;
             thumbnail.scaleMode = ScaleMode.StretchToFill;
             thumbnail.tintColor = Color.white;
-            thumbnailRT = new RenderTexture((int)(16.0f * EditorGUIUtility.pixelsPerPoint), (int)(16.0f * EditorGUIUtility.pixelsPerPoint), 1, RenderTextureFormat.ARGB32, 1);
+            thumbnailRT = new RenderTexture((int)(32.0f * EditorGUIUtility.pixelsPerPoint), (int)(32.0f * EditorGUIUtility.pixelsPerPoint), 1, RenderTextureFormat.ARGB32, 1);
             thumbnailRT.depth = 0;
+            thumbnailRT.name = textureProperty.name + "_icon";
             thumbnailRT.Create();
             thumbnail.image = thumbnailRT;
-            UpdateThumbnail();
+
             contents.Insert(0, thumbnail);
 
             texObjField.RegisterValueChangedCallback(OnObjectFieldChanged);
 
 
-            if (textureProperty.hasMixedValue || textureProperty.textureValue == null)
+            if (textureProperty.hasMixedValue)
             {
-                texObjField.value = null;
-                texObjField.showMixedValue = false;
+                currentValue = null;
+                
+                texObjField.showMixedValue = true;
             }
             else
             {
-                texObjField.value = textureProperty.textureValue as Texture2D;
+                texObjField.showMixedValue = false;
             }
+            texObjField.SetValueWithoutNotify(currentValue);
+
+            UpdateThumbnail();
 
             leftAlignBox.Add(texObjField);
             Add(leftAlignBox);
@@ -214,16 +219,17 @@ namespace UnityEditor.SLZMaterialUI
 
             textureProperty = boundProp;
             currentValue = boundProp.textureValue;
-            UpdateThumbnail();
             texObjField.SetValueWithoutNotify(currentValue);
-            if (boundProp.hasMixedValue || currentValue == null)
+            if (boundProp.hasMixedValue)
             {
-                texObjField.showMixedValue = false;
+                texObjField.showMixedValue = true;
+                currentValue = null;
             }
             else
             {
                 texObjField.showMixedValue = false;
             }
+            UpdateThumbnail();
         }
 
         void Dispose() 

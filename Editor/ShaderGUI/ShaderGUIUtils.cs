@@ -73,10 +73,15 @@ namespace SLZ.SLZEditorTools
                 icon.image = iconTex;
                 icon.style.height = 16;
                 icon.style.width = 16;
+                icon.style.minWidth = 16;
+                icon.style.minHeight = 16;
                 icon.style.maxWidth = 16;
                 icon.style.maxHeight = 16;
                 icon.style.marginRight = 0;
-               // icon.style.ba
+                icon.style.marginLeft = 0;
+                icon.style.marginTop = 0;
+                icon.style.marginBottom = 0;
+                // icon.style.ba
                 //icon.style.scale = new Vector2(1.1f, 1.1f);
                 container.Add(icon);
             }

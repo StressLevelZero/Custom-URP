@@ -27,11 +27,12 @@ namespace UnityEditor.UIElements
             this.style.alignSelf = Align.Stretch;
             this.style.alignItems = Align.Stretch;
             this.style.flexWrap = Wrap.NoWrap;
-            this.style.justifyContent = Justify.SpaceBetween; 
+            this.style.justifyContent = Justify.SpaceBetween;
+            this.style.marginRight = 4;
 
             List<int> queues = new List<int>() { -1, 1000, 2000, 2450, 3000 };
 
-            SerializedProperty renderQueueProp = serializedMaterial.FindProperty("m_CustomRenderQueue");
+            //SerializedProperty renderQueueProp = serializedMaterial.FindProperty("m_CustomRenderQueue");
             
             renderQueuePresets = new PopupField<int>(queues, -1, GetCurrentQueueName, GetValidQueueName);
             //renderQueuePresets.style.minWidth = 9 * 12;

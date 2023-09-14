@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 
 namespace UnityEditor.SLZMaterialUI
 {
-    public class MaterialToggleField : Toggle, BaseMaterialField
+    public class EmissionToggleField : Toggle, BaseMaterialField
     {
         
         public int shaderPropertyIdx;
@@ -15,7 +15,6 @@ namespace UnityEditor.SLZMaterialUI
         bool isIntField = false;
         string keyword;
         public delegate void BeforeChangeEvent(ChangeEvent<bool> evt);
-        //public BeforeChangeEvent BeforeChange;
         public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx, string keyword, bool isIntField, bool noStyle = false)
         {
             this.materialProperty = materialProperty;
@@ -59,7 +58,7 @@ namespace UnityEditor.SLZMaterialUI
         }
         public void OnChangedEvent(ChangeEvent<bool> evt)
         {
-            //BeforeChange.Invoke(evt);
+            
             if (isIntField)
             {
                 materialProperty.intValue = evt.newValue ? 1 : 0;
@@ -69,19 +68,18 @@ namespace UnityEditor.SLZMaterialUI
                 materialProperty.floatValue = evt.newValue ? 1 : 0;
             }
             
-            if (keyword != null)
-            {
-                Object[] targets = materialProperty.targets;
-                int numMats = targets.Length;
-                // Setting the value through the materialProperty already recorded an undo, append to that
-                Undo.RecordObjects(targets, Undo.GetCurrentGroupName());
-            }
+        
+            Object[] targets = materialProperty.targets;
+            int numMats = targets.Length;
+            // Setting the value through the materialProperty already recorded an undo, append to that
+            Undo.RecordObjects(targets, Undo.GetCurrentGroupName());
+
             SetKeywordOnTargets(evt.newValue);
-            if (keyword != null)
-            {
-                Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
-                Undo.IncrementCurrentGroup();
-            }
+            SetGIFlagsOnTargets(evt.newValue);
+
+            Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
+            Undo.IncrementCurrentGroup();
+
             this.showMixedValue = false;
         }
 
@@ -99,6 +97,18 @@ namespace UnityEditor.SLZMaterialUI
                     (materials[0] as Material).SetKeyword(kw, value);
                 }
             }
+        }
+        void SetGIFlagsOnTargets(bool state)
+        {
+
+            Object[] materials = materialProperty.targets;
+            int numMaterials = materials.Length;
+           
+            for (int i = 0; i < numMaterials; i++)
+            {
+                (materials[0] as Material).globalIlluminationFlags = state ? MaterialGlobalIlluminationFlags.BakedEmissive : MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            }
+
         }
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {
