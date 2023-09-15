@@ -721,12 +721,12 @@ namespace SLZ.SLZEditorTools
 				using DeflateStream compress = new DeflateStream(outStream, CompressionMode.Compress);
 				rawStream.CopyTo(compress);
 			}
-			else
-			{
-				byte[] headerBytes = HeaderToBytes(header);
-				outStream.Write(headerBytes, 0, headerBytes.Length);
-				outStream.Write(fileUncompressed, 0, fileUncompressed.Length);
-			}
+			//else
+			//{
+			//	byte[] headerBytes = HeaderToBytes(header);
+			//	outStream.Write(headerBytes, 0, headerBytes.Length);
+			//	outStream.Write(fileUncompressed, 0, fileUncompressed.Length);
+			//}
 		}
 
 		public static NativeArray<byte> ReadVol3DToNative(string path, out ImageInfo imageInfo)

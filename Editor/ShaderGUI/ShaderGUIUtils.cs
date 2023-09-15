@@ -253,6 +253,35 @@ namespace SLZ.SLZEditorTools
             s_IncrementVersion.Invoke(v, 8 | 2048);
         }
 
-       
+        static MethodInfo getTracker;
+        static FieldInfo s_PropertyViewer;
+
+        static void ReflectEditorTracker()
+        {
+            s_PropertyViewer = typeof(Editor).GetField("m_PropertyViewer", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (s_PropertyViewer == null) Debug.Log("NULL Property Viewer field");
+            Type viewerInterface = s_PropertyViewer.FieldType;
+            if (viewerInterface == null) Debug.Log("NULL Property Viewer type");
+            getTracker = viewerInterface.GetProperty("tracker", BindingFlags.Public | BindingFlags.Instance).GetGetMethod();
+        }
+
+        public static void ForceRebuild(Editor e)
+        {
+            if (s_PropertyViewer == null)
+            {
+                ReflectEditorTracker();
+            }
+            object propertyViewer = s_PropertyViewer.GetValue(e);
+            UnityEngine.Object.DestroyImmediate(e);
+            if (propertyViewer != null)
+            {
+                var map = propertyViewer.GetType().GetInterfaceMap(getTracker.DeclaringType);
+                int index = Array.IndexOf(map.InterfaceMethods, getTracker);
+                if (index < 0) return;
+                object tracker = map.InterfaceMethods[index].Invoke(propertyViewer, null);
+                ActiveEditorTracker activeEditorTracker = (ActiveEditorTracker) tracker;
+                activeEditorTracker.ForceRebuild();
+            }
+        }
     }
 }

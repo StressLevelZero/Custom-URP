@@ -3,7 +3,7 @@ using UnityEngine.Rendering.Universal;
 
 namespace UnityEditor.Rendering.Universal
 {
-    [VolumeComponentEditor(typeof(Volumetrics))]
+    [CustomEditor(typeof(Volumetrics))]
     sealed class VolumetricsEditor : VolumeComponentEditor
     {
         //      SerializedDataParameter m_Type;

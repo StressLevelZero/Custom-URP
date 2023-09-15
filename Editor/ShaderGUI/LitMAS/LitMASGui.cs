@@ -22,6 +22,20 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
     {
         const string keyword_DETAILS_ON = "_DETAILS_ON";
 
+        const string defaultMASGUID = "75f1fbacfa73385419ec8d7700a107ea";
+        static string s_defaultMASPath;
+        static string defaultMASPath
+        {
+            get
+            {
+                if (s_defaultMASPath == null)
+                {
+                    s_defaultMASPath = AssetDatabase.GUIDToAssetPath(defaultMASGUID);
+                }
+                return s_defaultMASPath;
+            }
+        }
+
         enum PName
         {
             _BaseMap = 0,
@@ -74,10 +88,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
         public override VisualElement CreateInspectorGUI()
         {
-
+            VisualElement root = new VisualElement();
             VisualElement MainWindow = new VisualElement();
-
-            bool success = base.Initialize(MainWindow);
+            root.Add(MainWindow);
+            bool success = base.Initialize(root,MainWindow);
             if (!success)
             {
                 return null;
@@ -87,7 +101,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             MaterialProperty[] props = GetMaterialProperties(this.targets);
 
-            int[] propIdx = ShaderGUIUtils.GetMaterialPropertyShaderIdx(props, shader);
+            int[] propIdx = ShaderGUIUtils.GetMaterialPropertyShaderIdx(props, base.shader);
+
+            ShaderImporter shaderImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(base.shader)) as ShaderImporter;
+            
             //ShaderGUIUtils.SanitizeMaterials(this.targets, props, propIdx, shader);
 
             ShaderPropertyTable propTable = GetPropertyTable(props);
@@ -126,7 +143,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             if (baseMapIdx != -1)
             {
                 baseMapField = new TextureField(props[baseMapIdx], propIdx[baseMapIdx], false);
-                baseMapField.tooltip2 = "The albedo map is simply the color of the material. When the material is metallic, this also tints the reflections";
+                baseMapField.tooltip2 = LitMASGui_Tooltips.BaseMap.ToString();
                 baseProps.Add(baseMapField);
                 materialFields[currentFieldIdx] = baseMapField;
                 currentFieldIdx++;
@@ -148,7 +165,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                     baseColorField.Initialize(props[baseColorIdx], propIdx[baseColorIdx], false);
                     baseProps.Add(baseColorField);
                 }
-                baseColorField.tooltip = "Base color, tints the albedo map";
+                baseColorField.tooltip = LitMASGui_Tooltips.BaseColor.ToString();
                 materialFields[currentFieldIdx] = baseColorField;
                 currentFieldIdx++;
                 hasCoreProperty = true;
@@ -158,14 +175,16 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             int MASMapIdx = PropertyIdx(ref propTable, PName._MetallicGlossMap);
             if (MASMapIdx != -1)
             {
-                TextureField MASMap = new TextureField(props[MASMapIdx], propIdx[MASMapIdx], false);
-                MASMap.tooltip2 = "Metallic, Ambient Occlusion, Smoothness map. The metallic (red channel) controls how reflective the surface is and how much the albedo tints reflections." +
-                    " Ambient occlusion (green channel) is fake pre-baked shadows that darkens areas like crevices or creases which are likely to be shadowed by surface itself. " +
-                    "Smoothness (blue channel) controls the sharpness of reflections, and for non-metallic surfaces the strength of reflections.";
+                Texture2D defaultMAS = AssetDatabase.LoadAssetAtPath<Texture2D>(defaultMASPath);
+                TextureField MASMap = new TextureField(props[MASMapIdx], propIdx[MASMapIdx], false, shaderImporter?.GetDefaultTexture(props[MASMapIdx].name));
+                MASMap.tooltip2 = LitMASGui_Tooltips.MASMap.ToString();
                 baseProps.Add(MASMap);
                 materialFields[currentFieldIdx] = MASMap;
                 currentFieldIdx++;
                 hasCoreProperty = true;
+
+                MAS_defaultSlider defaultSlider = new MAS_defaultSlider(MASMap);
+                MASMap.rightAlignBox.Add(defaultSlider);
             }
 
             // Normal Map ----------------------------------------------------
@@ -173,7 +192,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             if (NormalMapIdx != -1)
             {
                 TextureField NormalMap = new TextureField(props[NormalMapIdx], propIdx[NormalMapIdx], true);
-                NormalMap.tooltip2 = "Vector map that offsets the normal (direction the surface is facing) when calculating lighting. Used to add high-resolution detail to otherwise simple mesh geometry.";
+                NormalMap.tooltip2 = LitMASGui_Tooltips.NormalMap.ToString();
                 baseProps.Add(NormalMap);
                 materialFields[currentFieldIdx] = NormalMap;
                 currentFieldIdx++;
@@ -218,7 +237,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             if (emissionMapIdx != -1)
             {
                 emissionMapField = new TextureField(props[emissionMapIdx], propIdx[emissionMapIdx], false);
-                emissionMapField.tooltip2 = "The emission map controls the intensity and color of light being emitted by the material";
+                emissionMapField.tooltip2 = LitMASGui_Tooltips.EmissionMap.ToString();
                 emissionProps.Add(emissionMapField);
                 materialFields[currentFieldIdx] = emissionMapField;
                 currentFieldIdx++;
@@ -240,8 +259,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                     emissionColorField.Initialize(props[emissionColorIdx], propIdx[emissionColorIdx], false);
                     emissionProps.Add(emissionColorField);
                 }
-                emissionColorField.tooltip = "Emission color, tints the emission from the emission map. Additionally, the alpha channel controls" +
-                    " how much the albedo map tints the emission. As the alpha goes to 0, the emission is increasingly tinted by the albedo";
+                emissionColorField.tooltip = LitMASGui_Tooltips.EmissionColor.ToString();
                 materialFields[currentFieldIdx] = emissionColorField;
                 currentFieldIdx++;
                 hasEmissionProperty = true;
@@ -255,7 +273,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 emissionFalloffField.Initialize(props[emissionFalloffIdx], propIdx[emissionFalloffIdx]);
                 emissionProps.Add(emissionFalloffField);
 
-                emissionFalloffField.tooltip = "Controls the strength of the emission fresenel. This is an effect where the strength of the emission decreases as the surface points farther away from the camera.";
+                emissionFalloffField.tooltip = LitMASGui_Tooltips.EmissionFalloff.ToString();
                 materialFields[currentFieldIdx] = emissionFalloffField;
                 currentFieldIdx++;
                 hasEmissionProperty = true;
@@ -269,9 +287,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 emissionMultiplierField.Initialize(props[emissionMultiplierIdx], propIdx[emissionMultiplierIdx]);
                 emissionProps.Add(emissionMultiplierField);
 
-                emissionMultiplierField.tooltip = "Artificially increases the strength of the emission when baking lights. WARNING: this will make specular lighting too " +
-                    "dark when <i><b>not</b></i> using shaders that guestimate the specular from light probes. Normally specular lighting comes entirely from the reflection probe, and this " +
-                    "multiplier does not effect the brightness seen by reflection probes";
+                emissionMultiplierField.tooltip = LitMASGui_Tooltips.EmissionFalloff.ToString();
                 materialFields[currentFieldIdx] = emissionMultiplierField;
                 currentFieldIdx++;
                 hasEmissionProperty = true;
@@ -307,7 +323,6 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
                 ShaderGUIUtils.SetHeaderStyle(emissionProps, "Emission", LightIcon, emissionToggle);
                 MainWindow.Add(emissionProps);
-
             }
 
             //----------------------------------------------------------------
@@ -322,8 +337,8 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             int detailMapIdx = PropertyIdx(ref propTable, PName._DetailMap);
             if (detailMapIdx != -1)
             {
-                TextureField detailsMapField = new TextureField(props[detailMapIdx], propIdx[detailMapIdx], false);
-                detailsMapField.tooltip2 = "REPLACE THIS";
+                TextureField detailsMapField = new TextureField(props[detailMapIdx], propIdx[detailMapIdx], false, shaderImporter?.GetDefaultTexture(props[detailMapIdx].name));
+                detailsMapField.tooltip2 = LitMASGui_Tooltips.DetailMap.ToString();
                 detailProps.Add(detailsMapField);
                 materialFields[currentFieldIdx] = detailsMapField;
                 currentFieldIdx++;
@@ -347,6 +362,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 materialFields[currentFieldIdx] = detailMatToggle;
                 currentFieldIdx++;
 
+                
                 detailToggle = detailMatToggle;
             }
 
@@ -360,7 +376,8 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             // Unknown Properties --------------------------------------------
             //----------------------------------------------------------------
             Foldout unknownProps = new Foldout();
-            ShaderGUIUtils.SetHeaderStyle(unknownProps, "Other");
+            Texture2D otherIcon = ShaderGUIUtils.GetClosestUnityIconMip("Settings Icon", 16);
+            ShaderGUIUtils.SetHeaderStyle(unknownProps, "Other", otherIcon);
 
             int numUnknown = propTable.unknownProperties.Count;
             List<int> unknownPropIdx = propTable.unknownProperties;
@@ -376,7 +393,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 {
                     case (MaterialProperty.PropType.Texture):
                         if ((prop.flags & MaterialProperty.PropFlags.NonModifiableTextureData) != 0) continue;
-                        TextureField tf = new TextureField(prop, shaderIdx, (prop.flags & MaterialProperty.PropFlags.Normal) != 0);
+                        TextureField tf = new TextureField(prop, shaderIdx, (prop.flags & MaterialProperty.PropFlags.Normal) != 0, shaderImporter?.GetDefaultTexture(prop.name));
                         unknownProps.Add(tf);
                         materialFields[currentFieldIdx] = tf;
                         currentFieldIdx++;
@@ -464,7 +481,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 MainWindow.Add(unknownProps);
             }
 
-            return MainWindow;
+            return root;
         }
 
         static char[] attributeSeparators = new char[2] { '(', ')' };

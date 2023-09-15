@@ -21,13 +21,16 @@ namespace UnityEditor.SLZMaterialUI
         public VisualElement rightAlignBox { get; private set; }
 
         public string tooltip2 { get { return texObjField.tooltip; } set { texObjField.tooltip = value; } }
+        public Texture defaultTexture;
 
-        UnityEditor.UIElements.ObjectField texObjField;
+        public UnityEditor.UIElements.ObjectField texObjField;
         Texture currentValue;
+        
         Image thumbnail;
         bool updateScheduled = false;
         bool isNormalMap;
         RenderTexture thumbnailRT;
+
         UnityEngine.Rendering.TextureDimension textureType;
 
         public int shaderPropertyIdx;
@@ -50,12 +53,13 @@ namespace UnityEditor.SLZMaterialUI
             }
 
         }
-        public TextureField(MaterialProperty textureProperty, int texturePropertyIdx, bool isNormalMap)
+        public TextureField(MaterialProperty textureProperty, int texturePropertyIdx, bool isNormalMap, Texture defaultTexture = null)
         {
             this.textureProperty = textureProperty;
             this.currentValue = textureProperty.textureValue;
             this.shaderPropertyIdx = texturePropertyIdx;
             this.isNormalMap = isNormalMap;
+            this.defaultTexture = defaultTexture;
             RegisterCallback<DetachFromPanelEvent>(evt => Dispose());
             leftAlignBox = new VisualElement();
             leftAlignBox.AddToClassList("materialGUILeftBox");
@@ -166,6 +170,12 @@ namespace UnityEditor.SLZMaterialUI
             }
             else
             {
+                //if (textureProperty.textureValue == null && defaultTexture != null) 
+                //{
+                //    textureProperty.textureValue = defaultTexture;
+                //    currentValue = defaultTexture;
+                //}
+                
                 texObjField.showMixedValue = false;
             }
             texObjField.SetValueWithoutNotify(currentValue);
@@ -187,6 +197,12 @@ namespace UnityEditor.SLZMaterialUI
             if (newValue == null || newValue is Texture)
             {
                 currentValue = (Texture) newValue;
+
+                if (currentValue == null && defaultTexture != null)
+                {
+                    currentValue = defaultTexture;
+                }
+
                 UpdateThumbnail();
                 textureProperty.textureValue = currentValue;
                 texObjField.SetValueWithoutNotify(currentValue);

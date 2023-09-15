@@ -7,6 +7,8 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using SLZ.SLZEditorTools;
+using UnityEditor.Graphing.Util;
+using System.Reflection;
 
 namespace UnityEditor.SLZMaterialUI
 {
@@ -47,8 +49,9 @@ namespace UnityEditor.SLZMaterialUI
         /// But I don't trust unity, so check to make sure that they're all the same and not null.
         /// </summary>
         /// <returns>true on success, false on failure</returns>
-        public bool Initialize(VisualElement root)
+        public bool Initialize(VisualElement root, VisualElement window)
         {
+
             SerializedProperty serializedShader = serializedObject.FindProperty("m_Shader");
             if (serializedShader.hasMultipleDifferentValues || serializedShader.objectReferenceValue == null)
             {
@@ -62,10 +65,34 @@ namespace UnityEditor.SLZMaterialUI
                 return false;
             }
 
+
+            IMGUIContainer OnUpdate = new IMGUIContainer(() => {
+                bool isDisplay = window.style.display != DisplayStyle.None;
+                if (base.isVisible != isDisplay)
+                {
+                    window.style.display = base.isVisible ? DisplayStyle.Flex : DisplayStyle.None;
+                    root.MarkDirtyRepaint();
+                }
+                if ((target as Material).shader != shader)
+                {
+                    ShaderGUIUtils.ForceRebuild(this);
+                }
+            });
+            root.Add(OnUpdate);
             root.RegisterCallback<AttachToPanelEvent>(evt => Undo.undoRedoPerformed += UpdateUI);
             root.RegisterCallback<DetachFromPanelEvent>(evt => Undo.undoRedoPerformed -= UpdateUI);
 
             return true;
+        }
+
+        static MethodInfo s_RefreshInspectors;
+        
+
+        protected override void OnShaderChanged()
+        {
+            //UnityEngine.Object.DestroyImmediate(this);
+            Debug.Log("Changing Shader");
+            ShaderGUIUtils.ForceRebuild(this);
         }
     }
 }
