@@ -9,33 +9,36 @@ using UnityEngine.UIElements;
 using SLZ.SLZEditorTools;
 using UnityEditor.Graphing.Util;
 using System.Reflection;
+using Unity.Profiling;
 
 namespace UnityEditor.SLZMaterialUI
 {
     public abstract class UIElementsMaterialEditor : MaterialEditor
     {
-
+        static ProfilerMarker UpdateProfiler = new ProfilerMarker("UIElementsUpdateUI");
+        static ProfilerMarker PrepareForAnim = new ProfilerMarker("UIElementsUpdateUI_PrepareForAnim");
         public Shader shader;
-        public BaseMaterialField[] materialFields;
+        public List<BaseMaterialField> materialFields;
+        public MaterialProperty[] materialProperties;
         public virtual void UpdateUI()
         {
+            UpdateProfiler.Begin();
             //Debug.Log("Called Update UI");
-            MaterialProperty[] materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
+            materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
+            PrepareMaterialPropertiesForAnimationMode(materialProperties, true);
             int[] shaderProp2MatProp = ShaderGUIUtils.GetShaderIdxToMaterialProp(materialProperties, shader);
             if (materialFields == null)
             {
                 return;
             }
-            int numFields = materialFields.Length;
+            int numFields = materialFields.Count;
             for (int fIdx = 0; fIdx < numFields; fIdx++)
             {
-                if (materialFields[fIdx] != null)
-                {
                     int propIndex = shaderProp2MatProp[materialFields[fIdx].GetShaderPropIdx()];
                     //Debug.Log("Updating with indices: " + materialFields[fIdx].GetShaderPropIdx() + " " + propIndex);
                     materialFields[fIdx].UpdateMaterialProperty(materialProperties[propIndex]);
-                }
             }
+            UpdateProfiler.End();
         }
 
         public override bool UseDefaultMargins()
@@ -51,6 +54,8 @@ namespace UnityEditor.SLZMaterialUI
         /// <returns>true on success, false on failure</returns>
         public bool Initialize(VisualElement root, VisualElement window)
         {
+            materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
+            PrepareMaterialPropertiesForAnimationMode(materialProperties, true);
 
             SerializedProperty serializedShader = serializedObject.FindProperty("m_Shader");
             if (serializedShader.hasMultipleDifferentValues || serializedShader.objectReferenceValue == null)
@@ -73,10 +78,9 @@ namespace UnityEditor.SLZMaterialUI
                     window.style.display = base.isVisible ? DisplayStyle.Flex : DisplayStyle.None;
                     root.MarkDirtyRepaint();
                 }
-                if ((target as Material).shader != shader)
-                {
-                    ShaderGUIUtils.ForceRebuild(this);
-                }
+
+                OnIMGUITick();
+             
             });
             root.Add(OnUpdate);
             root.RegisterCallback<AttachToPanelEvent>(evt => Undo.undoRedoPerformed += UpdateUI);
@@ -90,9 +94,22 @@ namespace UnityEditor.SLZMaterialUI
 
         protected override void OnShaderChanged()
         {
-            //UnityEngine.Object.DestroyImmediate(this);
-            Debug.Log("Changing Shader");
             ShaderGUIUtils.ForceRebuild(this);
         }
+
+        void OnIMGUITick()
+        {
+            if ((target as Material).shader != shader)
+            {
+                ShaderGUIUtils.ForceRebuild(this);
+                return;
+            }
+            if (base.isVisible && AnimationMode.InAnimationMode())
+            {
+                PrepareMaterialPropertiesForAnimationMode(materialProperties, true);
+                UpdateUI();
+            }
+        }
+
     }
 }

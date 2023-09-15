@@ -55,13 +55,11 @@ namespace UnityEditor.SLZMaterialUI
         }
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {
-            this.SetValueWithoutNotify(boundProp.colorValue);
-            if (materialProperty.hasMixedValue)
+            if (value != boundProp.colorValue)
             {
-                //this.SetValueWithoutNotify(Color.gray);
-                this.showMixedValue = true;
+                this.SetValueWithoutNotify(boundProp.colorValue);
             }
-            MarkDirtyRepaint();
+            this.showMixedValue = boundProp.hasMixedValue;
         }
     }
 }

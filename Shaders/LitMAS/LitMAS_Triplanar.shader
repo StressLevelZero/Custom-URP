@@ -146,6 +146,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             ENDHLSL
         }
     }
-    CustomEditor "UnityEditor.ShaderGraphLitGUI"
+    CustomEditor "LitMASGUI"
+    //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }

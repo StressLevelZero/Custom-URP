@@ -21,6 +21,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
     public class LitMASGUI : UIElementsMaterialEditor
     {
         const string keyword_DETAILS_ON = "_DETAILS_ON";
+        const string keyword_BRDF = "_BRDFMAP";
 
         const string defaultMASGUID = "75f1fbacfa73385419ec8d7700a107ea";
         static string s_defaultMASPath;
@@ -50,6 +51,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             _BakedMutiplier,
             _Details,
             _DetailMap,
+            g_tBRDFMap,
+            BRDFMAP,
+            _HitRamp,
+            _HitColor,
         }
         static ReadOnlySpan<string> propertyNames => new string[] {
             "_BaseMap",
@@ -64,6 +69,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "_BakedMutiplier",
             "_Details",
             "_DetailMap",
+            "g_tBRDFMap",
+            "BRDFMAP",
+            "_HitRamp",
+            "_HitColor"
         };
         class ShaderPropertyTable
         {
@@ -99,7 +108,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             MainWindow.styleSheets.Add(ShaderGUIUtils.shaderGUISheet);
 
-            MaterialProperty[] props = GetMaterialProperties(this.targets);
+            MaterialProperty[] props = materialProperties;
 
             int[] propIdx = ShaderGUIUtils.GetMaterialPropertyShaderIdx(props, base.shader);
 
@@ -108,8 +117,8 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             //ShaderGUIUtils.SanitizeMaterials(this.targets, props, propIdx, shader);
 
             ShaderPropertyTable propTable = GetPropertyTable(props);
-            materialFields = new BaseMaterialField[props.Length + propTable.texturePropertyCount]; // Scale/offsets are separate fields, double the number of texture properties
-            int currentFieldIdx = 0;
+            materialFields = new List<BaseMaterialField>(props.Length + propTable.texturePropertyCount); // Scale/offsets are separate fields, double the number of texture properties
+            //int currentFieldIdx = 0;
 
             //----------------------------------------------------------------
             // Rendering Properties ------------------------------------------
@@ -117,8 +126,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             Foldout drawProps = new Foldout();
 
-            Texture2D RTIcon = ShaderGUIUtils.GetClosestUnityIconMip("RenderTexture Icon", 16);
-            ShaderGUIUtils.SetHeaderStyle(drawProps, "Rendering Properties", RTIcon);
+           
             //drawProps.value = false;
 
             RenderQueueDropdown renderQueue = new RenderQueueDropdown(serializedObject, shader);
@@ -145,8 +153,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 baseMapField = new TextureField(props[baseMapIdx], propIdx[baseMapIdx], false);
                 baseMapField.tooltip2 = LitMASGui_Tooltips.BaseMap.ToString();
                 baseProps.Add(baseMapField);
-                materialFields[currentFieldIdx] = baseMapField;
-                currentFieldIdx++;
+                materialFields.Add(baseMapField);
                 hasCoreProperty = true;
             }
 
@@ -166,8 +173,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                     baseProps.Add(baseColorField);
                 }
                 baseColorField.tooltip = LitMASGui_Tooltips.BaseColor.ToString();
-                materialFields[currentFieldIdx] = baseColorField;
-                currentFieldIdx++;
+                materialFields.Add(baseColorField);
                 hasCoreProperty = true;
             }
 
@@ -179,8 +185,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 TextureField MASMap = new TextureField(props[MASMapIdx], propIdx[MASMapIdx], false, shaderImporter?.GetDefaultTexture(props[MASMapIdx].name));
                 MASMap.tooltip2 = LitMASGui_Tooltips.MASMap.ToString();
                 baseProps.Add(MASMap);
-                materialFields[currentFieldIdx] = MASMap;
-                currentFieldIdx++;
+                materialFields.Add(MASMap);
                 hasCoreProperty = true;
 
                 MAS_defaultSlider defaultSlider = new MAS_defaultSlider(MASMap);
@@ -194,8 +199,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 TextureField NormalMap = new TextureField(props[NormalMapIdx], propIdx[NormalMapIdx], true);
                 NormalMap.tooltip2 = LitMASGui_Tooltips.NormalMap.ToString();
                 baseProps.Add(NormalMap);
-                materialFields[currentFieldIdx] = NormalMap;
-                currentFieldIdx++;
+                materialFields.Add(NormalMap);
 
                 int NormalsIdx = PropertyIdx(ref propTable, PName._Normals);
                 if (NormalsIdx != -1) 
@@ -205,6 +209,28 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                     normalToggle.Initialize(props[NormalsIdx], propIdx[NormalsIdx], null, false, true);
                     normalToggle.RegisterValueChangedCallback(evt => NormalMap.leftAlignBox.SetEnabled(evt.newValue));
                     NormalMap.rightAlignBox.Add(normalToggle);
+                    materialFields.Add(normalToggle);
+                }
+                hasCoreProperty = true;
+            }
+
+            int BRDFRampIdx = PropertyIdx(ref propTable, PName.g_tBRDFMap);
+            if(BRDFRampIdx != -1)
+            {
+                TextureField BRDFRamp = new TextureField(props[BRDFRampIdx], propIdx[BRDFRampIdx], false);
+                //NormalMap.tooltip2 = LitMASGui_Tooltips.NormalMap.ToString();
+                baseProps.Add(BRDFRamp);
+                materialFields.Add(BRDFRamp);
+
+                int BRDFRampToggleIdx = PropertyIdx(ref propTable, PName.BRDFMAP);
+                if (BRDFRampToggleIdx != -1)
+                {
+                    BRDFRamp.leftAlignBox.SetEnabled(props[BRDFRampToggleIdx].floatValue > 0.0);
+                    MaterialToggleField BRDFRampToggle = new MaterialToggleField();
+                    BRDFRampToggle.Initialize(props[BRDFRampToggleIdx], propIdx[BRDFRampToggleIdx], keyword_BRDF, false, true);
+                    BRDFRampToggle.RegisterValueChangedCallback(evt => BRDFRamp.leftAlignBox.SetEnabled(evt.newValue));
+                    BRDFRamp.rightAlignBox.Add(BRDFRampToggle);
+                    materialFields.Add(BRDFRampToggle);
                 }
                 hasCoreProperty = true;
             }
@@ -215,11 +241,15 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             {
                 MaterialScaleOffsetField baseScaleOffsetField = new MaterialScaleOffsetField(props[baseMapIdx], propIdx[baseMapIdx]);
                 baseProps.Add(baseScaleOffsetField);
-                materialFields[currentFieldIdx] = baseScaleOffsetField;
-                currentFieldIdx++;
+                materialFields.Add(baseScaleOffsetField);
             }
 
-            if (hasCoreProperty) MainWindow.Add(baseProps);
+            if (hasCoreProperty)
+            {
+                Texture2D RTIcon = ShaderGUIUtils.GetClosestUnityIconMip("RenderTexture Icon", 16);
+                ShaderGUIUtils.SetHeaderStyle(drawProps, "Rendering Properties", RTIcon);
+                MainWindow.Add(baseProps);
+            }
 
             //----------------------------------------------------------------
             // Emission Properties -------------------------------------------
@@ -227,7 +257,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             Toggle emissionToggle = null;
             Foldout emissionProps = new Foldout();
-            Texture2D LightIcon = ShaderGUIUtils.GetClosestUnityIconMip("Light Icon", 16);
+            
             
             bool hasEmissionProperty = false;
             // Emission Map --------------------------------------------------
@@ -239,8 +269,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 emissionMapField = new TextureField(props[emissionMapIdx], propIdx[emissionMapIdx], false);
                 emissionMapField.tooltip2 = LitMASGui_Tooltips.EmissionMap.ToString();
                 emissionProps.Add(emissionMapField);
-                materialFields[currentFieldIdx] = emissionMapField;
-                currentFieldIdx++;
+                materialFields.Add(emissionMapField);
                 hasEmissionProperty = true;
             }
 
@@ -260,8 +289,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                     emissionProps.Add(emissionColorField);
                 }
                 emissionColorField.tooltip = LitMASGui_Tooltips.EmissionColor.ToString();
-                materialFields[currentFieldIdx] = emissionColorField;
-                currentFieldIdx++;
+                materialFields.Add(emissionColorField);
                 hasEmissionProperty = true;
             }
 
@@ -274,8 +302,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 emissionProps.Add(emissionFalloffField);
 
                 emissionFalloffField.tooltip = LitMASGui_Tooltips.EmissionFalloff.ToString();
-                materialFields[currentFieldIdx] = emissionFalloffField;
-                currentFieldIdx++;
+                materialFields.Add(emissionFalloffField);
                 hasEmissionProperty = true;
             }
 
@@ -288,8 +315,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 emissionProps.Add(emissionMultiplierField);
 
                 emissionMultiplierField.tooltip = LitMASGui_Tooltips.EmissionFalloff.ToString();
-                materialFields[currentFieldIdx] = emissionMultiplierField;
-                currentFieldIdx++;
+                materialFields.Add(emissionMultiplierField);
                 hasEmissionProperty = true;
             }
 
@@ -302,8 +328,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
                 emissionMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => { emissionProps.contentContainer.SetEnabled(evt.newValue); });
                 emissionToggle = emissionMatToggle;
-                materialFields[currentFieldIdx] = emissionMatToggle;
-                currentFieldIdx++;
+                materialFields.Add(emissionMatToggle);
                 hasEmissionProperty = true;
 
                 bool emissionEnabled = props[emissionToggleIdx].floatValue > 0.0f;
@@ -321,6 +346,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 doubleSidedGIToggle.bindingPath = "m_DoubleSidedGI";
                 emissionProps.Add(doubleSidedGIToggle);
 
+                Texture2D LightIcon = ShaderGUIUtils.GetClosestUnityIconMip("Light Icon", 16);
                 ShaderGUIUtils.SetHeaderStyle(emissionProps, "Emission", LightIcon, emissionToggle);
                 MainWindow.Add(emissionProps);
             }
@@ -331,7 +357,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             Toggle detailToggle = null;
             Foldout detailProps = new Foldout();
-            Texture2D detailIcon = ShaderGUIUtils.GetClosestUnityIconMip("Grid Icon", 16);
+           
             bool hasDetails = false;
 
             int detailMapIdx = PropertyIdx(ref propTable, PName._DetailMap);
@@ -340,14 +366,12 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 TextureField detailsMapField = new TextureField(props[detailMapIdx], propIdx[detailMapIdx], false, shaderImporter?.GetDefaultTexture(props[detailMapIdx].name));
                 detailsMapField.tooltip2 = LitMASGui_Tooltips.DetailMap.ToString();
                 detailProps.Add(detailsMapField);
-                materialFields[currentFieldIdx] = detailsMapField;
-                currentFieldIdx++;
+                materialFields.Add(detailsMapField);
                 hasDetails = true;
 
                 MaterialScaleOffsetField detailScaleOffset = new MaterialScaleOffsetField(props[detailMapIdx], propIdx[detailMapIdx]);
                 detailProps.Add(detailScaleOffset);
-                materialFields[currentFieldIdx] = detailScaleOffset;
-                currentFieldIdx++;
+                materialFields.Add(detailScaleOffset);
             }
 
             int detailToggleIdx = PropertyIdx(ref propTable, PName._Details);
@@ -358,20 +382,62 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => { detailProps.contentContainer.SetEnabled(evt.newValue); });
                 bool detailEnabled = props[detailToggleIdx].floatValue > 0.0f;
                 detailProps.contentContainer.SetEnabled(detailEnabled);
-                //detailProps.Add(detailMatToggle);
-                materialFields[currentFieldIdx] = detailMatToggle;
-                currentFieldIdx++;
-
-                
+                materialFields.Add(detailMatToggle);                
                 detailToggle = detailMatToggle;
             }
 
 
             if (hasDetails)
             {
+                Texture2D detailIcon = ShaderGUIUtils.GetClosestUnityIconMip("Grid Icon", 16);
                 ShaderGUIUtils.SetHeaderStyle(detailProps, "Details", detailIcon, detailToggle);
                 MainWindow.Add(detailProps);
             }
+
+
+            //----------------------------------------------------------------
+            // Impact Properties --------------------------------------------
+            //----------------------------------------------------------------
+            Foldout ImpactProps = new Foldout();
+            bool hasImpacts = false;
+
+            int hitRampIdx = PropertyIdx(ref propTable, PName._HitRamp);
+            TextureField hitRamp = null;
+            if (hitRampIdx != -1)
+            {
+                hitRamp = new TextureField(props[hitRampIdx], propIdx[hitRampIdx], false);
+                ImpactProps.Add(hitRamp);
+                materialFields.Add(hitRamp);
+                hasImpacts = true;
+            }
+
+            int hitColorIdx = PropertyIdx(ref propTable, PName._HitColor);
+            if (hitRampIdx != -1)
+            {
+                MaterialColorField hitColorField = new MaterialColorField();
+                hitColorField.hdr = true;
+                if (hitColorIdx != -1)
+                {
+                    hitColorField.Initialize(props[hitColorIdx], propIdx[hitColorIdx], true);
+                    hitRamp.rightAlignBox.Add(hitColorField);
+                }
+                else
+                {
+                    hitColorField.Initialize(props[emissionColorIdx], propIdx[emissionColorIdx], false);
+                    ImpactProps.Add(hitColorField);
+                }
+                hitColorField.tooltip = LitMASGui_Tooltips.EmissionColor.ToString();
+                materialFields.Add(hitColorField);
+                hasImpacts = true;
+            }
+
+            if (hasImpacts)
+            {
+                Texture2D impactIcon = ShaderGUIUtils.GetClosestUnityIconMip("RaycastCollider Icon", 16);
+                ShaderGUIUtils.SetHeaderStyle(ImpactProps, "Impacts", impactIcon);
+                MainWindow.Add(ImpactProps);
+            }
+
             //----------------------------------------------------------------
             // Unknown Properties --------------------------------------------
             //----------------------------------------------------------------
@@ -395,14 +461,13 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                         if ((prop.flags & MaterialProperty.PropFlags.NonModifiableTextureData) != 0) continue;
                         TextureField tf = new TextureField(prop, shaderIdx, (prop.flags & MaterialProperty.PropFlags.Normal) != 0, shaderImporter?.GetDefaultTexture(prop.name));
                         unknownProps.Add(tf);
-                        materialFields[currentFieldIdx] = tf;
-                        currentFieldIdx++;
+                        materialFields.Add(tf);
+
                         if ((prop.flags & MaterialProperty.PropFlags.NoScaleOffset) == 0)
                         {
                             MaterialScaleOffsetField msof = new MaterialScaleOffsetField(prop, shaderIdx);
                             unknownProps.Add(msof);
-                            materialFields[currentFieldIdx] = msof;
-                            currentFieldIdx++;
+                            materialFields.Add(msof);
                         }
 
                         break;
@@ -414,15 +479,13 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                         }
                         cf.Initialize(prop, shaderIdx, false);
                         unknownProps.Add(cf);
-                        materialFields[currentFieldIdx] = cf;
-                        currentFieldIdx++;
+                        materialFields.Add(cf);
                         break;
                     case (MaterialProperty.PropType.Vector):
                         MaterialVectorField vf = new MaterialVectorField();
                         vf.Initialize(prop, shaderIdx);
                         unknownProps.Add(vf);
-                        materialFields[currentFieldIdx] = vf;
-                        currentFieldIdx++;
+                        materialFields.Add(vf);
                         break;
                     case (MaterialProperty.PropType.Range):
                         if (shader.GetPropertyAttributes(shaderIdx).Contains("IntRange"))
@@ -430,16 +493,14 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                             MaterialIntRangeField irf = new MaterialIntRangeField();
                             irf.Initialize(prop, shaderIdx);
                             unknownProps.Add(irf);
-                            materialFields[currentFieldIdx] = irf;
-                            currentFieldIdx++;
+                            materialFields.Add(irf);
                         }
                         else
                         {
                             MaterialRangeField rf = new MaterialRangeField();
                             rf.Initialize(prop, shaderIdx);
                             unknownProps.Add(rf);
-                            materialFields[currentFieldIdx] = rf;
-                            currentFieldIdx++;
+                            materialFields.Add(rf);
                         }
                         break;
                     case (MaterialProperty.PropType.Float):
@@ -450,31 +511,24 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                             MaterialToggleField tgf = new MaterialToggleField();
                             tgf.Initialize(prop, shaderIdx, keyword, false);
                             unknownProps.Add(tgf);
-                            materialFields[currentFieldIdx] = tgf;
-                            currentFieldIdx++;
+                            materialFields.Add(tgf);
                         }
                         else
                         {
                             MaterialFloatField ff = new MaterialFloatField();
                             ff.Initialize(prop, shaderIdx);
                             unknownProps.Add(ff);
-                            materialFields[currentFieldIdx] = ff;
-                            currentFieldIdx++;
+                            materialFields.Add(ff);
                         }
                         break;
                     case (MaterialProperty.PropType.Int):
                         MaterialIntField inf = new MaterialIntField();
                         inf.Initialize(prop, shaderIdx);
                         unknownProps.Add(inf);
-                        materialFields[currentFieldIdx] = inf;
-                        currentFieldIdx++;
+                        materialFields.Add(inf);
                         break;
                 }
             }
-
-            //testBox.name = "headerRoot";
-          
-
             
             if (numUnknown > 0)
             {

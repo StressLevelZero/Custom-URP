@@ -27,7 +27,6 @@ namespace UnityEditor.SLZMaterialUI
         Texture currentValue;
         
         Image thumbnail;
-        bool updateScheduled = false;
         bool isNormalMap;
         RenderTexture thumbnailRT;
 
@@ -232,20 +231,17 @@ namespace UnityEditor.SLZMaterialUI
 
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {
-
+            bool valueChanged = currentValue != boundProp.textureValue;
             textureProperty = boundProp;
-            currentValue = boundProp.textureValue;
-            texObjField.SetValueWithoutNotify(currentValue);
-            if (boundProp.hasMixedValue)
+            if (valueChanged)
             {
-                texObjField.showMixedValue = true;
-                currentValue = null;
+               
+                currentValue = boundProp.textureValue;
+                texObjField.SetValueWithoutNotify(currentValue);
+                UpdateThumbnail();
             }
-            else
-            {
-                texObjField.showMixedValue = false;
-            }
-            UpdateThumbnail();
+
+            texObjField.showMixedValue = boundProp.hasMixedValue;
         }
 
         void Dispose() 

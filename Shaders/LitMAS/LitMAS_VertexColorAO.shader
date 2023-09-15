@@ -145,6 +145,7 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             ENDHLSL
         }
     }
-    CustomEditor "UnityEditor.ShaderGraphLitGUI"
+    CustomEditor "LitMASGUI"
+    //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }

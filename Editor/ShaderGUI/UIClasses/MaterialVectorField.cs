@@ -8,8 +8,10 @@ namespace UnityEditor.SLZMaterialUI
     public class MaterialVectorField : Vector4Field, BaseMaterialField
     {
         public int shaderPropertyIdx;
+
         public int GetShaderPropIdx() { return shaderPropertyIdx; }
         public MaterialProperty materialProperty;
+        
 
         public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx)
         {
@@ -44,13 +46,12 @@ namespace UnityEditor.SLZMaterialUI
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {
             materialProperty = boundProp;
-            this.SetValueWithoutNotify(boundProp.vectorValue);
-            if (materialProperty.hasMixedValue)
+            if (this.value != boundProp.vectorValue)
             {
-                //this.SetValueWithoutNotify(Color.gray);
-                this.showMixedValue = true;
+                this.SetValueWithoutNotify(boundProp.vectorValue);
             }
-            MarkDirtyRepaint();
+            this.showMixedValue = boundProp.hasMixedValue;
+            //MarkDirtyRepaint();
         }
     }
 }

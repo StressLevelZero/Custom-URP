@@ -137,6 +137,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
             ENDHLSL
         }
     }
-    CustomEditor "UnityEditor.ShaderGraphLitGUI"
+    CustomEditor "LitMASGUI"
+    //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }

@@ -116,7 +116,8 @@ namespace SLZ.SLZEditorTools
             int[] propertyIdx = new int[shader.GetPropertyCount()];
             for (int i = 0; i < numMatProps; i++)
             {
-                propertyIdx[shader.FindPropertyIndex(materialProperties[i].name)] = i;
+                //propertyIdx[shader.FindPropertyIndex(materialProperties[i].name)] = i;
+                propertyIdx[i] = i;
             }
             return propertyIdx;
         }
@@ -272,7 +273,7 @@ namespace SLZ.SLZEditorTools
                 ReflectEditorTracker();
             }
             object propertyViewer = s_PropertyViewer.GetValue(e);
-            UnityEngine.Object.DestroyImmediate(e);
+
             if (propertyViewer != null)
             {
                 var map = propertyViewer.GetType().GetInterfaceMap(getTracker.DeclaringType);

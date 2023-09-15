@@ -44,13 +44,11 @@ namespace UnityEditor.SLZMaterialUI
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {
             materialProperty = boundProp;
-            this.SetValueWithoutNotify(boundProp.floatValue);
-            if (materialProperty.hasMixedValue)
+            if (value != boundProp.floatValue)
             {
-                //this.SetValueWithoutNotify(Color.gray);
-                this.showMixedValue = true;
+                this.SetValueWithoutNotify(boundProp.floatValue);
             }
-            MarkDirtyRepaint();
+            this.showMixedValue = boundProp.hasMixedValue;
         }
     }
 }

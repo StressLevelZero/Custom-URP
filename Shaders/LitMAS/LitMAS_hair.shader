@@ -1,4 +1,4 @@
-Shader "SLZ/LitMAS/LitMAS Hair"
+Shader "Hidden/SLZ/LitMAS/LitMAS Hair"
 {
 	Properties
 	{

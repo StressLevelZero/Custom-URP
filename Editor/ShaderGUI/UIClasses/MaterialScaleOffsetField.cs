@@ -14,12 +14,12 @@ namespace UnityEditor.SLZMaterialUI
         public MaterialProperty materialProperty;
         Vector2Field tilingField;
         Vector2Field offsetField;
-
+        public Vector4 value;
         public MaterialScaleOffsetField(MaterialProperty boundProp, int shaderPropertyIdx)
         {
             this.materialProperty = boundProp;
             this.shaderPropertyIdx = shaderPropertyIdx;
-            Vector4 scaleOffset = boundProp.textureScaleAndOffset;
+            value = boundProp.textureScaleAndOffset;
             tilingField = new Vector2Field();
             tilingField.style.marginRight = 4;
             tilingField.label = "Tiling";
@@ -28,7 +28,7 @@ namespace UnityEditor.SLZMaterialUI
             tilingInput.RemoveAt(2);
             tilingLabel.AddToClassList("materialGUILeftBox");
             tilingInput.AddToClassList("materialGUIRightBox");
-            tilingField.SetValueWithoutNotify(new Vector2(scaleOffset.x, scaleOffset.y));
+            tilingField.SetValueWithoutNotify(new Vector2(value.x, value.y));
             tilingField.RegisterValueChangedCallback(OnChangedEventTiling);
 
             offsetField = new Vector2Field();
@@ -40,7 +40,7 @@ namespace UnityEditor.SLZMaterialUI
             offsetInput.RemoveAt(2);
             offsetLabel.AddToClassList("materialGUILeftBox");
             offsetInput.AddToClassList("materialGUIRightBox");
-            offsetField.SetValueWithoutNotify(new Vector2(scaleOffset.z, scaleOffset.w));
+            offsetField.SetValueWithoutNotify(new Vector2(value.z, value.w));
             offsetField.RegisterValueChangedCallback(OnChangedEventOffset);
 
             Add(tilingField);
@@ -49,31 +49,33 @@ namespace UnityEditor.SLZMaterialUI
 
         public void OnChangedEventTiling(ChangeEvent<Vector2> evt)
         {
-            Vector4 scaleOffset = new Vector4(evt.newValue.x, evt.newValue.y, offsetField.value.x, offsetField.value.y);
+            Vector4 scaleOffset = new Vector4(evt.newValue.x, evt.newValue.y, value.z, value.w);
+            value = scaleOffset;
             materialProperty.textureScaleAndOffset = scaleOffset;
             tilingField.showMixedValue = false;
         }
 
         public void OnChangedEventOffset(ChangeEvent<Vector2> evt)
         {
-            Vector4 scaleOffset = new Vector4(tilingField.value.x, tilingField.value.y, evt.newValue.x, evt.newValue.y);
+            Vector4 scaleOffset = new Vector4(value.x, value.y, evt.newValue.x, evt.newValue.y);
+            value = scaleOffset;
             materialProperty.textureScaleAndOffset = scaleOffset;
             tilingField.showMixedValue = false;
         }
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {
             materialProperty = boundProp;
-            Vector2 scale = new Vector2(boundProp.textureScaleAndOffset.x, boundProp.textureScaleAndOffset.y);
-            Vector2 offset = new Vector2(boundProp.textureScaleAndOffset.z, boundProp.textureScaleAndOffset.w);
-            tilingField.SetValueWithoutNotify(scale);
-            offsetField.SetValueWithoutNotify(offset);
-            if (materialProperty.hasMixedValue)
+            if (value != boundProp.textureScaleAndOffset)
             {
-                tilingField.showMixedValue = true;
-                offsetField.showMixedValue = true;
-            }
-            MarkDirtyRepaint();
-        }
+                value = boundProp.textureScaleAndOffset;
+                Vector2 scale = new Vector2(value.x, value.y);
+                Vector2 offset = new Vector2(value.z, value.w);
+                tilingField.SetValueWithoutNotify(scale);
+                offsetField.SetValueWithoutNotify(offset);
 
+            }
+            tilingField.showMixedValue = materialProperty.hasMixedValue;
+            offsetField.showMixedValue = materialProperty.hasMixedValue;
+        }
     }
 }

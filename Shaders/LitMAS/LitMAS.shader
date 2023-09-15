@@ -3,7 +3,7 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 {
 	Properties
 	{
-		[MainTexture] _BaseMap("Base Map", 2D) = "white" {}
+		[ForceReload][MainTexture] _BaseMap("Base Map", 2D) = "white" {}
 		[MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
 		[ToggleUI] _Normals("Normal Map enabled", Float) = 1
 		[NoScaleOffset][Normal] _BumpMap ("Normal map", 2D) = "bump" {}
@@ -14,7 +14,7 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 		_EmissionFalloff("Emission Falloff", Float) = 1
 		_BakedMutiplier("Emission Baked Mutiplier", Float) = 1
 		[Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
-		_DetailMap("DetailMap", 2D) = "gray" {}
+		_DetailMap("Detail Map", 2D) = "gray" {}
 		[Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_NO_SSR)] _SSROff("Disable SSR", Float) = 0
 		[Header(This should be 0 for skinned meshes)]
 		_SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
@@ -148,6 +148,6 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 		}
 	}
 	CustomEditor "LitMASGUI"
-	CustomEditor "UnityEditor.ShaderGraphLitGUI"
+	//CustomEditor "UnityEditor.ShaderGraphLitGUI"
 	//Fallback "Hidden/InternalErrorShader"
 }

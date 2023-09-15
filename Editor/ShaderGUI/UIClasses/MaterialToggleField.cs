@@ -112,12 +112,13 @@ namespace UnityEditor.SLZMaterialUI
             {
                 state = materialProperty.floatValue > 0 ? true : false;
             }
-            this.SetValueWithoutNotify(state);
-            if (materialProperty.hasMixedValue)
+            if (this.value != state)
             {
-                this.showMixedValue = true;
+                this.SetValueWithoutNotify(state);
+
             }
-            MarkDirtyRepaint();
+            this.showMixedValue = materialProperty.hasMixedValue;
+            //MarkDirtyRepaint();
         }
     }
 }
