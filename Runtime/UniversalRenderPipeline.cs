@@ -204,8 +204,7 @@ namespace UnityEngine.Rendering.Universal
 
             // Initial state of the RTHandle system.
             // We initialize to screen width/height to avoid multiple realloc that can lead to inflated memory usage (as releasing of memory is delayed).
-            // Note: Use legacy DR control. Can be removed once URP integrates with core package DynamicResolutionHandler
-            RTHandles.Initialize(Screen.width, Screen.height, useLegacyDynamicResControl: true);
+            RTHandles.Initialize(Screen.width, Screen.height);
 
             GraphicsSettings.useScriptableRenderPipelineBatching = asset.useSRPBatcher;
 
