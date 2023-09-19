@@ -297,6 +297,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		UNITY_BRANCH if (inHitRadius && isMinMip)
 		{
 			finalPos = reflectedRay;
+			totalDistance = -totalDistance;
 			break;
 		}
 
@@ -399,10 +400,12 @@ float4 getSSRColor(SSRData data)
 	
 	
 	// get the total number of iterations out of finalPos's w component and replace with 1.
-	float totalDistance = finalPos.w;
+	float totalDistance = abs(finalPos.w);
+	float rayHit = finalPos.w < 0;
 	finalPos.w = 1;
 	
 
+	
 
 	/*
 	 * A position of 0, 0, 0 signifies that the ray went off screen or ran
@@ -453,13 +456,41 @@ float4 getSSRColor(SSRData data)
 	float roughRadius = rayTanAngle2 * totalDistance;
 	
 	float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
+	//roughRatio = rayHit > 0 ? roughRatio : data.perceptualRoughness * data.perceptualRoughness;
 	//uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
 	float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
+	
 	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
+	
+	#if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
+    
+	reflection.a = rayHit;
+	
+    real4 colorX = QuadReadAcrossX(reflection);
+    real4 colorY = QuadReadAcrossY(reflection);
+    real4 colorD = QuadReadAcrossDiagonal(reflection);
+    float4 kernel = float4(0.5 * reflection.a, 0.2 * colorX.a, 0.2 * colorY.a, 0.1 * colorD.a);
+	float weight = kernel.x + kernel.y + kernel.z + kernel.w;
+    float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;
+       
+    reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
+    
+	float fadeX = QuadReadAcrossX(fade);
+	float fadeY = QuadReadAcrossY(fade);
+	float fadeD = QuadReadAcrossDiagonal(fade);
+	
+	
+	fade = weight > 0.01 ? dot(float4(fade, fadeX, fadeY, fadeD), kernel) / weight : fade;
+	
+	#endif
+	//fade = 1;
+	reflection.a = fade;
+	//reflection.rgb = rayHit ? reflection.rgb : float3(1,0,1);
+	
 	//reflection *= _ProjectionParams.z;
 	//reflection.a *= smoothness*reflStr*fade;
 	//return 	totalDistance < 0.1 ? float4(1, 0, 1, 1) : float4(reflection.rgb, fade);
-	return float4(reflection.rgb, fade); //sqrt(1 - saturate(uvs.y)));
+	return reflection; //sqrt(1 - saturate(uvs.y)));
 }
 
 

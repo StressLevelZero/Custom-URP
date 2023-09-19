@@ -95,13 +95,13 @@ namespace SLZ.SLZEditorTools
 			{
 				TextureFormat compressedFmt = GetPlatformFormat(buildTarget);
 				TextureFormat uncompFmt = GraphicsFormatUtility.GetTextureFormat(info.graphicsFormat);
-				Debug.Log("Uncompressed Format: " + uncompFmt.ToString() + " " + (GraphicsFormat)info.graphicsFormat);
+				//Debug.Log("Uncompressed Format: " + uncompFmt.ToString() + " " + (GraphicsFormat)info.graphicsFormat);
 				int rawSliceSize = fileBytes.Length / info.depth;
 				bool needsPadding = compressedFmt == TextureFormat.BC6H;
 
 				
 				int mipLevels = math.max(1, info.mipLevels);
-				Debug.Log("Mip Levels: " + mipLevels);
+				//Debug.Log("Mip Levels: " + mipLevels);
 				int blockSize = BlockSize[compressedFmt];
 				int bytesPerBlock = BytesPerBlock[compressedFmt];
 				int bytesPerRawPixel = BytesPerBlock[uncompFmt];
@@ -376,7 +376,7 @@ namespace SLZ.SLZEditorTools
 				{
 					int slicePtr = mipPtr[mip] + z * mipDim[mip].x * mipDim[mip].y * pixelSize;
 					int padSlicePtr = padMipPtr[mip] + z * padMipDim[mip].x * padMipDim[mip].y * pixelSize;
-					Debug.Log(padMipDim[mip].x);
+					//Debug.Log(padMipDim[mip].x);
 					for (int y = 0; y < mipDim[mip].y; y++)
 					{
 						int rowPtr = slicePtr + y * mipDim[mip].x * pixelSize;
@@ -759,7 +759,7 @@ namespace SLZ.SLZEditorTools
 			}
 			else
 			{
-				Debug.Log("UncompressedData");
+				//Debug.Log("UncompressedData");
 				NativeArray<byte> vol3d = new NativeArray<byte>(dfilesize, Allocator.Persistent);
 				byte[] uncompressedBytes = new byte[dfilesize];
 				inStream.Read(uncompressedBytes, 0, dfilesize);

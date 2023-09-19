@@ -89,24 +89,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
         SSR = getSSRColor(ssrData);
     }
     
-#if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
-    
-    real4 colorX = QuadReadAcrossX(SSR);
-    real4 colorY = QuadReadAcrossY(SSR);
-    real4 colorD = QuadReadAcrossDiagonal(SSR);
-    float alphaConst = 0.4 * colorX.a + 0.4 * colorY.a + 0.2 * colorD.a;
-    float3 avgSSRColor = 
-        //0.5 * SSR.rgb * SSR.a + 
-        0.4 * colorX.rgb * colorX.a + 
-        0.4 * colorY.rgb * colorY.a + 
-        0.2 * colorD.rgb * colorD.a;
-    SSR = SSR.a > 1e-4 || alphaConst < 1e-4 ? SSR : float4(avgSSRColor / max(0.01,alphaConst), 1);
-   
-    //real alphaAvg = max(colorX.a + colorY.a + colorD.a, 1e-6);
-    //real4 colorAvg = real4((colorX.a * colorX + colorY.a * colorY + colorD.a*colorD) / (alphaAvg));//, alphaAvg);
-    //SSR = lerp(colorAvg, SSR,-SSR.a * saturate(2 * ssrData.perceptualRoughness) + SSR.a);
-    
-#endif
+
 
     //reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
     SSRColor = SSR.rgb;
