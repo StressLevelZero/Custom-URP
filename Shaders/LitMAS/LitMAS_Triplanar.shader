@@ -48,6 +48,10 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #define LITMAS_FEATURE_LIGHTMAPPING
             #define LITMAS_FEATURE_TP
             #define LITMAS_FEATURE_EMISSION
+			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+			#pragma require QuadShuffle
+			#define _SM6_QUAD 1
+			#endif
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarForward.hlsl"
             ENDHLSL

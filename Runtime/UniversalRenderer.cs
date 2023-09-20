@@ -1302,12 +1302,10 @@ namespace UnityEngine.Rendering.Universal
 
             if (cameraData.enableSSR)
             {
-                //m_SetHiZ0GlobalPass.Setup(m_PrevHiZ0Texture.Identifier(), m_PrevHiZ0Texture.id);
-                //EnqueuePass(m_SetHiZ0GlobalPass);
-                //m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
-                PersistentRT prevHiZ0Texture = PersistentRT.TryGet(cameraExtData, (int)CamDataExtType.HI_Z);
-                m_CopyHiZ0Pass.Setup(m_DepthHiZTexture, prevHiZ0Texture);
-                EnqueuePass(m_CopyHiZ0Pass);
+                // EXPERIMENT: use averaging across quad instead of temporal averaging to reduce noise. Thus, don't run this as its no longer needed
+                // PersistentRT prevHiZ0Texture = PersistentRT.TryGet(cameraExtData, (int)CamDataExtType.HI_Z);
+                // m_CopyHiZ0Pass.Setup(m_DepthHiZTexture, prevHiZ0Texture);
+                // EnqueuePass(m_CopyHiZ0Pass);
             }
 
             // END SLZ MODIFIED

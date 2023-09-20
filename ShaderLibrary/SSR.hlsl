@@ -156,7 +156,7 @@ float3 CameraToScreenPosCheap(const float3 pos)
  *  Lawrence 2002 "Importance Sampling of the Phong Reflectance Mode". Lawrence
  *  gives the angle between perfect specular and random ray as arccos(u^(1/(n+1))
  *  where u is a random value and n is the phong power. Uludag 2014 "Hi-Z 
- *  Screen-Space Cone-Traced Re?ections" sets u to a constant of 0.244 to 
+ *  Screen-Space Cone-Traced Refections" sets u to a constant of 0.244 to 
  *  get the average angle. Karis 2013 "Specular BRDF Reference" converts the
  *  phong specular exponent to physical roughness as n = 2/r^2 - 2. Combining
  *  this with the formula for the angle, the angle is almost a linear function
@@ -168,8 +168,8 @@ float3 CameraToScreenPosCheap(const float3 pos)
  */
 float TanPhongConeAngle(const float roughness)
 {
-	float roughness2 = roughness;
-	float alpha = roughness2 / (2 - roughness2);
+	float roughness2 = roughness; // already using roughness^2? doesn't look even close to right when given perceptual roughness^2, and perceptual roughness == sqrt(roughness)? wtf?
+	float alpha = roughness2 / (2 - roughness2); //a = 1 / (n + 1) = 1 / ((2/r - 2) + 1) = r / (2 - r)
 	return rcp(1 - (2.5 * INV_PI) * alpha) - 1.0;
 }
 
@@ -256,7 +256,10 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		int2 uvInt = int2(uvDepth * _HiZDim.xy) >> mipLevel;
 		float rawDepth = LOAD_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, uvInt, mipLevel).r;
 		float linearDepth = Linear01Depth(rawDepth, _ZBufferParams);
-		
+		if (linearDepth == 0)
+		{
+			break;
+		}
 		linearDepth = linearDepth > 0.999999 ? 9999 : linearDepth;
 		//float sampleDepth = -mul(worldToDepth, float4(reflectedRay.xyz, 1)).z;
 		float sampleDepth = -reflectedRay.z;
@@ -372,7 +375,11 @@ float4 getSSRColor(SSRData data)
 
 	// Random offset to the ray, based on roughness
 	// Expensive!
-	float rayTanAngle = TanPhongConeAngle(data.perceptualRoughness * data.perceptualRoughness); //half the angle because random scatter looks bad, rely on the color pyramid for blur 
+	float rayTanAngle = TanPhongConeAngle(
+		lerp(data.perceptualRoughness, 
+			data.perceptualRoughness * data.perceptualRoughness, 
+			smoothstep(0.1, 0.4, data.perceptualRoughness)
+	)); //half the angle because random scatter looks bad, rely on the color pyramid for blur 
 	float3 rayNoise = rayTanAngle * (2*data.noise.rgb - 1);
 	rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
 	data.rayDir += rayNoise;
@@ -401,21 +408,13 @@ float4 getSSRColor(SSRData data)
 	
 	// get the total number of iterations out of finalPos's w component and replace with 1.
 	float totalDistance = abs(finalPos.w);
-	float rayHit = finalPos.w < 0;
+	
 	finalPos.w = 1;
 	
 
 	
 
-	/*
-	 * A position of 0, 0, 0 signifies that the ray went off screen or ran
-	 * out of iterations before actually hitting anything.
-	 */
-	
-	if (finalPos.x == 1.#INF) 
-	{
-		return float4(0,0,0,0);
-	}
+
 	
 	/*
 	 * Get the screen space coordinates of the ray's final position
@@ -456,19 +455,31 @@ float4 getSSRColor(SSRData data)
 	float roughRadius = rayTanAngle2 * totalDistance;
 	
 	float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
+	fade *= smoothstep(0.75, 0.5, roughRatio);
 	//roughRatio = rayHit > 0 ? roughRatio : data.perceptualRoughness * data.perceptualRoughness;
 	//uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
 	float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
 	
 	float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
 	
+	/*
+	 * A position of 0, 0, 0 signifies that the ray went off screen or ran
+	 * out of iterations before actually hitting anything.
+	 */
+	float rayHit = 1;
+	if (finalPos.x == 1.#INF) 
+	{
+		rayHit = 0;
+		reflection = float4(0,0,0,0);
+	}
+	
 	#if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
     
 	reflection.a = rayHit;
 	
-    real4 colorX = QuadReadAcrossX(reflection);
-    real4 colorY = QuadReadAcrossY(reflection);
-    real4 colorD = QuadReadAcrossDiagonal(reflection);
+    float4 colorX = QuadReadAcrossX(reflection);
+    float4 colorY = QuadReadAcrossY(reflection);
+    float4 colorD = QuadReadAcrossDiagonal(reflection);
     float4 kernel = float4(0.5 * reflection.a, 0.2 * colorX.a, 0.2 * colorY.a, 0.1 * colorD.a);
 	float weight = kernel.x + kernel.y + kernel.z + kernel.w;
     float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;

@@ -45,10 +45,10 @@ Shader "SLZ/LitMAS/LitMAS Opaque"
 			#define LITMAS_FEATURE_EMISSION
 			#define LITMAS_FEATURE_SSR
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			//#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			//#pragma require QuadShuffle
-			//#define _SM6_QUAD 1
-			//#endif
+			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+			#pragma require QuadShuffle
+			#define _SM6_QUAD 1
+			#endif
 			#include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
 			//
 			ENDHLSL

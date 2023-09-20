@@ -52,6 +52,10 @@ ENDHLSL
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_IMPACTS
             #pragma shader_feature_local_fragment _BRDFMAP
+			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+			#pragma require QuadShuffle
+			#define _SM6_QUAD 1
+			#endif
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
 

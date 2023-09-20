@@ -197,10 +197,11 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     float4 volColor = GetVolumetricColor(fragData.position);
     float3 output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
 
-    UNITY_BRANCH if (ssrExtra.temporalWeight == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
+    if (true)//UNITY_BRANCH if (ssrExtra.temporalWeight == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
         output += surfData.occlusion * SSR.rgb;
     }
+    /* Temporal averaging, replaced by across pixel quad-average
     else
     {
 
@@ -224,7 +225,7 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         output += SSR;
         //output = frameTemp.xxx + 0.0001 * output;
     }
-
+    */
     //-------------------------------------------------------------------------------------------------
     // Combine the final lighting information
     //-------------------------------------------------------------------------------------------------
