@@ -114,8 +114,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             // Preallocated a fixed size. CommandBuffer.SetGlobal* does allow this data to grow.
             int maxVisibleAdditionalLights = UniversalRenderPipeline.maxVisibleAdditionalLights;
             const int maxMainLights = 1;
-            int maxVisibleLights = UniversalRenderPipeline.maxVisibleAdditionalLights + maxMainLights;
-            int maxAdditionalLightShadowParams = m_UseStructuredBuffer ? maxVisibleLights : Math.Min(maxVisibleLights, UniversalRenderPipeline.maxVisibleAdditionalLights);
+            int maxVisibleLights = maxVisibleAdditionalLights + maxMainLights;
+            int maxAdditionalLightShadowParams = m_UseStructuredBuffer ? maxVisibleLights : Math.Min(maxVisibleLights, maxVisibleAdditionalLights);
 
             // These array sizes should be as big as ScriptableCullingParameters.maximumVisibleLights (that is defined during ScriptableRenderer.SetupCullingParameters).
             // We initialize these array sizes with the number of visible lights allowed by the UniversalRenderer.
@@ -129,10 +129,9 @@ namespace UnityEngine.Rendering.Universal.Internal
             if (!m_UseStructuredBuffer)
             {
                 // Uniform buffers are faster on some platforms, but they have stricter size limitations
-                int capacity = UniversalRenderPipeline.maxVisibleAdditionalLights;
-                m_AdditionalLightShadowSliceIndexTo_WorldShadowMatrix = new Matrix4x4[capacity];
-                m_UnusedAtlasSquareAreas.Capacity = capacity;
-                m_ShadowResolutionRequests.Capacity = capacity;
+                m_AdditionalLightShadowSliceIndexTo_WorldShadowMatrix = new Matrix4x4[maxVisibleAdditionalLights];
+                m_UnusedAtlasSquareAreas.Capacity = maxVisibleAdditionalLights;
+                m_ShadowResolutionRequests.Capacity = maxVisibleAdditionalLights;
             }
         }
 
@@ -494,6 +493,12 @@ namespace UnityEngine.Rendering.Universal.Internal
         {
             using var profScope = new ProfilingScope(null, m_ProfilingSetupSampler);
 
+            if (!renderingData.shadowData.additionalLightShadowsEnabled)
+                return false;
+
+            if (!renderingData.shadowData.supportsAdditionalLightShadows)
+                return SetupForEmptyRendering(ref renderingData);
+
             Clear();
 
             renderTargetWidth = renderingData.shadowData.additionalLightsShadowmapWidth;
@@ -641,7 +646,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             int validShadowCastingLightsCount = 0;
             bool supportsSoftShadows = renderingData.shadowData.supportsSoftShadows;
             int additionalLightCount = 0;
-            for (int visibleLightIndex = 0; visibleLightIndex < visibleLights.Length && m_ShadowSliceToAdditionalLightIndex.Count < totalShadowSlicesCount && additionalLightCount < maxAdditionalLightShadowParams; ++visibleLightIndex)
+            for (int visibleLightIndex = 0; visibleLightIndex < visibleLights.Length; ++visibleLightIndex)
             {
                 ref VisibleLight shadowLight = ref visibleLights.UnsafeElementAt(visibleLightIndex);
 
@@ -653,8 +658,15 @@ namespace UnityEngine.Rendering.Universal.Internal
                 }
 
                 int additionalLightIndex = additionalLightCount++;
+                if (additionalLightIndex >= m_AdditionalLightIndexToVisibleLightIndex.Length)
+                    continue;
+
+                // We need to always set these indices, even if the light is not shadow casting or doesn't fit in the shadow slices (UUM-46577)
                 m_AdditionalLightIndexToVisibleLightIndex[additionalLightIndex] = visibleLightIndex;
                 m_VisibleLightIndexToAdditionalLightIndex[visibleLightIndex] = additionalLightIndex;
+
+                if (m_ShadowSliceToAdditionalLightIndex.Count >= totalShadowSlicesCount || additionalLightIndex >= maxAdditionalLightShadowParams)
+                    continue;
 
                 LightType lightType = shadowLight.lightType;
                 int perLightShadowSlicesCount = GetPunctualLightShadowSlicesCount(lightType);
@@ -962,11 +974,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                 // If the OFF variant has been stripped, the additional light shadows keyword must always be enabled
                 bool hasOffVariant = !renderingData.cameraData.renderer.stripShadowsOffVariants;
                 renderingData.shadowData.isKeywordAdditionalLightShadowsEnabled = !hasOffVariant || anyShadowSliceRenderer;
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.AdditionalLightShadows, renderingData.shadowData.isKeywordAdditionalLightShadowsEnabled);
 
                 bool softShadows = renderingData.shadowData.supportsSoftShadows && (mainLightHasSoftShadows || additionalLightHasSoftShadows);
                 renderingData.shadowData.isKeywordSoftShadowsEnabled = softShadows;
-
-                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.AdditionalLightShadows, renderingData.shadowData.isKeywordAdditionalLightShadowsEnabled);
                 CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadows, renderingData.shadowData.isKeywordSoftShadowsEnabled);
 
                 if (anyShadowSliceRenderer)

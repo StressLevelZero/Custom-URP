@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal.Internal;
@@ -39,18 +40,20 @@ namespace UnityEngine.Rendering.Universal
     public sealed partial class UniversalRenderer : ScriptableRenderer
     {
         #if UNITY_SWITCH || UNITY_ANDROID
-        const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
-        const int k_DepthBufferBits = 24;
+        public const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
+        public const int k_DepthBufferBits = 24;
         #else
-        const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D32_SFloat_S8_UInt;
-        const int k_DepthBufferBits = 32;
+        public const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
+
+        public const int k_DepthBufferBits = 24;
         #endif
 
         // SLZ MODIFIED // Hacky-ass-bullshit flag that the VRS render feature can set to make passes that should have VRS use an array of rendertagets containing the actual render target duplicated twice
                         // This is necessary for the vulkan plugin, so that A) during framebuffer object creation I can tell if a framebuffer should have the VRS texture, B) Unity doesn't use a cached
                         // framebuffer not containing the VRS texture for a renderpass that needs it
 
-        public static bool s_IsUsingVkVRS = false;
+        public bool s_IsUsingVkVRS = false;
+        public bool m_dontPoolRTs; //Necessary because unity will reuse frambuffers with shading rate attachments on passes without attachments
         // END SLZ MODIFIED
 
         const int k_FinalBlitPassQueueOffset = 1;
@@ -172,6 +175,7 @@ namespace UnityEngine.Rendering.Universal
 
         // Materials used in URP Scriptable Render Passes
         Material m_BlitMaterial = null;
+        Material m_CopyColorMaterial = null;
         Material m_BlitHDRMaterial = null;
         Material m_CopyDepthMaterial = null;
         Material m_SamplingMaterial = null;
@@ -205,6 +209,7 @@ namespace UnityEngine.Rendering.Universal
             Experimental.Rendering.XRSystem.Initialize(XRPassUniversal.Create, data.xrSystemData.shaders.xrOcclusionMeshPS, data.xrSystemData.shaders.xrMirrorViewPS);
 #endif
             m_BlitMaterial = CoreUtils.CreateEngineMaterial(data.shaders.coreBlitPS);
+            m_CopyColorMaterial = CoreUtils.CreateEngineMaterial(data.shaders.blitPS);
             m_BlitHDRMaterial = CoreUtils.CreateEngineMaterial(data.shaders.blitHDROverlay);
             m_CopyDepthMaterial = CoreUtils.CreateEngineMaterial(data.shaders.copyDepthPS);
             m_SamplingMaterial = CoreUtils.CreateEngineMaterial(data.shaders.samplingPS);
@@ -332,7 +337,7 @@ namespace UnityEngine.Rendering.Universal
 
             // SLZ MODIFIED
             m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2);
-			
+            
             // END SLZ MODIFIED
 
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
@@ -349,7 +354,7 @@ namespace UnityEngine.Rendering.Universal
 
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
             // SLZ MODIFIED
-            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_BlitMaterial, true);
+            m_CopyColorPass = new CopyColorPass(RenderPassEvent.AfterRenderingSkybox, m_SamplingMaterial, data.shaders.computeColorPyramid, m_CopyColorMaterial, true);
             // END SLZ MODIFIED
 #if ADAPTIVE_PERFORMANCE_2_1_0_OR_NEWER
             if (needTransparencyPass)
@@ -425,8 +430,9 @@ namespace UnityEngine.Rendering.Universal
 
             ReleaseRenderTargets();
 
-            DebugHandler?.Dispose();
+            base.Dispose(disposing);
             CoreUtils.Destroy(m_BlitMaterial);
+            CoreUtils.Destroy(m_CopyColorMaterial);
             CoreUtils.Destroy(m_BlitHDRMaterial);
             CoreUtils.Destroy(m_CopyDepthMaterial);
             CoreUtils.Destroy(m_SamplingMaterial);
@@ -559,43 +565,62 @@ namespace UnityEngine.Rendering.Universal
             return IsGLESDevice() || SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLCore;
         }
 
-		/// <inheritdoc />
-		public override void Setup(ScriptableRenderContext context, ref RenderingData renderingData)
-		{
-		//}
-		//public void dummy1(ScriptableRenderContext context, ref RenderingData renderingData)
-		//{ 
+        /// <inheritdoc />
+        public override void Setup(ScriptableRenderContext context, ref RenderingData renderingData)
+        {
+        //}
+        //public void dummy1(ScriptableRenderContext context, ref RenderingData renderingData)
+        //{ 
+            s_IsUsingVkVRS = false;
             m_ForwardLights.PreSetup(ref renderingData);
            
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
-
+            CameraDataExtSet cameraExtData = CameraExtDataPool.Instance.GetCameraDataSet(camera);
             var cmd = renderingData.commandBuffer;
-            DebugHandler?.Setup(context, ref renderingData);
+            if (DebugHandler != null)
+            {
+                DebugHandler.Setup(context, ref renderingData);
+                
+                if (DebugHandler.IsActiveForCamera(ref cameraData))
+                {
+                    if (DebugHandler.WriteToDebugScreenTexture(ref cameraData))
+                    {
+                        RenderTextureDescriptor colorDesc = cameraData.cameraTargetDescriptor;
+                        DebugHandler.ConfigureColorDescriptorForDebugScreen(ref colorDesc, cameraData.pixelWidth, cameraData.pixelHeight);
+                        RenderingUtils.ReAllocateIfNeeded(ref DebugHandler.DebugScreenColorHandle, colorDesc, name: "_DebugScreenColor");
+
+                        RenderTextureDescriptor depthDesc = cameraData.cameraTargetDescriptor;
+                        DebugHandler.ConfigureDepthDescriptorForDebugScreen(ref depthDesc, k_DepthBufferBits, cameraData.pixelWidth, cameraData.pixelHeight);
+                        RenderingUtils.ReAllocateIfNeeded(ref DebugHandler.DebugScreenDepthHandle, depthDesc, name: "_DebugScreenDepth");
+                    }
+
+                    if (DebugHandler.HDRDebugViewIsActive(ref cameraData))
+                    {
+                        DebugHandler.hdrDebugViewPass.Setup(ref cameraData, DebugHandler.DebugDisplaySettings.lightingSettings.hdrDebugMode);
+                        EnqueuePass(DebugHandler.hdrDebugViewPass);
+                    }
+                }
+            }
 
             // SLZ MODIFIED // Set up SLZGlobals pass which sets a bunch of random global shader variables. Also set motion vectors on Opaque pass, update blue noise, and set previous frame globals
 
             //SLZGlobals.instance.SetSSRGlobals(renderingData.cameraData.maxSSRSteps, renderingData.cameraData.SSRMinMip, renderingData.cameraData.SSRHitRadius,
             //    renderingData.cameraData.SSRTemporalWeight, camera.fieldOfView, cameraTargetDescriptor.height);
-            m_SLZGlobalsSetPass.Setup(renderingData.cameraData);
+            m_SLZGlobalsSetPass.Setup(renderingData.cameraData, cameraExtData);
             EnqueuePass(m_SLZGlobalsSetPass);
 
             //SLZ - Enable "motion vector data" (prev obj to world matricies) for SSR so we can get prev frame's pixel pos for temporal accumulation
             m_RenderOpaqueForwardPass.useMotionVectorData = renderingData.cameraData.enableSSR;
 
             // Bullshit hacks go! Turn on render target duplication to signal to the Vulkan VRS plugin that framebuffer objects created for these passes need VRS attachments
-            if (s_IsUsingVkVRS)
-            {
-                m_RenderOpaqueForwardPass.testMRT = true;
-                m_RenderTransparentForwardPass.testMRT = true;
-                m_DepthNormalPrepass.VkVRSHackOn = true;
-            }
-            else
-            {
-                m_RenderOpaqueForwardPass.testMRT = false;
-                m_RenderTransparentForwardPass.testMRT = false;
-            }
+
+           
+            m_DepthNormalPrepass.vkVRSHackOn = true;
+            m_RenderOpaqueForwardPass.vkVRSHackOn = true;
+            m_RenderTransparentForwardPass.vkVRSHackOn = true;
+
             //TODO: This should probably happen in the SLZGlobals pass, not here
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
             SLZGlobals.instance.UpdateBlueNoiseFrame();
@@ -642,11 +667,22 @@ namespace UnityEngine.Rendering.Universal
             if (IsGLDevice())
                 requiresRenderingLayer = false;
 
-            bool renderingLayerProvidesByDepthNormalPass = requiresRenderingLayer && renderingLayersEvent == RenderingLayerUtils.Event.DepthNormalPrePass;
-            bool renderingLayerProvidesRenderObjectPass = requiresRenderingLayer &&
-                this.renderingModeActual != RenderingMode.Deferred && renderingLayersEvent == RenderingLayerUtils.Event.Opaque;
-            bool renderingLayerProvidesGBufferPass = requiresRenderingLayer &&
-                this.renderingModeActual == RenderingMode.Deferred && renderingLayersEvent == RenderingLayerUtils.Event.Opaque;
+            bool renderingLayerProvidesByDepthNormalPass = false;
+            bool renderingLayerProvidesRenderObjectPass = false;
+            if (requiresRenderingLayer && renderingModeActual != RenderingMode.Deferred)
+            {
+                switch (renderingLayersEvent)
+                {
+                    case RenderingLayerUtils.Event.DepthNormalPrePass:
+                        renderingLayerProvidesByDepthNormalPass = true;
+                        break;
+                    case RenderingLayerUtils.Event.Opaque:
+                        renderingLayerProvidesRenderObjectPass = true;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
             // Enable depth normal prepass
             if (renderingLayerProvidesByDepthNormalPass)
@@ -663,6 +699,19 @@ namespace UnityEngine.Rendering.Universal
 
                 m_DeferredLights.ResolveMixedLightingMode(ref renderingData);
                 m_DeferredLights.IsOverlay = cameraData.renderType == CameraRenderType.Overlay;
+                if (m_DeferredLights.UseRenderPass)
+                {
+                    // At this point we only have injected renderer features in the queue and can do assumptions on whether we'll need Framebuffer Fetch
+                    foreach (var pass in activeRenderPassQueue)
+                    {
+                        if (pass.renderPassEvent >= RenderPassEvent.AfterRenderingGbuffer &&
+                            pass.renderPassEvent <= RenderPassEvent.BeforeRenderingDeferredLights)
+                        {
+                            m_DeferredLights.DisableFramebufferFetchInput();
+                            break;
+                        }
+                    }
+                }
             }
 
             // Should apply post-processing after rendering this camera?
@@ -776,6 +825,17 @@ namespace UnityEngine.Rendering.Universal
             if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Vulkan)
                 createColorTexture |= createDepthTexture;
 #endif
+            // If there is any scaling, the color and depth need to be the same resolution and the target texture
+            // will not be the proper size in this case. Same happens with GameView.
+            // This introduces the final blit pass.
+            if (RTHandles.rtHandleProperties.rtHandleScale.x != 1.0f || RTHandles.rtHandleProperties.rtHandleScale.y != 1.0f)
+                createColorTexture |= createDepthTexture;
+
+            // If there is any scaling, the color and depth need to be the same resolution and the target texture
+            // will not be the proper size in this case. Same happens with GameView.
+            // This introduces the final blit pass.
+            if (RTHandles.rtHandleProperties.rtHandleScale.x != 1.0f || RTHandles.rtHandleProperties.rtHandleScale.y != 1.0f)
+                createColorTexture |= createDepthTexture;
 
             if (useRenderPassEnabled || useDepthPriming)
                 createColorTexture |= createDepthTexture;
@@ -785,30 +845,45 @@ namespace UnityEngine.Rendering.Universal
             colorDescriptor.useMipMap = false;
             colorDescriptor.autoGenerateMips = false;
             colorDescriptor.depthBufferBits = (int)DepthBits.None;
-            m_ColorBufferSystem.SetCameraSettings(colorDescriptor, FilterMode.Bilinear);
-
+            CamExtSwapBufferNames bufferNames;
+            bufferNames = CamExtSwapBufferNames.TryGet(cameraExtData, (int)CamDataExtType.BUFFER_NAMES);
+            if (m_dontPoolRTs)
+            {
+                m_ColorBufferSystem.SetCameraSettingsUnique(colorDescriptor, FilterMode.Bilinear, bufferNames.ColorBufferNameA, bufferNames.ColorBufferNameB);
+            }
+            else
+            {
+                m_ColorBufferSystem.SetCameraSettings(colorDescriptor, FilterMode.Bilinear);
+            }
+           
+            //colorDescriptor.depthBufferBits = k_DepthBufferBits;
+            colorDescriptor.depthStencilFormat = k_DepthStencilFormat;
             // Configure all settings require to start a new camera stack (base camera only)
             if (cameraData.renderType == CameraRenderType.Base)
             {
-                //Scene filtering redraws the objects on top of the resulting frame. It has to draw directly to the sceneview buffer.
+                // Scene filtering redraws the objects on top of the resulting frame. It has to draw directly to the sceneview buffer.
                 bool sceneViewFilterEnabled = camera.sceneViewFilterMode == Camera.SceneViewFilterMode.ShowFiltered;
                 bool intermediateRenderTexture = (createColorTexture || createDepthTexture) && !sceneViewFilterEnabled;
 
                 // RTHandles do not support combining color and depth in the same texture so we create them separately
-                createDepthTexture = intermediateRenderTexture;
+                // Should be independent from filtered scene view
+                createDepthTexture |= createColorTexture;
 
                 RenderTargetIdentifier targetId = BuiltinRenderTextureType.CameraTarget;
 #if ENABLE_VR && ENABLE_XR_MODULE
                 if (cameraData.xr.enabled)
                     targetId = cameraData.xr.renderTarget;
 #endif
-
-                if (m_XRTargetHandleAlias == null || m_XRTargetHandleAlias.nameID != targetId)
+                if (m_XRTargetHandleAlias == null)
                 {
-                    m_XRTargetHandleAlias?.Release();
                     m_XRTargetHandleAlias = RTHandles.Alloc(targetId);
                 }
                 //LogOnce.Instance.Print("Begin intermediateRenderTexture", 2);
+                else if (m_XRTargetHandleAlias.nameID != targetId)
+                {
+                    RTHandleStaticHelpers.SetRTHandleUserManagedWrapper(ref m_XRTargetHandleAlias, targetId);
+                }
+
                 // Doesn't create texture for Overlay cameras as they are already overlaying on top of created textures.
                 if (intermediateRenderTexture)
                     CreateCameraRenderTarget(context, ref cameraTargetDescriptor, useDepthPriming, cmd, ref cameraData);
@@ -896,11 +971,12 @@ namespace UnityEngine.Rendering.Universal
             if ((this.renderingModeActual == RenderingMode.Deferred && !this.useRenderPassEnabled) || requiresDepthPrepass || requiresDepthCopyPass)
             {
                 var depthDescriptor = cameraTargetDescriptor;
-                if (requiresDepthPrepass && this.renderingModeActual != RenderingMode.Deferred)
+                if ((requiresDepthPrepass && this.renderingModeActual != RenderingMode.Deferred) || !RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R32_SFloat, FormatUsage.Render))
                 {
                     depthDescriptor.graphicsFormat = GraphicsFormat.None;
                     depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                    depthDescriptor.depthBufferBits = k_DepthBufferBits;
+                    //depthDescriptor.depthBufferBits = k_DepthBufferBits;
+                    //Debug.Log("Supports 24 bit depth : " + (SystemInfo.IsFormatSupported(GraphicsFormat.D24_UNorm_S8_UInt, FormatUsage.Render)));
                 }
                 else
                 {
@@ -928,7 +1004,7 @@ namespace UnityEngine.Rendering.Universal
                 cmd.Clear();
             }
 
-            if (requiresRenderingLayer)
+            if (requiresRenderingLayer || (renderingModeActual == RenderingMode.Deferred && m_DeferredLights.UseRenderingLayers))
             {
                 ref var renderingLayersTexture = ref m_DecalLayersTexture;
                 string renderingLayersTextureName = "_CameraRenderingLayersTexture";
@@ -1000,7 +1076,7 @@ namespace UnityEngine.Rendering.Universal
                 }
                 else
                 {
-                    RenderingUtils.ReAllocateIfNeeded(ref normalsTexture, normalDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: normalsTextureName);
+                    RenderingUtils.ReAllocateIfNeeded(ref normalsTexture, normalDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: m_dontPoolRTs ? bufferNames.NormalBufferName : normalsTextureName);
                 }
 
                 cmd.SetGlobalTexture(normalsTexture.name, normalsTexture.nameID);
@@ -1212,9 +1288,10 @@ namespace UnityEngine.Rendering.Universal
                 // 
                 // RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueColor, descriptor, filterMode, TextureWrapMode.Clamp, name: "_CameraOpaqueTexture");
                 // m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, m_OpaqueColor, downsamplingMethod);
-
-                RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
-                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, opaqueHandle, downsamplingMethod, cameraData.requiresColorPyramid);
+                
+                PersistentRT opaqueRT = PersistentRT.TryGet(cameraExtData, (int)CamDataExtType.CAMERA_OPAQUE);
+                //RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
+                m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, opaqueRT, downsamplingMethod, cameraData.requiresColorPyramid);
 
                 // END SLZ MODIFIED
 
@@ -1225,11 +1302,10 @@ namespace UnityEngine.Rendering.Universal
 
             if (cameraData.enableSSR)
             {
-                //m_SetHiZ0GlobalPass.Setup(m_PrevHiZ0Texture.Identifier(), m_PrevHiZ0Texture.id);
-                //EnqueuePass(m_SetHiZ0GlobalPass);
-                m_PrevHiZ0Texture = SLZGlobals.instance.PerCameraPrevHiZ.GetHandle(camera);
-                m_CopyHiZ0Pass.Setup(m_DepthHiZTexture, m_PrevHiZ0Texture);
-                EnqueuePass(m_CopyHiZ0Pass);
+                // EXPERIMENT: use averaging across quad instead of temporal averaging to reduce noise. Thus, don't run this as its no longer needed
+                // PersistentRT prevHiZ0Texture = PersistentRT.TryGet(cameraExtData, (int)CamDataExtType.HI_Z);
+                // m_CopyHiZ0Pass.Setup(m_DepthHiZTexture, prevHiZ0Texture);
+                // EnqueuePass(m_CopyHiZ0Pass);
             }
 
             // END SLZ MODIFIED
@@ -1280,12 +1356,12 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_RenderTransparentForwardPass);
             }
             EnqueuePass(m_OnRenderObjectCallbackPass);
-            
+
             bool shouldRenderUI = cameraData.rendersOverlayUI;
             bool outputToHDR = cameraData.isHDROutputActive;
             if (shouldRenderUI && outputToHDR)
             {
-                m_DrawOffscreenUIPass.Setup(cameraTargetDescriptor, m_ActiveCameraDepthAttachment);
+                m_DrawOffscreenUIPass.Setup(ref cameraData, k_DepthBufferBits);
                 EnqueuePass(m_DrawOffscreenUIPass);
             }
 
@@ -1401,6 +1477,7 @@ namespace UnityEngine.Rendering.Universal
             }
 #endif
             s_IsUsingVkVRS = false; // Unset every frame, so if the VRS render feature gets disabled this isn't stuck on
+            m_dontPoolRTs = false;
         }
 
         /// <inheritdoc />
@@ -1590,7 +1667,8 @@ namespace UnityEngine.Rendering.Universal
 
                     depthDescriptor.graphicsFormat = GraphicsFormat.None;
                     depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                    RenderingUtils.ReAllocateIfNeeded(ref m_CameraDepthAttachment, depthDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: "_CameraDepthAttachment");
+                    string name0 = "_CameraDepthAttachment";// (m_dontPoolRTs) ? "_CameraDepthAttachment" : "_CameraDepthAttachment" + cameraData.camera.GetHashCode();
+                    RenderingUtils.ReAllocateIfNeeded(ref m_CameraDepthAttachment, depthDescriptor, FilterMode.Point, TextureWrapMode.Clamp, name: name0);
                     cmd.SetGlobalTexture(m_CameraDepthAttachment.name, m_CameraDepthAttachment.nameID);
                 }
             }
@@ -1652,8 +1730,8 @@ namespace UnityEngine.Rendering.Universal
                 isCompatibleBackbufferTextureDimension = cameraData.xr.renderTargetDesc.dimension == cameraTargetDescriptor.dimension;
             }
 #endif
-
-            bool requiresBlitForOffscreenCamera = cameraData.postProcessEnabled || cameraData.requiresOpaqueTexture || requiresExplicitMsaaResolve || !cameraData.isDefaultViewport;
+            bool postProcessEnabled = cameraData.postProcessEnabled && m_PostProcessPasses.isCreated;
+            bool requiresBlitForOffscreenCamera = postProcessEnabled || cameraData.requiresOpaqueTexture || requiresExplicitMsaaResolve || !cameraData.isDefaultViewport;
             if (isOffscreenRender)
                 return requiresBlitForOffscreenCamera;
 
@@ -1706,6 +1784,9 @@ namespace UnityEngine.Rendering.Universal
         {
             return m_ColorBufferSystem.GetBackBuffer(cmd);
         }
+
+
+
 
         // SLZ MODIFIED // Make internal method public
         public override void EnableSwapBufferMSAA(bool enable)

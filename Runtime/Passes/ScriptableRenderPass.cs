@@ -327,6 +327,10 @@ namespace UnityEngine.Rendering.Universal
         ClearFlag m_ClearFlag = ClearFlag.None;
         Color m_ClearColor = Color.black;
 
+        // SLZ MODIFIED
+        internal bool enableFoveatedRendering;
+        internal IntPtr foveatedSettingsStruct;
+
         static internal DebugHandler GetActiveDebugHandler(ref RenderingData renderingData)
         {
             var debugHandler = renderingData.cameraData.renderer.DebugHandler;

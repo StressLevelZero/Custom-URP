@@ -50,7 +50,7 @@ half3or4_fl LightingLambert(half3or4_fl lightColor, half3 lightDir, half3 normal
 #if defined(_BRDFMAP)
     half NormNdotL = ((dot(normal, lightDir)) + 1) * 0.5;
     // float flNDotV = saturate(dot(normalWS,viewDirectionWS));
-    half3or4_fl BRDFMap = (half3or4_fl)SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(NormNdotL, 1), 0);//*(lightAttenuation+.5),
+    half3or4_fl BRDFMap = (half3or4_fl)SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, sampler_LinearClamp, float2(NormNdotL, 1), 0);//*(lightAttenuation+.5),
     return lightColor * (BRDFMap);
 
     half NdotL2 = saturate(dot(normal, lightDir));
@@ -86,7 +86,7 @@ half3 LightingPhysicallyBased(BRDFData brdfData, BRDFData brdfDataClearCoat,
 #if defined(_BRDFMAP)
     half NormNdotL = saturate(((dot(normalWS, lightDirectionWS)) + 1) * 0.5);
     float flNDotV = saturate(dot(normalWS, viewDirectionWS));
-    half3or4_fl BRDFMap = (half3or4_fl)SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(min(NormNdotL, light.shadowAttenuation), flNDotV), 0);//*(lightAttenuation+.5),
+    half3or4_fl BRDFMap = (half3or4_fl)SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, sampler_LinearClamp, float2(min(NormNdotL, light.shadowAttenuation), flNDotV), 0);//*(lightAttenuation+.5),
     half3or4_fl radiance = lightColor * BRDFMap * light.distanceAttenuation;
 #else
     half NdotL = saturate(dot(normalWS, lightDirectionWS));
@@ -423,7 +423,12 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
     // END SLZ MODIFIED
     #endif
 
+#if REAL_IS_HALF
+    // Clamp any half.inf+ to HALF_MAX
+    return min(CalculateFinalColor(lightingData, surfaceData.alpha), HALF_MAX);
+#else
     return CalculateFinalColor(lightingData, surfaceData.alpha);
+#endif
 }
 
 // Deprecated: Use the version which takes "SurfaceData" instead of passing all of these arguments...

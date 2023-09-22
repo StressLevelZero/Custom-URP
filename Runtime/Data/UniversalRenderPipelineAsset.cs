@@ -551,6 +551,7 @@ namespace UnityEngine.Rendering.Universal
         [ShaderKeywordFilter.SelectOrRemove(true, keywordNames: ShaderKeywordStrings.UseFastSRGBLinearConversion)]
 #endif
         [SerializeField] bool m_UseFastSRGBLinearConversion = false;
+        [SerializeField] bool m_SupportDataDrivenLensFlare = true;
 
         // Deprecated settings
         [SerializeField] ShadowQuality m_ShadowType = ShadowQuality.HardShadows;
@@ -1524,6 +1525,14 @@ namespace UnityEngine.Rendering.Universal
         {
             get { return m_UseFastSRGBLinearConversion; }
         }
+        
+        /// <summary>
+        /// Returns true if Data Driven Lens Flare are supported by this asset, false otherwise.
+        /// </summary>
+        public bool supportDataDrivenLensFlare
+        {
+            get { return m_SupportDataDrivenLensFlare; }
+        }
 
         /// <summary>
         /// Set to true to allow Adaptive performance to modify graphics quality settings during runtime.
@@ -1752,10 +1761,9 @@ namespace UnityEngine.Rendering.Universal
             get { return editorResources?.shaders.defaultSpeedTree8PS; }
         }
 
-        /// <inheritdoc/>
-        // SLZ MODIFIED // TODO: Was an override, but on 2022.2.0f1 RenderPipelineAsset doesn't have renderPipelineShaderTag
-        public string renderPipelineShaderTag => UniversalRenderPipeline.k_ShaderTagName;
-        // END SLZ MODIFIED
+        /// <inheritdoc/>        
+        public override string renderPipelineShaderTag => UniversalRenderPipeline.k_ShaderTagName;
+
 #endif
 
         /// <summary>Names used for display of rendering layer masks.</summary>

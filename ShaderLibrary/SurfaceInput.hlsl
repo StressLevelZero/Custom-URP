@@ -20,10 +20,10 @@ SAMPLER(sampler_EmissionMap);
 #if defined(DYNAMIC_EMISSION)
 	#define BRANCH_EMISSION _EMISSION
 #else
-	#ifndef _EMISSION
-		#define BRANCH_EMISSION false
-	#else
+	#if defined(_EMISSION)
 		#define BRANCH_EMISSION true
+	#else
+		#define BRANCH_EMISSION false
 	#endif
 #endif
 

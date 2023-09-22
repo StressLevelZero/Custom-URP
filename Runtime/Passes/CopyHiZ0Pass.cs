@@ -54,7 +54,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         private int gaussianKernelID;
 
         private RTHandle source { get; set; }
-        private RTPermanentHandle destination { get; set; }
+        private PersistentRT destination { get; set; }
         private RenderTargetHandle tempBuffer { get; set; }
         private RenderTextureDescriptor tempDescriptor;
 
@@ -78,7 +78,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// </summary>
         /// <param name="source">Source Render Target</param>
         /// <param name="destination">Destination Render Target</param>
-        public void Setup(RTHandle source, RTPermanentHandle destination)
+        public void Setup(RTHandle source, PersistentRT destination)
         {
             this.source = source;
             this.destination = destination;
@@ -100,7 +100,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             descriptor.autoGenerateMips = false;
             descriptor.sRGB = false;
             descriptor.enableRandomWrite = false;
-            destination.UpdateRT(descriptor, renderingData.cameraData.camera.name, "PrevHiZ");
+            ref CameraData camData = ref renderingData.cameraData;
+            destination.UpdateRT(descriptor, camData.camera, "PrevHiZ");
             
             //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
         }
@@ -125,7 +126,8 @@ namespace UnityEngine.Rendering.Universal.Internal
 
                 //bool useDrawProceduleBlit = renderingData.cameraData.xr.enabled;
                 ConfigureTarget(destination.handle);
-                RenderingUtils.BlitNoRect(cmd, source, destination.handle, m_CopyColorMaterial, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, 0);
+                cmd.CopyTexture(source, 0, 0, destination.handle, 0, 0);
+                //RenderingUtils.BlitNoRect(cmd, source, destination.handle, m_CopyColorMaterial, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, 0);
             }
            
             //context.ExecuteCommandBuffer(cmd);

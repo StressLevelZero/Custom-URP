@@ -4,18 +4,27 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using Unity.Profiling;
 
 namespace UnityEngine.Rendering.Universal.Internal
 {
     internal sealed class RenderTargetBufferSystem
     {
-        struct SwapBuffer
+        static readonly ProfilerMarker s_NameSystemU = new ProfilerMarker("RenderTargetBufferSystem.NameBufferUnique");
+        static readonly ProfilerMarker s_NameSystem = new ProfilerMarker("RenderTargetBufferSystem.NameBuffer");
+
+        class SwapBuffer
         {
             public RTHandle rtMSAA;
             public RTHandle rtResolve;
             public string name;
             public int msaa;
         }
+        string bufferAName;
+        string bufferBName;
+        char[] bufferANameUnique;
+        char[] bufferBNameUnique;
+
         SwapBuffer m_A, m_B;
         static bool m_AisBackBuffer = true;
 
@@ -23,13 +32,25 @@ namespace UnityEngine.Rendering.Universal.Internal
         FilterMode m_FilterMode;
         bool m_AllowMSAA = true;
 
+        // SLZ MODIFIED - Rendertarget pool hashes based on name. Allow setting the name to avoid pooling when necessary
+        string m_Name;
+        // END SLZ MODIFIED
+
         ref SwapBuffer backBuffer { get { return ref m_AisBackBuffer ? ref m_A : ref m_B; } }
         ref SwapBuffer frontBuffer { get { return ref m_AisBackBuffer ? ref m_B : ref m_A; } }
 
         public RenderTargetBufferSystem(string name)
         {
-            m_A.name = name + "A";
-            m_B.name = name + "B";
+            m_A = new SwapBuffer();
+            m_B = new SwapBuffer();
+            // SLZ MODIFIED - store the actual name since we'll need to reconstruct the names later
+            m_Name = name;
+            // END SLZ MODIFIED
+            bufferAName = name + "A";
+            bufferANameUnique = new char[bufferAName.Length + 9]; // +8 for 32 bit hex value, + 1 for null terminator
+
+            bufferBName = name + "B";
+            bufferBNameUnique = new char[bufferAName.Length + 9]; // +8 for 32 bit hex value, + 1 for null terminator
         }
 
         public void Dispose()
@@ -96,6 +117,30 @@ namespace UnityEngine.Rendering.Universal.Internal
             desc.depthBufferBits = 0;
             m_Desc = desc;
             m_FilterMode = filterMode;
+
+            // SLZ MODIFIED - Reset the name as it may have been modified
+            m_A.name = bufferAName;
+            m_B.name = bufferBName;
+            // END SLZ MODIFIED
+
+            m_A.msaa = m_Desc.msaaSamples;
+            m_B.msaa = m_Desc.msaaSamples;
+
+            if (m_Desc.msaaSamples > 1)
+                EnableMSAA(true);
+        }
+
+        public void SetCameraSettingsUnique(RenderTextureDescriptor desc, FilterMode filterMode, string cbufferAName, string cbufferBName)
+        {
+
+            desc.depthBufferBits = 0;
+            m_Desc = desc;
+            m_FilterMode = filterMode;
+
+            
+            m_A.name = cbufferAName;
+            m_B.name = cbufferBName;
+            // END SLZ MODIFIED
 
             m_A.msaa = m_Desc.msaaSamples;
             m_B.msaa = m_Desc.msaaSamples;

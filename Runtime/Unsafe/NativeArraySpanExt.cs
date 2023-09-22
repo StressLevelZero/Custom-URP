@@ -26,5 +26,14 @@ namespace UnityEngine.Rendering.Universal
 				UnsafeUtility.MemCpy((byte*)dst.GetUnsafePtr<T>() + dstIndex * UnsafeUtility.SizeOf<T>(), (byte*)(void*)pData + srcIndex * UnsafeUtility.SizeOf<T>(), length * UnsafeUtility.SizeOf<T>());
 			}
 		}
-	}
+
+        public unsafe static void Copy<T>(NativeArray<T> src, int srcIndex, Span<T> dst, int dstIndex, int length) where T : unmanaged
+        {
+            fixed (T* pData = &dst.GetPinnableReference())
+            {
+                //AtomicSafetyHandle.CheckWriteAndThrow(dst.m_Safety);
+                UnsafeUtility.MemCpy((byte*)(void*)pData + dstIndex * UnsafeUtility.SizeOf<T>(), (byte*)src.GetUnsafePtr<T>() + srcIndex * UnsafeUtility.SizeOf<T>(), length * UnsafeUtility.SizeOf<T>());
+            }
+        }
+    }
 }

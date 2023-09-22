@@ -153,7 +153,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             else if (index == GbufferDepthIndex) // Render-pass on mobiles: reading back real depth-buffer is either inefficient (Arm Vulkan) or impossible (Metal).
                 return GraphicsFormat.R32_SFloat;
             else if (index == GBufferShadowMask) // Optional: shadow mask is outputed in mixed lighting subtractive mode for non-static meshes only
-                return GraphicsFormat.R8G8B8A8_UNorm;
+                return GraphicsFormat.B8G8R8A8_UNorm;
             else if (index == GBufferRenderingLayers) // Optional: rendering layers is outputed when light layers are enabled (subset of rendering layers)
                 return RenderingLayerUtils.GetFormat(RenderingLayerMaskSize);
             else
@@ -425,6 +425,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             this.DeferredInputAttachments[1] = this.GbufferAttachments[1];
             this.DeferredInputAttachments[2] = this.GbufferAttachments[2];
             this.DeferredInputAttachments[3] = this.GbufferAttachments[4];
+            if (UseShadowMask)
+                this.DeferredInputAttachments[4] = this.GbufferAttachments[GBufferShadowMask];
         }
 
         internal bool IsRuntimeSupportedThisFrame()
@@ -455,15 +457,17 @@ namespace UnityEngine.Rendering.Universal.Internal
 
             if (this.DeferredInputAttachments == null && this.UseRenderPass && this.GbufferAttachments.Length >= 3)
             {
-                this.DeferredInputAttachments = new RTHandle[4]
+                var inputCount = 4 + (UseShadowMask ?  1 : 0);
+                this.DeferredInputAttachments = new RTHandle[inputCount];
+                this.DeferredInputIsTransient = new bool[inputCount];
+                int i, j = 0;
+                for (i = 0; i < inputCount; i++, j++)
                 {
-                    GbufferAttachments[0], GbufferAttachments[1], GbufferAttachments[2], GbufferAttachments[4],
-                };
-
-                this.DeferredInputIsTransient = new bool[4]
-                {
-                    true, true, true, false
-                };
+                    if (j == GBufferLightingIndex)
+                        j++;
+                    DeferredInputAttachments[i] = GbufferAttachments[j];
+                    DeferredInputIsTransient[i] = j != GbufferDepthIndex;
+                }
             }
             this.DepthAttachmentHandle = this.DepthAttachment;
         }
@@ -758,10 +762,15 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         void SetAdditionalLightsShadowsKeyword(ref CommandBuffer cmd, ref RenderingData renderingData, bool hasDeferredShadows)
         {
-            // The OFF variant is stripped out based on the stripShadowsOffVariants parameter in the renderer.
-            // This is done to improve build times. Instead a very small texture is sampled.
+            bool additionalLightShadowsEnabledInAsset = renderingData.shadowData.additionalLightShadowsEnabled;
             bool hasOffVariant = !renderingData.cameraData.renderer.stripShadowsOffVariants;
-            CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.AdditionalLightShadows, !hasOffVariant || hasDeferredShadows);
+
+            // AdditionalLightShadows Keyword is enabled when:
+            // Shadows are enabled in Asset and
+            // a) the OFF variant has been stripped
+            // b) light is casting a shadow
+            bool shouldEnable = additionalLightShadowsEnabledInAsset && (!hasOffVariant || hasDeferredShadows);
+            CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.AdditionalLightShadows, shouldEnable);
         }
 
         void RenderStencilDirectionalLights(CommandBuffer cmd, ref RenderingData renderingData, NativeArray<VisibleLight> visibleLights, int mainLightIndex)
@@ -796,7 +805,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 var additionalLightData = light.GetUniversalAdditionalLightData();
                 uint lightLayerMask = RenderingLayerUtils.ToValidRenderingLayers(additionalLightData.renderingLayers);
 
-                // Setup shadow paramters:
+                // Setup shadow parameters:
                 // - for the main light, they have already been setup globally, so nothing to do.
                 // - for other directional lights, it is actually not supported by URP, but the code would look like this.
                 bool hasDeferredShadows;

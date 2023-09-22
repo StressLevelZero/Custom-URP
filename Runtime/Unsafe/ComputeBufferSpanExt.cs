@@ -95,8 +95,8 @@ namespace UnityEngine.Rendering.Universal
 		static Action<ComputeBuffer, IntPtr, int, int, int, int> SetCBNativeDelegate => _setCBNativeDelegate ?? (_setCBNativeDelegate = GetCBNativeDelegate());
 		static Action<CommandBuffer, ComputeBuffer, IntPtr, int, int, int, int> SetCmdNativeDelegate => _setCmdNativeDelegate ?? (_setCmdNativeDelegate = GetCmdNativeDelegate());
 
-		static object[] _args5 = new object[5];
-		static object[] _args6 = new object[6];
+		//static object[] _args5 = new object[5];
+		//static object[] _args6 = new object[6];
 	}
 
 }

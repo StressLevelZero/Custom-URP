@@ -62,7 +62,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             )
         {
             this.destination = depthAttachmentHandle;
-            this.depthStencilFormat = baseDescriptor.depthStencilFormat;
+            this.depthStencilFormat = UniversalRenderer.k_DepthStencilFormat;
             // SLZ MODIFIED
             m_ClearTarget = clearTarget;
             // END SLZ MODIFIED
@@ -71,7 +71,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <inheritdoc />
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
-            var desc = renderingData.cameraData.cameraTargetDescriptor;
+            //var desc = renderingData.cameraData.cameraTargetDescriptor;
 
             // When depth priming is in use the camera target should not be overridden so the Camera's MSAA depth attachment is used.
             if (renderingData.cameraData.renderer.useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth))
@@ -135,15 +135,15 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         internal void Render(RenderGraph renderGraph, out TextureHandle cameraDepthTexture, ref RenderingData renderingData)
         {
-            const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D32_SFloat_S8_UInt;
-            const int k_DepthBufferBits = 32;
+            const GraphicsFormat k_DepthStencilFormat = UniversalRenderer.k_DepthStencilFormat;
+            const int k_DepthBufferBits = UniversalRenderer.k_DepthBufferBits;
 
             using (var builder = renderGraph.AddRenderPass<PassData>("DepthOnly Prepass", out var passData, base.profilingSampler))
             {
                 var depthDescriptor = renderingData.cameraData.cameraTargetDescriptor;
                 depthDescriptor.graphicsFormat = GraphicsFormat.None;
                 depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                depthDescriptor.depthBufferBits = k_DepthBufferBits;
+                //depthDescriptor.depthBufferBits = k_DepthBufferBits;
                 depthDescriptor.msaaSamples = 1;// Depth-Only pass don't use MSAA
                 cameraDepthTexture = UniversalRenderer.CreateRenderGraphTexture(renderGraph, depthDescriptor, "_CameraDepthTexture", true);
 

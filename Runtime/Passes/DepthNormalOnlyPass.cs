@@ -10,9 +10,11 @@ namespace UnityEngine.Rendering.Universal.Internal
     /// </summary>
     public class DepthNormalOnlyPass : ScriptableRenderPass
     {
+        public UniversalRenderer caller;
         internal List<ShaderTagId> shaderTagIds { get; set; }
 
         private RTHandle depthHandle { get; set; }
+        private RTHandle m_DepthHandle;
         private RTHandle normalHandle { get; set; }
         private RTHandle renderingLayersHandle { get; set; }
         internal bool enableRenderingLayers { get; set; } = false;
@@ -23,13 +25,16 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static readonly RTHandle[] k_ColorAttachment1 = new RTHandle[1];
         private static readonly RTHandle[] k_ColorAttachment2 = new RTHandle[2];
 
+        static int s_NormalsID = Shader.PropertyToID("_CameraNormalsTexture");
+        //static int s_DepthID = Shader.PropertyToID("_CameraDepthTexture");
+
         // SLZ MODIFIED 
-        
+
         // toggle to control if this pass clears the screen or not. We added an XR occlusion mesh pass that renders before this depth prepass, so don't clear if in VR
         private bool m_ClearTarget = true;
 
         // VK VRS HACK. Makes the pass's 1st and 2nd color attachment the same to tell VkCreateFrameBuffer that it needs to add the Shading rate texture to the framebuffer
-        public bool VkVRSHackOn = false;
+        public bool vkVRSHackOn = false;
         // END SLZ MODIFIED
 
         /// <summary>
@@ -107,6 +112,22 @@ namespace UnityEngine.Rendering.Universal.Internal
         /// <inheritdoc/>
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
+            caller = renderingData.cameraData.renderer as UniversalRenderer;
+
+            if (renderingData.cameraData.renderer.useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth))
+                m_DepthHandle = caller.cameraDepthTargetHandle;
+            else
+                m_DepthHandle = depthHandle;
+        }
+
+        /// <summary>
+        /// SLZ MODIFIED. Configure the targets for this pass. This differs from OnCameraSetup in that it executes AFTER the passes have been sorted by queue, so we can rely on
+        /// the VRS render feature having set the correct flags for VRS on the renderer.
+        /// </summary>
+        /// <param name="cmd"></param>
+        /// <param name="cameraTextureDescriptor"></param>
+        public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
+        {
             RTHandle[] colorHandles;
             if (this.enableRenderingLayers)
             {
@@ -116,7 +137,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             else
             {
-                if (VkVRSHackOn)
+                if (vkVRSHackOn && caller.s_IsUsingVkVRS)
                 {
                     k_ColorAttachment2[0] = normalHandle;
                     k_ColorAttachment2[1] = normalHandle;
@@ -128,13 +149,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                     colorHandles = k_ColorAttachment1;
                 }
             }
+            cmd.SetGlobalTexture(s_NormalsID, normalHandle);
+           // cmd.SetGlobalTexture(s_DepthID, m_DepthHandle);
+            ConfigureTarget(colorHandles, m_DepthHandle);
 
-            if (renderingData.cameraData.renderer.useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth))
-                ConfigureTarget(colorHandles, renderingData.cameraData.renderer.cameraDepthTargetHandle);
-            else
-                ConfigureTarget(colorHandles, depthHandle);
-
-            // SLZ MODIFIED // Only clear everything if m_ClearTarget is true, otherwise only clear color and stencil. m_ClearTarget should be false when the early XR occlusion mesh pass runs before
             if (m_ClearTarget)
             {
                 ConfigureClear(ClearFlag.All, Color.black);
@@ -143,6 +161,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             {
                 ConfigureClear(ClearFlag.ColorStencil, Color.black);
             }
+
+            base.Configure(cmd, cameraTextureDescriptor);
         }
 
         private static void ExecutePass(ScriptableRenderContext context, PassData passData, ref RenderingData renderingData)
@@ -169,13 +189,15 @@ namespace UnityEngine.Rendering.Universal.Internal
                 drawSettings.perObjectData = PerObjectData.None;
                 context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
+
                 // Clean up
                 if (passData.enableRenderingLayers)
                 {
                     CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);
-                    context.ExecuteCommandBuffer(cmd);
-                    cmd.Clear();
+
                 }
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
             }
         }
 
@@ -198,6 +220,9 @@ namespace UnityEngine.Rendering.Universal.Internal
             normalHandle = null;
             depthHandle = null;
             renderingLayersHandle = null;
+
+            // This needs to be reset as the renderer might change this in runtime (UUM-36069)
+            shaderTagIds = k_DepthNormals;
         }
 
         private class PassData
@@ -220,7 +245,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 var depthDescriptor = renderingData.cameraData.cameraTargetDescriptor;
                 depthDescriptor.graphicsFormat = GraphicsFormat.None;
                 depthDescriptor.depthStencilFormat = k_DepthStencilFormat;
-                depthDescriptor.depthBufferBits = k_DepthBufferBits;
+                //depthDescriptor.depthBufferBits = k_DepthBufferBits;
                 depthDescriptor.msaaSamples = 1;// Depth-Only pass don't use MSAA
                 cameraDepthTexture = UniversalRenderer.CreateRenderGraphTexture(renderGraph, depthDescriptor, "_CameraDepthTexture", true);
 

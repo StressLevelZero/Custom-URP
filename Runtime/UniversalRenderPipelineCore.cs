@@ -369,6 +369,11 @@ namespace UnityEngine.Rendering.Universal
         public bool isHdrEnabled;
 
         /// <summary>
+        /// True if this camera allow color conversion and encoding for high dynamic range displays.
+        /// </summary>
+        public bool allowHDROutput;
+
+        /// <summary>
         /// True if this camera requires to write _CameraDepthTexture.
         /// </summary>
         public bool requiresDepthTexture;
@@ -418,7 +423,7 @@ namespace UnityEngine.Rendering.Universal
         /// <summary>
         /// True if the Camera should output to an HDR display.
         /// </summary>
-        public bool isHDROutputActive => UniversalRenderPipeline.HDROutputIsActive() && isHdrEnabled && resolveToScreen;
+        public bool isHDROutputActive => UniversalRenderPipeline.HDROutputIsActive() && allowHDROutput && resolveToScreen;
 
         /// <summary>
         /// True if the Camera should render overlay UI.
@@ -693,6 +698,11 @@ namespace UnityEngine.Rendering.Universal
         public bool supportsMainLightShadows;
 
         /// <summary>
+        /// True if additional lights shadows are enabled in the URP Asset
+        /// </summary>
+        internal bool mainLightShadowsEnabled;
+
+        /// <summary>
         /// True if screen space shadows are required.
         /// Obsolete, this feature was replaced by new 'ScreenSpaceShadows' renderer feature
         /// </summary>
@@ -730,6 +740,11 @@ namespace UnityEngine.Rendering.Universal
         /// True if additional lights shadows are enabled.
         /// </summary>
         public bool supportsAdditionalLightShadows;
+
+        /// <summary>
+        /// True if additional lights shadows are enabled in the URP Asset
+        /// </summary>
+        internal bool additionalLightShadowsEnabled;
 
         /// <summary>
         /// The width of the additional light shadow map.
@@ -968,6 +983,11 @@ namespace UnityEngine.Rendering.Universal
         /// True if fast approximation functions are used when converting between the sRGB and Linear color spaces, false otherwise.
         /// </summary>
         public bool useFastSRGBLinearConversion;
+        
+        /// <summary>
+        /// Returns true if Data Driven Lens Flare are supported by this asset, false otherwise.
+        /// </summary>
+        public bool supportDataDrivenLensFlare;
     }
 
     /// <summary>
@@ -1134,8 +1154,14 @@ namespace UnityEngine.Rendering.Universal
         /// <summary> Keyword used for Robust Contrast-Adaptive Sharpening (RCAS) when doing upsampling. </summary>
         public const string Rcas = "_RCAS";
 
+        /// <summary> Keyword used for Robust Contrast-Adaptive Sharpening (RCAS) when doing upsampling, after EASU has ran and with HDR Dsiplay output. </summary>
+        public const string EasuRcasAndHDRInput = "_EASU_RCAS_AND_HDR_INPUT";
+
         /// <summary> Keyword used for Gamma 2.0. </summary>
         public const string Gamma20 = "_GAMMA_20";
+
+        /// <summary> Keyword used for Gamma 2.0 with HDR_INPUT. </summary>
+        public const string Gamma20AndHDRInput = "_GAMMA_20_AND_HDR_INPUT";
 
         /// <summary> Keyword used for high quality sampling for Depth Of Field. </summary>
         public const string HighQualitySampling = "_HIGH_QUALITY_SAMPLING";
@@ -1364,13 +1390,15 @@ namespace UnityEngine.Rendering.Universal
                 desc.width = scaledWidth;
                 desc.height = scaledHeight;
                 desc.graphicsFormat = MakeRenderTextureGraphicsFormat(isHdrEnabled, requestHDRColorBufferPrecision, needsAlpha);
-                desc.depthBufferBits = 32;
+                //desc.depthBufferBits = 24;
+                desc.depthStencilFormat = UniversalRenderer.k_DepthStencilFormat;
                 desc.msaaSamples = msaaSamples;
                 desc.sRGB = (QualitySettings.activeColorSpace == ColorSpace.Linear);
             }
             else
             {
                 desc = camera.targetTexture.descriptor;
+                desc.msaaSamples = msaaSamples;
                 desc.width = scaledWidth;
                 desc.height = scaledHeight;
 
@@ -1410,10 +1438,10 @@ namespace UnityEngine.Rendering.Universal
             // replace the requested desc.msaaSamples value with the actual value the engine falls back to
             desc.msaaSamples = SystemInfo.GetRenderTextureSupportedMSAASampleCount(desc);
 
-            // if the target platform doesn't support storing multisampled RTs and we are doing a separate opaque pass, using a Load load action on the subsequent passes
+            // if the target platform doesn't support storing multisampled RTs and we are doing any offscreen passes, using a Load load action on the subsequent passes
             // will result in loading Resolved data, which on some platforms is discarded, resulting in losing the results of the previous passes.
             // As a workaround we disable MSAA to make sure that the results of previous passes are stored. (fix for Case 1247423).
-            if (!SystemInfo.supportsStoreAndResolveAction && requiresOpaqueTexture)
+            if (!SystemInfo.supportsStoreAndResolveAction)
                 desc.msaaSamples = 1;
 
             return desc;

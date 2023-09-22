@@ -109,6 +109,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
         // Constants
         static readonly GUID kSourceCodeGuid = new GUID("8c72f47fdde33b14a9340e325ce56f4d"); // UniversalTarget.cs
         public const string kPipelineTag = "UniversalPipeline";
+        public const string kComplexLitMaterialTypeTag = "\"UniversalMaterialType\" = \"ComplexLit\"";
         public const string kLitMaterialTypeTag = "\"UniversalMaterialType\" = \"Lit\"";
         public const string kUnlitMaterialTypeTag = "\"UniversalMaterialType\" = \"Unlit\"";
         public static readonly string[] kSharedTemplateDirectories = GenerationUtils.GetDefaultSharedTemplateDirectories().Union(new string[]
@@ -947,7 +948,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
                 displayName = "DepthNormals",
                 referenceName = "SHADERPASS_DEPTHNORMALS",
                 lightMode = "DepthNormals",
-                useInPreview = false,
+                useInPreview = true,
 
                 // Template
                 passTemplatePath = UniversalTarget.kUberTemplatePath,
@@ -988,7 +989,7 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
                 displayName = "DepthNormalsOnly",
                 referenceName = "SHADERPASS_DEPTHNORMALSONLY",
                 lightMode = "DepthNormalsOnly",
-                useInPreview = false,
+                useInPreview = true,
 
                 // Template
                 passTemplatePath = UniversalTarget.kUberTemplatePath,
@@ -2032,8 +2033,12 @@ namespace UnityEditor.Rendering.Universal.ShaderGraph
             referenceName = ShaderKeywordStrings.LOD_FADE_CROSSFADE,
             type = KeywordType.Boolean,
             definition = KeywordDefinition.MultiCompile,
-            scope = KeywordScope.Global,
-            stages = KeywordShaderStage.Fragment,
+            
+            // Note: SpeedTree shaders used to have their own PS-based Crossfade,
+            //       as well as a VS-based smooth LOD transition effect.
+            //       These shaders need the LOD_FADE_CROSSFADE keyword in the VS
+            //       to skip the VS-based effect. 
+            scope = KeywordScope.Global
         };
 
         public static readonly KeywordDescriptor UseUnityCrossFade = new KeywordDescriptor()

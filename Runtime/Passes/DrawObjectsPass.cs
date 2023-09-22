@@ -59,10 +59,13 @@ namespace UnityEngine.Rendering.Universal.Internal
         string m_ProfilerTag;
         ProfilingSampler m_ProfilingSampler;
         bool m_IsOpaque;
-        public bool testMRT = false;
+
+       
+        public bool vkVRSHackOn = false;
         public RTHandle colorTarget;
-		RTHandle[] vrsColorTargets = new RTHandle[2];
-		public RTHandle depthTarget;
+        RTHandle[] vrsColorTargets = new RTHandle[2];
+        public RTHandle depthTarget;
+        UniversalRenderer caller; // Keep a reference to the current running renderer so we can check if VRS is enabled on it during the configuration stage
 
         /// <summary>
         /// Used to indicate whether transparent objects should receive shadows or not.
@@ -142,18 +145,28 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_ProfilingSampler = ProfilingSampler.Get(profileId);
         }
 
+        public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
+        {
+            caller = renderingData.cameraData.renderer as UniversalRenderer;
+            base.OnCameraSetup(cmd, ref renderingData);
+        }
+
         //SLZ MODIFIED // Added Configure, used to signal to the vulkan VRS plugin that this passes framebuffer needs a VRS attachment, and to prevent reuse of cached framebuffers without the VRS attachment
         public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
         {
-            if (testMRT)
+
+            if (vkVRSHackOn && caller != null && caller.s_IsUsingVkVRS)
             {
-				// Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
-				vrsColorTargets[0] = vrsColorTargets[1] = colorTarget;
-				ConfigureTarget(vrsColorTargets, depthTarget);
+                // Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
+                vrsColorTargets[0] = vrsColorTargets[1] = colorTarget;
+                //vrsColorTargets[2] = dummyRTH;
+                ConfigureTarget(vrsColorTargets, depthTarget);
+
                 //ConfigureColorStoreAction(RenderBufferStoreAction.DontCare, 1);
             }
             else
             {
+                enableFoveatedRendering = false;
                 // if VRS was enabled previously, then the target will remain until reset
                 ResetTarget();
             }
@@ -198,7 +211,6 @@ namespace UnityEngine.Rendering.Universal.Internal
                 // w is used for knowing whether the object is opaque(1) or alpha blended(0)
                 Vector4 drawObjectPassData = new Vector4(0.0f, 0.0f, 0.0f, (data.m_IsOpaque) ? 1.0f : 0.0f);
                 cmd.SetGlobalVector(s_DrawObjectPassDataPropID, drawObjectPassData);
-
                 // scaleBias.x = flipSign
                 // scaleBias.y = scale
                 // scaleBias.z = bias

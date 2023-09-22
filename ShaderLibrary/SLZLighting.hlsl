@@ -336,7 +336,7 @@ real3 SLZLambertDiffuse(const real3 attenLightColor, const real3 normal, const r
 
 real4 BDRFLUTSAMPLER(real2 UV){
     #if defined(_BRDFMAP)
-        return SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, UV, 0);
+        return SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, sampler_LinearClamp, UV, 0);
     #else
         return 0;
     #endif
@@ -677,7 +677,7 @@ real3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfDat
 
     #if defined(ANIME)
     #if defined(_BRDFMAP)
-        real3 bdrfTerm = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, BRDF_linear_clamp_sampler, float2(specular.r, specInfo.NoH), 0).rgb;
+        real3 bdrfTerm = SAMPLE_TEXTURE2D_LOD(g_tBRDFMap, sampler_LinearClamp, float2(specular.r, specInfo.NoH), 0).rgb;
         specular += bdrfTerm;
     #endif
     #endif
@@ -897,7 +897,7 @@ void SLZImageBasedSpecular(half3 diffuse, inout real3 specular, half3 reflection
     fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
     real3 IBSpec = real3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
     
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
         reflectionProbe *= indSSAO;
     }
@@ -946,7 +946,7 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
     Light mainLight = GetMainLight(fragData.shadowCoord, fragData.position, fragData.shadowMask);
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, mainLight);
 
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
         diffuseBRDF *= directSSAO;
     }
@@ -982,7 +982,7 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
 void SLZAddLight(inout real3 diffuse, inout real3 specular, const SLZFragData fragData, const SLZSurfData surfData, Light addLight, half directSSAO)
 {
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, addLight);
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
         diffuseBRDF *= directSSAO;
     }
@@ -1003,17 +1003,6 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-	AmbientOcclusionFactor ao;
-    ao.indirectAmbientOcclusion = 1.0h;
-    ao.directAmbientOcclusion = 1.0h;
-
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
-	{
-        AmbientOcclusionFactor ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
-        surfData.occlusion = 1.0h; // we are already multiplying by the AO in the intermediate steps, don't do it at the end like normal
-    }
-
-    
        
     #if defined(LIGHTMAP_ON) 
     //-------------------------------------------------------------------------------------------------
@@ -1034,11 +1023,14 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
     
     //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting) 
-    UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
+	AmbientOcclusionFactor ao;
+	UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
-        diffuse *= ao.indirectAmbientOcclusion;
-        specular *= ao.indirectAmbientOcclusion;
-    }
+		ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
+		surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal
+		diffuse *= ao.indirectAmbientOcclusion;
+		specular *= ao.indirectAmbientOcclusion;
+	}
     
     //-------------------------------------------------------------------------------------------------
     // Realtime light calculations

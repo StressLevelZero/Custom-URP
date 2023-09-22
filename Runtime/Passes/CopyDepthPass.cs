@@ -64,7 +64,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         {
             var descriptor = renderingData.cameraData.cameraTargetDescriptor;
             var isDepth = (destination.rt && destination.rt.graphicsFormat == GraphicsFormat.None);
-            descriptor.graphicsFormat = isDepth ? GraphicsFormat.D32_SFloat_S8_UInt : GraphicsFormat.R32_SFloat;
+            descriptor.graphicsFormat = isDepth ? UniversalRenderer.k_DepthStencilFormat : GraphicsFormat.R32_SFloat;
             descriptor.msaaSamples = 1;
             // This is a temporary workaround for Editor as not setting any depth here
             // would lead to overwriting depth in certain scenarios (reproducable while running DX11 tests)
@@ -98,7 +98,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_PassData.copyDepthMaterial = m_CopyDepthMaterial;
             m_PassData.msaaSamples = MssaSamples;
             m_PassData.copyResolvedDepth = m_CopyResolvedDepth;
-            m_PassData.copyToDepth = CopyToDepth;
+            m_PassData.copyToDepth = CopyToDepth || !RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R32_SFloat, FormatUsage.Render);
             renderingData.commandBuffer.SetGlobalTexture("_CameraDepthAttachment", source.nameID);
             ExecutePass(context, m_PassData, ref renderingData.commandBuffer, ref renderingData.cameraData, source, destination);
         }

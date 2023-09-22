@@ -1,6 +1,6 @@
 using System;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
-
+using Unity.Profiling;
 // SLZ MODIFIED
 using System.Collections.Generic;
 using Unity.Mathematics;
@@ -21,8 +21,9 @@ namespace UnityEngine.Rendering.Universal.Internal
 		Material m_SamplingMaterial;
 		Downsampling m_DownsamplingMethod;
 		Material m_CopyColorMaterial;
+        static readonly ProfilerMarker s_CameraSetup = new ProfilerMarker("CopyColorPass.OnCameraSetup");
 
-		private RTHandle source { get; set; }
+        private RTHandle source { get; set; }
 
 		private RTHandle destination { get; set; }
 
@@ -47,7 +48,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 		private int m_DownsampleKernelID;
 		private int m_GaussianKernelID;
 		private bool m_ReconstructTiles = false;
-		private RTPermanentHandle m_PermanentDest { get; set; }
+		private PersistentRT m_PermanentDest { get; set; }
 		private RTHandle m_PermHandle;
 		private bool m_UseRT;
 		private RTHandle m_TempBuffer { get; set; }
@@ -158,7 +159,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 		}
 
 		[Obsolete("Use RTHandles for source and destination.")]
-		public void Setup(RenderTargetIdentifier source, RTPermanentHandle destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
+		public void Setup(RenderTargetIdentifier source, PersistentRT destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
 		{
 			this.source = RTHandles.Alloc(source);
 			this.m_PermanentDest = destination;
@@ -183,7 +184,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 			m_ReconstructTiles = reconstructTiles;
 		}
 
-		public void Setup(RTHandle source, RTPermanentHandle destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
+		public void Setup(RTHandle source, PersistentRT destination, Downsampling downsampling, bool RequiresMips, bool reconstructTiles = false)
 		{
 			this.source = source;
 			this.m_PermanentDest = destination;
@@ -196,8 +197,9 @@ namespace UnityEngine.Rendering.Universal.Internal
 		/// <inheritdoc />
 		public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
 		{
-			//if (destination == null || destination.rt == null || m_UseRT)
-			{
+			//s_CameraSetup.Begin();
+            //if (destination == null || destination.rt == null || m_UseRT)
+            {
 				RenderTextureDescriptor descriptor = renderingData.cameraData.cameraTargetDescriptor;
 				descriptor.msaaSamples = 1;
 				descriptor.depthBufferBits = 0;
@@ -229,7 +231,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
 				if (m_UseRT)
 				{
-					destination = m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera.name, "Opaque");
+					destination = m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera, "Opaque");
 				}
 				else if (destination == null || destination.rt == null)
 				{
@@ -248,12 +250,13 @@ namespace UnityEngine.Rendering.Universal.Internal
 				// END SLZ MODIFIED
 
 			}
-			//else
-			//{
-			//    cmd.SetGlobalTexture(destination.name, destination.nameID);
-			//}
+			//s_CameraSetup.End();
+            //else
+            //{
+            //    cmd.SetGlobalTexture(destination.name, destination.nameID);
+            //}
 
-		}
+        }
 
 		/// <inheritdoc/>
 		public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -337,18 +340,22 @@ namespace UnityEngine.Rendering.Universal.Internal
 						Blitter.BlitCameraTexture(cmd, source, destination, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, copyColorMaterial, 0);
 						break;
 					case Downsampling._2xBilinear:
-						Blitter.BlitCameraTexture(cmd, source, destination, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, copyColorMaterial, 1);
+						Blitter.BlitCameraTexture(cmd, source, destination, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, copyColorMaterial, 0);//1
 						break;
 					case Downsampling._4xBox:
 						samplingMaterial.SetFloat(sampleOffsetShaderHandle, 2);
 						Blitter.BlitCameraTexture(cmd, source, destination, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, samplingMaterial, 0);
 						break;
 					case Downsampling._4xBilinear:
-						Blitter.BlitCameraTexture(cmd, source, destination, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, copyColorMaterial, 1);
+						Blitter.BlitCameraTexture(cmd, source, destination, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, copyColorMaterial, 0);//1
 						break;
 				}
-				
-			}
+                if (reconstructTiles)
+                {
+                    cmd.DisableKeyword(_RECONSTRUCT_VRS_TILES);
+                }
+
+            }
 
 		   
 			if (requiresMips && mipLevels > 1)
@@ -452,7 +459,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 				}
 				if (true)
 				{
-					destination = renderGraph.ImportTexture(m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera.name, "Opaque"));
+					destination = renderGraph.ImportTexture(m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera, "Opaque"));
 				}
 				else
 				{

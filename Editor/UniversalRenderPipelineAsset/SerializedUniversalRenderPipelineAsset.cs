@@ -70,6 +70,7 @@ namespace UnityEditor.Rendering.Universal
         public SerializedProperty colorGradingMode { get; }
         public SerializedProperty colorGradingLutSize { get; }
         public SerializedProperty useFastSRGBLinearConversion { get; }
+        public SerializedProperty supportDataDrivenLensFlare { get; }
 
         // SLZ MODIFIED
         public SerializedProperty enableSSR { get; }
@@ -158,6 +159,7 @@ namespace UnityEditor.Rendering.Universal
             colorGradingLutSize = serializedObject.FindProperty("m_ColorGradingLutSize");
 
             useFastSRGBLinearConversion = serializedObject.FindProperty("m_UseFastSRGBLinearConversion");
+            supportDataDrivenLensFlare = serializedObject.FindProperty("m_SupportDataDrivenLensFlare");
 
 #if ADAPTIVE_PERFORMANCE_2_0_0_OR_NEWER
             useAdaptivePerformance = serializedObject.FindProperty("m_UseAdaptivePerformance");
