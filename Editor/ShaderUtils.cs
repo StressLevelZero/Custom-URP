@@ -28,6 +28,7 @@ namespace Unity.Rendering.Universal
             SpeedTree7 = ShaderPathID.SpeedTree7,
             SpeedTree7Billboard = ShaderPathID.SpeedTree7Billboard,
             SpeedTree8 = ShaderPathID.SpeedTree8,
+            LitMAS = ShaderPathID.LitMAS,
 
             // ShaderGraph IDs start at 1000, correspond to subtargets
             SG_Unlit = 1000,        // UniversalUnlitSubTarget

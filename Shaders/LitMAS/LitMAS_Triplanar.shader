@@ -3,13 +3,12 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 {
     Properties
     {
-        [Toggle(_EXPENSIVE_TP)] _Expensive("Fix Derivative Seams (expensive)", float) = 0
+        [ForceReload][Toggle(_EXPENSIVE_TP)] _Expensive("Fix Derivative Seams (expensive)", float) = 0
         [NoScaleOffset][MainTexture] _BaseMap("Texture", 2D) = "white" {}
         _UVScaler("Texture Scale", Float) = 1
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
-            
         [ToggleUI] _RotateUVs("Rotate UVs", Float) = 0
-        [ToggleUI] _Normals("Normal Map enabled", Float) = 1
+        [ToggleUI] _Normals("Normal Map enabled", Float) = 0
         [NoScaleOffset][Normal] _BumpMap ("Normal map", 2D) = "bump" {}
         [NoScaleOffset]_MetallicGlossMap("MAS", 2D) = "white" {}
         [Space(30)][Header(Emissions)][Space(10)][ToggleUI] _Emission("Emission Enable", Float) = 0
@@ -23,13 +22,19 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
                 [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_NO_SSR)] _SSROff("Disable SSR", Float) = 0
         [Header(This should be 0 for skinned meshes)]
         _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
+
+		_Surface ("Surface Type", float) = 0
+		_BlendSrc ("Blend Source", float) = 1
+		_BlendDst ("Blend Destination", float) = 0
+		[ToggleUI] _ZWrite ("ZWrite", float) = 1
+		_Cull ("Cull Side", float) = 2
       
     }
     SubShader
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
-        Blend One Zero
-		ZWrite On
+        //Blend One Zero
+		//ZWrite On
 		ZTest LEqual
 		Offset 0 , 0
 		ColorMask RGBA
@@ -39,6 +44,9 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         {
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
+            Blend [_BlendSrc] [_BlendDst]
+			ZWrite [_ZWrite]
+			Cull [_Cull]
             HLSLPROGRAM
             //#pragma use_dxc
             #pragma vertex vert
@@ -61,7 +69,8 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite On
+			ZWrite [_ZWrite]
+			Cull [_Cull]
 			//ZTest Off
 			ColorMask 0
 
@@ -79,7 +88,8 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         {
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
-            ZWrite On
+            ZWrite [_ZWrite]
+			Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
@@ -99,7 +109,8 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 			Name "ShadowCaster"
 			Tags { "LightMode"="ShadowCaster" }
 
-			ZWrite On
+			ZWrite [_ZWrite]
+			Cull Off
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0
@@ -119,7 +130,8 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         {
             Name "Meta"
             Tags { "LightMode" = "Meta" }
-
+            Blend [_BlendSrc] [_BlendDst]
+            ZWrite [_ZWrite]
             Cull Off
 
             HLSLPROGRAM

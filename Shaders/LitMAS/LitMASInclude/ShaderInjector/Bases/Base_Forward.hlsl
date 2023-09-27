@@ -111,6 +111,7 @@ CBUFFER_START(UnityPerMaterial)
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 	//#!INJECT_POINT MATERIAL_CBUFFER
+	int _Surface;
 CBUFFER_END
 
 half3 OverlayBlendDetail(half source, half3 destination)
@@ -255,21 +256,21 @@ half4 frag(VertOut i) : SV_Target
 
 	//#!INJECT_POINT PRE_SURFDATA
 
-	SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb);
+	SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb, albedo.a);
 	half4 color = half4(1, 1, 1, 1);
 
 	//#!INJECT_POINT PRE_LIGHTING_CALC
 
 	//#!INJECT_POINT LIGHTING_CALC
 	//#!INJECT_DEFAULT
-		color.rgb = SLZPBRFragment(fragData, surfData);
+		color.rgb = SLZPBRFragment(fragData, surfData, _Surface);
 	//#!INJECT_END
 
 
 	//#!INJECT_POINT VOLUMETRIC_FOG
 	//#!INJECT_DEFAULT
 	color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
-	color = Volumetrics(color, fragData.position);
+	color = VolumetricsSurf(color, fragData.position, _Surface);
 	//#!INJECT_END
 	return color;
 }

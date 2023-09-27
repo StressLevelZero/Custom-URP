@@ -39,6 +39,7 @@ CBUFFER_START(UnityPerMaterial)
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 	//#!INJECT_POINT MATERIAL_CBUFFER
+	int _Surface;
 CBUFFER_END
 	
 //#!INJECT_POINT FUNCTIONS

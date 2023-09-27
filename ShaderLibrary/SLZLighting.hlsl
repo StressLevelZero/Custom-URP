@@ -72,6 +72,7 @@ struct SLZSurfData
     real    reflectivity;
     real3   emission;
     real    occlusion;
+    real    alpha;
 // #if defined(_SLZ_BRDF_LUT)
 //     TEXTURE2D(brdfLUT);
 //     SAMPLER(sampler_brdfLUT);
@@ -229,7 +230,7 @@ void SLZFragDataAddAniso(inout SLZFragData fragData, real3 tangent, real3 bitang
  * @param occlusion     The occlusion factor
  * @param emission      The emission value
  */
-SLZSurfData SLZGetSurfDataMetallicGloss(const real3 albedo, const real metallic, const real smoothness, const real occlusion, const real3 emission)
+SLZSurfData SLZGetSurfDataMetallicGloss(const real3 albedo, const real metallic, const real smoothness, const real occlusion, const real3 emission, const real alpha = 1.0)
 {
     SLZSurfData data;
     data.albedo = albedo;
@@ -239,6 +240,7 @@ SLZSurfData SLZGetSurfDataMetallicGloss(const real3 albedo, const real metallic,
     //data.fusedVFNorm = 4.0h * data.roughness + 2.0h; // no reason to eat a register to store this, its literally a single MAD
     data.emission = emission;
     data.occlusion = occlusion;
+    data.alpha = alpha;
     return data;
 }
 
@@ -898,7 +900,7 @@ void SLZImageBasedSpecular(half3 diffuse, inout real3 specular, half3 reflection
     real3 IBSpec = real3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
     
     UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
-	{
+    {
         reflectionProbe *= indSSAO;
     }
     
@@ -915,14 +917,13 @@ void SLZImageBasedSpecular(half3 diffuse, inout real3 specular, half3 reflection
  * the front but the shader thinks were looking at the back. This leads to a reflection
  * vector pointing into the surface.
  *
- * @param[in,out] specular  Running total of the specular color
- * @param         normal    Worldspace normal vector
- * 
+ * @param   normal          Worldspace normal vector
+ * @param   reflectionDir   Reflection vector
  */
-void SLZSpecularHorizonOcclusion(inout real3 specular, half3 normal, half3 reflectionDir)
+half SLZSpecularHorizonOcclusion(half3 normal, half3 reflectionDir)
 {
     real horizonOcclusion = min(1.0h + dot(reflectionDir, normal), 1.0h);
-    specular *= horizonOcclusion * horizonOcclusion;
+    return horizonOcclusion * horizonOcclusion;
 }
 
 
@@ -947,7 +948,7 @@ void SLZMainLight(inout real3 diffuse, inout real3 specular, const SLZFragData f
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, mainLight);
 
     UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
-	{
+    {
         diffuseBRDF *= directSSAO;
     }
     
@@ -983,7 +984,7 @@ void SLZAddLight(inout real3 diffuse, inout real3 specular, const SLZFragData fr
 {
     real3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, addLight);
     UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
-	{
+    {
         diffuseBRDF *= directSSAO;
     }
     diffuse += diffuseBRDF;
@@ -994,11 +995,14 @@ void SLZAddLight(inout real3 diffuse, inout real3 specular, const SLZFragData fr
 /**
  * Full PBR lighting calculation
  *
- * @param  fragData  Struct containing all relevant fragment data (normal, position, etc)
- * @param  surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
+ * @param  fragData    Struct containing all relevant fragment data (normal, position, etc)
+ * @param  surfData    Struct containing physical properties of the surface (specular color, roughness, etc)
+ * @param  surfaceType int indicating if the surface is opaque (0), transparent (1), fade (2). In transparent, 
+ *                     the blend mode is presumed to be alpha premultiplied, and the diffuse is multiplied by
+ *                     the alpha
  * @return PBR lit surface color
  */
-real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
+real4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType = 0)
 {
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
@@ -1023,14 +1027,16 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
     
     //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting) 
-	AmbientOcclusionFactor ao;
-	UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
-	{
-		ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
-		surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal
-		diffuse *= ao.indirectAmbientOcclusion;
-		specular *= ao.indirectAmbientOcclusion;
-	}
+    AmbientOcclusionFactor ao;
+    
+    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    {
+        ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
+        if (surfaceType > 0) ao.indirectAmbientOcclusion = 1; 
+        surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal
+        diffuse *= ao.indirectAmbientOcclusion;
+        specular *= ao.indirectAmbientOcclusion;
+    }
     
     //-------------------------------------------------------------------------------------------------
     // Realtime light calculations
@@ -1057,13 +1063,27 @@ real3 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData)
     //-------------------------------------------------------------------------------------------------
     real3 reflectionDir = SLZProbeReflectionDir(fragData, surfData);
     SLZImageBasedSpecular(diffuse,specular, reflectionDir, fragData, surfData, ao.indirectAmbientOcclusion);
-    SLZSpecularHorizonOcclusion(specular, fragData.normal, reflectionDir);
-    
+    real occlusionFactor = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
+    specular *= occlusionFactor;
+
     //-------------------------------------------------------------------------------------------------
     // Combine the final lighting information
     //-------------------------------------------------------------------------------------------------
+    real3 finalDiffuse = surfData.occlusion * (surfData.albedo * diffuse) + surfData.emission;
+    if (surfaceType == 1) finalDiffuse *= surfData.alpha;
+    real3 finalSpecular = surfData.occlusion * specular;
     
-    return surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
+    if (surfaceType == 1) 
+	{
+        surfData.alpha = lerp(surfData.alpha, 1, surfData.reflectivity);
+		real fresnelTerm = (1.0h - saturate(fragData.NoV));
+		fresnelTerm *= fresnelTerm;
+		fresnelTerm *= fresnelTerm;
+		surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
+        surfData.alpha *= occlusionFactor;
+	}
+    
+    return real4(finalDiffuse + finalSpecular, surfData.alpha);
 }
 
 

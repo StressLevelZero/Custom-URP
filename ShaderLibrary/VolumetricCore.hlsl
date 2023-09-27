@@ -104,6 +104,28 @@ half4 Volumetrics(half4 color, float3 positionWS) {
     return color;
 }
 
+/* @brief Blend volumetrics with control for the surface type.
+ *
+ * @param color       Final surface color
+ * @param positionWS  World-space position of the fragment
+ * @param surfaceType Enum of the surface type, where 0: opaque, 1: transparent (alpha premultiplied), 2: fade (alpha blend) 
+ * @return color blended towards the volumetric color if the surface is opaque, or blended towards transparency otherwise
+ */
+half4 VolumetricsSurf(half4 color, float3 positionWS, int surfaceType) {
+
+#if defined(_VOLUMETRICS_ENABLED)
+
+    half4 FroxelColor = GetVolumetricColor(positionWS);
+	
+
+	color.rgb *= surfaceType != 2 ? FroxelColor.a : 1;
+	color.a *= surfaceType == 2 ? FroxelColor.a : 1;
+	color.rgb += surfaceType == 0 ? FroxelColor.rgb : 1;
+
+#endif
+    return color;
+}
+
 // half4 VolumetricsJittered(half4 color, float3 positionWS, float2 noise) {
 //
 // #if defined(_VOLUMETRICS_ENABLED)

@@ -3,9 +3,9 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
 {
     Properties
     {
-        [MainTexture] _BaseMap("Texture", 2D) = "white" {}
+        [ForceReload][MainTexture] _BaseMap("Texture", 2D) = "white" {}
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
-        [ToggleUI] _Normals("Normal Map enabled", Float) = 1
+        [ToggleUI] _Normals("Normal Map enabled", Float) = 0
         [NoScaleOffset][Normal] _BumpMap ("Normal map", 2D) = "bump" {}
         [NoScaleOffset]_MetallicGlossMap("MAS", 2D) = "white" {}
         [Space(30)][Header(Emissions)][Space(10)][ToggleUI] _Emission("Emission Enable", Float) = 0
@@ -23,12 +23,18 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_NO_SSR)] _SSROff("Disable SSR", Float) = 0
         [Header(This should be 0 for skinned meshes)]
         _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
+
+		_Surface ("Surface Type", float) = 0
+		_BlendSrc ("Blend Source", float) = 1
+		_BlendDst ("Blend Destination", float) = 0
+		[ToggleUI] _ZWrite ("ZWrite", float) = 1
+		_Cull ("Cull Side", float) = 2
     }
     SubShader
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
-        Blend One Zero
-		ZWrite On
+        //Blend One Zero
+		//ZWrite On
 		ZTest LEqual
 		Offset 0 , 0
 		ColorMask RGBA
@@ -42,6 +48,9 @@ ENDHLSL
         {
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
+            Blend [_BlendSrc] [_BlendDst]
+			ZWrite [_ZWrite]
+			Cull [_Cull]
             HLSLPROGRAM
             //
             #pragma vertex vert
@@ -66,7 +75,9 @@ ENDHLSL
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite On
+			ZWrite [_ZWrite]
+			Cull [_Cull]
+
 			//ZTest Off
 			ColorMask 0
 
@@ -84,7 +95,9 @@ ENDHLSL
         {
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
-            ZWrite On
+            
+			ZWrite [_ZWrite]
+			Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
@@ -103,8 +116,9 @@ ENDHLSL
 			
 			Name "ShadowCaster"
 			Tags { "LightMode"="ShadowCaster" }
-
-			ZWrite On
+ 
+			ZWrite [_ZWrite]
+			Cull Off
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0

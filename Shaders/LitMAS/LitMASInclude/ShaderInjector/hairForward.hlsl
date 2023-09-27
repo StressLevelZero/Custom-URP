@@ -124,6 +124,7 @@ half  _Normals;
 // Begin Injection MATERIAL_CBUFFER from Injection_Anisotropic.hlsl ----------------------------------------------------------
 	half _AnisoAspect;
 // End Injection MATERIAL_CBUFFER from Injection_Anisotropic.hlsl ----------------------------------------------------------
+	int _Surface;
 CBUFFER_END
 
 half3 OverlayBlendDetail(half source, half3 destination)
@@ -272,7 +273,7 @@ half4 frag(VertOut i) : SV_Target
 
 
 
-	SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb);
+	SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb, albedo.a);
 	half4 color = half4(1, 1, 1, 1);
 
 // Begin Injection PRE_LIGHTING_CALC from Injection_Anisotropic.hlsl ----------------------------------------------------------
@@ -283,10 +284,10 @@ half4 frag(VertOut i) : SV_Target
 	surfData.specular *= albedo.rgb/Max3(albedo.r,albedo.g,albedo.b);
 // End Injection PRE_LIGHTING_CALC from Injection_HairSpecColor.hlsl ----------------------------------------------------------
 
-		color.rgb = SLZPBRFragment(fragData, surfData);
+		color.rgb = SLZPBRFragment(fragData, surfData, _Surface);
 
 
 	color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
-	color = Volumetrics(color, fragData.position);
+	color = VolumetricsSurf(color, fragData.position, _Surface);
 	return color;
 }

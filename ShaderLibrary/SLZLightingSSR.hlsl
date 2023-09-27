@@ -29,11 +29,11 @@ half3 invertFogLerp(half fogIntensity, half3 mipFog, half3 finalColor)
     return fogIntensity > 1e-7 ? (finalColor + (fogIntensity - 1) * mipFog) / fogIntensity : finalColor;
 }
 
-real SLZSpecularHorizonOcclusion(half3 normal, half3 reflectionDir)
-{
-    real horizonOcclusion = min(1.0h + dot(reflectionDir, normal), 1.0h);
-    return horizonOcclusion * horizonOcclusion;
-}
+//real SLZSpecularHorizonOcclusion(half3 normal, half3 reflectionDir)
+//{
+//    real horizonOcclusion = min(1.0h + dot(reflectionDir, normal), 1.0h);
+//    return horizonOcclusion * horizonOcclusion;
+//}
 
 struct SSRExtraData
 {
@@ -118,7 +118,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
 
 
 
-real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData ssrExtra)
+real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData ssrExtra, int surfaceType = 0)
 {
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
@@ -146,9 +146,12 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 
     //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting)
     AmbientOcclusionFactor ao;
+
     UNITY_BRANCH if (_SCREEN_SPACE_OCCLUSION)
     {
+        
         ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
+        if (surfaceType > 0) ao.indirectAmbientOcclusion = 1; 
         surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal
         diffuse *= ao.indirectAmbientOcclusion;
         specular *= ao.indirectAmbientOcclusion;
@@ -188,15 +191,17 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real horizOcclusion = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
     specular *= horizOcclusion;
     SSR.rgb *= horizOcclusion;
+    
     //SSRLerp *= saturate(dot(-fragData.viewDir, ))
     float2 oldScreenUV = SLZComputeNDCFromClip(ssrExtra.lastClipPos);
    
     float oldDepth = LOAD_TEXTURE2D_X(_PrevHiZ0Texture, oldScreenUV.xy * _HiZDim.xy).r;
     
     bool isWithinDepthError = abs(oldDepth - oldVertDepth) < 2 * ddzOld + HALF_MIN;
-    float4 volColor = GetVolumetricColor(fragData.position);
-    float3 output = surfData.occlusion * (surfData.albedo * diffuse + specular) + surfData.emission;
-
+    //float4 volColor = GetVolumetricColor(fragData.position);
+    float3 output = surfData.occlusion * (surfData.albedo * diffuse) + surfData.emission;
+    output = surfaceType == 1 ? output * surfData.alpha : output; //Premultiply diffuse by alpha if surface is transparent
+    output += surfData.occlusion * specular;
     if (true)//UNITY_BRANCH if (ssrExtra.temporalWeight == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
         output += surfData.occlusion * SSR.rgb;
@@ -234,11 +239,22 @@ real3 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 
     output = MixFog(output, -fragData.viewDir, ssrExtra.fogFactor);
 
-#if defined(_VOLUMETRICS_ENABLED)
-    output = volColor.rgb + output * volColor.a;
-#endif
+//#if defined(_VOLUMETRICS_ENABLED)
+//    output = volColor.rgb + output * volColor.a;
+//#endif
+    if (surfaceType == 1)
+	{
+        surfData.alpha = lerp(surfData.alpha, 1, surfData.reflectivity);
+		real fresnelTerm = (1.0h - saturate(fragData.NoV));
+		fresnelTerm *= fresnelTerm;
+		fresnelTerm *= fresnelTerm;
+		surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
+        surfData.alpha *= horizOcclusion;
+	}
+	float4 finalColor = float4(output, surfData.alpha);
+    VolumetricsSurf(finalColor, fragData.position, surfaceType);
 
-    return output;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
+    return finalColor;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
 }
 
 #endif

@@ -145,6 +145,7 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
+	int _Surface;
 CBUFFER_END
 
 half3 OverlayBlendDetail(half source, half3 destination)
@@ -307,7 +308,7 @@ half4 frag(VertOut i) : SV_Target
 // End Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 
 
-	SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb);
+	SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb, albedo.a);
 	half4 color = half4(1, 1, 1, 1);
 
 
@@ -323,9 +324,10 @@ half4 frag(VertOut i) : SV_Target
 		ssrExtra.noise = noiseRGBA;
 		ssrExtra.fogFactor = i.uv0XY_bitZ_fog.w;
 
-		color.rgb = max(0,SLZPBRFragmentSSR(fragData, surfData, ssrExtra));
+		color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
+		color.rgb = max(0, color.rgb);
 	#else
-		color.rgb = SLZPBRFragment(fragData, surfData);
+		color = SLZPBRFragment(fragData, surfData, _Surface);
 	#endif
 // End Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
 
@@ -333,7 +335,8 @@ half4 frag(VertOut i) : SV_Target
 // Begin Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
 	#if !defined(_SSR_ENABLED)
 		color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
-		color = Volumetrics(color, fragData.position);
+		
+		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif
 // End Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
 	return color;

@@ -53,6 +53,7 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
+	int _Surface;
 CBUFFER_END
 
 struct appdata

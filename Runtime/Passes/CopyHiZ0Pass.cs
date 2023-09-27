@@ -48,7 +48,6 @@ namespace UnityEngine.Rendering.Universal.Internal
         ComputeShader m_ColorPyramidCompute;
         public bool m_RequiresMips;
 
-        private int m_MipLevels;
         private int[] m_Size;
         private int downsampleKernelID;
         private int gaussianKernelID;
@@ -69,7 +68,6 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_CopyColorMaterial = copyColorMaterial;
             renderPassEvent = evt;
             m_DownsamplingMethod = Downsampling.None;
-            m_MipLevels = 1;
             base.useNativeRenderPass = false;
         }
 

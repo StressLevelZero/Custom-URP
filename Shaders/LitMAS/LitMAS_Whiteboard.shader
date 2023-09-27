@@ -2,24 +2,28 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
 {
     Properties
     {
-        [MainTexture] _BaseMap("Texture", 2D) = "white" {}
+        [ForceReload][MainTexture] _BaseMap("Texture", 2D) = "white" {}
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
         _PenMap("Pen Texture", 2D) = "black" {}
         [ToggleUI] _PenMono("Pen Monochrome", float) = 0
         [HideInInspector]_PenMonoColor("Pen Monochrome Color", Color) = (0,0,0,1)
-        [ToggleUI] _Normals("Normal Map enabled", Float) = 1
+        [ToggleUI] _Normals("Normal Map enabled", Float) = 0
         [NoScaleOffset][Normal] _BumpMap ("Normal map", 2D) = "bump" {}
         [NoScaleOffset]_MetallicGlossMap("MAS", 2D) = "white" {}
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("DetailMap", 2D) = "gray" {}
        
-
+		_Surface ("Surface Type", float) = 0
+		_BlendSrc ("Blend Source", float) = 1
+		_BlendDst ("Blend Destination", float) = 0
+		[ToggleUI] _ZWrite ("ZWrite", float) = 1
+		_Cull ("Cull Side", float) = 2
     }
     SubShader
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" "DisableBatching"="True"}
-        Blend One Zero
-		ZWrite On
+        //Blend One Zero
+		//ZWrite On
 		ZTest LEqual
 		Offset 0 , 0
 		ColorMask RGBA
@@ -29,6 +33,9 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
         {
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
+            Blend [_BlendSrc] [_BlendDst]
+			ZWrite [_ZWrite]
+			Cull [_Cull]
             HLSLPROGRAM
             
             #pragma vertex vert
@@ -49,7 +56,9 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite On
+
+			ZWrite [_ZWrite]
+			Cull [_Cull]
 			//ZTest Off
 			ColorMask 0
 
@@ -67,7 +76,9 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
         {
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
-            ZWrite On
+
+			ZWrite [_ZWrite]
+			Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
@@ -87,7 +98,8 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
 			Name "ShadowCaster"
 			Tags { "LightMode"="ShadowCaster" }
 
-			ZWrite On
+			ZWrite [_ZWrite]
+			Cull Off
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0
@@ -107,6 +119,9 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
         {
             Name "Meta"
             Tags { "LightMode" = "Meta" }
+
+            Blend [_BlendSrc] [_BlendDst]
+			ZWrite [_ZWrite]
 
             Cull Off
 
