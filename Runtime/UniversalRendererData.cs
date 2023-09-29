@@ -76,6 +76,9 @@ namespace UnityEngine.Rendering.Universal
 
             [Reload("Shaders/ObjectMotionVectors.shader")]
             public Shader objectMotionVector;
+
+            [Reload("Shaders/Utils/DummyShader.shader")]
+            public Shader DummyShader;
         }
 
         [Serializable, ReloadGroup]
