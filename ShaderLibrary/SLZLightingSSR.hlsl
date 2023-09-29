@@ -45,6 +45,8 @@ struct SSRExtraData
     real fogFactor;
 };
 
+
+
  /**
   * Specular from reflection probes and SSR split, so we can reverse the non-ssr color later
   *
@@ -76,15 +78,18 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
         ssrExtra.depthDerivativeSum,
         ssrExtra.noise);
 
-    SSRLerp = smoothstep(0.3, 0.9, 1 - surfData.roughness * surfData.roughness);
+    SSRLerp = saturate((surfData.perceptualRoughness - 0.5) / (0.4 - 0.5));
     //Piecewise function to make a sinusoidal falloff curve
 #define SSR_FALLOFF_START 0.6666667
     RdotV = 2 * saturate( (1 / SSR_FALLOFF_START) * RdotV);
     RdotV = RdotV > 1 ? -0.5*(RdotV * RdotV) + (2*RdotV - 1) : 0.5 * RdotV * RdotV;
     SSRLerp *= RdotV;
     real4 SSR = real4(0, 0, 0, 0);
-
-    UNITY_BRANCH if (SSRLerp > 0.008)
+    #if defined(_SM6_QUAD)
+    if (WaveActiveAnyTrue(SSRLerp > 0.008))
+    #else
+    if (SSRLerp > 0.008)
+    #endif
     {
         SSR = getSSRColor(ssrData);
     }
