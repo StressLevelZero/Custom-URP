@@ -1254,7 +1254,7 @@ public class VolumetricRendering : MonoBehaviour
                 FroxelFogCompute.SetBuffer(ScatteringKernel, ID_media_sphere_buffer, participatingMediaSphereBuffer);
                 FroxelFogCompute.SetFloat(ID_media_sphere_buffer_length, mediaCount);
             }
-            */
+            
 
             /*
             if (VolumetricConstantBuffer != null && projectionMatrix != null && activeCam != null && vbuff.depthEncodingParams != null)

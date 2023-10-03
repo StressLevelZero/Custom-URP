@@ -65,7 +65,8 @@ namespace UnityEngine.Rendering.Universal
                 // This doesn't seem to happen if the texture is non-null
                 if (SkyTexture.value == null)
                 {
-                    SkyTexture.overrideState = false;
+                    SkyTexture = new CubemapParameter(null);
+                    SkyManager.CheckSky();
                 }
                 else
                 {

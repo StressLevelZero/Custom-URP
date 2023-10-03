@@ -361,7 +361,7 @@ namespace UnityEngine.Rendering.Universal
             m_ClearColor = Color.black;
             overrideCameraTarget = false;
             isBlitRenderPass = false;
-            profilingSampler = new ProfilingSampler($"Unnamed_{nameof(ScriptableRenderPass)}");
+            profilingSampler = new ProfilingSampler($"Unnamed_{this.GetType().Name}");
             useNativeRenderPass = true;
             renderPassQueueIndex = -1;
             renderTargetFormat = new GraphicsFormat[]

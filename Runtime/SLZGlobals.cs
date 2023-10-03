@@ -252,6 +252,7 @@ namespace UnityEngine.Rendering.Universal
 
     public class SLZGlobalsSetPass : ScriptableRenderPass
     {
+        static RTHandle[] target = new RTHandle[0];
         private bool enableSSR;
         private bool requireHiZ;
         private bool requireMinMax;
@@ -272,6 +273,7 @@ namespace UnityEngine.Rendering.Universal
         {
             renderPassEvent = evt;
             passData = new SLZGlobalsData();
+            ConfigureTarget(target);
         }
         public void Setup(CameraData camData, CameraDataExtSet camDataExtSet)
         {
@@ -301,7 +303,6 @@ namespace UnityEngine.Rendering.Universal
             //ConfigureTarget(new RenderTargetIdentifier(BuiltinRenderTextureType.None), new RenderTargetIdentifier(BuiltinRenderTextureType.None));
             //Debug.Log("Setup for " + camData.camera.name);
         }
-
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
             CameraData camData = renderingData.cameraData;

@@ -50,10 +50,9 @@ public class SkyManager
     }
     static public void CheckSky()
     {
-        Debug.Log("Running CheckSky");
+        //Debug.Log("Running CheckSky");
         if (skytexture == null)
         {
-            Debug.Log("skytex set null");
             GenerateSkyTexture();
         }
 
@@ -67,11 +66,9 @@ public class SkyManager
             if (skytexture != null)
             {
                 SetSkyTexture(CoreUtils.blackCubeTexture);
-                Debug.Log("skytex set non-null");
             }
             else SetSkyTexture(CoreUtils.blackCubeTexture);
-        }
-     //   if (Shader.GetGlobalTexture(ID_SkyTexture) != null) return;              
+        }        
     }
 
     static public void SetSkyMips(Vector4 MipFogParam)
