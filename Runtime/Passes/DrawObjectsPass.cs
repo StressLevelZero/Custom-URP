@@ -56,8 +56,6 @@ namespace UnityEngine.Rendering.Universal.Internal
 
 #if DEBUG_NO_SHADERS
         static Material s_defaultMat;
-        static ShaderTagId s_tag = new ShaderTagId("Always");
-        static ShaderTagId s_tag2 = new ShaderTagId("ForwardBase");
         static Material defaultMat
         {
             get

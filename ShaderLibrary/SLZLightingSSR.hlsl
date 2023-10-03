@@ -257,7 +257,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         surfData.alpha *= horizOcclusion;
 	}
 	float4 finalColor = float4(output, surfData.alpha);
-    VolumetricsSurf(finalColor, fragData.position, surfaceType);
+    finalColor = VolumetricsSurf(finalColor, fragData.position, surfaceType);
 
     return finalColor;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;
 }

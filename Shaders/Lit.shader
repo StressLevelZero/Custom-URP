@@ -515,7 +515,10 @@ ENDHLSL
 
             #pragma target 5.0
             #pragma raytracing BakedRaytrace
-            #pragma multi_compile _EMISSION
+            //#pragma multi_compile _EMISSION
+            #define DYNAMIC_EMISSION
+            #define _EMISSION _EmissionMeta
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/LitTracingPass.hlsl"
 
             ENDHLSL

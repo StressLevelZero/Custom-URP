@@ -32,6 +32,7 @@
         
         //StructuredBuffer<LightObject> LightObjects;
         
+/*
         struct ParticipatingMediaSphere
         {
         	float3 CenterPosition;
@@ -42,7 +43,8 @@
         
         StructuredBuffer<ParticipatingMediaSphere> media_sphere_buffer;
 		int media_sphere_buffer_length;
-        
+        */
+
         //shared float4 _VolumePlaneSettings;
         shared float _GlobalExtinction;
         shared float _FogBaseHeight;
@@ -226,20 +228,23 @@
         
         //Real-time media
         
+/*
 		float RealtimeMediaSpheres(float3 worldspace){
 	        
 	        // uint2 count;
         	// media_sphere_buffer.GetDimensions(count.x,count.y);
 	        float accumulation = 0;	
+            
 	        for (uint i = 0; i < media_sphere_buffer_length; i++)
 	        {
         		//Get the distance, scale it to the range, and multiple the linear ramp with the Extinction
         		accumulation +=  saturate(((1 - ( distance(media_sphere_buffer[i].CenterPosition,worldspace) + 1
         			- media_sphere_buffer[i].LocalRange) )/ media_sphere_buffer[i].LocalRange)) * media_sphere_buffer[i].LocalExtinction;				
 	        }
+            
 			return accumulation;
 		}
-
+*/
 
 
 ///Main scattering pass. Integration is done separately so we can reproject this result for XR rather than do it twice.
@@ -432,7 +437,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	float HeightRemap = (WS_coordinate.y - _FogBaseHeight) / (_FogMaxHeight - _FogBaseHeight);
 	float heightDensity = lerp(_GlobalExtinction, .001,sqrt(saturate( HeightRemap)) ); 
 	//accumLighting.a += _GlobalExtinction;
-	accumLighting.a +=  RealtimeMediaSpheres(WS_coordinate.xyz); //Simple density spheres
+//	accumLighting.a +=  RealtimeMediaSpheres(WS_coordinate.xyz); //Simple density spheres
 	accumLighting.a += heightDensity;
 	//accumLighting.a += distance(WS_coordinate.xyz,0) > 3 ? 0:10 ;
 	

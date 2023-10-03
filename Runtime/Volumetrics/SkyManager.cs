@@ -16,6 +16,7 @@ public class SkyManager
 
     static void GenerateSkyTexture()
     {
+        Debug.Log("Generating Sky");
         //Generate Skybox
         RenderTexture cubetex = new RenderTexture(256, 256, 1, RenderTextureFormat.DefaultHDR);
         cubetex.enableRandomWrite = true;
@@ -49,7 +50,12 @@ public class SkyManager
     }
     static public void CheckSky()
     {
-        if (skytexture == null) GenerateSkyTexture();
+        Debug.Log("Running CheckSky");
+        if (skytexture == null)
+        {
+            Debug.Log("skytex set null");
+            GenerateSkyTexture();
+        }
 
         if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom)
         {
@@ -60,7 +66,8 @@ public class SkyManager
         {
             if (skytexture != null)
             {
-                SetSkyTexture(skytexture);
+                SetSkyTexture(CoreUtils.blackCubeTexture);
+                Debug.Log("skytex set non-null");
             }
             else SetSkyTexture(CoreUtils.blackCubeTexture);
         }
