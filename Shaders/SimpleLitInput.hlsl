@@ -29,7 +29,8 @@ CBUFFER_END
     #define _Surface            UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float  , _Surface)
 #endif
 
-TEXTURE2D(_SpecGlossMap);       SAMPLER(sampler_SpecGlossMap);
+TEXTURE2D(_SpecGlossMap);
+#define sampler_SpecGlossMap sampler_BaseMap
 
 half4 SampleSpecularSmoothness(float2 uv, half alpha, half4 specColor, TEXTURE2D_PARAM(specMap, sampler_specMap))
 {

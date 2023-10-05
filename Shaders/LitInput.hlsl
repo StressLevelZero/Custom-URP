@@ -18,7 +18,7 @@
 // NOTE: Do not ifdef the properties here as SRP batcher can not handle different layouts.
 CBUFFER_START(UnityPerMaterial)
 float4 _BaseMap_ST;
-float4 _DetailAlbedoMap_ST;
+float4 _DetailMap_ST;
 half4 _BaseColor;
 half4 _SpecColor;
 half4 _EmissionColor;
@@ -88,9 +88,13 @@ UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
 TEXTURE2D(_DetailMap);         SAMPLER(sampler_DetailMap);
 //TEXTURE2D(_DetailAlbedoMap);    SAMPLER(sampler_DetailAlbedoMap);
 //TEXTURE2D(_DetailNormalMap);    SAMPLER(sampler_DetailNormalMap);
-TEXTURE2D(_MetallicGlossMap);   SAMPLER(sampler_MetallicGlossMap);
-TEXTURE2D(_SpecGlossMap);       SAMPLER(sampler_SpecGlossMap);
-TEXTURE2D(_ClearCoatMap);       SAMPLER(sampler_ClearCoatMap);
+//Defining samplers here so they just reuse the base.
+TEXTURE2D(_MetallicGlossMap);
+#define sampler_MetallicGlossMap sampler_BaseMap
+TEXTURE2D(_SpecGlossMap);
+#define sampler_SpecGlossMap sampler_BaseMap
+TEXTURE2D(_ClearCoatMap);
+#define  sampler_ClearCoatMap sampler_BaseMap
 
 #ifdef _SPECULAR_SETUP
     #define SAMPLE_METALLICSPECULAR(uv) SAMPLE_TEXTURE2D(_SpecGlossMap, sampler_SpecGlossMap, uv)
@@ -286,7 +290,7 @@ inline void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData outSurfa
 
 #if defined(_DETAIL)
     half detailMask = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv).a;
-    float2 detailUv = uv * _DetailAlbedoMap_ST.xy + _DetailAlbedoMap_ST.zw;
+    float2 detailUv = uv * _DetailMap_ST.xy + _DetailMap_ST.zw;
     ApplyDetails(detailUv, outSurfaceData, detailMask);
     //outSurfaceData.albedo = ApplyDetailAlbedo(detailUv, outSurfaceData.albedo, detailMask);
     //outSurfaceData.normalTS = ApplyDetailNormal(detailUv, outSurfaceData.normalTS, detailMask);
