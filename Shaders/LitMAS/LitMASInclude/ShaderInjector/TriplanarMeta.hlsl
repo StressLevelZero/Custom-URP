@@ -56,6 +56,7 @@ half _UVScaler;
 // Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
 	float _SSRTemporalMul;
 // End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
+	int _Surface;
 CBUFFER_END
 
 struct appdata
@@ -121,10 +122,13 @@ half4 frag(v2f i) : SV_Target
 	half4 emission = half4(0, 0, 0, 0);
 
 // Begin Injection EMISSION from Injection_Emission_Meta.hlsl ----------------------------------------------------------
-	half4 emissionDefault = _EmissionColor * SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, i.uv);
-	emissionDefault.rgb *= _BakedMutiplier * _Emission;
-	emissionDefault.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emissionDefault.a);
-	emission += emissionDefault;
+	if (_Emission)
+	{
+		half4 emissionDefault = _EmissionColor * SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, i.uv);
+		emissionDefault.rgb *= _BakedMutiplier * _Emission;
+		emissionDefault.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emissionDefault.a);
+		emission += emissionDefault;
+	}
 // End Injection EMISSION from Injection_Emission_Meta.hlsl ----------------------------------------------------------
 
 	metaInput.Emission = emission.rgb;

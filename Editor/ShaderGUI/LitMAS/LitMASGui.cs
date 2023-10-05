@@ -14,6 +14,7 @@ using UnityEditor.SLZMaterialUI;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using static UnityEngine.Rendering.DebugUI.MessageBox;
+using UnityEditor.ShaderGraph;
 
 namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 {
@@ -22,6 +23,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
     {
         const string keyword_DETAILS_ON = "_DETAILS_ON";
         const string keyword_BRDF = "_BRDFMAP";
+        const string keyword_EXPENSIVE_TP = "_EXPENSIVE_TP";
 
         const string defaultMASGUID = "75f1fbacfa73385419ec8d7700a107ea";
         static string s_defaultMASPath;
@@ -55,6 +57,19 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             BRDFMAP,
             _HitRamp,
             _HitColor,
+
+            // Rendering properties
+            _Surface,
+            _BlendSrc,
+            _BlendDst,
+            _ZWrite,
+            _Cull,
+
+            // Triplanar properties
+            _Expensive,
+            _RotateUVs,
+            _DetailsuseLocalUVs,
+            _UVScaler,
         }
         static ReadOnlySpan<string> propertyNames => new string[] {
             "_BaseMap",
@@ -72,7 +87,20 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "g_tBRDFMap",
             "BRDFMAP",
             "_HitRamp",
-            "_HitColor"
+            "_HitColor",
+
+            // Rendering properties
+            "_Surface",
+            "_BlendSrc",
+            "_BlendDst",
+            "_ZWrite",
+            "_Cull",
+
+             // Triplanar properties
+            "_Expensive",
+            "_RotateUVs",
+            "_DetailsuseLocalUVs",
+            "_UVScaler",
         };
         class ShaderPropertyTable
         {
@@ -117,7 +145,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             //ShaderGUIUtils.SanitizeMaterials(this.targets, props, propIdx, shader);
 
             ShaderPropertyTable propTable = GetPropertyTable(props);
-            materialFields = new List<BaseMaterialField>(props.Length + propTable.texturePropertyCount); // Scale/offsets are separate fields, double the number of texture properties
+            materialFields = new List<BaseMaterialField>(props.Length + propTable.texturePropertyCount + 5); // Scale/offsets are separate fields, double the number of texture properties
             //int currentFieldIdx = 0;
 
             //----------------------------------------------------------------
@@ -126,12 +154,55 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             Foldout drawProps = new Foldout();
 
-           
-            //drawProps.value = false;
 
-            RenderQueueDropdown renderQueue = new RenderQueueDropdown(serializedObject, shader);
-            drawProps.contentContainer.Add(renderQueue);
+            {
+                //drawProps.value = false;
 
+                RenderQueueDropdown renderQueue = new RenderQueueDropdown(serializedObject, shader);
+
+                int surfaceIdx = PropertyIdx(ref propTable, PName._Surface);
+                int blendSrcIdx = PropertyIdx(ref propTable, PName._BlendSrc);
+                int blendDstIdx = PropertyIdx(ref propTable, PName._BlendDst);
+                int zWriteIdx = PropertyIdx(ref propTable, PName._ZWrite);
+                if (surfaceIdx != -1 && blendSrcIdx != -1 && blendDstIdx != -1 && zWriteIdx != -1)
+                {
+                    MaterialDummyField blendSrcField = new MaterialDummyField(props[blendSrcIdx], propIdx[blendSrcIdx]);
+                    MaterialDummyField blendDstField = new MaterialDummyField(props[blendDstIdx], propIdx[blendDstIdx]);
+                    MaterialDummyField zWriteField = new MaterialDummyField(props[zWriteIdx], propIdx[zWriteIdx]);
+                    materialFields.Add(blendSrcField);
+                    materialFields.Add(blendDstField);
+                    materialFields.Add(zWriteField);
+
+                    SurfaceTypeField surfaceTypeField = new SurfaceTypeField();
+                    surfaceTypeField.Initialize(
+                        props[surfaceIdx], 
+                        propIdx[surfaceIdx],
+                        blendSrcField,
+                        blendDstField,
+                        zWriteField,
+                        renderQueue
+                        );
+                    surfaceTypeField.tooltip = LitMASGui_Tooltips.Surface.ToString();
+                    materialFields.Add(surfaceTypeField);
+                    drawProps.contentContainer.Add(surfaceTypeField);
+                }
+
+                int cullIdx = PropertyIdx(ref propTable, PName._Cull);
+                if (cullIdx != -1)
+                {
+                    List<int> cullChoices = new List<int>() { (int)CullMode.Back, (int)CullMode.Front, (int)CullMode.Off};
+                    Dictionary<int, string> cullLabels = new Dictionary<int, string>() { { (int)CullMode.Back, "Front" }, { (int)CullMode.Front, "Back" }, { (int)CullMode.Off, "Both (EXPENSIVE)" } };
+
+                    MaterialIntPopup cullPopup = new MaterialIntPopup();
+                    cullPopup.label = "Rendered Side";
+                    cullPopup.Initialize(props[cullIdx], propIdx[cullIdx], cullChoices, cullLabels);
+                   
+                    materialFields.Add(cullPopup);
+                    drawProps.contentContainer.Add(cullPopup);
+                }
+
+                drawProps.contentContainer.Add(renderQueue);
+            }
             MainWindow.Add(drawProps);
 
             //----------------------------------------------------------------
@@ -235,14 +306,44 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 hasCoreProperty = true;
             }
 
+            // Triplanar options ---------------------------------------------
+
+            int fixSeamsIdx = PropertyIdx(ref propTable, PName._Expensive);
+            if (fixSeamsIdx != -1)
+            {
+                MaterialToggleField seamToggle = new MaterialToggleField();
+                seamToggle.Initialize(props[fixSeamsIdx], propIdx[fixSeamsIdx], keyword_EXPENSIVE_TP, false);
+                materialFields.Add(seamToggle);
+                baseProps.Add(seamToggle);
+            }
+
+            int rotateUVsIdx = PropertyIdx(ref propTable, PName._RotateUVs);
+            if (rotateUVsIdx != -1)
+            {
+                MaterialToggleField rotateUVsToggle = new MaterialToggleField();
+                rotateUVsToggle.Initialize(props[rotateUVsIdx], propIdx[rotateUVsIdx], null, false);
+                materialFields.Add(rotateUVsToggle);
+                baseProps.Add(rotateUVsToggle);
+            }
+            int triplanarScaleIdx = PropertyIdx(ref propTable, PName._UVScaler);
+            if (triplanarScaleIdx != -1)
+            {
+                MaterialFloatField triplanarScaleField = new MaterialFloatField();
+                triplanarScaleField.Initialize(props[triplanarScaleIdx], propIdx[triplanarScaleIdx]);
+                materialFields.Add(triplanarScaleField);
+                baseProps.Add(triplanarScaleField);
+            }
+
             // Base map tiling offset ----------------------------------------
 
-            if (baseMapIdx != -1)
+            if (baseMapIdx != -1 && (props[baseMapIdx].flags & MaterialProperty.PropFlags.NoScaleOffset) == 0)
             {
                 MaterialScaleOffsetField baseScaleOffsetField = new MaterialScaleOffsetField(props[baseMapIdx], propIdx[baseMapIdx]);
                 baseProps.Add(baseScaleOffsetField);
                 materialFields.Add(baseScaleOffsetField);
             }
+
+
 
             if (hasCoreProperty)
             {

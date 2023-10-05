@@ -49,6 +49,7 @@ half _UVScaler;
 // Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
 	float _SSRTemporalMul;
 // End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
+	int _Surface;
 CBUFFER_END
 	
 

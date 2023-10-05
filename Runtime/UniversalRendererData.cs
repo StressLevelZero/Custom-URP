@@ -139,6 +139,9 @@ namespace UnityEngine.Rendering.Universal
             [Reload("Shaders/Utils/ColorPyramid.compute")]
             public ComputeShader computeColorPyramid;
 
+            [Reload("Shaders/Utils/DummyShader.shader")]
+            public Shader DummyShader;
+
             // END SLZ MODIFIED
 
             /// <summary>

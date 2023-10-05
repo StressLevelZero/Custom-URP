@@ -58,7 +58,21 @@ namespace UnityEngine.Rendering.Universal
             Shader.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
 
             SkyManager.SetSkyMips(new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
-            if (SkyTexture.value != null && SkyTexture.overrideState) SkyManager.SetSkyTexture(SkyTexture.value);
+          
+            if (SkyTexture.overrideState)
+            {
+                // Disable the override if skytexture.value is null. For some reason, checking if a null texture is null causes a 0.15ms of Loading.IsObjectAvailable (when the actual rendering only takes 0.04ms!).
+                // This doesn't seem to happen if the texture is non-null
+                if (SkyTexture.value == null)
+                {
+                    SkyTexture = new CubemapParameter(null);
+                    SkyManager.CheckSky();
+                }
+                else
+                {
+                    SkyManager.SetSkyTexture(SkyTexture.value); // SkyTexture.value != null &&
+                }
+            }
             else SkyManager.CheckSky();
         }
 

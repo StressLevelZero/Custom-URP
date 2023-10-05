@@ -35,15 +35,17 @@
 		ssrExtra.noise = noiseRGBA;
 		ssrExtra.fogFactor = i.uv0XY_bitZ_fog.w;
 
-		color.rgb = max(0,SLZPBRFragmentSSR(fragData, surfData, ssrExtra));
+		color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
+		color.rgb = max(0, color.rgb);
 	#else
-		color.rgb = SLZPBRFragment(fragData, surfData);
+		color = SLZPBRFragment(fragData, surfData, _Surface);
 	#endif
 //#!INJECT_END
 
 //#!INJECT_BEGIN VOLUMETRIC_FOG 0
 	#if !defined(_SSR_ENABLED)
 		color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
-		color = Volumetrics(color, fragData.position);
+		
+		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif
 //#!INJECT_END

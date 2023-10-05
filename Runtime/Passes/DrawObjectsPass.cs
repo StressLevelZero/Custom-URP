@@ -53,6 +53,23 @@ namespace UnityEngine.Rendering.Universal.Internal
     /// </summary>
     public class DrawObjectsPass : ScriptableRenderPass
     {
+
+#if DEBUG_NO_SHADERS
+        static Material s_defaultMat;
+        static Material defaultMat
+        {
+            get
+            {
+                if (s_defaultMat == null)
+                {
+                    Shader s = Shader.Find("Hidden/DUMMY_SHADER");
+                    s_defaultMat = new Material(s);
+                }
+                return s_defaultMat;
+            }
+        }
+#endif
+
         FilteringSettings m_FilteringSettings;
         RenderStateBlock m_RenderStateBlock;
         List<ShaderTagId> m_ShaderTagIdList = new List<ShaderTagId>();
@@ -257,6 +274,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 // END SLZ MODIFIED
 
                 var activeDebugHandler = GetActiveDebugHandler(ref renderingData);
+#if !DEBUG_NO_SHADERS
                 if (activeDebugHandler != null)
                 {
                     activeDebugHandler.DrawWithDebugRenderState(context, cmd, ref renderingData, ref drawSettings, ref filterSettings, ref data.m_RenderStateBlock,
@@ -272,7 +290,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                     // Render objects that did not match any shader pass with error shader
                     RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, camera, filterSettings, SortingCriteria.None);
                 }
-
+#else
+                drawSettings.overrideMaterial = defaultMat;
+                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filterSettings);
+#endif
                 // Clean up
                 CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);
                 context.ExecuteCommandBuffer(cmd);

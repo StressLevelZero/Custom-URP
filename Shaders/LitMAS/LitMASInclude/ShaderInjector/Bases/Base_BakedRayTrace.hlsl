@@ -31,6 +31,7 @@ CBUFFER_START( UnityPerMaterial )
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 	//#!INJECT_POINT MATERIAL_CBUFFER
+	int _AlphaPreMult;
 CBUFFER_END
 
 

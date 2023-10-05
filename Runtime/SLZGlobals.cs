@@ -46,8 +46,8 @@ namespace UnityEngine.Rendering.Universal
         //public SLZPerCameraRTStorage PerCameraOpaque;
         //public SLZPerCameraRTStorage PerCameraPrevHiZ;
 
-        private uint PerCameraPrevHiZIter = 0;
-        private uint PerCameraOpaqueIter = 0;
+        //private uint PerCameraPrevHiZIter = 0;
+        //private uint PerCameraOpaqueIter = 0;
 
         private ComputeBuffer SSRGlobalCB;
 
@@ -252,6 +252,7 @@ namespace UnityEngine.Rendering.Universal
 
     public class SLZGlobalsSetPass : ScriptableRenderPass
     {
+        static RTHandle[] target = new RTHandle[0];
         private bool enableSSR;
         private bool requireHiZ;
         private bool requireMinMax;
@@ -272,6 +273,7 @@ namespace UnityEngine.Rendering.Universal
         {
             renderPassEvent = evt;
             passData = new SLZGlobalsData();
+            ConfigureTarget(target);
         }
         public void Setup(CameraData camData, CameraDataExtSet camDataExtSet)
         {
@@ -301,13 +303,11 @@ namespace UnityEngine.Rendering.Universal
             //ConfigureTarget(new RenderTargetIdentifier(BuiltinRenderTextureType.None), new RenderTargetIdentifier(BuiltinRenderTextureType.None));
             //Debug.Log("Setup for " + camData.camera.name);
         }
-
-
-        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
             CameraData camData = renderingData.cameraData;
             ref RenderTextureDescriptor targetDesc = ref camData.cameraTargetDescriptor;
-            passData.cmd = renderingData.commandBuffer;
+            passData.cmd = cmd;
             passData.cam = camData.camera;
             passData.enableSSR = camData.enableSSR;
             passData.requireHiZ = camData.requiresDepthPyramid;
@@ -331,7 +331,11 @@ namespace UnityEngine.Rendering.Universal
                 passData.opaqueMipLevels = SLZGlobals.CalculateOpaqueTexMipLevels(targetDesc.width / opaqueTexSizeFrac, targetDesc.height / opaqueTexSizeFrac);
             else
                 passData.opaqueMipLevels = 1;
-            ExecutePass(passData, ref passData.cmd);
+            ExecutePass(passData, ref cmd);
+        }
+        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        {
+           
         }
 
         internal static void ExecutePass(SLZGlobalsData data, ref CommandBuffer cmd)
@@ -352,7 +356,7 @@ namespace UnityEngine.Rendering.Universal
             using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.SetSLZGlobals)))
             {
 
-                if (enableSSR)
+                if (enableSSR && opaqueTex != null)
                 {
                     cmd.SetGlobalTexture(opaqueID, opaqueTex);
                     //cmd.SetGlobalTexture(hiZID, hiZTex); // EXPERIMENT: use quad averaging instead of temporal averaging and avoid extra RT + blit + jank previous frame SSR estimation

@@ -63,7 +63,14 @@ namespace UnityEngine.Rendering.Universal
         /// Use this for URP SpeedTree 8 shader.
         /// </summary>
         SpeedTree8,
+
+        /// <summary>
+        /// SLZ LitMAS
+        /// </summary>
+        LitMAS
+
         // If you add a value here, also add it to ShaderID in Editor/ShaderUtils.cs
+
     }
 
     /// <summary>
@@ -84,6 +91,7 @@ namespace UnityEngine.Rendering.Universal
             "Universal Render Pipeline/Nature/SpeedTree7",
             "Universal Render Pipeline/Nature/SpeedTree7 Billboard",
             "Universal Render Pipeline/Nature/SpeedTree8_PBRLit",
+            "SLZ/LitMAS/LitMAS Standard"
         };
 
         /// <summary>
@@ -137,6 +145,7 @@ namespace UnityEngine.Rendering.Universal
             "0f4122b9a743b744abe2fb6a0a88868b",
             "5ec81c81908db34429b4f6ddecadd3bd",
             "9920c1f1781549a46ba081a2a15a16ec",
+            "e2bc12b142787a84e95ff4f3ca0bac39", // LitMAS
         };
 
         /// <summary>

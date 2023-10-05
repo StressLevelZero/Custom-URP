@@ -46,6 +46,7 @@ half  _Normals;
 	half  _PenMono;
 	half4  _PenMonoColor;
 // End Injection MATERIAL_CBUFFER from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
+	int _Surface;
 CBUFFER_END
 
 struct appdata

@@ -43,6 +43,10 @@ namespace SLZ.SLZEditorTools
             "Overlay Brighten/Darken (R), Normal X (G), Geometric Roughness (B), Normal Y (A).\nRed channel brightens or darkens the material, with 0.5 being neutral. " +
             "The rest of the channels are exactly like the normal map, and are blended with the normal map to allow having two different scales of normal details";
 
-
+        public static ReadOnlySpan<char> Surface =>
+            "How the material is blended with the background. Opaque does what you'd expect and does not blend with what's behind it. Transparent is physically transparent, ie " +
+            "only the diffuse lighting component is alpha blended with the background. Specular reflections off the surface are unaffected by alpha and are added " +
+            "to the background. Thus you can still see reflections off a 0 alpha transparent object. Addtionally, as the metallic goes to 1, the material becomes opaque. Fade is " +
+            "simple alpha blending; as the alpha goes to 0 the material fully disappears";
     }
 }
