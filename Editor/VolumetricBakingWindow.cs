@@ -14,7 +14,6 @@ using Unity.Collections;
 using SLZ.SLZEditorTools;
 using UnityEngine.Rendering;
 using static UnityEditor.Experimental.GraphView.GraphView;
-using Codice.Client.BaseCommands;
 
 public class VolumetricBaking : EditorWindow
 {
