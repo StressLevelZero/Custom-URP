@@ -9,6 +9,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.XR;
+using Unity.Profiling;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -52,6 +53,9 @@ public class VolumetricRendering : MonoBehaviour
 {
 
     #region variables
+    static ProfilingSampler profileUpdateFunc = new ProfilingSampler("VolumetricRendering.UpdateFunc");
+    static ProfilingSampler profileUpdateClipmap = new ProfilingSampler("VolumetricRendering.UpdateClipmap");
+
     public float tempOffset = 0;
     Texture3D BlackTex; //Temp texture for 
     Color clearColor = new Color(0.0f, 0.0f, 0.0f, 0f);
@@ -117,12 +121,28 @@ public class VolumetricRendering : MonoBehaviour
 
     Vector3 ClipmapTransform; //Have this follow the camera and resample when the camera moves enough 
     Vector3 ClipmapCurrentPos; //chached location of previous sample point
+    
+    private ComputeBuffer participatingMediaSphereBuffer;
+    
+    [StructLayout(LayoutKind.Sequential)]
+    struct MediaSphere
+    {
+        public Vector3 CenterPosition;
+        public float LocalExtinction;
+        public float LocalFalloff;
+        public float LocalRange;
+    }
 
+    private const int MediaSphereStride = (3 + 1 + 1 + 1) * sizeof(float);
+    int MediaCount;
+
+    
     //public Matrix4x4 randomatrix;
 
     //Required shaders
     [SerializeField, HideInInspector] ComputeShader FroxelFogCompute;
     [SerializeField, HideInInspector] ComputeShader FroxelIntegrationCompute;
+    [SerializeField, HideInInspector] ComputeShader FroxelLocalFogCompute;
     [SerializeField, HideInInspector] ComputeShader ClipmapCompute;
     [SerializeField, HideInInspector] ComputeShader BlurCompute;
 
@@ -205,23 +225,22 @@ public class VolumetricRendering : MonoBehaviour
     // float CamFieldOfView = XRSettings.vi
 
 
+    //Unity implemented their own cookie method, so we'll just tie into that system instead. This is no longer needed. 
     /// Dynamic Light Projection///      
-    [SerializeField, HideInInspector] List<Light> Lights; // TODO: Make this a smart dynamic list not living here
-    public struct LightObject
-    {
-        public Matrix4x4 LightProjectionMatrix;
-        public Vector3 LightPosition;
-        public Vector4 LightColor;
-        public int LightCookie; //TODO: Add general light cookie system to render engine
-    }
+    // [SerializeField, HideInInspector] List<Light> Lights; // TODO: Make this a smart dynamic list not living here
+    // public struct LightObject
+    // {
+    //     public Matrix4x4 LightProjectionMatrix;
+    //     public Vector3 LightPosition;
+    //     public Vector4 LightColor;
+    //     public int LightCookie; //TODO: Add general light cookie system to render engine
+    // }
 
     //Figure out how much data is in the struct above
-    int LightObjectStride = sizeof(float) * 4 * 4 + sizeof(float) * 3 + sizeof(float) * 4 + sizeof(int);
-
-    Texture2DArray LightProjectionTextures; // TODO: Make this a smart dynamic list pulling from light cookies
-
-    private static List<LightObject> LightObjects;
-    ComputeBuffer LightBuffer;
+    // int LightObjectStride = sizeof(float) * 4 * 4 + sizeof(float) * 3 + sizeof(float) * 4 + sizeof(int);
+    // Texture2DArray LightProjectionTextures; // TODO: Make this a smart dynamic list pulling from light cookies
+    // private static List<LightObject> LightObjects;
+    // ComputeBuffer LightBuffer;
 
     /// END Dynamic Light Projection/// 
     /// 
@@ -278,6 +297,9 @@ public class VolumetricRendering : MonoBehaviour
     int ID_VolumeWorldSize = Shader.PropertyToID("VolumeWorldSize");
     int ID_VolumeWorldPosition = Shader.PropertyToID("VolumeWorldPosition");
 
+    private int ID_media_sphere_buffer_length = Shader.PropertyToID("media_sphere_buffer_length");
+    private int ID_media_sphere_buffer = Shader.PropertyToID("media_sphere_buffer");
+
     int ID_ClipMapGenKern;
     int ID_ClipMapClearKern;
     int ID_ClipMapHeightKern;
@@ -299,7 +321,7 @@ public class VolumetricRendering : MonoBehaviour
     int ClipmapScaleID = Shader.PropertyToID("_ClipmapScale");
     int ClipmapTransformID = Shader.PropertyToID("_ClipmapPosition");
 
-    int LightObjectsID = Shader.PropertyToID("LightObjects");
+    // int LightObjectsID = Shader.PropertyToID("LightObjects");
 
     //Temp Jitter stuff
     int tempjitter = 0; //TEMP jitter switcher thing 
@@ -421,16 +443,16 @@ public class VolumetricRendering : MonoBehaviour
 //#endif
     }
 
-    bool createdLightProjectionTexture = false;
-    void CheckCookieList()
-    {
-        if (LightProjectionTextures != null) return;
-        LightProjectionTextures = new Texture2DArray(1, 1, 1, TextureFormat.RGBA32, false);
-        LightProjectionTextures.hideFlags = HideFlags.DontSave;
-        LightProjectionTextures.name = activeCam.name + " Volumetric Light Cookies";
-        createdLightProjectionTexture = true;
-        //Debug.Log("Made blank cookie sheet");
-    }
+    // bool createdLightProjectionTexture = false;
+    // void CheckCookieList()
+    // {
+    //     if (LightProjectionTextures != null) return;
+    //     LightProjectionTextures = new Texture2DArray(1, 1, 1, TextureFormat.RGBA32, false);
+    //     LightProjectionTextures.hideFlags = HideFlags.DontSave;
+    //     LightProjectionTextures.name = activeCam.name + " Volumetric Light Cookies";
+    //     createdLightProjectionTexture = true;
+    //     //Debug.Log("Made blank cookie sheet");
+    // }
 
     //void dedbugRTC()
     //{
@@ -530,6 +552,9 @@ public class VolumetricRendering : MonoBehaviour
         ShaderConstantBuffer = new ComputeBuffer(1, ShaderConstantsSize, ComputeBufferType.Constant);
         ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
         StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+        int mediaCount = VolumetricRegisters.VolumetricMediaEntities.Count;
+        MediaCount = Math.Max(mediaCount, 1);
+        participatingMediaSphereBuffer = new ComputeBuffer(MediaCount, MediaSphereStride, ComputeBufferType.Structured);
 
 
         //activeCameraState = activeCam.isActiveAndEnabled;
@@ -587,7 +612,7 @@ public class VolumetricRendering : MonoBehaviour
 
         if (FroxelBlur == BlurType.Gaussian) IntializeBlur(rtdiscrpt);
 
-        LightObjects = new List<LightObject>();
+        // LightObjects = new List<LightObject>();
 
         ScatteringKernel = FroxelFogCompute.FindKernel("Scatter");
 
@@ -682,8 +707,8 @@ public class VolumetricRendering : MonoBehaviour
             //FroxelFogCompute.SetFloat(ID_GlobalExtinction, Extinction);
             //FroxelFogCompute.SetFloat(ID_StaticLightMultiplier, StaticLightMultiplier);
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_Result, FroxelBufferA);
-            CheckCookieList();
-            FroxelFogCompute.SetTexture(ScatteringKernel, ID_LightProjectionTextureArray, LightProjectionTextures);
+            // CheckCookieList();
+            // FroxelFogCompute.SetTexture(ScatteringKernel, ID_LightProjectionTextureArray, LightProjectionTextures);
             FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
             lastFroxelFog = this;
         }
@@ -749,30 +774,32 @@ public class VolumetricRendering : MonoBehaviour
         Clear3DTexture(IntegrationBuffer);
     }
 
-    void UpdateLights()
-    {
-        LightObjects.Clear(); //clear and rebuild for now. TODO: Make a smarter constructor
-        if (LightBuffer != null) LightBuffer.Release();
-
-        for (int i = 0; i < Lights.Count; i++)
-        {
-            LightObject lightObject = new LightObject();
-            lightObject.LightPosition = Lights[i].transform.position;
-            lightObject.LightColor = new Color(
-                Lights[i].color.r * Lights[i].intensity,
-                Lights[i].color.g * Lights[i].intensity,
-                Lights[i].color.b * Lights[i].intensity,
-                Lights[i].color.a);
-            lightObject.LightProjectionMatrix = matScaleBias
-                * Matrix4x4.Perspective(Lights[i].spotAngle, 1, 0.1f, Lights[i].range)
-                * Matrix4x4.Rotate(Lights[i].transform.rotation).inverse;
-
-            LightObjects.Add(lightObject);
-        }
-        LightBuffer = new ComputeBuffer(LightObjects.Count, LightObjectStride);
-        LightBuffer.SetData(LightObjects);
-        FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); 
-    }
+    // void UpdateLights()
+    // {
+    //     LightObjects.Clear(); //clear and rebuild for now. TODO: Make a smarter constructor
+    //     if (LightBuffer != null) LightBuffer.Release();
+    //
+    //     for (int i = 0; i < Lights.Count; i++)
+    //     {
+    //         LightObject lightObject = new LightObject();
+    //         lightObject.LightPosition = Lights[i].transform.position;
+    //         lightObject.LightColor = new Color(
+    //             Lights[i].color.r * Lights[i].intensity,
+    //             Lights[i].color.g * Lights[i].intensity,
+    //             Lights[i].color.b * Lights[i].intensity,
+    //             Lights[i].color.a);
+    //         lightObject.LightProjectionMatrix = matScaleBias
+    //             * Matrix4x4.Perspective(Lights[i].spotAngle, 1, 0.1f, Lights[i].range)
+    //             * Matrix4x4.Rotate(Lights[i].transform.rotation).inverse;
+    //
+    //         LightObjects.Add(lightObject);
+    //     }
+    //     LightBuffer = new ComputeBuffer(LightObjects.Count, LightObjectStride);
+    //     LightBuffer.SetData(LightObjects);
+    //     FroxelFogCompute.SetBuffer(ScatteringKernel, LightObjectsID, LightBuffer); 
+    // }
+    
+    
 #region Clipmap funtions
     void SetupClipmap()
     {
@@ -1018,6 +1045,7 @@ public class VolumetricRendering : MonoBehaviour
     Matrix4x4 PrevViewProjMatrix = Matrix4x4.identity;
 
 
+
     public void SetVariables()
     {
         //Global multiplier for static lights
@@ -1059,164 +1087,215 @@ public class VolumetricRendering : MonoBehaviour
     {
         if (activeCam == cam1) UpdateFunc();
     }
+
     void UpdateFunc()
     {
-        if (!hasInitialized)
+        using (new ProfilingScope(null, profileUpdateFunc))
         {
-            return;
-        }
-        if (activeCam == null)
-        {
-            Debug.LogWarning("Volumetric Rendering: Active camera destroyed or de-assigned, disabling");
-            this.enabled = false;
-            return;
-        }
+            if (!hasInitialized)
+            {
+                //Debug.LogWarning("Volumetric Rendering: Volumetrics trying to render without initializing");
+                return;
+            }
+            if (activeCam == null)
+            {
+                Debug.LogError("Volumetric Rendering: Active camera destroyed or de-assigned, disabling");
+                this.enabled = false;
+                return;
+            }
 #if UNITY_EDITOR
-        if ((Application.isPlaying && !activeCam.isActiveAndEnabled && !enableEditorPreview))
+            if ((Application.isPlaying && !activeCam.isActiveAndEnabled && !enableEditorPreview))
 #else
         if (!activeCam.isActiveAndEnabled)
 #endif
-        {
-            return;
+            {
+                return;
+            }
+
+
+
+
+            CheckOverrideVolumes();
+            //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
+            //bleh
+            CamAspectRatio = GetAspectRatio();
+
+            Matrix4x4 projectionMatrix = Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(activeCam.transform.rotation).inverse;
+            projectionMatrix = matScaleBias * projectionMatrix;
+
+            //Previous frame's matrix//!!!!!!!!!
+            FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix);///
+            //   FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix );///
+            //            var controller = hdCamera.volumeStack.GetComponent<Fog>(); //TODO: Link with controller
+            //     UpdateLights();
+
+            CheckClipmap(); // UpdateClipmap();
+
+            SetFroxelFogUniforms();
+            SetFroxelIntegrationUniforms();
+            SetBlurUniforms();
+
+            FlopIntegralBuffers();
+            //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
+            VBufferParameters vbuff = new VBufferParameters(
+                                            new Vector3Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelWidthResolution, volumetricData.FroxelDepthResolution),
+                                            volumetricData.far,
+                                            activeCam.nearClipPlane,
+                                            activeCam.farClipPlane,
+                                            activeCam.fieldOfView,
+                                            SliceDistributionUniformity);
+
+            //     Vector2Int sharedBufferSize = new Vector2Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution); //Taking scaler functuion from HDRP for reprojection
+            //     Shader.SetGlobalVector("_VBufferSharedUvScaleAndLimit", vbuff.ComputeUvScaleAndLimit(sharedBufferSize) ); //Just assuming same scale
+
+            Vector4 vres = new Vector4(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution, 1.0f / volumetricData.FroxelWidthResolution, 1.0f / volumetricData.FroxelHeightResolution);
+            //Vector4  vres = new Vector4(cam.pixelWidth, cam.pixelHeight, 1.0f / cam.pixelWidth, cam.pixelHeight);
+
+            Matrix4x4 PixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(activeCam, vres);
+
+            GetHexagonalClosePackedSpheres7(m_xySeq);
+            int sampleIndex = Time.renderedFrameCount % 7;
+            Vector3 seqOffset = new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex]);
+
+            Span<ShaderConstants> shaderConsts = stackalloc ShaderConstants[1];
+            shaderConsts[0].TransposedCameraProjectionMatrix = projectionMatrix.transpose;
+            shaderConsts[0].CameraProjectionMatrix = projectionMatrix;
+            shaderConsts[0]._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
+            shaderConsts[0]._VolumetricResultDim = new Vector3(FroxelBlur != BlurType.Gaussian ? volumetricData.FroxelWidthResolution * 2 : volumetricData.FroxelWidthResolution,
+                volumetricData.FroxelHeightResolution, volumetricData.FroxelDepthResolution);
+            shaderConsts[0]._VolCameraPos = activeCam.transform.position;
+            if (ShaderConstantBuffer == null)
+            {
+                ShaderConstantBuffer = new ComputeBuffer(ShaderConstantsCount, sizeof(float), ComputeBufferType.Constant);
+                //Shader.SetGlobalConstantBuffer(ID_VolumetricsCB, ShaderConstantBuffer, 0, ShaderConstantsSize);
+                //Debug.Log("Created New Compute Buffer");
+            }
+            ShaderConstantBuffer.SetData<ShaderConstants>(shaderConsts);
+
+
+            Span<StepAddPerFrameConstants> stepAddConst = stackalloc StepAddPerFrameConstants[1];
+            stepAddConst[0] = new StepAddPerFrameConstants();
+            stepAddConst[0]._VBufferDistanceDecodingParams = vbuff.depthDecodingParams;
+            stepAddConst[0].SeqOffset = seqOffset;
+            if (StepAddPerFrameConstantBuffer == null)
+            {
+                StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+                //Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
+                //Debug.Log("Created New Compute Buffer");
+            }
+            StepAddPerFrameConstantBuffer.SetData<StepAddPerFrameConstants>(stepAddConst);
+
+            Span<ScatteringPerFrameConstants> VolScatteringCB = stackalloc ScatteringPerFrameConstants[1];
+            VolScatteringCB[0] = new ScatteringPerFrameConstants()
+            {
+                _VBufferCoordToViewDirWS = PixelCoordToViewDirWS,
+                _PrevViewProjMatrix = PrevViewProjMatrix,
+                _ViewMatrix = activeCam.worldToCameraMatrix,
+                TransposedCameraProjectionMatrix = projectionMatrix.transpose,
+                CameraProjectionMatrix = projectionMatrix,
+                _VBufferDistanceEncodingParams = vbuff.depthEncodingParams,
+                _VBufferDistanceDecodingParams = vbuff.depthDecodingParams,
+                SeqOffset = seqOffset,
+                CameraPosition = activeCam.transform.position,
+                CameraMotionVector = activeCam.transform.position - PreviousCameraPosition
+            };
+            //float[] VolScatteringCBArray = VolStructToArray(VolScatteringCB, PerFrameConstantsCount, PerFrameConstantsSize);
+            //Debug.Log(VolScatteringCB._VBufferCoordToViewDirWS);
+            //Debug.Log(VolScatteringCBArray[4] + " " + VolScatteringCBArray[5] + " " + VolScatteringCBArray[6] + " " + VolScatteringCBArray[7]);
+            if (ComputePerFrameConstantBuffer == null)
+            {
+                ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
+                //Debug.Log("Created New Compute Buffer");
+            }
+            ComputePerFrameConstantBuffer.SetData<ScatteringPerFrameConstants>(VolScatteringCB);
+            FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, ComputePerFrameConstantBuffer, 0, ScatterPerFrameCount * sizeof(float));
+
+            /*
+            int mediaCount = VolumetricRegisters.VolumetricMediaEntities.Count;
+            int maxCount = Math.Max(mediaCount, 1);
+
+            if (object.ReferenceEquals(participatingMediaSphereBuffer, null) || participatingMediaSphereBuffer == null)
+            {
+                participatingMediaSphereBuffer = new ComputeBuffer(maxCount, MediaSphereStride, ComputeBufferType.Structured);
+                //Debug.Log("Created New Compute Buffer");
+            }
+            else if (maxCount > MediaCount)
+            {
+                participatingMediaSphereBuffer.Release();
+                participatingMediaSphereBuffer = new ComputeBuffer(maxCount, MediaSphereStride, ComputeBufferType.Structured);
+                MediaCount = maxCount;
+            }
+
+            
+            MediaSphere[] mediadata = new MediaSphere[maxCount];
+
+            if (mediaCount < 1)
+            {
+                //mediadata[0].CenterPosition = Vector3.zero;
+                //mediadata[0].LocalExtinction = 0;
+                //mediadata[0].LocalRange = 0; 
+                //mediadata[0].LocalFalloff = 0;
+            }
+            else
+            {
+                for (int i = 0; i < mediadata.Length; i++)
+                {
+                    //TODO: generalize the strut between the classes so we don't have to recast it here 
+                    mediadata[i].CenterPosition = VolumetricRegisters.VolumetricMediaEntities[i].gameObject.transform.position;
+                    mediadata[i].LocalExtinction = VolumetricRegisters.VolumetricMediaEntities[i].LocalExtinction();
+                    mediadata[i].LocalRange = VolumetricRegisters.VolumetricMediaEntities[i].Scale.magnitude; // temp mag
+                    mediadata[i].LocalFalloff = VolumetricRegisters.VolumetricMediaEntities[i].falloffDistance;
+                }
+            }
+
+            if (participatingMediaSphereBuffer != null)
+            {
+                participatingMediaSphereBuffer.SetData(mediadata);
+                FroxelFogCompute.SetBuffer(ScatteringKernel, ID_media_sphere_buffer, participatingMediaSphereBuffer);
+                FroxelFogCompute.SetFloat(ID_media_sphere_buffer_length, mediaCount);
+            }
+            
+
+            /*
+            if (VolumetricConstantBuffer != null && projectionMatrix != null && activeCam != null && vbuff.depthEncodingParams != null)
+            {
+                VolumetricConstants vConst = new VolumetricConstants();
+                vConst.CameraProjectionMatrix = projectionMatrix.transpose;
+                vConst.TransposedCameraProjectionMatrix = projectionMatrix;
+                vConst._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
+                vConst._VolCameraPos = activeCam.transform.position;
+                float[] vConstArray = VolStructToArray(vConst);
+                VolumetricConstantBuffer.SetData(vConstArray);
+                Shader.SetGlobalConstantBuffer("VolumetricCB", VolumetricConstantBuffer, 0, VolCBCount * sizeof(float));
+            }
+            */
+            PreviousFrameMatrix = projectionMatrix;
+            PreviousCameraPosition = activeCam.transform.position;
+            ////MATRIX
+            ///
+            ///camera.projectionMatrix is ALSO broken and returns the final viewport's projection rather than the center XR projection.
+            ///cam.GetStereoProjectionMatrix returns the skewed XR projection matrix per eye. Just doing our own calulation
+            var gpuProj = GL.GetGPUProjectionMatrix(Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, 100000f), true);
+            PrevViewProjMatrix = gpuProj * activeCam.worldToCameraMatrix;
+            //Debug.Log("Dispatching 3");
+            FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+            //    FroxelStackingCompute.DispatchIndirect
+            //CONVERT TO DISPATCH INDIRECT to avoid CPU callback?
+            //Debug.Log("Dispatching 4");
+            FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
+
+            if (FroxelBlur == BlurType.Gaussian)
+            {
+                BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+                BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+            }
+            /* Give the shader constant buffer and volumetric render texture to the
+             * additional camera data so that on render the camera can set them as
+             * globals
+             */
+            SetCameraData();
         }
-
-
-
-
-        CheckOverrideVolumes();
-        //camera.aspect no longer returns the correct value & this workaround only works when XR is fully intialized otherwise it returns 0 and divs by 0; >W<
-        //bleh
-        CamAspectRatio = GetAspectRatio();
-
-        Matrix4x4 projectionMatrix = Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, volumetricData.far) * Matrix4x4.Rotate(activeCam.transform.rotation).inverse;     
-        projectionMatrix = matScaleBias * projectionMatrix ;
-
-        //Previous frame's matrix//!!!!!!!!!
-        FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix);///
-        //   FroxelFogCompute.SetMatrix(PreviousFrameMatrixID, PreviousFrameMatrix );///
-        //            var controller = hdCamera.volumeStack.GetComponent<Fog>(); //TODO: Link with controller
-        //     UpdateLights();
-
-        CheckClipmap(); // UpdateClipmap();
-
-        SetFroxelFogUniforms();
-        SetFroxelIntegrationUniforms();
-        SetBlurUniforms();
-
-        FlopIntegralBuffers();
-        //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
-        VBufferParameters vbuff =  new VBufferParameters(
-                                        new Vector3Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelWidthResolution, volumetricData.FroxelDepthResolution), 
-                                        volumetricData.far,
-                                        activeCam.nearClipPlane,
-                                        activeCam.farClipPlane,
-                                        activeCam.fieldOfView,
-                                        SliceDistributionUniformity);
-
-   //     Vector2Int sharedBufferSize = new Vector2Int(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution); //Taking scaler functuion from HDRP for reprojection
-   //     Shader.SetGlobalVector("_VBufferSharedUvScaleAndLimit", vbuff.ComputeUvScaleAndLimit(sharedBufferSize) ); //Just assuming same scale
-
-        Vector4  vres = new Vector4(volumetricData.FroxelWidthResolution, volumetricData.FroxelHeightResolution, 1.0f / volumetricData.FroxelWidthResolution, 1.0f / volumetricData.FroxelHeightResolution);
-        //Vector4  vres = new Vector4(cam.pixelWidth, cam.pixelHeight, 1.0f / cam.pixelWidth, cam.pixelHeight);
-
-        Matrix4x4 PixelCoordToViewDirWS = ComputePixelCoordToWorldSpaceViewDirectionMatrix(activeCam, vres);
-
-        GetHexagonalClosePackedSpheres7(m_xySeq);
-        int sampleIndex = Time.renderedFrameCount % 7;
-        Vector3 seqOffset = new Vector3(m_xySeq[sampleIndex].x, m_xySeq[sampleIndex].y, m_zSeq[sampleIndex]);
-
-        Span<ShaderConstants> shaderConsts = stackalloc ShaderConstants[1];
-        shaderConsts[0].TransposedCameraProjectionMatrix = projectionMatrix.transpose;
-        shaderConsts[0].CameraProjectionMatrix = projectionMatrix;
-        shaderConsts[0]._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
-        shaderConsts[0]._VolumetricResultDim = new Vector3(FroxelBlur != BlurType.Gaussian ? volumetricData.FroxelWidthResolution * 2 : volumetricData.FroxelWidthResolution, 
-            volumetricData.FroxelHeightResolution, volumetricData.FroxelDepthResolution);
-        shaderConsts[0]._VolCameraPos = activeCam.transform.position;
-        if (ShaderConstantBuffer == null)
-        {
-            ShaderConstantBuffer = new ComputeBuffer(ShaderConstantsCount, sizeof(float), ComputeBufferType.Constant);
-            //Shader.SetGlobalConstantBuffer(ID_VolumetricsCB, ShaderConstantBuffer, 0, ShaderConstantsSize);
-            //Debug.Log("Created New Compute Buffer");
-        }
-        ShaderConstantBuffer.SetData<ShaderConstants>(shaderConsts);
-        
-
-        Span<StepAddPerFrameConstants> stepAddConst = stackalloc StepAddPerFrameConstants[1];
-        stepAddConst[0] = new StepAddPerFrameConstants();
-        stepAddConst[0]._VBufferDistanceDecodingParams = vbuff.depthDecodingParams;
-        stepAddConst[0].SeqOffset = seqOffset;
-        if (StepAddPerFrameConstantBuffer == null)
-        {
-            StepAddPerFrameConstantBuffer = new ComputeBuffer(1, StepAddPerFrameCount * sizeof(float), ComputeBufferType.Constant);
-            //Shader.SetGlobalConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
-            //Debug.Log("Created New Compute Buffer");
-        }
-        StepAddPerFrameConstantBuffer.SetData<StepAddPerFrameConstants>(stepAddConst);
-       
-        Span<ScatteringPerFrameConstants> VolScatteringCB = stackalloc ScatteringPerFrameConstants[1];
-        VolScatteringCB[0] = new ScatteringPerFrameConstants();
-        VolScatteringCB[0]._VBufferCoordToViewDirWS = PixelCoordToViewDirWS;
-        VolScatteringCB[0]._PrevViewProjMatrix = PrevViewProjMatrix;
-        VolScatteringCB[0]._ViewMatrix = activeCam.worldToCameraMatrix;
-        VolScatteringCB[0].TransposedCameraProjectionMatrix = projectionMatrix.transpose;
-        VolScatteringCB[0].CameraProjectionMatrix = projectionMatrix;
-        VolScatteringCB[0]._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
-        VolScatteringCB[0]._VBufferDistanceDecodingParams = vbuff.depthDecodingParams;
-        VolScatteringCB[0].SeqOffset = seqOffset;
-        VolScatteringCB[0].CameraPosition = activeCam.transform.position;
-        VolScatteringCB[0].CameraMotionVector = activeCam.transform.position - PreviousCameraPosition;
-        //float[] VolScatteringCBArray = VolStructToArray(VolScatteringCB, PerFrameConstantsCount, PerFrameConstantsSize);
-        //Debug.Log(VolScatteringCB._VBufferCoordToViewDirWS);
-        //Debug.Log(VolScatteringCBArray[4] + " " + VolScatteringCBArray[5] + " " + VolScatteringCBArray[6] + " " + VolScatteringCBArray[7]);
-        if (ComputePerFrameConstantBuffer == null)
-        {
-            ComputePerFrameConstantBuffer = new ComputeBuffer(1, ScatterPerFrameCount * sizeof(float), ComputeBufferType.Constant);
-            Debug.Log("Created New Compute Buffer");
-        }
-        ComputePerFrameConstantBuffer.SetData<ScatteringPerFrameConstants>(VolScatteringCB);
-        FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, ComputePerFrameConstantBuffer, 0, ScatterPerFrameCount * sizeof(float));
-
-
-        /*
-        if (VolumetricConstantBuffer != null && projectionMatrix != null && activeCam != null && vbuff.depthEncodingParams != null)
-        {
-            VolumetricConstants vConst = new VolumetricConstants();
-            vConst.CameraProjectionMatrix = projectionMatrix.transpose;
-            vConst.TransposedCameraProjectionMatrix = projectionMatrix;
-            vConst._VBufferDistanceEncodingParams = vbuff.depthEncodingParams;
-            vConst._VolCameraPos = activeCam.transform.position;
-            float[] vConstArray = VolStructToArray(vConst);
-            VolumetricConstantBuffer.SetData(vConstArray);
-            Shader.SetGlobalConstantBuffer("VolumetricCB", VolumetricConstantBuffer, 0, VolCBCount * sizeof(float));
-        }
-        */
-        PreviousFrameMatrix = projectionMatrix;
-        PreviousCameraPosition = activeCam.transform.position;
-        ////MATRIX
-        ///
-        ///camera.projectionMatrix is ALSO broken and returns the final viewport's projection rather than the center XR projection.
-        ///cam.GetStereoProjectionMatrix returns the skewed XR projection matrix per eye. Just doing our own calulation
-        var gpuProj = GL.GetGPUProjectionMatrix( Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, 100000f) , true);
-        PrevViewProjMatrix = gpuProj * activeCam.worldToCameraMatrix;
-        //Debug.Log("Dispatching 3");
-        FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
-    //    FroxelStackingCompute.DispatchIndirect
-        //CONVERT TO DISPATCH INDIRECT to avoid CPU callback?
-        //Debug.Log("Dispatching 4");
-        FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
-
-        if (FroxelBlur == BlurType.Gaussian)
-        {
-            BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
-            BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
-        }
-        /* Give the shader constant buffer and volumetric render texture to the
-         * additional camera data so that on render the camera can set them as
-         * globals
-         */
-        SetCameraData();
     }
-
 
 
     //Coping the parms from HDRP to get the log encoded depth.
@@ -1418,7 +1497,7 @@ public class VolumetricRendering : MonoBehaviour
         BlurBuffer.Clear();
         BlurBufferB.Clear();
         
-        if (createdLightProjectionTexture && LightProjectionTextures != null) { CoreUtils.Destroy(LightProjectionTextures); }
+       // if (createdLightProjectionTexture && LightProjectionTextures != null) { CoreUtils.Destroy(LightProjectionTextures); }
     }
 
 
@@ -1445,6 +1524,53 @@ public class VolumetricRendering : MonoBehaviour
     {
 
 
+    }
+    
+    void SetComputeBuffer(string name, ComputeShader shader, int kernel, ComputeBuffer buffer)
+    {
+        //   Debug.Log("Setting buffer");
+        if (buffer != null)
+        {
+            shader.SetBuffer(kernel, name, buffer);
+
+            //     Debug.Log(name + " set");
+        }
+    }
+    
+    private static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, List<T> data, int stride)
+        where T : struct
+    {
+        //Debug.Log("Making computebuffer ");
+        //buffer = new ComputeBuffer(data.Count, stride);
+
+        // Do we already have a compute buffer?
+        if (buffer != null && data != null && stride != null)
+        {
+            // If no data or buffer doesn't match the given criteria, release it
+            if (data.Count == 0 || buffer.count != data.Count || buffer.stride != stride)
+            {
+                //    Debug.Log("Buffer count = " + buffer.count);
+
+                buffer.Release();
+                buffer = null;
+            }
+        }
+
+        if (data.Count != 0)
+        {
+            // If the buffer has been released or wasn't there to
+            // begin with, create it
+            if (buffer == null)
+            {
+                buffer = new ComputeBuffer(data.Count, stride);
+
+                //        Debug.Log("Buffer count = " + buffer.count);
+
+            }
+
+            // Set data on the buffer
+            buffer.SetData(data);
+        }
     }
 
     /// <summary>
@@ -1494,18 +1620,22 @@ public class VolumetricRendering : MonoBehaviour
 
         if (ComputePerFrameConstantBuffer != null)
         {
-            ComputePerFrameConstantBuffer.Dispose();
+            ComputePerFrameConstantBuffer.Release();
             ComputePerFrameConstantBuffer = null;
         }
         if (StepAddPerFrameConstantBuffer != null)
         { 
-            StepAddPerFrameConstantBuffer.Dispose();
+            StepAddPerFrameConstantBuffer.Release();
             StepAddPerFrameConstantBuffer = null;
         }
         if (ShaderConstantBuffer != null)
         {
-            ShaderConstantBuffer.Dispose();
+            ShaderConstantBuffer.Release();
             ShaderConstantBuffer = null;
+        }
+        if (participatingMediaSphereBuffer != null)
+        {
+            participatingMediaSphereBuffer.Release();
         }
     }
 
@@ -1541,6 +1671,8 @@ public class VolumetricRendering : MonoBehaviour
         
         //cam = GetComponentInChildren<Camera>();
         //Get shaders and seri
+        if (FroxelFogCompute == null)
+            FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
         if (FroxelFogCompute == null)
             FroxelFogCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricScattering.compute");
         if (FroxelIntegrationCompute == null)

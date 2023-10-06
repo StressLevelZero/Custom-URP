@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
 using System.Reflection;
+using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -19,20 +20,6 @@ using UnityEditor;
 //    public uint x;
 //    public uint y;
 //}
-[System.Serializable]
-public struct int3
-{
-    public int x;
-    public int y;
-    public int z;
-}
-[System.Serializable]
-public struct uint3
-{
-    public uint x;
-    public uint y;
-    public uint z;
-}
 
 [System.Serializable]
 public enum RGBA
@@ -181,7 +168,7 @@ public static class TextureExtentions
 
     public static TextureFileExtension GetTextureExtension(this string path)
     {        
-        return (TextureFileExtension)System.Enum.Parse(typeof(TextureFileExtension), Path.GetExtension(path) );
+        return (TextureFileExtension)System.Enum.Parse(typeof(TextureFileExtension), Path.GetExtension(path).ToUpper().Replace(".", string.Empty) );
     }
 
 

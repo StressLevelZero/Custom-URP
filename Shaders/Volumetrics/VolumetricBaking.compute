@@ -1,6 +1,7 @@
 ﻿///This bakes lights into a 3d texture
 
 //#pragma kernel VolumetricAreaBake
+#pragma use_dxc vulkan
 #pragma kernel PointLight
 #pragma kernel SpotLight
 #pragma kernel RectangleLight
@@ -303,19 +304,19 @@ float4 SimpleGround(float3 pos) {
 	}
 }
 
-float _Seed;
+uniform float _Seed;
 
-float rand(float2 Pixel)
+float rand(float2 Pixel, inout float seed)
 {
-	float result = frac(sin(_Seed / 100.0f * dot(Pixel, float2(12.9898f, 78.233f) ) ) * 43758.5453f);
-	_Seed += 1.0f;
+	float result = frac(sin(seed / 100.0f * dot(Pixel, float2(12.9898f, 78.233f) ) ) * 43758.5453f);
+	seed += 1.0f;
 	return result;
 }
 
-float rand(float3 Pixel)
+float rand(float3 Pixel, inout float seed)
 {
-	float result = frac(sin(_Seed / 100.0f * dot(Pixel, float3(12.9898f, 49.1165f, 29.1165f))) * 43758.5453f);
-	_Seed += 1.0f;
+	float result = frac(sin(seed / 100.0f * dot(Pixel, float3(12.9898f, 49.1165f, 29.1165f))) * 43758.5453f);
+	seed += 1.0f;
 	return result;
 }
 
@@ -466,7 +467,7 @@ void RectangleLight(uint3 id : SV_DispatchThreadID) {
 	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
 
 	float4 MonteCarlointegration = float4(0, 0, 0, 0);
-
+	float seed = _Seed;
 	for (int i = 0; i < AreaLightSamples; i++) {
 
 		float4 ShadowColor = float4(1, 1, 1, 1);
@@ -474,11 +475,11 @@ void RectangleLight(uint3 id : SV_DispatchThreadID) {
 		float3 VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosition);
 
 		float Facing = saturate(dot(LightDirection, -VoxelDirectionToLight)); //Intal direction check
-
+		
 		//Only cast rays from one side of the light
 		if (Facing > 0){
 
-			float3 LightPosSample = LightPosition + mul(AreaMatrix, float3( (rand(id.xyz)-0.5) * AreaSize.x , (rand(id.xyz) - 0.5) * AreaSize.y, 0) );
+			float3 LightPosSample = LightPosition + mul(AreaMatrix, float3( (rand(id.xyz, seed)-0.5) * AreaSize.x , (rand(id.xyz, seed) - 0.5) * AreaSize.y, 0) );
 
 			VoxelDirectionToLight = -normalize(VoxelWorldPosition - LightPosSample);
 
@@ -516,6 +517,7 @@ void DiscLight(uint3 id : SV_DispatchThreadID) {
 	float3 VoxelWorldPosition = Position + ((id + 0.5) / (whd / Size));
 
 	float4 MonteCarlointegration = float4(0, 0, 0, 0);
+	float seed = _Seed;
 
 	for (int i = 0; i < AreaLightSamples; i++) {
 
@@ -529,8 +531,8 @@ void DiscLight(uint3 id : SV_DispatchThreadID) {
 		if (Facing > 0) {
 
 			//https://stackoverflow.com/questions/5837572/generate-a-random-point-within-a-circle-uniformly
-			float t = 2 * M_PI * rand(id.xyz);
-			float u = rand(id.xyz) + rand(id.xyz);
+			float t = 2 * M_PI * rand(id.xyz, seed);
+			float u = rand(id.xyz, seed) + rand(id.xyz, seed);
 			float r;
 			if (u > 1)
 			{

@@ -43,6 +43,7 @@ MonoBehaviour:
       type: 3}
     objectMotionVector: {fileID: 4800000, guid: 7b3ede40266cd49a395def176e1bc486,
       type: 3}
+    DummyShader: {fileID: 4800000, guid: 1849e767ba948a84aae10d52f75a5a47, type: 3}
   textures:
     blueNoiseRGBA: {fileID: 18700000, guid: 1b2caf7a618cad3419945d7ef3a5858b, type: 2}
     blueNoiseR: {fileID: 18700000, guid: 712b2d2a3c1660c429e2748554a1c72c, type: 2}

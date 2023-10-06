@@ -1,12 +1,20 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Linq;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.SceneManagement;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal;
 using System.IO;
+using Unity.Collections;
+using SLZ.SLZEditorTools;
+using UnityEngine.Rendering;
+using static UnityEditor.Experimental.GraphView.GraphView;
+using Codice.Client.BaseCommands;
 
 public class VolumetricBaking : EditorWindow
 {
@@ -30,7 +38,7 @@ public class VolumetricBaking : EditorWindow
     public bool SkyboxContribution = false;
     public Cubemap CustomEnvorment;
     public int EnvLightSamples = 2048;
-
+    public int RayChunkSize = 2048;
     public float VolExposure = 0.05f;
 
     //interal
@@ -45,6 +53,7 @@ public class VolumetricBaking : EditorWindow
         GUI.enabled = true;
         VolExposure = EditorGUILayout.Slider("Debug Exposure", RefreshExposure(VolExposure), 0, 2);
         DXRAcceletration = EditorGUILayout.Toggle("DXR Acceletration", DXRAcceletration);
+        RayChunkSize = EditorGUILayout.IntSlider("DXR Ray Chunk Size", RayChunkSize, 256, 8192);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Light Settings", EditorStyles.boldLabel);
@@ -300,7 +309,7 @@ public class VolumetricBaking : EditorWindow
             rtdiscrpt.width = Texels.x;
             rtdiscrpt.height = Texels.y;
             rtdiscrpt.volumeDepth = Texels.z;
-            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat; //R32G32B32A32_SFloat
+            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat; //R32G32B32A32_SFloat is excessive, the compressed formats won't befefit and even lightmaps are saved as 16 bit EXRs
             rtdiscrpt.msaaSamples = 1;
 
             RenderTexture RT3d = new RenderTexture(rtdiscrpt);
@@ -420,10 +429,19 @@ public class VolumetricBaking : EditorWindow
 
             //Define path and save 3d texture
             string path = CheckDirectoryAndReturnPath() + j;
-            RT3d.SaveToTexture3D(path);
-            RT3d.Release();
+            //RT3d.SaveToTexture3D(path);
+            RenderTexture[] mipChain = Get3DMips(RT3d);
 
-            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D) AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D) );
+            Texture3D ReadBackTex = ReadRT2Tex3D(mipChain);
+            for (int i = 0; i < mipChain.Length; i++)
+            {
+                mipChain[i].Release();
+                DestroyImmediate(mipChain[i]);
+            }
+            Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
+            AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
+
+            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D) AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D) );
 
             MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
             propertyBlock.SetTexture("_3dTexture", VolumetricRegisters.volumetricAreas[j].bakedTexture);
@@ -441,6 +459,108 @@ public class VolumetricBaking : EditorWindow
             );
 
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+    }
+
+    static int prop_OutputDim = Shader.PropertyToID("_OutputDim");
+    static int prop_Input = Shader.PropertyToID("_Input");
+    static int prop_Output = Shader.PropertyToID("_Output");
+
+    RenderTexture[] Get3DMips(RenderTexture mip0)
+    {
+        int numMips = (int)math.floor(math.log2(math.max(mip0.width, math.max(mip0.height, mip0.volumeDepth)))) + 1;
+        RenderTexture[] mips = new RenderTexture[numMips];
+
+        RenderTextureDescriptor rtDesc = mip0.descriptor;
+
+        const string Mip3DTextureGUID = "a7b6f45f3454c3345a78c989cedd7229";
+        string mip3dComputePath = AssetDatabase.GUIDToAssetPath(Mip3DTextureGUID);
+        if (string.IsNullOrEmpty(mip3dComputePath))
+        {
+            Debug.LogError("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). Either the shader is missing or its meta file got regenerated");
+            return null;
+        }
+        ComputeShader mip3DCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(mip3dComputePath);
+        if (mip3DCompute == null)
+        {
+            Debug.LogError("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). No compute shader was found at the path of the GUID, meaning another asset has the same GUID!");
+            return null;
+        }
+
+        int kernelMip = mip3DCompute.FindKernel("CalculateMip");
+
+        mips[0] = mip0;
+
+        for (int level = 1; level < numMips; level++)
+        {
+            
+
+            rtDesc.width = math.max(rtDesc.width / 2, 1);
+            rtDesc.height = math.max(rtDesc.height / 2, 1);
+            rtDesc.volumeDepth = math.max(rtDesc.volumeDepth / 2, 1);
+            mips[level] = new RenderTexture(rtDesc);
+            mips[level].Create();
+
+            mip3DCompute.SetTexture(kernelMip, prop_Input, mips[level-1]);
+            mip3DCompute.SetTexture(kernelMip, prop_Output, mips[level]);
+            mip3DCompute.SetInts(prop_OutputDim, new int[] { rtDesc.width, rtDesc.height, rtDesc.volumeDepth, 0 });
+
+            mip3DCompute.Dispatch(kernelMip, (rtDesc.width + 3) / 4, (rtDesc.height + 3) / 4, (rtDesc.volumeDepth + 3) / 4);
+        }
+        return mips;
+    }
+
+    Texture3D ReadRT2Tex3D(RenderTexture[] rtAndMips)
+    {
+        
+        GraphicsFormat gfmt = rtAndMips[0].graphicsFormat;
+        TextureFormat tfmt = GraphicsFormatUtility.GetTextureFormat(gfmt);
+        int width = rtAndMips[0].width;
+        int height = rtAndMips[0].height;
+        int depth = rtAndMips[0].volumeDepth;
+
+        Texture3D output = new Texture3D(width, height, depth, gfmt, rtAndMips.Length > 1 ? TextureCreationFlags.MipChain : TextureCreationFlags.None);
+        
+        AsyncGPUReadbackRequest[] request = new AsyncGPUReadbackRequest[rtAndMips.Length];
+        for (int i = 0; i < rtAndMips.Length; i++)
+        {
+            request[i] = AsyncGPUReadback.Request(rtAndMips[i], 0);
+        }
+
+        for (int mip = 0; mip < output.mipmapCount; mip++)
+        {
+            int currPtr = 0;
+            NativeArray<byte> outputRaw = output.GetPixelData<byte>(mip);
+            request[mip].WaitForCompletion();
+            int layers = request[mip].layerCount;
+            for (int slice = 0; slice < layers; slice++)
+            {
+
+                NativeArray<byte> readBackRaw = request[mip].GetData<byte>(slice);
+                NativeArray<byte>.Copy(readBackRaw, 0, outputRaw, currPtr, readBackRaw.Length);
+                currPtr += readBackRaw.Length;
+               
+                readBackRaw.Dispose();
+            }
+        }
+        //Texture2D temp = new Texture2D(width, height, gfmt, TextureCreationFlags.None);
+        //Rect sliceRect = new Rect(0, 0, width, height);
+        //int sliceSize = width * height;
+        //RenderTexture oldActive = RenderTexture.active;
+        //RenderTexture.active = rt;
+        //int outputRawPtr = 0;
+        //for (int depthSlice = 0; depthSlice < depth; depthSlice++)
+        //{
+        //	Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, depthSlice);
+        //	temp.ReadPixels(sliceRect,0,0);
+        //	temp.Apply(false);
+        //	NativeArray<byte> tempNative = temp.GetPixelData<byte>(0);
+        //	NativeArray<byte>.Copy(tempNative, 0, outputRaw, outputRawPtr, tempNative.Length);
+        //	outputRawPtr += tempNative.Length;
+        //}
+        //Graphics.SetRenderTarget(oldActive, 0, CubemapFace.Unknown, 0);
+        //RenderTexture.active = oldActive;
+
+        return output;
     }
     //////
 
@@ -468,7 +588,7 @@ public class VolumetricBaking : EditorWindow
             rtdiscrpt.width = Texels.x;
             rtdiscrpt.height = Texels.y;
             rtdiscrpt.volumeDepth = Texels.z;
-            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat; 
             rtdiscrpt.msaaSamples = 1;
 
             //Target buffer
@@ -578,13 +698,21 @@ public class VolumetricBaking : EditorWindow
             //}
 
             //Define path and save 3d texture
-            string path = CheckDirectoryAndReturnPath() + j; 
-            RT3d.SaveToTexture3D(path);
+            string path = CheckDirectoryAndReturnPath() + j;
+            RenderTexture[] mipChain = Get3DMips(RT3d);
 
-            RT3d.Release();
+            Texture3D ReadBackTex = ReadRT2Tex3D(mipChain);
+            for (int i = 0; i < mipChain.Length; i++)
+            {
+                mipChain[i].Release();
+                DestroyImmediate(mipChain[i]);
+            }
+
+            Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
+
             bucketBuffer.Release();
-
-            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
+            AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
+            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
          //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
 
@@ -627,7 +755,7 @@ public class VolumetricBaking : EditorWindow
         rtdiscrpt.width = Texels.x;
         rtdiscrpt.height = Texels.y;
         rtdiscrpt.volumeDepth = Texels.z;
-        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32B32A32_SFloat;
+        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
         rtdiscrpt.msaaSamples = 1;
 
         //Target buffer
@@ -700,7 +828,7 @@ public class VolumetricBaking : EditorWindow
 
         System.DateTime startTime = System.DateTime.Now;
         UpdateStatus("Baking " + SceneManager.GetActiveScene().name);
-        ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
+        //ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
 
         RayTracingShader rtshader = AssetDatabase.LoadAssetAtPath<RayTracingShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/DXR-Volumebaker.raytrace");
         rtshader.SetShaderPass("BakedRaytrace");
@@ -715,156 +843,189 @@ public class VolumetricBaking : EditorWindow
 
         Vector3Int threads = new Vector3Int();
 
+
+        List<Light> PointLights, ConeLights, DirectionalLights, AreaLights;
+
+        Light[] Lights = GatherBakedLights();
+
+        PointLights = new List<Light>();
+        ConeLights = new List<Light>();
+        DirectionalLights = new List<Light>();
+        AreaLights = new List<Light>();
+
+        for (int i = 0; i < Lights.Length; i++)
+        {
+
+            switch (Lights[i].type)
+            {
+                case LightType.Point:
+                    PointLights.Add(Lights[i]);
+                    break;
+
+                case LightType.Spot:
+                    ConeLights.Add(Lights[i]);
+                    break;
+
+                case LightType.Directional:
+                    DirectionalLights.Add(Lights[i]);
+                    break;
+
+                case LightType.Area:
+                    AreaLights.Add(Lights[i]);
+                    break;
+
+                case LightType.Disc:
+                    AreaLights.Add(Lights[i]); //Stacking area and disc
+                    break;
+                default:
+
+                    break;
+            }
+        }
+
+        Debug.Log(PointLights.Count + "Point Lights, " + ConeLights.Count + " Cone Lights, " + DirectionalLights.Count + " Dir Lights, " + AreaLights.Count + " area lights.");
+
+        //Set up buffers with data stride. Keeping a min count of 1 to keep buffer valid. Get's skipped in shader.
+        ComputeBuffer pointBuffer = new ComputeBuffer(Mathf.Max(PointLights.Count, 1), (3 + 4) * 4);
+        ComputeBuffer coneBuffer = new ComputeBuffer(Mathf.Max(ConeLights.Count, 1), (3 + 4 + 3 + 2) * 4);
+        ComputeBuffer dirBuffer = new ComputeBuffer(Mathf.Max(DirectionalLights.Count, 1), (3 + 4) * 4);
+        ComputeBuffer areaBuffer = new ComputeBuffer(Mathf.Max(AreaLights.Count, 1), (4 * 4 + 4 * 4 + 3 + 4 + 3) * 4);
+
+        PointLightData[] PointLDatas = new PointLightData[PointLights.Count];
+        ConeLightData[] ConeLDatas = new ConeLightData[ConeLights.Count];
+        DirLightData[] DirLDatas = new DirLightData[DirectionalLights.Count];
+        AreaLightData[] AreaLDatas = new AreaLightData[AreaLights.Count];
+
+        for (int i = 0; i < PointLights.Count; i++)
+        {
+            PointLDatas[i].PointLightsPos = PointLights[i].transform.position;
+            PointLDatas[i].PointLightsColors = ColorExtraction(PointLights[i]);
+        }
+
+        for (int i = 0; i < ConeLights.Count; i++)
+        {
+            ConeLDatas[i].ConeLightsWS = ConeLights[i].transform.position;
+            ConeLDatas[i].ConeLightsColors = ColorExtraction(ConeLights[i]);
+            ConeLDatas[i].ConeLightsDir = ConeLights[i].transform.forward;
+
+            float flPhiDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].spotAngle * 0.5f * Mathf.Deg2Rad)); // outer cone
+            float flThetaDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].innerSpotAngle * 0.5f * Mathf.Deg2Rad)); // inner cone
+
+            ConeLDatas[i].ConeLightsPram = new Vector4(flPhiDot, 1.0f / Mathf.Max(0.01f, flThetaDot - flPhiDot), 0, 0);
+        }
+
+        for (int i = 0; i < DirectionalLights.Count; i++)
+        {
+            DirLDatas[i].DirLightsDir = DirectionalLights[i].transform.forward;
+            DirLDatas[i].DirLightsColors = ColorExtraction(DirectionalLights[i]);
+        }
+
+        for (int i = 0; i < AreaLights.Count; i++)
+        {
+            AreaLDatas[i].AreaLightsPos = AreaLights[i].transform.position;
+            AreaLDatas[i].AreaLightsMatrix = Matrix4x4.TRS(AreaLights[i].transform.position, AreaLights[i].transform.rotation, Vector3.one);
+            AreaLDatas[i].AreaLightsMatrixInv = AreaLDatas[i].AreaLightsMatrix.inverse;
+            AreaLDatas[i].AreaLightsColors = ColorExtraction(AreaLights[i]);
+            AreaLDatas[i].AreaLightsSize = new Vector3(AreaLights[i].areaSize.x, AreaLights[i].areaSize.y, AreaLights[i].type == LightType.Disc ? 1 : 0); //Packing for area or disc logic
+        }
+
+        pointBuffer.SetData(PointLDatas);
+        coneBuffer.SetData(ConeLDatas);
+        dirBuffer.SetData(DirLDatas);
+        areaBuffer.SetData(AreaLDatas);
+
+        Texture skyTex = MakeEnvironmentalCubemap();
+        CommandBuffer cmd = CommandBufferPool.Get();
+
+        cmd.SetRayTracingIntParam(rtshader, "PointLightCount", PointLDatas.Length); //Add a stack overflow loop or computebuffer
+        cmd.SetRayTracingBufferParam(rtshader, "PLD", pointBuffer);
+
+        //Cone
+        cmd.SetRayTracingIntParam(rtshader, "ConeLightCount", ConeLDatas.Length); //Add a stack overflow loop or computebuffer
+        cmd.SetRayTracingBufferParam(rtshader, "CLD", coneBuffer);
+
+        //Directional
+        cmd.SetRayTracingIntParam(rtshader, "DirLightCount", DirLDatas.Length); //Add a stack overflow loop or computebuffer
+        cmd.SetRayTracingBufferParam(rtshader, "DLD", dirBuffer);
+
+        //Area
+        cmd.SetRayTracingIntParam(rtshader, "AreaLightCount", AreaLDatas.Length); //Add a stack overflow loop or computebuffer
+        cmd.SetRayTracingIntParam(rtshader, "AreaLightSamples", System.Convert.ToInt32(AreaLightSamples));
+        cmd.SetRayTracingBufferParam(rtshader, "ALD", areaBuffer);
+
+        //Env
+        rtshader.SetTexture("_SkyTexture", skyTex);
+        cmd.SetRayTracingIntParam(rtshader, "EnvLightSamples", System.Convert.ToInt32(EnvLightSamples));
+
+        int id_startIdx = Shader.PropertyToID("StartRayIdx");
+        cmd.SetRayTracingIntParam(rtshader, "PerDispatchRayCount", RayChunkSize);
+
+        Graphics.ExecuteCommandBuffer(cmd);
+        cmd.Clear();
         for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
         {
-            threads = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+            Vector3Int resolution = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+            threads = resolution;
+            Vector3 boxSize = VolumetricRegisters.volumetricAreas[j].BoxScale;
+            float maxVoxelSize = math.max(boxSize.x / (float)resolution.x, math.max(boxSize.y / (float)resolution.y, boxSize.z / (float)resolution.z));
+
             RenderTexture RT3d = initializeVolume(j);
-            rtshader.SetTexture("g_Output", RT3d);
+            cmd.SetRayTracingTextureParam(rtshader, "g_Output", RT3d);
 
-            ///
-            /// 
-            /// 
-
-            List<Light> PointLights, ConeLights, DirectionalLights, AreaLights;
-
-            Light[] Lights = GatherBakedLights();
-
-            PointLights = new List<Light>();
-            ConeLights = new List<Light>();
-            DirectionalLights = new List<Light>();
-            AreaLights = new List<Light>();
-
-            for (int i = 0; i < Lights.Length; i++)
-            {
-
-                switch (Lights[i].type)
-                {
-                    case LightType.Point:
-                        PointLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Spot:
-                        ConeLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Directional:
-                        DirectionalLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Area:
-                        AreaLights.Add(Lights[i]);
-                        break;
-
-                    case LightType.Disc:
-                        AreaLights.Add(Lights[i]); //Stacking area and disc
-                        break;
-                    default:
-
-                        break;
-                }
-            }
-
-            Debug.Log(PointLights.Count + "Point Lights, " + ConeLights.Count + " Cone Lights, " + DirectionalLights.Count + " Dir Lights, " + AreaLights.Count + " area lights.");
-
-            //Set up buffers with data stride. Keeping a min count of 1 to keep buffer valid. Get's skipped in shader.
-            ComputeBuffer pointBuffer = new ComputeBuffer(Mathf.Max(PointLights.Count,1), (3 + 4) * 4);
-            ComputeBuffer coneBuffer = new ComputeBuffer(Mathf.Max(ConeLights.Count,1), (3 + 4 + 3 + 2) * 4);
-            ComputeBuffer dirBuffer = new ComputeBuffer(Mathf.Max(DirectionalLights.Count,1), (3 + 4) * 4);
-            ComputeBuffer areaBuffer = new ComputeBuffer(Mathf.Max(AreaLights.Count,1), (4 * 4 + 4 * 4 + 3 + 4 + 3) * 4);
-
-            PointLightData[] PointLDatas = new PointLightData[PointLights.Count];
-            ConeLightData[] ConeLDatas =  new ConeLightData[ConeLights.Count] ;
-            DirLightData[] DirLDatas = new DirLightData[DirectionalLights.Count];
-            AreaLightData[] AreaLDatas = new AreaLightData[AreaLights.Count];
-
-            for (int i = 0; i < PointLights.Count; i++)
-            {
-                PointLDatas[i].PointLightsPos = PointLights[i].transform.position;
-                PointLDatas[i].PointLightsColors = ColorExtraction(PointLights[i]);
-            }
-
-            for (int i = 0; i < ConeLights.Count; i++)
-            {
-                ConeLDatas[i].ConeLightsWS = ConeLights[i].transform.position;
-                ConeLDatas[i].ConeLightsColors = ColorExtraction(ConeLights[i]);
-                ConeLDatas[i].ConeLightsDir = ConeLights[i].transform.forward;
-
-                float flPhiDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].spotAngle * 0.5f * Mathf.Deg2Rad)); // outer cone
-                float flThetaDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].innerSpotAngle * 0.5f * Mathf.Deg2Rad)); // inner cone
-
-                ConeLDatas[i].ConeLightsPram = new Vector4(flPhiDot, 1.0f / Mathf.Max(0.01f, flThetaDot - flPhiDot), 0, 0);
-            }
-
-            for (int i = 0; i < DirectionalLights.Count; i++)
-            {
-                DirLDatas[i].DirLightsDir = DirectionalLights[i].transform.forward;
-                DirLDatas[i].DirLightsColors = ColorExtraction(DirectionalLights[i]);
-            }
-
-            for (int i = 0; i < AreaLights.Count; i++)
-            {
-                AreaLDatas[i].AreaLightsPos = AreaLights[i].transform.position;
-                AreaLDatas[i].AreaLightsMatrix = Matrix4x4.TRS(AreaLights[i].transform.position, AreaLights[i].transform.rotation, Vector3.one);
-                AreaLDatas[i].AreaLightsMatrixInv = AreaLDatas[i].AreaLightsMatrix.inverse;
-                AreaLDatas[i].AreaLightsColors = ColorExtraction(AreaLights[i]);
-                AreaLDatas[i].AreaLightsSize = new Vector3(AreaLights[i].areaSize.x, AreaLights[i].areaSize.y, AreaLights[i].type == LightType.Disc ? 1 : 0); //Packing for area or disc logic
-            }
-
-            pointBuffer.SetData(PointLDatas);
-            coneBuffer.SetData(ConeLDatas);
-            dirBuffer.SetData(DirLDatas);
-            areaBuffer.SetData(AreaLDatas);
-
-
-            //General
-            rtshader.SetVector("Size", VolumetricRegisters.volumetricAreas[j].NormalizedScale);
-            rtshader.SetVector("WPosition", VolumetricRegisters.volumetricAreas[j].Corner);
-            rtshader.SetFloat("_Seed", (Random.Range(0.0f, 64.0f)));
-
+            cmd.SetRayTracingVectorParam(rtshader, "Size", VolumetricRegisters.volumetricAreas[j].NormalizedScale);
+            cmd.SetRayTracingVectorParam(rtshader, "WPosition", VolumetricRegisters.volumetricAreas[j].Corner);
+            cmd.SetRayTracingFloatParam(rtshader, "_Seed", (UnityEngine.Random.Range(0.0f, 64.0f)));
+            cmd.SetRayTracingFloatParam(rtshader, "HalfVoxelSize", maxVoxelSize * 0.5f);
+            Graphics.ExecuteCommandBuffer(cmd);
+            cmd.Clear();
             //Point
-            rtshader.SetInt("PointLightCount", PointLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetBuffer("PLD", pointBuffer); ;
-
-            //Cone
-            rtshader.SetInt("ConeLightCount", ConeLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetBuffer("CLD", coneBuffer);
-
-            //Directional
-            rtshader.SetInt("DirLightCount", DirLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetBuffer("DLD", dirBuffer);
-
-            //Area
-            rtshader.SetInt("AreaLightCount", AreaLDatas.Length); //Add a stack overflow loop or computebuffer
-            rtshader.SetInt("AreaLightSamples", System.Convert.ToInt32(AreaLightSamples));
-            rtshader.SetBuffer("ALD", areaBuffer);
-
-            //Env
-            rtshader.SetTexture("_SkyTexture", MakeEnvironmentalCubemap());
-            rtshader.SetInt("EnvLightSamples", System.Convert.ToInt32(EnvLightSamples));
 
             //Dispatching
-            rtshader.Dispatch("MainRayGenShader", threads.x, threads.y, threads.z);
+            int maxRays = PointLDatas.Length + ConeLDatas.Length + DirLDatas.Length + EnvLightSamples + (AreaLDatas.Length * AreaLightSamples);
+            Debug.Log("Max Rays: " + maxRays);
+            
+            for (int i = 0; i < maxRays; i += RayChunkSize)
+            {
+                cmd.SetRayTracingIntParam(rtshader, id_startIdx, i);
+                cmd.DispatchRays(rtshader, "MainRayGenShader", (uint)threads.x, (uint)threads.y, (uint)threads.z);
+                Graphics.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+            }
 
-            pointBuffer.Release();
-            coneBuffer.Release();
-            dirBuffer.Release();
-            areaBuffer.Release();
+            
             ///
             /// 
             ///
 
             string path = CheckDirectoryAndReturnPath() + j;
-            RT3d.SaveToTexture3D(path);
-            RT3d.Release();
-            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + ".asset", typeof(Texture3D));
+            RenderTexture[] mipChain = Get3DMips(RT3d);
+
+            Texture3D ReadBackTex = ReadRT2Tex3D(mipChain);
+            for (int i = 0; i < mipChain.Length; i++)
+            {
+                mipChain[i].Release();
+                DestroyImmediate(mipChain[i]);
+            }
+            Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
+            AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
+            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
             //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
 
         }
-
+        pointBuffer.Release();
+        coneBuffer.Release();
+        dirBuffer.Release();
+        areaBuffer.Release();
         Running = false;
         EditorUtility.ClearProgressBar();
-
+        if (skyTex.GetType() == typeof(RenderTexture))
+        {
+            RenderTexture rtSky = skyTex as RenderTexture;
+            rtSky.DiscardContents(true, true);
+            rtSky.Release();
+            DestroyImmediate(rtSky);
+        }
         accelerationStructure.Dispose();
 
         System.DateTime endTime = System.DateTime.Now;
@@ -915,7 +1076,7 @@ public class VolumetricBaking : EditorWindow
                 BakingShader.SetFloat("AreaLightSamples", AreaLightSamples);
                 BakingShader.SetMatrix("AreaMatrix", Matrix4x4.Rotate(light.transform.rotation));
 
-                BakingShader.SetFloat("_Seed", Random.value);
+                BakingShader.SetFloat("_Seed", UnityEngine.Random.value);
 
                 break;
             case LightType.Disc:
@@ -924,7 +1085,7 @@ public class VolumetricBaking : EditorWindow
                 BakingShader.SetFloat("AreaLightSamples", AreaLightSamples);
                 BakingShader.SetMatrix("AreaMatrix", Matrix4x4.Rotate(light.transform.rotation));
 
-                BakingShader.SetFloat("_Seed", Random.value);
+                BakingShader.SetFloat("_Seed", UnityEngine.Random.value);
                 break;
             default:
                 return;
