@@ -15,8 +15,8 @@ using Unity.Burst.CompilerServices;
 using UnityEngine.Rendering.Universal;
 using System.Collections.Generic;
 using static UnityEngine.Rendering.Universal.Internal.CopyColorPass;
-using System.Runtime.CompilerServices;
-using System.Text;
+
+
 namespace SLZ.SLZEditorTools
 {
     [ScriptedImporter(1, new string[] { "vol3d" }, new string[] { "" }, AllowCaching = true)]
@@ -269,6 +269,7 @@ namespace SLZ.SLZEditorTools
                         NativeArray<T> texBacking = tex.GetPixelData<T>(mip);
                         //if (uncmpSliceBytes[mip] != texBacking.Length) Debug.LogError("Expected size: " + uncmpSliceBytes[mip] + " got: " + texBacking.Length);
                         NativeArray<T>.Copy(fileBytes, uncompressedMipPtr[mip] + slice * uncmpSliceLen[mip], texBacking, 0, uncmpSliceLen[mip]);
+                        texBacking.Dispose();
                     }
                 }
                 //rawPtr += texBacking.Length;
@@ -285,19 +286,22 @@ namespace SLZ.SLZEditorTools
                 //if (d == 0) Debug.Log("Dimensions: " + tex.width + tex.height);
                 for (int mip = 0; mip < mipLevels; mip++)
                 {
+                 
                     int mipDepth = mipDim[mip].z;
                     if (slice < mipDepth)
                     {
                         NativeArray<T2> texBacking = tex.GetPixelData<T2>(mip);
-                        //if (cmpSliceLen[mip] != texBacking.Length) Debug.LogError("Cmp Expected size: " + cmpSliceLen[mip] + " got: " + texBacking.Length);
                         NativeArray<T2> vcData = tex3D.GetPixelData<T2>(mip);
+                        //if (cmpSliceLen[mip] != texBacking.Length) Debug.LogError("Cmp Expected size: " + cmpSliceLen[mip] + " got: " + texBacking.Length);
                         //if (vcData.Length / mipDepth != texBacking.Length) Debug.LogError("VC Expected size: " + vcData.Length + " got: " + texBacking.Length);
                         NativeArray<T2>.Copy(texBacking, 0, vcData,
                             compress ? slice * cmpSliceLen[mip] : slice * uncmpSliceLen[mip],
                             compress ? cmpSliceLen[mip] : uncmpSliceLen[mip]);
+                        texBacking.Dispose();
+                        vcData.Dispose();
                     }
                 }
-
+                Resources.UnloadAsset(tex);
                 DestroyImmediate(tex);
             }
         }
@@ -312,18 +316,19 @@ namespace SLZ.SLZEditorTools
             //File.WriteAllBytes("C:/temp/TestFile.bin", paddedBytes.ToArray());
             try
             {
-                
+                Texture2D tex;
+                GraphicsFormat gformat = GraphicsFormatUtility.GetGraphicsFormat(uncompFmt, false);
+                tex = new Texture2D(mipDim[0].x, mipDim[0].y, uncompFmt, false, true);
                 for (int mip = 0; mip < mipLevels; mip++)
                 {
-
+                   
                     for (int slice = 0; slice < mipDim[mip].z; slice++)
                     {
-                        Texture2D tex;
-                        tex = new Texture2D(mipDim[mip].x, mipDim[mip].y, uncompFmt, false, true);
-
+                        tex.Reinitialize(mipDim[mip].x, mipDim[mip].y, gformat, false);
                         NativeArray<byte> texBacking = tex.GetPixelData<byte>(0);
                         //if (uncmpSliceBytes[mip] != texBacking.Length) Debug.LogError("Expected size: " + uncmpSliceBytes[mip] + " got: " + texBacking.Length);
                         NativeArray<byte>.Copy(paddedBytes, uncompressedMipPtr[mip] + slice * uncmpSliceLen[mip], texBacking, 0, uncmpSliceLen[mip]);
+                        texBacking.Dispose();
                         //if ((mip == mipLevels - 2) && slice == 0) 
                         //{
                         //    Span<byte> bytes = stackalloc byte[pixelSize];
@@ -348,13 +353,17 @@ namespace SLZ.SLZEditorTools
                         NativeArray<byte> vcData = tex3D.GetPixelData<byte>(mip);
                         //if (vcData.Length / mipDepth != texBacking.Length) Debug.LogError("VC Expected size: " + vcData.Length + " got: " + texBacking.Length);
                         NativeArray<byte>.Copy(texBacking2, 0, vcData, slice * cmpSliceLen[mip], cmpSliceLen[mip]);
-                        DestroyImmediate(tex);
+                        texBacking2.Dispose();
+                        vcData.Dispose();
+                        //Resources.UnloadAsset(tex);
                     }
                 }
+                DestroyImmediate(tex);
             }
             finally
             {
                 paddedBytes.Dispose();
+
             }
         }
 

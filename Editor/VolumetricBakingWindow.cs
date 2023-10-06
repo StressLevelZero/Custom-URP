@@ -440,12 +440,14 @@ public class VolumetricBaking : EditorWindow
             Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
             AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
 
-            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D) AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D) );
-
-            MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
-            propertyBlock.SetTexture("_3dTexture", VolumetricRegisters.volumetricAreas[j].bakedTexture);
+            Texture3D volTex = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
+            VolumetricRegisters.volumetricAreas[j].bakedTexture = volTex;
+            EditorUtility.UnloadUnusedAssetsImmediate();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
+            //MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+            //propertyBlock.SetTexture("_3dTexture", VolumetricRegisters.volumetricAreas[j].bakedTexture);
             //    VolumetricRegisters.volumetricAreas[j].DebugCube.SetPropertyBlock(propertyBlock);
-            Repaint();
+            //Repaint();
 
         }
 
@@ -710,9 +712,13 @@ public class VolumetricBaking : EditorWindow
             Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
 
             bucketBuffer.Release();
+            DestroyImmediate(bucketBuffer);
+
             AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
             VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
-         //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
+            EditorUtility.UnloadUnusedAssetsImmediate();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
+            //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
 
         }
@@ -959,8 +965,7 @@ public class VolumetricBaking : EditorWindow
         int id_startIdx = Shader.PropertyToID("StartRayIdx");
         cmd.SetRayTracingIntParam(rtshader, "PerDispatchRayCount", RayChunkSize);
 
-        Graphics.ExecuteCommandBuffer(cmd);
-        cmd.Clear();
+
         for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
         {
             Vector3Int resolution = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
@@ -975,8 +980,7 @@ public class VolumetricBaking : EditorWindow
             cmd.SetRayTracingVectorParam(rtshader, "WPosition", VolumetricRegisters.volumetricAreas[j].Corner);
             cmd.SetRayTracingFloatParam(rtshader, "_Seed", (UnityEngine.Random.Range(0.0f, 64.0f)));
             cmd.SetRayTracingFloatParam(rtshader, "HalfVoxelSize", maxVoxelSize * 0.5f);
-            Graphics.ExecuteCommandBuffer(cmd);
-            cmd.Clear();
+
             //Point
 
             //Dispatching
@@ -987,11 +991,11 @@ public class VolumetricBaking : EditorWindow
             {
                 cmd.SetRayTracingIntParam(rtshader, id_startIdx, i);
                 cmd.DispatchRays(rtshader, "MainRayGenShader", (uint)threads.x, (uint)threads.y, (uint)threads.z);
-                Graphics.ExecuteCommandBuffer(cmd);
-                cmd.Clear();
+
             }
 
-            
+            Graphics.ExecuteCommandBuffer(cmd);
+            cmd.Clear();
             ///
             /// 
             ///
@@ -1008,6 +1012,7 @@ public class VolumetricBaking : EditorWindow
             Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
             AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
             VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
+           
             //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
 
@@ -1018,7 +1023,7 @@ public class VolumetricBaking : EditorWindow
         areaBuffer.Release();
         Running = false;
         EditorUtility.ClearProgressBar();
-        if (skyTex.GetType() == typeof(RenderTexture))
+        if (skyTex != null && skyTex.GetType() == typeof(RenderTexture))
         {
             RenderTexture rtSky = skyTex as RenderTexture;
             rtSky.DiscardContents(true, true);
@@ -1034,7 +1039,8 @@ public class VolumetricBaking : EditorWindow
             );
 
         RefreshDebuggers();
-
+        EditorUtility.UnloadUnusedAssetsImmediate();
+        GC.Collect();
     }
 
 
