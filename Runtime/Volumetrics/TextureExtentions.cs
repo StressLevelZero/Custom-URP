@@ -186,4 +186,118 @@ public static class TextureExtentions
         }
         return null;
     }
+    
+    
+    
+    /// <summary>
+    /// Convert Texture array to Texture2DArray
+    /// </summary>
+    /// <param name="textures"></param>
+    /// <returns></returns>
+//     public static Texture2DArray ConvertToTexture2DArray(this Texture[] textures, TextureFormat textureFormat)
+//     {
+//         bool compressed = false;
+//         if (textureFormat == TextureFormat.ARGB32 || textureFormat == TextureFormat.RGBA32 || textureFormat == TextureFormat.RGB24 || textureFormat == TextureFormat.Alpha8)
+//             compressed = false;
+//         else compressed = true;
+//         int w = textures[0].width;
+//         int h = textures[0].height;
+//         Texture2DArray tex2darray = new Texture2DArray(w, h, textures.Length, TextureFormat.ARGB32, true, true, true);
+//         Texture2D tempTex = new Texture2D(w, h, TextureFormat.ARGB32, true, true);
+//         RenderTexture TempRT = new RenderTexture(w, h, 32, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+//         TempRT.Create();
+//         for (int i = 0; i < textures.Length; i++)
+//         {
+//
+//             Graphics.Blit(textures[i], TempRT);
+//             //Move RT to tex2D to get pixels
+//             RenderTexture.active = TempRT;
+//             tempTex.ReadPixels(new Rect(0, 0, TempRT.width, TempRT.height), 0, 0, false);
+//
+//
+//             if (!compressed)
+//             {
+//                 tempTex.Apply();
+//                 //Set Pixels to array
+//                 tex2darray.SetPixels(tempTex.GetPixels(0), i);
+//             }
+//             else
+//             {
+// #if UNITY_EDITOR
+//                 EditorUtility.CompressTexture(tempTex, textureFormat, 100);
+// #endif
+//                 tempTex.Apply();
+//                 Graphics.CopyTexture(tempTex, tex2darray);
+//             }
+//
+//         }
+//         tex2darray.Apply();
+//         TempRT.Release();
+//         RenderTexture.active = null;
+//         return tex2darray;
+//     }
+    
+    public static Texture2DArray ConvertToTexture2DArray(this Texture2D[] textures)
+    {
+        return ConvertToTexture2DArray(textures, textures[0].format);
+    }
+    
+    
+    public static Texture2DArray ConvertToTexture2DArray(this Texture2D[] textures, TextureFormat textureFormat)
+    {
+        bool mips = textures[0].mipmapCount > 1;
+ 
+        var texArray = new Texture2DArray(
+            textures[0].width,
+            textures[0].height,
+            textures.Length,
+            textureFormat,
+            mips,
+            false
+        );
+ 
+        texArray.anisoLevel = textures[0].anisoLevel;
+        texArray.filterMode = textures[0].filterMode;
+        texArray.wrapMode = textures[0].wrapMode;
+ 
+        // Go over all the textures and add to array
+        for (int texIndex = 0; texIndex < textures.Length; texIndex++)
+        {
+            if (textures[texIndex] != null)
+            {
+                for (int mip = 0; mip < textures[texIndex].mipmapCount; mip++)
+                    Graphics.CopyTexture(textures[texIndex], 0, mip, texArray, texIndex, mip);
+            }
+        }
+ 
+        return texArray;
+    }
+ 
+    // public static void SetTexureProps(this Texture2D source, int maxSize, TextureImporterCompression compression, bool mipmaps)
+    // {
+    //     var importer = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(source)) as TextureImporter;
+    //
+    //     importer.isReadable = false;
+    //     importer.maxTextureSize = maxSize;
+    //     importer.textureCompression = compression;
+    //     importer.mipmapEnabled = mipmaps;
+    //
+    //     // disable platform specific overrides
+    //
+    //     var platforms = new string[]
+    //     {
+    //         "Standalone", "Web", "iPhone", "Android", "WebGL", "Windows Store Apps", "PS4", "XboxOne", "Nintendo 3DS" ,"tvOS"
+    //     };
+    //
+    //     foreach (var platform in platforms)
+    //     {
+    //         var settings = importer.GetPlatformTextureSettings(platform);
+    //         //settings.textureCompression = compression;
+    //         //Debug.Log(settings.overridden);
+    //         settings.overridden = false;
+    //         importer.SetPlatformTextureSettings(settings);
+    //     }
+    //     
+    //     importer.SaveAndReimport();
+    // }
 }
