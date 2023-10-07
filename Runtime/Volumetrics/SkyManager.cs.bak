@@ -65,7 +65,7 @@ public class SkyManager
         {
             if (skytexture != null)
             {
-                SetSkyTexture(skytexture);
+                SetSkyTexture(CoreUtils.blackCubeTexture);
             }
             else SetSkyTexture(CoreUtils.blackCubeTexture);
         }        

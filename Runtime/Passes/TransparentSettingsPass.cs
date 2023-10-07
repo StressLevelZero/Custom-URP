@@ -25,7 +25,7 @@ namespace UnityEngine.Rendering.Universal
 
             // Currently we only need to enqueue this pass when the user
             // doesn't want transparent objects to receive shadows
-            return !m_shouldReceiveShadows;
+            return !m_shouldReceiveShadows && (renderingData.shadowData.mainLightShadowsEnabled || renderingData.shadowData.additionalLightShadowsEnabled);
         }
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
