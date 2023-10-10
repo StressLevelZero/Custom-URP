@@ -257,11 +257,12 @@ namespace SLZ.SLZEditorTools
             ) where T : struct
              where T2 : struct
         {
+            int maxXyMip = (int)math.log2(math.max(info.width, info.height));
             for (int slice = 0; slice < info.depth; slice++)
             {
                 Texture2D tex;
                 tex = new Texture2D(info.width, info.height, uncompFmt, true, true);
-                for (int mip = 0; mip < mipLevels; mip++)
+                for (int mip = 0; mip <= maxXyMip; mip++)
                 {
                     if (slice < mipDim[mip].z)
                     {
@@ -290,7 +291,7 @@ namespace SLZ.SLZEditorTools
                     int mipDepth = mipDim[mip].z;
                     if (slice < mipDepth)
                     {
-                        NativeArray<T2> texBacking = tex.GetPixelData<T2>(mip);
+                        NativeArray<T2> texBacking = tex.GetPixelData<T2>(math.min(mip, maxXyMip));
                         NativeArray<T2> vcData = tex3D.GetPixelData<T2>(mip);
                         //if (cmpSliceLen[mip] != texBacking.Length) Debug.LogError("Cmp Expected size: " + cmpSliceLen[mip] + " got: " + texBacking.Length);
                         //if (vcData.Length / mipDepth != texBacking.Length) Debug.LogError("VC Expected size: " + vcData.Length + " got: " + texBacking.Length);
@@ -301,7 +302,6 @@ namespace SLZ.SLZEditorTools
                         vcData.Dispose();
                     }
                 }
-                Resources.UnloadAsset(tex);
                 DestroyImmediate(tex);
             }
         }
