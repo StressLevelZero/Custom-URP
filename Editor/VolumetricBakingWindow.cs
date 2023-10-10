@@ -465,6 +465,28 @@ public class VolumetricBaking : EditorWindow
     static int prop_OutputDim = Shader.PropertyToID("_OutputDim");
     static int prop_Input = Shader.PropertyToID("_Input");
     static int prop_Output = Shader.PropertyToID("_Output");
+    const string Mip3DTextureGUID = "a7b6f45f3454c3345a78c989cedd7229";
+    static ComputeShader s_mip3DCompute;
+    static ComputeShader Mip3DCompute
+    {
+        get {
+            if (s_mip3DCompute == null)
+            {
+                string mip3dComputePath = AssetDatabase.GUIDToAssetPath(Mip3DTextureGUID);
+                if (string.IsNullOrEmpty(mip3dComputePath))
+                {
+                    throw new FileNotFoundException("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). Either the shader is missing or its meta file got regenerated");
+                }
+                ComputeShader t_mip3DCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(mip3dComputePath);
+                if (t_mip3DCompute == null)
+                {
+                    throw new FileNotFoundException("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). No compute shader was found at the path of the GUID, meaning another asset has the same GUID!");
+                }
+                s_mip3DCompute = t_mip3DCompute;
+            }
+            return s_mip3DCompute;
+        }
+    }
 
     RenderTexture[] Get3DMips(RenderTexture mip0)
     {
@@ -473,19 +495,7 @@ public class VolumetricBaking : EditorWindow
 
         RenderTextureDescriptor rtDesc = mip0.descriptor;
 
-        const string Mip3DTextureGUID = "a7b6f45f3454c3345a78c989cedd7229";
-        string mip3dComputePath = AssetDatabase.GUIDToAssetPath(Mip3DTextureGUID);
-        if (string.IsNullOrEmpty(mip3dComputePath))
-        {
-            Debug.LogError("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). Either the shader is missing or its meta file got regenerated");
-            return null;
-        }
-        ComputeShader mip3DCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(mip3dComputePath);
-        if (mip3DCompute == null)
-        {
-            Debug.LogError("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). No compute shader was found at the path of the GUID, meaning another asset has the same GUID!");
-            return null;
-        }
+        ComputeShader mip3DCompute = Mip3DCompute;
 
         int kernelMip = mip3DCompute.FindKernel("CalculateMip");
 
@@ -579,25 +589,9 @@ public class VolumetricBaking : EditorWindow
             bufferCount += textureDim.x * textureDim.y * textureDim.z;
         }
        
-
-
         ComputeBuffer mips = new ComputeBuffer(bufferCount, 4 * sizeof(ushort), ComputeBufferType.Structured);
 
-
-
-        const string Mip3DTextureGUID = "a7b6f45f3454c3345a78c989cedd7229";
-        string mip3dComputePath = AssetDatabase.GUIDToAssetPath(Mip3DTextureGUID);
-        if (string.IsNullOrEmpty(mip3dComputePath))
-        {
-            Debug.LogError("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). Either the shader is missing or its meta file got regenerated");
-            return null;
-        }
-        ComputeShader mip3DCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(mip3dComputePath);
-        if (mip3DCompute == null)
-        {
-            Debug.LogError("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). No compute shader was found at the path of the GUID, meaning another asset has the same GUID!");
-            return null;
-        }
+        ComputeShader mip3DCompute = Mip3DCompute;
 
         int initKernel = mip3DCompute.FindKernel("CopyTexToBuffer");
         int mipKernel = mip3DCompute.FindKernel("CalculateMipBuffer");
@@ -627,19 +621,11 @@ public class VolumetricBaking : EditorWindow
 
     Texture3D ReadBufferToTex3D(ComputeBuffer rtAndMips, int width, int height, int depth)
     {
-
         GraphicsFormat gfmt = GraphicsFormat.R16G16B16A16_SFloat;
-        TextureFormat tfmt = GraphicsFormatUtility.GetTextureFormat(gfmt);
-
-
         Texture3D output = new Texture3D(width, height, depth, gfmt, TextureCreationFlags.MipChain);
         int stride = rtAndMips.stride / sizeof(ushort);
         ushort[] bufferReadBack = new ushort[rtAndMips.count * stride];
         rtAndMips.GetData(bufferReadBack);
-
-        int numE = bufferReadBack.Length;
-
-
         int ptr = 0;
         for (int mip = 0; mip < output.mipmapCount; mip++)
         {
@@ -656,32 +642,11 @@ public class VolumetricBaking : EditorWindow
             //    new half() { value = bufferReadBack[ptr - 1] });
             //    Debug.Log("Last Color: " + lastColor.ToString());
             //}
-
             ptr += copyCount;
             width = math.max(1, width / 2);
             height = math.max(1, height / 2);
             depth = math.max(1, depth / 2);
-
-            
         }
-        //Texture2D temp = new Texture2D(width, height, gfmt, TextureCreationFlags.None);
-        //Rect sliceRect = new Rect(0, 0, width, height);
-        //int sliceSize = width * height;
-        //RenderTexture oldActive = RenderTexture.active;
-        //RenderTexture.active = rt;
-        //int outputRawPtr = 0;
-        //for (int depthSlice = 0; depthSlice < depth; depthSlice++)
-        //{
-        //	Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, depthSlice);
-        //	temp.ReadPixels(sliceRect,0,0);
-        //	temp.Apply(false);
-        //	NativeArray<byte> tempNative = temp.GetPixelData<byte>(0);
-        //	NativeArray<byte>.Copy(tempNative, 0, outputRaw, outputRawPtr, tempNative.Length);
-        //	outputRawPtr += tempNative.Length;
-        //}
-        //Graphics.SetRenderTarget(oldActive, 0, CubemapFace.Unknown, 0);
-        //RenderTexture.active = oldActive;
-
         return output;
     }
 
