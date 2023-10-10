@@ -11,7 +11,7 @@
 
 #endif
 
-#pragma shader_feature _ EDITOR_VISUALIZATION
+//#pragma shader_feature _ EDITOR_VISUALIZATION
 
 //#!INJECT_POINT UNIVERSAL_DEFINES
 

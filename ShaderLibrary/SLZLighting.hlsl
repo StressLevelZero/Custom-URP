@@ -1031,7 +1031,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
     
     //Apply SSAO to "indirect" sources (not halfly indirect, but that's what unity calls baked and image based lighting) 
-    AmbientOcclusionFactor ao;
+    AmbientOcclusionFactor ao = (AmbientOcclusionFactor)0;
     
     UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
     {

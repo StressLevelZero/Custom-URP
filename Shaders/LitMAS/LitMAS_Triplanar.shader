@@ -97,7 +97,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             //ColorMask 0
 
             HLSLPROGRAM
-
+            #pragma only_renderers vulkan
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"

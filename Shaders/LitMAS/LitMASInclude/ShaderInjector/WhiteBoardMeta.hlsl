@@ -16,7 +16,7 @@
 
 #endif
 
-#pragma shader_feature _ EDITOR_VISUALIZATION
+//#pragma shader_feature _ EDITOR_VISUALIZATION
 
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
