@@ -1078,11 +1078,12 @@ public class VolumetricBaking : EditorWindow
             {
                 cmd.SetRayTracingIntParam(rtshader, id_startIdx, i);
                 cmd.DispatchRays(rtshader, "MainRayGenShader", (uint)threads.x, (uint)threads.y, (uint)threads.z);
-
+                // Execute the command buffer once per volume, if we add all the volumes to the buffer then execute the gpu will time out!
+                Graphics.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
             }
 
-            Graphics.ExecuteCommandBuffer(cmd);
-            cmd.Clear();
+
             ///
             /// 
             ///
