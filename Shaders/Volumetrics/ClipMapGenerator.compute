@@ -66,7 +66,7 @@ void ClipMapGen (uint3 id : SV_DispatchThreadID)
 	//Sample baked volume and clip it off to its area
 	//Doing max of the two results to account for overlaps
 
-	float4 colors = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, 4) * ClipUVW);
+	float4 colors = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, mip) * ClipUVW);
 	colors.a = 0;
 	Result[id.xyz] = colors;
 }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.Linq;
 using Unity.Mathematics;
 using UnityEngine;
@@ -13,10 +12,12 @@ using System.IO;
 using Unity.Collections;
 using SLZ.SLZEditorTools;
 using UnityEngine.Rendering;
+using System.Diagnostics;
+using UnityEditor.SceneManagement;
 #if UNITY_EDITOR_WIN
 using Microsoft.Win32;
 #endif 
-using static UnityEditor.Experimental.GraphView.GraphView;
+using Debug = UnityEngine.Debug;
 
 public class VolumetricBaking : EditorWindow
 {
@@ -102,6 +103,8 @@ public class VolumetricBaking : EditorWindow
 #endif
     }
 
+
+
     //TODO: Save to scene asset file 
     //Public variables
     [Range(1, 2048)]
@@ -114,6 +117,9 @@ public class VolumetricBaking : EditorWindow
     public int EnvLightSamples = 2048;
     public int RayChunkSize = 2048;
     public float VolExposure = 0.05f;
+
+    bool checkedD3D12 = false;
+    bool isD3D12 = false;
 
     //interal
     bool saveWarning = false;
@@ -166,6 +172,27 @@ public class VolumetricBaking : EditorWindow
         EditorGUILayout.LabelField(BakingStatus);
         WarningGUI();
         if (saveWarning) if (GUILayout.Button("Save scene(s)")) SaveScenes();
+
+        if (!checkedD3D12)
+        {
+            checkedD3D12 = true;
+            isD3D12 = SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D12;
+        }
+        if (!isD3D12)
+        {
+            if (GUILayout.Button("Restart Editor in DX12"))
+            {
+                if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                {
+                    Process unity = new Process();
+                    string projectPath = Path.GetDirectoryName(Application.dataPath);
+                    unity.StartInfo.FileName = EditorApplication.applicationPath;
+                    unity.StartInfo.Arguments = "-projectPath \"" + projectPath + "\" -force-d3d12";
+                    unity.Start();
+                    EditorApplication.Exit(0);
+                }
+            }
+        }
 
         //      EditorGUILayout.HelpBox("Some warning text", MessageType.Warning); //Todo: add warning box to window
     }
