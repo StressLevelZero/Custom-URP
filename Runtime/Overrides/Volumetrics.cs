@@ -29,7 +29,7 @@ namespace UnityEngine.Rendering.Universal
         public MinFloatParameter mipFogFar = new MinFloatParameter( 1, 1 );
         [Tooltip("Max mip level.")]
         public ClampedFloatParameter mipFogMaxMip = new ClampedFloatParameter(1.0f, 0.0f, 1);
-        public CubemapParameter SkyTexture = new CubemapParameter( null );
+        public CubemapParameter SkyTexture = new CubemapParameter(null);
 
 
         [Space, Header("Voulmetric Controls")]
@@ -45,6 +45,11 @@ namespace UnityEngine.Rendering.Universal
         [Tooltip("Baked static light multiplier.")]
         public MinFloatParameter GlobalStaticLightMultiplier = new MinFloatParameter(1f, .1f);
         public ColorParameter VolumetricAlbedo = new ColorParameter(Color.white,false);
+        [HideInInspector]
+        public BoolParameter isNullSky = new BoolParameter(false);
+
+        //public BoolParameter testBool = new BoolParameter(false);
+
         //       public bool IsActive() => intensity.value > 0f && (type.value != FilmGrainLookup.Custom || texture.value != null);
         //       public bool IsTileCompatible() => true;
 
@@ -61,27 +66,47 @@ namespace UnityEngine.Rendering.Universal
             //if (SkyTexture.value != null && SkyTexture.overrideState) SkyManager.SetSkyTexture(SkyTexture.value);
             //else SkyManager.CheckSky();
 
-            if (SkyTexture.overrideState)
-            {
-                // Disable the override if skytexture.value is null. For some reason, checking if a null texture is null causes a 0.15ms of Loading.IsObjectAvailable (when the actual rendering only takes 0.04ms!).
-                // This doesn't seem to happen if the texture is non-null
-                if (SkyTexture.value == null)
-                {
-                    SkyTexture = new CubemapParameter(null);
-                    SkyManager.CheckSky();
-                }
-                else
-                {
-                    SkyManager.SetSkyTexture(SkyTexture.value); // SkyTexture.value != null &&
-                }
-            }
+            //if (isNullSky.value)
+            //{
+            //    Debug.Log("Null Sky was Set");
+            //}
+
+            if (!isNullSky.value && SkyTexture.overrideState) SkyManager.SetSkyTexture(SkyTexture.value);
             else SkyManager.CheckSky();
+
+
+            // Only check if skytexture.value is null once and cache the result.
+            // For some reason, checking if a null texture is null causes a 0.15ms of Loading.IsObjectAvailable (when the actual rendering only takes 0.04ms!).
+            // This doesn't seem to happen if the texture is non-null
+            //if (!hasCheckedForNullOverride) 
+
+            //if (SkyTexture.overrideState)
+            //{
+            //    if (!checkedNullSky.value)
+            //    {
+            //        checkedNullSky.value = true;
+            //        if (SkyTexture.value == null)
+            //        {
+            //            SkyTexture.overrideState = false;
+            //            SkyManager.CheckSky();
+            //        }
+            //    }
+            //    else
+            //    {
+            //        SkyManager.SetSkyTexture(SkyTexture.value); // SkyTexture.value != null &&
+            //    }
+            //}
+            //else SkyManager.CheckSky();
         }
 
-        //private void OnValidate()
-        //{
-        //    PushFogShaderParameters();
-        //}
+        private void OnValidate()
+        {
+            // Only check if skytexture.value is null once and cache the result.
+            // For some reason, checking if a null texture is null causes a 0.15ms of Loading.IsObjectAvailable (when the actual rendering only takes 0.04ms!).
+            // This doesn't seem to happen if the texture is non-null
+            isNullSky.value = SkyTexture.value == null;
+            isNullSky.overrideState = true;
+        }
 
     }
 }
