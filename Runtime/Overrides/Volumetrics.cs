@@ -1,5 +1,7 @@
 ﻿using System;
-
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace UnityEngine.Rendering.Universal
 {
@@ -99,14 +101,26 @@ namespace UnityEngine.Rendering.Universal
             //else SkyManager.CheckSky();
         }
 
+#if UNITY_EDITOR
+        // Only check if SkyTexture.value is null in editor and serialize the result.
+        // For some reason, checking if the texture inside of a CubemapParameter is null causes a 0.15ms of Loading.IsObjectAvailable if it actually is null.
         private void OnValidate()
         {
-            // Only check if skytexture.value is null once and cache the result.
-            // For some reason, checking if a null texture is null causes a 0.15ms of Loading.IsObjectAvailable (when the actual rendering only takes 0.04ms!).
-            // This doesn't seem to happen if the texture is non-null
-            isNullSky.value = SkyTexture.value == null;
-            isNullSky.overrideState = true;
+           
+            if (isNullSky == null)
+            {
+                isNullSky = new BoolParameter(false);
+            }
+            //isNullSky.value = SkyTexture.value == null;
+            //isNullSky.overrideState = true;
+            SerializedObject so = new SerializedObject(this);
+            SerializedProperty sp_value = so.FindProperty("isNullSky.m_Value");
+            SerializedProperty sp_override = so.FindProperty("isNullSky.m_OverrideState");
+            sp_value.boolValue = SkyTexture.value == null;
+            sp_override.boolValue = true;
+            so.ApplyModifiedProperties();
+            so.Dispose();
         }
-
+#endif
     }
 }
