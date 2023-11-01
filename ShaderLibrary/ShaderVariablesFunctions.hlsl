@@ -323,12 +323,27 @@ float3 MixFogColor(float3 fragColor, float3 fogColor, float fogFactor)
 }
 
 
-half3 MixFogColor(real3 fragColor, real3 fogColor, real3 viewDirectionWS, real fogFactor)
+half3 MixFogColor(real3 fragColor, real3 fogColor, float3 viewDirectionWS, float fogFactor)
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
     real fogIntensity = ComputeFogIntensity(fogFactor);
     real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
     fragColor = lerp(mipFog, fragColor, fogIntensity);
+#endif
+    return fragColor;
+}
+
+half4 MixFogColorSurf(real4 fragColor, float3 viewDirectionWS, float fogFactor, int surface)
+{
+#if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+    real fogIntensity = ComputeFogIntensity(fogFactor);
+
+    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
+    if (surface == 1) // 1 = Transparent, which is actually alpha premultiplied.
+    {
+        mipFog *= fragColor.a;
+    }
+    fragColor.rgb = lerp(mipFog, fragColor.rgb, fogIntensity);
 #endif
     return fragColor;
 }
@@ -343,9 +358,14 @@ float3 MixFog(float3 fragColor, float fogFactor)
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
 }
 
-half3 MixFog(real3 fragColor, float3 viewDirectionWS, real fogFactor)
+half3 MixFog(real3 fragColor, float3 viewDirectionWS, float fogFactor)
 {
     return  (  half4(MixFogColor(fragColor, unity_FogColor.rgb, viewDirectionWS, fogFactor),1) ).rgb;
+}
+
+half4 MixFogSurf(real4 fragColor, float3 viewDirectionWS, float fogFactor, int surface)
+{
+    return  MixFogColorSurf(fragColor, viewDirectionWS, fogFactor, surface);
 }
 
 // Linear depth buffer value between [0, 1] or [1, 0] to eye depth value between [near, far]

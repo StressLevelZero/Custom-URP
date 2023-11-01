@@ -586,6 +586,7 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelBufferA = new RenderTexture(rtdiscrpt);
         FroxelBufferA.name = activeCam.name + "_FroxelBufferA";
+
         FroxelBufferA.Create();
 
         //Ugh... extra android buffer mess. Can I use a custom RT double buffer instead?

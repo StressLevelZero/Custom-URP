@@ -36,6 +36,9 @@ namespace UnityEngine.Rendering.Universal.Internal
         public bool useMotionVectorData;
         bool m_UseDepthPriming;
 
+        static GlobalKeyword s_DrawProcedural = GlobalKeyword.Create("DRAW_SKY_PROCEDURAL");
+        public bool drawSkybox;
+
         static readonly int s_DrawObjectPassDataPropID = Shader.PropertyToID("_DrawObjectPassData");
 
         public DrawObjectsPass(string profilerTag, ShaderTagId[] shaderTagIds, bool opaque, RenderPassEvent evt, RenderQueueRange renderQueueRange, LayerMask layerMask, StencilState stencilState, int stencilReference)
@@ -109,6 +112,8 @@ namespace UnityEngine.Rendering.Universal.Internal
                     : new Vector4(flipSign, 0.0f, 1.0f, 1.0f);
                 cmd.SetGlobalVector(ShaderPropertyId.scaleBiasRt, scaleBias);
 
+                
+
                 context.ExecuteCommandBuffer(cmd);
                 cmd.Clear();
 
@@ -133,6 +138,18 @@ namespace UnityEngine.Rendering.Universal.Internal
                     drawSettings.perObjectData = drawSettings.perObjectData | PerObjectData.MotionVectors;
                 }
 
+                if (drawSkybox)
+                {
+                    Material skybox = RenderSettings.skybox;
+                    if (skybox != null)
+                    {
+                        cmd.EnableKeyword(s_DrawProcedural);
+                        cmd.DrawProcedural(Matrix4x4.identity, RenderSettings.skybox, 0, MeshTopology.Triangles, 3, 1);
+                        cmd.DisableKeyword(s_DrawProcedural);
+                        context.ExecuteCommandBuffer(cmd);
+                        cmd.Clear();
+                    }
+                }
 #if !DEBUG_NO_SHADERS
                 var activeDebugHandler = GetActiveDebugHandler(renderingData);
                 if (activeDebugHandler != null)

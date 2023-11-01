@@ -3,6 +3,7 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Fullscreen.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 // ----------------------------------------------------------------------------------
 // Render fullscreen mesh by using a matrix set directly by the pipeline instead of
@@ -34,10 +35,10 @@ Varyings VertFullscreenMesh(Attributes input)
 // ----------------------------------------------------------------------------------
 // Samplers
 
-SAMPLER(sampler_LinearClamp);
-SAMPLER(sampler_LinearRepeat);
-SAMPLER(sampler_PointClamp);
-SAMPLER(sampler_PointRepeat);
+//SAMPLER(sampler_LinearClamp);
+//SAMPLER(sampler_LinearRepeat);
+//SAMPLER(sampler_PointClamp);
+//SAMPLER(sampler_PointRepeat);
 
 // ----------------------------------------------------------------------------------
 // Utility functions

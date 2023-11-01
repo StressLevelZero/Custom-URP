@@ -3,9 +3,9 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 TEXTURECUBE(_SkyTexture);
-SAMPLER(sampler_SkyTexture);
 int _SkyMipCount;
 
 CBUFFER_START(VolumetricsCB)
@@ -17,7 +17,7 @@ float3 _VolCameraPos;
 CBUFFER_END
 
 
-TEXTURE3D(_VolumetricResult); SAMPLER(sampler_linear_clamp);
+TEXTURE3D(_VolumetricResult);
 //float4 _VolumePlaneSettings; // Not used
 
 half4 GetVolumetricColor(float3 positionWS)
@@ -50,7 +50,7 @@ half4 GetVolumetricColor(float3 positionWS)
     //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
 
 //    float random = GenerateHashedRandomFloat(DoubleUV * 4000) * 0.003;
-    return SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_linear_clamp, DoubleUV, 0);
+    return SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, DoubleUV, 0);
 }
 
 
@@ -98,6 +98,27 @@ half4 Volumetrics(half4 color, float3 positionWS) {
 
     half4 FroxelColor = GetVolumetricColor(positionWS);
     color.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
+
+#endif
+    return color;
+}
+
+/* @brief Blend volumetrics with control for the surface type.
+ *
+ * @param color       Final surface color
+ * @param positionWS  World-space position of the fragment
+ * @param surfaceType Enum of the surface type, where 0: opaque, 1: transparent (alpha premultiplied), 2: fade (alpha blend) 
+ * @return color blended towards the volumetric color if the surface is opaque, or blended towards transparency otherwise
+ */
+half4 VolumetricsSurf(half4 color, float3 positionWS, int surfaceType) {
+
+#if defined(_VOLUMETRICS_ENABLED)
+
+    half4 FroxelColor = GetVolumetricColor(positionWS);
+	
+    FroxelColor.rgb = surfaceType == 1 ? FroxelColor.rgb * color.a : FroxelColor.rgb;
+	color.rgb *= FroxelColor.a;
+	color.rgb += FroxelColor.rgb;
 
 #endif
     return color;
@@ -197,14 +218,14 @@ half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
 #if defined(FOG_LINEAR)
     float mipLevel = ((depth )) * _SkyMipCount;
 #else
-    float mipLevel = ((1 -  (_MipFogParameters.z * saturate((depth - nearParam) / (farParam - nearParam)))  ) )  * _SkyMipCount;
+    float mipLevel = ((1 -  (_MipFogParameters.z * saturate((depth - nearParam) / (farParam - nearParam)))  ) )  * (_SkyMipCount - 1);
 
 #endif
 
 //#if defined(REFLECTIONFOG)
   //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
   //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(_SkyTexture, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
-    return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_SkyTexture, viewDirectionWS, mipLevel)).rgb;
+    return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_TrilinearClamp, viewDirectionWS, mipLevel)).rgb;
 
 
 

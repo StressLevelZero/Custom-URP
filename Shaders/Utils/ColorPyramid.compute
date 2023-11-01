@@ -39,6 +39,7 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 #if COPY_MIP_0
        TEXTURE2D_X(_Source);
@@ -57,7 +58,7 @@ RW_TEXTURE2D_X(float4, _Destination);
     #define UVINT uint2
 #endif
 
-SamplerState sampler_LinearClamp;
+//SamplerState sampler_LinearClamp;
 
 //CBUFFER_START(cb)
     int4 _Size;       // x: src width, y: src height, zw: unused

@@ -1,5 +1,6 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 
 #if SRC_TEXTURE2D_X_ARRAY
 TEXTURE2D_ARRAY(_SourceTex);
@@ -7,7 +8,7 @@ TEXTURE2D_ARRAY(_SourceTex);
 TEXTURE2D(_SourceTex);
 #endif
 
-SamplerState sampler_LinearClamp;
+//SamplerState sampler_LinearClamp;
 uniform uint _SourceTexArraySlice;
 uniform uint _SRGBRead;
 uniform uint _SRGBWrite;
