@@ -200,7 +200,7 @@ Shader "SLZ/Nullman"
 			#define ASE_NEEDS_FRAG_WORLD_NORMAL
 			#define ASE_NEEDS_FRAG_WORLD_VIEW_DIR
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
@@ -252,7 +252,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			float4x4 EllipsoidPosArray[HitArrayCount];
+			half4x4 EllipsoidPosArray[HitArrayCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -827,7 +827,7 @@ Shader "SLZ/Nullman"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 
 			struct VertexInput
@@ -1117,7 +1117,7 @@ Shader "SLZ/Nullman"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 
 			struct VertexInput
@@ -1381,7 +1381,7 @@ Shader "SLZ/Nullman"
 			#define ASE_NEEDS_VERT_NORMAL
 			#define ASE_NEEDS_FRAG_WORLD_POSITION
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 
 			struct VertexInput
@@ -1785,7 +1785,7 @@ Shader "SLZ/Nullman"
 			#define ASE_NEEDS_VERT_NORMAL
 			#define ASE_NEEDS_FRAG_WORLD_POSITION
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 
 			struct VertexInput
@@ -2053,7 +2053,7 @@ Shader "SLZ/Nullman"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 
 			struct VertexInput
@@ -2861,7 +2861,7 @@ Shader "SLZ/Nullman"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
         
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 
 			struct VertexInput
@@ -3081,7 +3081,7 @@ Shader "SLZ/Nullman"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
         
 			#pragma shader_feature_local_fragment _BRDFMAP
-			#include "LitMASInclude/PosespaceImpacts.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
 
 
 			struct VertexInput
