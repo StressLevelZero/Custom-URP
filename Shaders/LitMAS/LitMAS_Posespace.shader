@@ -24,11 +24,11 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         [Header(This should be 0 for skinned meshes)]
         _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
 
-		_Surface ("Surface Type", float) = 0
-		_BlendSrc ("Blend Source", float) = 1
-		_BlendDst ("Blend Destination", float) = 0
-		[ToggleUI] _ZWrite ("ZWrite", float) = 1
-		_Cull ("Cull Side", float) = 2
+		[HideInInspector]_Surface ("Surface Type", float) = 0
+		[HideInInspector]_BlendSrc ("Blend Source", float) = 1
+		[HideInInspector]_BlendDst ("Blend Destination", float) = 0
+		[HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
+		[HideInInspector]_Cull ("Cull Side", float) = 2
     }
     SubShader
     {
@@ -270,7 +270,8 @@ ENDHLSL
             ENDHLSL
         }
     }
-	CustomEditor "LitMASGUI"
+	//CustomEditor "LitMASGUI"
+	CustomEditor "UnityEditor.LitMASIMGUI"
     //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }

@@ -12,7 +12,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using BlendMode = UnityEngine.Rendering.BlendMode;
 using RenderQueue = UnityEngine.Rendering.RenderQueue;
-
+using System.Reflection;
 
 namespace UnityEditor
 {
@@ -22,6 +22,7 @@ namespace UnityEditor
         public MaterialProperty workflowMode;
         public MaterialProperty blendSrc;
         public MaterialProperty blendDst;
+        public MaterialProperty temporalAcm;
 
 
         MaterialProperty[] properties;
@@ -41,6 +42,7 @@ namespace UnityEditor
             blendSrc = BaseShaderGUI.FindProperty("_BlendSrc", properties, false);
             blendDst = BaseShaderGUI.FindProperty("_BlendDst", properties, false);
             zwriteProp = BaseShaderGUI.FindProperty("_ZWrite", properties, false);
+            temporalAcm = BaseShaderGUI.FindProperty("_SSRTemporalMul", properties, false);
         }
 
         static string[] surfaceNames = new string[]
@@ -49,9 +51,20 @@ namespace UnityEditor
             "Transparent",
             "Fade",
         };
+
+        bool hasInitialized = false;
+        bool hasSSR = false;
+        public override void AssignNewShaderToMaterial(Material material, Shader oldShader, Shader newShader)
+        {
+            base.AssignNewShaderToMaterial(material, oldShader, newShader);
+            ValidateQueue();
+            hasInitialized = false;
+        }
+
         public override void DrawSurfaceOptions(Material material)
         {
             int val = (int)surfaceTypeProp.floatValue;
+           
 
             EditorGUI.BeginChangeCheck();
             EditorGUI.showMixedValue = surfaceTypeProp.hasMixedValue;
@@ -68,17 +81,20 @@ namespace UnityEditor
                         blendDst.floatValue = (float)UnityEngine.Rendering.BlendMode.Zero;
                         zwriteProp.floatValue = 1;
                         SetQueue(-1);
+                        if (temporalAcm != null) temporalAcm.floatValue = 1; 
                         break;
                     case 1:
                         blendSrc.floatValue = (float)UnityEngine.Rendering.BlendMode.One;
                         blendDst.floatValue = (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha;
                         zwriteProp.floatValue = 0;
+                        if (temporalAcm != null) temporalAcm.floatValue = 0;
                         SetQueue(3000);
                         break;
                     case 2:
                         blendSrc.floatValue = (float)UnityEngine.Rendering.BlendMode.SrcAlpha;
                         blendDst.floatValue = (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha;
                         zwriteProp.floatValue = 0;
+                        if (temporalAcm != null) temporalAcm.floatValue = 0;
                         SetQueue(3000);
                         break;
                 }
@@ -101,6 +117,7 @@ namespace UnityEditor
 
             DrawFloatToggleProperty(Styles.castShadowText, castShadowsProp);
             DrawFloatToggleProperty(Styles.receiveShadowText, receiveShadowsProp);
+            hasInitialized = true;
         }
 
         void SetQueue(int value)
@@ -109,6 +126,17 @@ namespace UnityEditor
             foreach (UnityEngine.Object @object in array3)
             {
                 ((Material)@object).renderQueue = value;
+            }
+        }
+
+        void ValidateQueue()
+        {
+            UnityEngine.Object[] array3 = materialEditor.targets;
+            foreach (UnityEngine.Object @object in array3)
+            {
+                Material mat = ((Material)@object);
+                int desiredQueue = mat.GetFloat("_Surface") > 0 ? 3000 : -1;
+                mat.renderQueue = desiredQueue;
             }
         }
 

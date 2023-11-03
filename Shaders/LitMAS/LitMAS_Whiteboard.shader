@@ -13,11 +13,11 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("DetailMap", 2D) = "gray" {}
        
-		_Surface ("Surface Type", float) = 0
-		_BlendSrc ("Blend Source", float) = 1
-		_BlendDst ("Blend Destination", float) = 0
-		[ToggleUI] _ZWrite ("ZWrite", float) = 1
-		_Cull ("Cull Side", float) = 2
+		[HideInInspector]_Surface ("Surface Type", float) = 0
+		[HideInInspector]_BlendSrc ("Blend Source", float) = 1
+		[HideInInspector]_BlendDst ("Blend Destination", float) = 0
+		[HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
+		[HideInInspector]_Cull ("Cull Side", float) = 2
     }
     SubShader
     {
@@ -154,7 +154,8 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
     }
 
 
-    CustomEditor "LitMASGUI"
+    //CustomEditor "LitMASGUI"
+	CustomEditor "UnityEditor.LitMASIMGUI"
     //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }

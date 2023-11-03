@@ -286,10 +286,10 @@ half4 frag(VertOut i) : SV_Target
 	half4 color = half4(1, 1, 1, 1);
 
 
-		color.rgb = SLZPBRFragment(fragData, surfData, _Surface);
+		color = SLZPBRFragment(fragData, surfData, _Surface);
 
 
-	color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
+	color.rgba = MixFogSurf(color.rgba, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
 	color = VolumetricsSurf(color, fragData.position, _Surface);
 	return color;
 }

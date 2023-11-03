@@ -25,11 +25,11 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 		_AudioInputBoost("AudioInputBoost", Range(0 , 1)) = 0.01
 		[NoScaleOffset][SingleLineTexture]g_tBRDFMap("BRDF Ramp", 2D) = "black" {}
 
-		_Surface ("Surface Type", float) = 0
-		_BlendSrc ("Blend Source", float) = 1
-		_BlendDst ("Blend Destination", float) = 0
-		[ToggleUI] _ZWrite ("ZWrite", float) = 1
-		_Cull ("Cull Side", float) = 2
+		[HideInInspector]_Surface ("Surface Type", float) = 0
+		[HideInInspector]_BlendSrc ("Blend Source", float) = 1
+		[HideInInspector]_BlendDst ("Blend Destination", float) = 0
+		[HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
+		[HideInInspector]_Cull ("Cull Side", float) = 2
 	}
 	SubShader
 	{
@@ -304,7 +304,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 		}
 	}
 
-
-	CustomEditor "UnityEditor.ShaderGraphLitGUI"
+	CustomEditor "UnityEditor.LitMASIMGUI"
+	//CustomEditor "UnityEditor.ShaderGraphLitGUI"
 	Fallback "Hidden/InternalErrorShader"
 }
