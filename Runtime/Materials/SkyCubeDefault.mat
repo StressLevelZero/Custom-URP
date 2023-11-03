@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: SkyCubeDefault
-  m_Shader: {fileID: 4800000, guid: e2bc12b142787a84e95ff4f3ca0bac39, type: 3}
+  m_Shader: {fileID: 4800000, guid: 6934b4a95f9e43d49b9bfdbd516f25be, type: 3}
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
@@ -40,6 +40,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: 93d3930e8ab926f48a63ecc221b21768, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _Tex:
+        m_Texture: {fileID: 8900000, guid: cd5dad0b8377fd34c8f72ce00cbb7f3b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _BakedMutiplier: 1
@@ -49,14 +53,18 @@ Material:
     - _Details: 0
     - _Emission: 0
     - _EmissionFalloff: 1
+    - _FogDist: 1
     - _Normals: 0
+    - _Rotation: 0
     - _SSROff: 0
     - _SSRTemporalMul: 1
     - _Surface: 0
+    - _UseFog: 0
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SkyColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &2249774035058855984
 MonoBehaviour:
