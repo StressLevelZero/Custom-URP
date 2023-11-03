@@ -1108,13 +1108,13 @@ namespace UnityEngine.Rendering.Universal
 
                 if (m_DefaultShader == null)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(ShaderUtils.GetShaderGUID(ShaderPathID.Lit));
+                    string path = AssetDatabase.GUIDToAssetPath(ShaderUtils.GetShaderGUID(ShaderPathID.LitMAS));
                     m_DefaultShader  = AssetDatabase.LoadAssetAtPath<Shader>(path);
                 }
 #endif
 
                 if (m_DefaultShader == null)
-                    m_DefaultShader = Shader.Find(ShaderUtils.GetShaderPath(ShaderPathID.Lit));
+                    m_DefaultShader = Shader.Find(ShaderUtils.GetShaderPath(ShaderPathID.LitMAS));
 
                 return m_DefaultShader;
             }

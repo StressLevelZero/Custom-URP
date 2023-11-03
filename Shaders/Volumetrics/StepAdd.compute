@@ -69,57 +69,57 @@ CBUFFER_END
 [numthreads(8, 8, 1)]	
 void StepAdd(uint3 id : SV_DispatchThreadID)
 {
-	//Use this to figure out distance between layers
-	//float near = _VolumePlaneSettings.x;
-	//float far = _VolumePlaneSettings.y;
+    //Use this to figure out distance between layers
+    //float near = _VolumePlaneSettings.x;
+    //float far = _VolumePlaneSettings.y;
 
-	// T (A → B) = 𝑒 ^ -({ S [𝐴 - 𝐵]}	𝛽𝑒(𝑥) 𝑑x	)
-	//float Absorption = 0.01f; //temp Absorption rate
+    // T (A → B) = 𝑒 ^ -({ S [𝐴 - 𝐵]}	𝛽𝑒(𝑥) 𝑑x	)
+    //float Absorption = 0.01f; //temp Absorption rate
 
-	float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
+    float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
 
 // This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
 // Each of them is the centroid of the interval of length 2/14.
-	float3 rndVal =  frac(perPixelRandomOffset + 1-SeqOffset);
+    float3 rndVal =  frac(perPixelRandomOffset + 1-SeqOffset);
 
-	float3 whd ; //make floating to avoid interger calulations later
-	Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this in scrpit instead of getting it here
+    float3 whd ; //make floating to avoid interger calulations later
+    Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this in scrpit instead of getting it here
 
-	float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //used for current slice output
+    float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //used for current slice output
 
-	//Make stereoscopic.
-	float4 Stereo_UVWs = float4( ((id ))/ whd ,1);
+    //Make stereoscopic.
+    float4 Stereo_UVWs = float4( ((id ))/ whd ,1);
 
-	//Shift space to linear. TODO: link to a shared file and add bias
-	//Stereo_UVWs.z = Stereo_UVWs.z * _VolumePlaneSettings.y / (1 + Stereo_UVWs.z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
+    //Shift space to linear. TODO: link to a shared file and add bias
+    //Stereo_UVWs.z = Stereo_UVWs.z * _VolumePlaneSettings.y / (1 + Stereo_UVWs.z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
 
-	int EyeID = floor(Stereo_UVWs.x * 2); //Assume left and right eyes
+    int EyeID = floor(Stereo_UVWs.x * 2); //Assume left and right eyes
 
-	Stereo_UVWs.x = frac(Stereo_UVWs.x * 2); //Make both eyes have proper UV.x
-	
-	///Doesn't support android.
-	//if (id.x < whd.x / 2) 	{
-	//	Stereo_UVWs = mul(LeftEyeMatrix, Stereo_UVWs);
-	//}
-	//else	{
-	//	Stereo_UVWs = mul(RightEyeMatrix, Stereo_UVWs);
-	//}
+    Stereo_UVWs.x = frac(Stereo_UVWs.x * 2); //Make both eyes have proper UV.x
+    
+    ///Doesn't support android.
+    //if (id.x < whd.x / 2) 	{
+    //	Stereo_UVWs = mul(LeftEyeMatrix, Stereo_UVWs);
+    //}
+    //else	{
+    //	Stereo_UVWs = mul(RightEyeMatrix, Stereo_UVWs);
+    //}
 
-	//Mask matrix transforms per eye
+    //Mask matrix transforms per eye
 //		Stereo_UVWs = (mul(LeftEyeMatrix, Stereo_UVWs) * (1-EyeID)) + (mul(RightEyeMatrix, Stereo_UVWs) * EyeID);
-	//Disabled until it's done correctly for log space
+    //Disabled until it's done correctly for log space
 
-	Stereo_UVWs.z = DecodeLogarithmicDepthGeneralized(Stereo_UVWs.z, _VBufferDistanceDecodingParams);
+    Stereo_UVWs.z = DecodeLogarithmicDepthGeneralized(Stereo_UVWs.z, _VBufferDistanceDecodingParams);
 
-	float ipd = 0.0001;
+    float ipd = 0.0001;
 
-	Stereo_UVWs.x = (((Stereo_UVWs.x + (ipd * (1- Stereo_UVWs.z)) )* (1-EyeID)) + (Stereo_UVWs.x - (ipd * (1 - Stereo_UVWs.z)) )*EyeID);
+    Stereo_UVWs.x = (((Stereo_UVWs.x + (ipd * (1- Stereo_UVWs.z)) )* (1-EyeID)) + (Stereo_UVWs.x - (ipd * (1 - Stereo_UVWs.z)) )*EyeID);
 
-	float invDepthNum = 1.0 / whd.z; // used to avoid division per slice TODO: move to sccpit
+    float invDepthNum = 1.0 / whd.z; // used to avoid division per slice TODO: move to sccpit
 
-	float previousDepth = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
+    float previousDepth = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
 
-	float4 previousResult = HistoryBuffer[id];
+    float4 previousResult = HistoryBuffer[id];
 
  //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
 //#if defined(SHADER_API_MOBILE)
@@ -127,30 +127,30 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 //#else
 //	[unroll(128)]
 //#endif 
-	for (float depth = 0.0; depth < whd.z; depth++) {
+    for (float depth = 0.0; depth < whd.z; depth++) {
 
-		float UVSlice = depth * invDepthNum; // slice / slicecount
+        float UVSlice = depth * invDepthNum; // slice / slicecount
 
-		//Sampling the input texture here instead of doing an ID lookup because we are offsetting the UVs to get stereo instead of doing it the previous step
-		float4 scatteringExtinction = 
-			InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0)  ; //Sample current Layer 
-		//float zDepth = GetWDepth(UVSlice);
-		float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
-		float travelDis = (zDepth - previousDepth)   ; //Distance between layers. Jittering and do temporal blend
-		//* (.5 + rndVal.z *.5)
-		float extinction = scatteringExtinction.a;
-		 float transmittance = exp(-extinction * travelDis );
+        //Sampling the input texture here instead of doing an ID lookup because we are offsetting the UVs to get stereo instead of doing it the previous step
+        float4 scatteringExtinction = 
+            InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0)  ; //Sample current Layer 
+        //float zDepth = GetWDepth(UVSlice);
+        float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
+        float travelDis = (zDepth - previousDepth)   ; //Distance between layers. Jittering and do temporal blend
+        //* (.5 + rndVal.z *.5)
+        float extinction = scatteringExtinction.a;
+         float transmittance = exp(-extinction * travelDis );
 
-	//	accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * _GlobalScattering; //Non-energy conserve
-		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction) * _GlobalScattering; //Corrected version
-		accumScatteringTransmittance.a *= transmittance ;
+    //	accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * _GlobalScattering; //Non-energy conserve
+        accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction) * _GlobalScattering.rgb; //Corrected version
+        accumScatteringTransmittance.a *= transmittance ;
 
 
-	//	float4 normalizedVoxelValue = accumScatteringTransmittance * rcp(travelDis);
+    //	float4 normalizedVoxelValue = accumScatteringTransmittance * rcp(travelDis);
 
-		Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
+        Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
 
-		previousDepth = zDepth;
-	}
+        previousDepth = zDepth;
+    }
 
 }

@@ -247,17 +247,17 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 //    output = volColor.rgb + output * volColor.a;
 //#endif
     if (surfaceType == 1)
-	{
+    {
         surfData.alpha = lerp(surfData.alpha, 1, surfData.reflectivity);
-		real fresnelTerm = (1.0h - saturate(fragData.NoV));
-		fresnelTerm *= fresnelTerm;
-		fresnelTerm *= fresnelTerm;
-		surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
+        real fresnelTerm = (1.0h - saturate(fragData.NoV));
+        fresnelTerm *= fresnelTerm;
+        fresnelTerm *= fresnelTerm;
+        surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
         surfData.alpha *= horizOcclusion;
         volColor.rgb *= surfData.alpha;
-	}
+    }
     
-	float4 finalColor = float4(output, surfData.alpha);
+    float4 finalColor = float4(output, surfData.alpha);
     finalColor = MixFogSurf(finalColor, -fragData.viewDir, ssrExtra.fogFactor, surfaceType);
     #if defined(_VOLUMETRICS_ENABLED)
     finalColor.rgb = volColor.rgb + finalColor.rgb * volColor.a;

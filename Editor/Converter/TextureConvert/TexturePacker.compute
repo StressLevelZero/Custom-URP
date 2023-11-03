@@ -24,8 +24,8 @@ uint inputChannelAlpha;
 SamplerState _LinearClamp;
 
 float InvertColor(float input, bool invert) {
-    if (!invert)  return input;
-    return 1 - input;
+   
+    return invert ? 1 - input : input;
 }
 
 float ExtractData(float2 UV, texture2D InputTexture, uint inputChannel) {
@@ -47,7 +47,7 @@ void CSMain (uint2 id : SV_DispatchThreadID)
 {
     float4 colorBuffer = float4(0, 0, 0, 1);
 
-    float2 wh;
+    float2 wh = (float2)0;
     Result.GetDimensions(wh.x, wh.y);
     float2 UV = (id + 0.5) / wh;
 

@@ -501,15 +501,15 @@ public class VolumetricBaking : EditorWindow
             /// 
 
             ///Sending data to the GPU
-            Debuger[] debuger = new Debuger[1];
-            debuger[0].DebugCcounter = 0;
+            //Debuger[] debuger = new Debuger[1];
+            //debuger[0].DebugCcounter = 0;
 
-            int DebugCountStride = sizeof(int); //Size of debug strut
-            int DebugID = Shader.PropertyToID("DebugBuffer");
+            //int DebugCountStride = sizeof(int); //Size of debug strut
+            //int DebugID = Shader.PropertyToID("DebugBuffer");
 
-            ComputeBuffer BakeBuffer = new ComputeBuffer(1, DebugCountStride);
-            BakeBuffer.SetData(debuger);
-            BakingShader.SetBuffer(shaderKernel, DebugID, BakeBuffer);
+            //ComputeBuffer BakeBuffer = new ComputeBuffer(1, DebugCountStride);
+            //BakeBuffer.SetData(debuger);
+            //BakingShader.SetBuffer(shaderKernel, DebugID, BakeBuffer);
             ///
 
          //   Graphics.CreateGraphicsFence ?
@@ -525,7 +525,7 @@ public class VolumetricBaking : EditorWindow
             //Sending data back to the CPU to check if work is done before writing to disk
          //   BakeBuffer.GetData(debuger);
      //       Debug.Log("Shot " + debuger[0].DebugCcounter + " rays");
-            BakeBuffer.Release(); //Avoiding memory leak
+            //BakeBuffer.Release(); //Avoiding memory leak
             ///
 
             //Define path and save 3d texture
@@ -1333,24 +1333,24 @@ public class VolumetricBaking : EditorWindow
         Mathf.CeilToInt(Texels.z / 4.0f)
         );
 
-        int DebugCountStride = sizeof(int); //Size of debug strut
-        int DebugID = Shader.PropertyToID("DebugBuffer");
+        //int DebugCountStride = sizeof(int); //Size of debug strut
+        //int DebugID = Shader.PropertyToID("DebugBuffer");
 
-        Debuger[] debuger = new Debuger[1];
-        debuger[0].DebugCcounter = 0;
+        //Debuger[] debuger = new Debuger[1];
+        //debuger[0].DebugCcounter = 0;
 
-        ComputeBuffer BakeBuffer = new ComputeBuffer(1, DebugCountStride);
-        BakingShader.SetBuffer(shaderKernel, DebugID, BakeBuffer);
+        //ComputeBuffer BakeBuffer = new ComputeBuffer(1, DebugCountStride);
+        //BakingShader.SetBuffer(shaderKernel, DebugID, BakeBuffer);
 
         BakingShader.Dispatch(shaderKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
 
-        while (debuger[0].DebugCcounter == 0)
-        {
-            BakeBuffer.GetData(debuger);
-         //   Debug.Log("Counter " + debuger[0].DebugCcounter);
-        }
+        //while (debuger[0].DebugCcounter == 0)
+        //{
+        //    //BakeBuffer.GetData(debuger);
+        // //   Debug.Log("Counter " + debuger[0].DebugCcounter);
+        //}
 
-        BakeBuffer.Release(); //Avoiding memory leak
+        //BakeBuffer.Release(); //Avoiding memory leak
       //  return RT3d;
     }
 
@@ -1444,7 +1444,6 @@ public class VolumetricBaking : EditorWindow
         //}
 
     //    VolumetricBakingRegisters._meshObjectsNeedRebuilding = false;
-        int _currentSample = 0;
 
         // Clear all lists
         _meshObjects.Clear();
@@ -1539,7 +1538,7 @@ public class VolumetricBaking : EditorWindow
         //buffer = new ComputeBuffer(data.Count, stride);
 
         // Do we already have a compute buffer?
-        if (buffer != null && data != null && stride != null)
+        if (buffer != null && data != null && stride != 0)
         {
             // If no data or buffer doesn't match the given criteria, release it
             if (data.Count == 0 || buffer.count != data.Count || buffer.stride != stride)

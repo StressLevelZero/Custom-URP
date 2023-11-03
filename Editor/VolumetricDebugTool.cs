@@ -16,7 +16,7 @@ public class VolumetricDebugTool : EditorTool
     VolumetricRendering VolumetricScript;
 
     //static bool isActive = false;
-    static bool isActive2 = false;
+    //static bool isActive2 = false;
     //float exposure = 1f;
     //float extinction;
     //Color scattering;
@@ -364,7 +364,7 @@ public class VolumetricDebugTool : EditorTool
     {
         if (VolumetricScript != null)
         {
-            isActive2 = false;
+            //isActive2 = false;
             activeToggle2.value = false;
             VolumetricScript.enableEditorPreview = false;
             VolumetricScript.disable();

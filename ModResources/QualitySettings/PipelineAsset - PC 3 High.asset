@@ -73,7 +73,7 @@ MonoBehaviour:
   m_VolumeFrameworkUpdateMode: 0
   m_EnableSSR: 1
   m_MaxSsrSteps: 35
-  m_SsrMinMip: 0
+  m_SsrMinMip: 1
   m_SsrHitRadius: 0.025
   m_SsrTemporalWeight: 0.5
   m_ShadowCascades: 2

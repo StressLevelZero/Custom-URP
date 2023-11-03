@@ -16,6 +16,10 @@ namespace UnityEngine.Rendering.Universal
         SpeedTree7,
         SpeedTree7Billboard,
         SpeedTree8,
+        /// <summary>
+        /// SLZ LitMAS
+        /// </summary>
+        LitMAS
         // If you add a value here, also add it to ShaderID in Editor/ShaderUtils.cs
     }
 
@@ -34,6 +38,7 @@ namespace UnityEngine.Rendering.Universal
             "Universal Render Pipeline/Nature/SpeedTree7",
             "Universal Render Pipeline/Nature/SpeedTree7 Billboard",
             "Universal Render Pipeline/Nature/SpeedTree8",
+            "SLZ/LitMAS/LitMAS Standard"
         };
 
         public static string GetShaderPath(ShaderPathID id)
@@ -72,6 +77,7 @@ namespace UnityEngine.Rendering.Universal
             "0f4122b9a743b744abe2fb6a0a88868b",
             "5ec81c81908db34429b4f6ddecadd3bd",
             "99134b1f0c27d54469a840832a28fadf",
+            "e2bc12b142787a84e95ff4f3ca0bac39", // LitMAS
         };
 
         /// <summary>

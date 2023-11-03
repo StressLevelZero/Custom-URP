@@ -13,27 +13,27 @@ SamplerState sampler_LinearClamp;
 [numthreads(4,4,4)]
 void CalculateMip(uint3 id : SV_DispatchThreadID)
 {
-		//id.xyz = min(id.xyz, _OutputDim.xyz - (1).xxx);
-		const float3 samplePoints[8] = {
-			float3(0.25, 0.25, 0.25),
-			float3(0.75, 0.25, 0.25),
-			float3(0.25, 0.75, 0.25),
-			float3(0.75, 0.75, 0.25),
-			float3(0.25, 0.25, 0.75),
-			float3(0.75, 0.25, 0.75),
-			float3(0.25, 0.75, 0.75),
-			float3(0.75, 0.75, 0.75),
-		};
-		float4 output = float4(0,0,0,0);
-		float3 coordsFloat = (float3)min(id.xyz, _OutputDim.xyz - (1).xxx);
-		float3 dimFloat = (float3)_OutputDim.xyz;
-		[unroll] for (int i = 0; i < 8; i++)
-		{
-			float3 voxelCenter = (coordsFloat + samplePoints[i]) / dimFloat;
-			output += 0.125 * _Input.SampleLevel(sampler_LinearClamp, voxelCenter, 0);
-		}
+        //id.xyz = min(id.xyz, _OutputDim.xyz - (1).xxx);
+        const float3 samplePoints[8] = {
+            float3(0.25, 0.25, 0.25),
+            float3(0.75, 0.25, 0.25),
+            float3(0.25, 0.75, 0.25),
+            float3(0.75, 0.75, 0.25),
+            float3(0.25, 0.25, 0.75),
+            float3(0.75, 0.25, 0.75),
+            float3(0.25, 0.75, 0.75),
+            float3(0.75, 0.75, 0.75),
+        };
+        float4 output = float4(0,0,0,0);
+        float3 coordsFloat = (float3)min(id.xyz, _OutputDim.xyz - (1).xxx);
+        float3 dimFloat = (float3)_OutputDim.xyz;
+        [unroll] for (int i = 0; i < 8; i++)
+        {
+            float3 voxelCenter = (coordsFloat + samplePoints[i]) / dimFloat;
+            output += 0.125 * _Input.SampleLevel(sampler_LinearClamp, voxelCenter, 0);
+        }
 
-		_Output[id.xyz] = output;
+        _Output[id.xyz] = output;
 }
 
 RWStructuredBuffer<uint2> _Buffer;
@@ -43,77 +43,77 @@ int4 _MipDimOffset;
 [numthreads(4,4,4)]
 void CalculateMipBuffer(uint3 id : SV_DispatchThreadID)
 {
-	if (id.x < _MipDimOffset.x && id.y < _MipDimOffset.y && id.z < _MipDimOffset.z)
-	{
-		//id.xyz = min(id.xyz, _OutputDim.xyz - (1).xxx);
-		const int3 samplePoints[8] =
-		{
-			int3(0, 0, 0),
-			int3(1, 0, 0),
-			int3(0, 1, 0),
-			int3(1, 1, 0),
-			int3(0, 0, 1),
-			int3(1, 0, 1),
-			int3(0, 1, 1),
-			int3(1, 1, 1),
-		};
-		float4 output = float4(0, 0, 0, 0);
-		int3 coords = (int3)id.xyz;
-		int3 prevCoords = 2 * coords;
-		int prevMipAdr = prevCoords.x + prevCoords.y * _PrevMipDimOffset.x + (prevCoords.z * _PrevMipDimOffset.x * _PrevMipDimOffset.y) + _PrevMipDimOffset.w;
-		int sliceSize = _PrevMipDimOffset.x * _PrevMipDimOffset.y;
-		//int sampleAddress[8] =
-		//{
-		//	prevMipAdr,
-		//	prevMipAdr + 1,
-		//	prevMipAdr + _PrevMipDimOffset.x,
-		//	prevMipAdr + 1 + _PrevMipDimOffset.x,
-		//	prevMipAdr + sliceSize,
-		//	prevMipAdr + 1 + sliceSize,
-		//	prevMipAdr + _PrevMipDimOffset.x + sliceSize,
-		//	prevMipAdr + 1 + _PrevMipDimOffset.x + sliceSize,
-		//};
-		int3 maxCoord = _PrevMipDimOffset.xyz - (1).xxx;
-		
-		[unroll]
-		for (int i = 0; i < 8; i++)
-		{
-			int sampleAddress = 
-				min(prevCoords.x + samplePoints[i].x, maxCoord.x) + 
-				min(prevCoords.y + samplePoints[i].y, maxCoord.y) * _PrevMipDimOffset.x + 
-				min(prevCoords.z + samplePoints[i].z, maxCoord.z) * _PrevMipDimOffset.x * _PrevMipDimOffset.y +
-				+ _PrevMipDimOffset.w;
-			uint2 dataHalf4 = _Buffer.Load(sampleAddress);
-			float4 dataFloat = float4(0, 0, 0, 0);
-			dataFloat.x = f16tof32(dataHalf4.x & 0xFFFF);
-			dataFloat.y = f16tof32(dataHalf4.x >> 16);
-			dataFloat.z = f16tof32(dataHalf4.y & 0xFFFF);
-			dataFloat.w = f16tof32(dataHalf4.y >> 16);
-			output += 0.125 * dataFloat;
-		}
-		
-		//output = float4(1,0,1,1);
-		uint2 outputHalf = uint2(0,0);
-		outputHalf.x = (f32tof16(output.x) & 0xFFFF) | (f32tof16(output.y) << 16);
-		outputHalf.y = (f32tof16(output.z) & 0xFFFF) | (f32tof16(output.w) << 16);
-		int mipAdr = coords.x + coords.y * _MipDimOffset.x + (coords.z * _MipDimOffset.x * _MipDimOffset.y) + _MipDimOffset.w;
-		
-		_Buffer[mipAdr] = outputHalf;
-	}
+    if (id.x < (uint)_MipDimOffset.x && id.y < (uint)_MipDimOffset.y && id.z < (uint)_MipDimOffset.z)
+    {
+        //id.xyz = min(id.xyz, _OutputDim.xyz - (1).xxx);
+        const int3 samplePoints[8] =
+        {
+            int3(0, 0, 0),
+            int3(1, 0, 0),
+            int3(0, 1, 0),
+            int3(1, 1, 0),
+            int3(0, 0, 1),
+            int3(1, 0, 1),
+            int3(0, 1, 1),
+            int3(1, 1, 1),
+        };
+        float4 output = float4(0, 0, 0, 0);
+        int3 coords = (int3)id.xyz;
+        int3 prevCoords = 2 * coords;
+        int prevMipAdr = prevCoords.x + prevCoords.y * _PrevMipDimOffset.x + (prevCoords.z * _PrevMipDimOffset.x * _PrevMipDimOffset.y) + _PrevMipDimOffset.w;
+        int sliceSize = _PrevMipDimOffset.x * _PrevMipDimOffset.y;
+        //int sampleAddress[8] =
+        //{
+        //	prevMipAdr,
+        //	prevMipAdr + 1,
+        //	prevMipAdr + _PrevMipDimOffset.x,
+        //	prevMipAdr + 1 + _PrevMipDimOffset.x,
+        //	prevMipAdr + sliceSize,
+        //	prevMipAdr + 1 + sliceSize,
+        //	prevMipAdr + _PrevMipDimOffset.x + sliceSize,
+        //	prevMipAdr + 1 + _PrevMipDimOffset.x + sliceSize,
+        //};
+        int3 maxCoord = _PrevMipDimOffset.xyz - (1).xxx;
+        
+        [unroll]
+        for (int i = 0; i < 8; i++)
+        {
+            int sampleAddress = 
+                min(prevCoords.x + samplePoints[i].x, maxCoord.x) + 
+                min(prevCoords.y + samplePoints[i].y, maxCoord.y) * _PrevMipDimOffset.x + 
+                min(prevCoords.z + samplePoints[i].z, maxCoord.z) * _PrevMipDimOffset.x * _PrevMipDimOffset.y +
+                + _PrevMipDimOffset.w;
+            uint2 dataHalf4 = _Buffer.Load(sampleAddress);
+            float4 dataFloat = float4(0, 0, 0, 0);
+            dataFloat.x = f16tof32(dataHalf4.x & 0xFFFF);
+            dataFloat.y = f16tof32(dataHalf4.x >> 16);
+            dataFloat.z = f16tof32(dataHalf4.y & 0xFFFF);
+            dataFloat.w = f16tof32(dataHalf4.y >> 16);
+            output += 0.125 * dataFloat;
+        }
+        
+        //output = float4(1,0,1,1);
+        uint2 outputHalf = uint2(0,0);
+        outputHalf.x = (f32tof16(output.x) & 0xFFFF) | (f32tof16(output.y) << 16);
+        outputHalf.y = (f32tof16(output.z) & 0xFFFF) | (f32tof16(output.w) << 16);
+        int mipAdr = coords.x + coords.y * _MipDimOffset.x + (coords.z * _MipDimOffset.x * _MipDimOffset.y) + _MipDimOffset.w;
+        
+        _Buffer[mipAdr] = outputHalf;
+    }
 }
 
 
 [numthreads(4,4,4)]
 void CopyTexToBuffer(uint3 id : SV_DispatchThreadID)
 {
-	if (id.x < _MipDimOffset.x && id.y < _MipDimOffset.y && id.z < _MipDimOffset.z)
-	{
-		int3 coords = (int3)id.xyz;
-		float4 output = _Input.Load(int4(coords, 0));
-		uint2 outputHalf = uint2(0,0);
-		outputHalf.x = (f32tof16(output.x) & 0xFFFF) | (f32tof16(output.y) << 16);
-		outputHalf.y = (f32tof16(output.z) & 0xFFFF) | (f32tof16(output.w) << 16);
-		uint mipAdr = id.x + (id.y * _MipDimOffset.x) + (id.z * _MipDimOffset.x * _MipDimOffset.y); // + _MipDimOffset.w; // offset is 0 for first mip
-		_Buffer[mipAdr] = outputHalf;
-	}
+    if (id.x < (uint)_MipDimOffset.x && id.y < (uint)_MipDimOffset.y && id.z < (uint)_MipDimOffset.z)
+    {
+        int3 coords = (int3)id.xyz;
+        float4 output = _Input.Load(int4(coords, 0));
+        uint2 outputHalf = uint2(0,0);
+        outputHalf.x = (f32tof16(output.x) & 0xFFFF) | (f32tof16(output.y) << 16);
+        outputHalf.y = (f32tof16(output.z) & 0xFFFF) | (f32tof16(output.w) << 16);
+        uint mipAdr = id.x + (id.y * _MipDimOffset.x) + (id.z * _MipDimOffset.x * _MipDimOffset.y); // + _MipDimOffset.w; // offset is 0 for first mip
+        _Buffer[mipAdr] = outputHalf;
+    }
 }

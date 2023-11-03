@@ -128,7 +128,7 @@ void MipMin(uint3 id : SV_DispatchThreadID)
         #else
             float max4 = 0.0;
         #endif
-        _MipDest[COORD_DEPTH(id)] = float4(min4,max4,0,0);
+        _MipDest[COORD_DEPTH(id)] = (float1or2)float4(min4,max4,0,0);
 }
 
 
@@ -162,7 +162,7 @@ void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, u
 #else
     float maxLevel0 = 0.0;
 #endif
-    _MipDest[COORD_DEPTH(id)] = float4(minLevel0, maxLevel0, 0, 0);
+    _MipDest[COORD_DEPTH(id)] = (float1or2)float4(minLevel0, maxLevel0, 0, 0);
     
     uint2 miniGroupId = uint2(0u,0u);
 
@@ -196,7 +196,7 @@ void MipMin2(uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupThreadID, u
                 float r1 = 0;
             #endif
 
-            _MipDest2[COORD_DEPTH(uv2)] = float4(r0,r1,0,0);
+            _MipDest2[COORD_DEPTH(uv2)] = (float1or2)float4(r0,r1,0,0);
         }
     }
     
@@ -257,6 +257,6 @@ void MipMinOdd(uint3 id : SV_DispatchThreadID)
 #endif
     }
 
-    _MipDest[COORD_DEPTH(id)] = float4(minLevel0, maxLevel0, 0,0);
+    _MipDest[COORD_DEPTH(id)] = (float1or2)float4(minLevel0, maxLevel0, 0,0);
     //}
 }

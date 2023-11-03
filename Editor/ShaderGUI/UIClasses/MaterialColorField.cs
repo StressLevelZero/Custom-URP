@@ -4,7 +4,6 @@ using UnityEditor;
 using UnityEditor.SLZMaterialUI;
 using UnityEditor.UIElements;
 using UnityEngine;
-using UnityEditor.UIElements;
 using UnityEngine.UIElements;
 
 namespace UnityEditor.SLZMaterialUI
