@@ -131,12 +131,15 @@ namespace UnityEditor
 
         void ValidateQueue()
         {
-            UnityEngine.Object[] array3 = materialEditor.targets;
-            foreach (UnityEngine.Object @object in array3)
+            if (materialEditor != null)
             {
-                Material mat = ((Material)@object);
-                int desiredQueue = mat.GetFloat("_Surface") > 0 ? 3000 : -1;
-                mat.renderQueue = desiredQueue;
+                UnityEngine.Object[] array3 = materialEditor.targets;
+                foreach (UnityEngine.Object @object in array3)
+                {
+                    Material mat = ((Material)@object);
+                    int desiredQueue = mat.GetFloat("_Surface") > 0 ? 3000 : -1;
+                    mat.renderQueue = desiredQueue;
+                }
             }
         }
 
