@@ -57,8 +57,47 @@ namespace UnityEditor
         public override void AssignNewShaderToMaterial(Material material, Shader oldShader, Shader newShader)
         {
             base.AssignNewShaderToMaterial(material, oldShader, newShader);
-            ValidateQueue();
-            hasInitialized = false;
+            float surface = material.GetFloat("_Surface");
+            Debug.Log(oldShader.name);
+            if (oldShader.name.StartsWith("Universal Render Pipeline"))
+            {
+                bool hasBlendmode = oldShader.FindPropertyIndex("_Blend") >= 0;
+                if (hasBlendmode) 
+                {
+                    float blend = material.GetFloat("_Blend");
+                    
+                    if (surface > 0.0f && blend == (float)BaseShaderGUI.BlendMode.Alpha)
+                    {
+                        surface = 2.0f;
+                        material.SetFloat("_Surface", surface);
+                    }
+                }
+            }
+            bool hasTemporalAcm = newShader.FindPropertyIndex("_SSRTemporalMul") >= 0;
+            switch (surface)
+            {
+                case 0:
+                    material.SetFloat("_BlendSrc", (float)UnityEngine.Rendering.BlendMode.One);
+                    material.SetFloat("_BlendDst", (float)UnityEngine.Rendering.BlendMode.Zero);
+                    material.SetFloat("_ZWrite", 1);
+                    material.renderQueue = -1;
+                    if (hasTemporalAcm) material.SetFloat("_SSRTemporalMul", 1.0f);
+                    break;
+                case 1:
+                    material.SetFloat("_BlendSrc", (float)UnityEngine.Rendering.BlendMode.One);
+                    material.SetFloat("_BlendDst", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    material.SetFloat("_ZWrite", 0);
+                    if (hasTemporalAcm) material.SetFloat("_SSRTemporalMul", 0.0f);
+                    material.renderQueue = 3000;
+                    break;
+                case 2:
+                    material.SetFloat("_BlendSrc", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    material.SetFloat("_BlendDst", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    material.SetFloat("_ZWrite", 0);
+                    if (hasTemporalAcm) material.SetFloat("_SSRTemporalMul", 0.0f);
+                    material.renderQueue = 3000;
+                    break;
+            }
         }
 
         public override void DrawSurfaceOptions(Material material)
@@ -129,18 +168,9 @@ namespace UnityEditor
             }
         }
 
-        void ValidateQueue()
+        void ValidateQueue(Material mat)
         {
-            if (materialEditor != null)
-            {
-                UnityEngine.Object[] array3 = materialEditor.targets;
-                foreach (UnityEngine.Object @object in array3)
-                {
-                    Material mat = ((Material)@object);
-                    int desiredQueue = mat.GetFloat("_Surface") > 0 ? 3000 : -1;
-                    mat.renderQueue = desiredQueue;
-                }
-            }
+
         }
 
         public static void UpdateMaterial(Material material, MaterialUpdateType updateType)
