@@ -22,7 +22,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/EncodeNormalsTexture.hlsl"
 // Begin Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 
 struct appdata
@@ -68,9 +68,9 @@ half  _Normals;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-	int _NumberOfHits;
-	half4 _HitColor;
-	half4 EllipsoidPosArray[HitMatrixRowCount];
+    int _NumberOfHits;
+    half4 _HitColor;
+    half4 EllipsoidPosArray[HitMatrixRowCount];
 // End Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 	int _Surface;
 CBUFFER_END
