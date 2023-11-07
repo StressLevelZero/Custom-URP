@@ -16,28 +16,28 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("DetailMap", 2D) = "gray" {}
         [NoScaleOffset][SingleLineTexture][Space(20)][Header(Hit Setup)][Space(10)]_HitRamp("Hit Ramp", 2D) = "black" {}
-        [HDR]_HitColor("HitColor", Color) = (0,0,0,0)
+        [HDR]_HitColor("HitColor", Color) = (0.2924528,0,0,1)
         [HideInInspector]_NumberOfHits("_NumberOfHits", Int) = 0
         [Space(30)][Header(BRDF map)][Space(10)][Toggle(_BRDFMAP)] BRDFMAP("BRDFMAP enabled", Float) = 0
         [NoScaleOffset][SingleLineTexture]g_tBRDFMap("BRDF Ramp", 2D) = "black" {}
         [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_NO_SSR)] _SSROff("Disable SSR", Float) = 0
         [Header(This should be 0 for skinned meshes)]
-        _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
+        _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 0.0
 
-		[HideInInspector]_Surface ("Surface Type", float) = 0
-		[HideInInspector]_BlendSrc ("Blend Source", float) = 1
-		[HideInInspector]_BlendDst ("Blend Destination", float) = 0
-		[HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
-		[HideInInspector]_Cull ("Cull Side", float) = 2
+        [HideInInspector]_Surface ("Surface Type", float) = 0
+        [HideInInspector]_BlendSrc ("Blend Source", float) = 1
+        [HideInInspector]_BlendDst ("Blend Destination", float) = 0
+        [HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
+        [HideInInspector]_Cull ("Cull Side", float) = 2
     }
     SubShader
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
         //Blend One Zero
-		//ZWrite On
-		ZTest LEqual
-		Offset 0 , 0
-		ColorMask RGBA
+        //ZWrite On
+        ZTest LEqual
+        Offset 0 , 0
+        ColorMask RGBA
         LOD 100
 
 HLSLINCLUDE
@@ -49,8 +49,8 @@ ENDHLSL
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             HLSLPROGRAM
             #pragma only_renderers vulkan
             #pragma vertex vert
@@ -61,26 +61,26 @@ ENDHLSL
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_IMPACTS
             #pragma shader_feature_local_fragment _BRDFMAP
-			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			#pragma require WaveVote
-			#pragma require QuadShuffle
-			#define _SM6_QUAD 1
-			#endif
+            #if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+            #pragma require WaveVote
+            #pragma require QuadShuffle
+            #define _SM6_QUAD 1
+            #endif
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
 
             ENDHLSL
         }
 
-		Pass
+        Pass
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
 
-			//ZTest Off
-			ColorMask 0
+            //ZTest Off
+            ColorMask 0
 
             HLSLPROGRAM
             #pragma only_renderers vulkan
@@ -97,8 +97,8 @@ ENDHLSL
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
             
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
@@ -112,36 +112,36 @@ ENDHLSL
             ENDHLSL
         }
 
- 		Pass
-		{
-			
-			Name "ShadowCaster"
-			Tags { "LightMode"="ShadowCaster" }
+        Pass
+        {
+            
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
  
-			ZWrite [_ZWrite]
-			Cull Off
-			ZTest LEqual
-			AlphaToMask Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull Off
+            ZTest LEqual
+            AlphaToMask Off
+            ColorMask 0
 
-			HLSLPROGRAM
-			#pragma only_renderers vulkan
-			#pragma vertex vert
-			#pragma fragment frag
+            HLSLPROGRAM
+            #pragma only_renderers vulkan
+            #pragma vertex vert
+            #pragma fragment frag
 
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include "LitMASInclude/ShadowCaster.hlsl" 
 
-			ENDHLSL
-		}
+            ENDHLSL
+        }
 
         Pass
-		{
-			
+        {
+            
             Name "BakedRaytrace"
             Tags{ "LightMode" = "BakedRaytrace" }
-			HLSLPROGRAM
+            HLSLPROGRAM
 #pragma only_renderers vulkan
             #include "LitMASInclude/BakedRayTrace.hlsl"
 
@@ -154,10 +154,10 @@ ENDHLSL
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
         //Blend One Zero
-		//ZWrite On
-		ZTest LEqual
-		Offset 0 , 0
-		ColorMask RGBA
+        //ZWrite On
+        ZTest LEqual
+        Offset 0 , 0
+        ColorMask RGBA
         LOD 100
 
 HLSLINCLUDE
@@ -169,8 +169,8 @@ ENDHLSL
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             HLSLPROGRAM
             #pragma exclude_renderers vulkan
             #pragma vertex vert
@@ -181,25 +181,25 @@ ENDHLSL
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_IMPACTS
             #pragma shader_feature_local_fragment _BRDFMAP
-			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			#pragma require QuadShuffle
-			#define _SM6_QUAD 1
-			#endif
+            #if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+            #pragma require QuadShuffle
+            #define _SM6_QUAD 1
+            #endif
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
 
             ENDHLSL
         }
 
-		Pass
+        Pass
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
 
-			//ZTest Off
-			ColorMask 0
+            //ZTest Off
+            ColorMask 0
            
             HLSLPROGRAM
             #pragma exclude_renderers vulkan
@@ -216,8 +216,8 @@ ENDHLSL
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
             
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
@@ -232,37 +232,37 @@ ENDHLSL
             ENDHLSL
         }
 
- 		Pass
-		{
-			
-			Name "ShadowCaster"
-			Tags { "LightMode"="ShadowCaster" }
+        Pass
+        {
+            
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
  
-			ZWrite [_ZWrite]
-			Cull Off
-			ZTest LEqual
-			AlphaToMask Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull Off
+            ZTest LEqual
+            AlphaToMask Off
+            ColorMask 0
 
-			HLSLPROGRAM
+            HLSLPROGRAM
             #pragma exclude_renderers vulkan
-			
-			#pragma vertex vert
-			#pragma fragment frag
+            
+            #pragma vertex vert
+            #pragma fragment frag
 
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include "LitMASInclude/ShadowCaster.hlsl" 
 
-			ENDHLSL
-		}
+            ENDHLSL
+        }
 
         Pass
-		{
-			
+        {
+            
             Name "BakedRaytrace"
             Tags{ "LightMode" = "BakedRaytrace" }
-			HLSLPROGRAM
+            HLSLPROGRAM
             #pragma exclude_renderers vulkan
 
             #include "LitMASInclude/BakedRayTrace.hlsl"
@@ -270,8 +270,8 @@ ENDHLSL
             ENDHLSL
         }
     }
-	//CustomEditor "LitMASGUI"
-	CustomEditor "UnityEditor.LitMASIMGUI"
+    //CustomEditor "LitMASGUI"
+    CustomEditor "UnityEditor.LitMASIMGUI"
     //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }

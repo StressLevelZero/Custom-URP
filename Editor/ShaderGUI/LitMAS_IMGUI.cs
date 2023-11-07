@@ -62,6 +62,8 @@ namespace UnityEditor
             if (oldShader.name.StartsWith("Universal Render Pipeline"))
             {
                 bool hasBlendmode = oldShader.FindPropertyIndex("_Blend") >= 0;
+                
+
                 if (hasBlendmode) 
                 {
                     float blend = material.GetFloat("_Blend");
@@ -71,6 +73,11 @@ namespace UnityEditor
                         surface = 2.0f;
                         material.SetFloat("_Surface", surface);
                     }
+                }
+                bool hasEmission = material.IsKeywordEnabled("_EMISSION");
+                if (hasEmission) 
+                {
+                    material.SetFloat("_Emission", 1);
                 }
             }
             bool hasTemporalAcm = newShader.FindPropertyIndex("_SSRTemporalMul") >= 0;

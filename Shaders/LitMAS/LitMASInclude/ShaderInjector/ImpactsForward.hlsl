@@ -148,17 +148,17 @@ float4 _DetailMap_ST;
 half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-	half4x4 EllipsoidPosArray[HitArrayCount];
-	int _NumberOfHits;
-	half4 _HitColor;
-// End Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
 	half  _Emission;
 	half4 _EmissionColor;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
+	int _NumberOfHits;
+	half4 _HitColor;
+	half4 EllipsoidPosArray[HitMatrixRowCount];
+// End Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 	int _Surface;
 CBUFFER_END
 
@@ -360,7 +360,7 @@ half4 frag(VertOut i) : SV_Target
 
 // Begin Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
 	#if !defined(_SSR_ENABLED)
-		color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
+		color = MixFogSurf(color, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif

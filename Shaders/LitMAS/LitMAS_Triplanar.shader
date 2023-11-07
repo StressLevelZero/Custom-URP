@@ -23,21 +23,21 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         [Header(This should be 0 for skinned meshes)]
         _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
 
-		[HideInInspector]_Surface ("Surface Type", float) = 0
-		[HideInInspector]_BlendSrc ("Blend Source", float) = 1
-		[HideInInspector]_BlendDst ("Blend Destination", float) = 0
-		[HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
-		[HideInInspector]_Cull ("Cull Side", float) = 2
+        [HideInInspector]_Surface ("Surface Type", float) = 0
+        [HideInInspector]_BlendSrc ("Blend Source", float) = 1
+        [HideInInspector]_BlendDst ("Blend Destination", float) = 0
+        [HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
+        [HideInInspector]_Cull ("Cull Side", float) = 2
       
     }
     SubShader
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
         //Blend One Zero
-		//ZWrite On
-		ZTest LEqual
-		Offset 0 , 0
-		ColorMask RGBA
+        //ZWrite On
+        ZTest LEqual
+        Offset 0 , 0
+        ColorMask RGBA
         LOD 100
 
         Pass
@@ -45,8 +45,8 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             HLSLPROGRAM
             //#pragma use_dxc
             #pragma only_renderers vulkan
@@ -57,24 +57,24 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #define LITMAS_FEATURE_LIGHTMAPPING
             #define LITMAS_FEATURE_TP
             #define LITMAS_FEATURE_EMISSION
-			#if defined(SHADER_API_DESKTOP)
-			#pragma require WaveVote
-			#pragma require QuadShuffle
-			#define _SM6_QUAD 1
-			#endif
+            #if defined(SHADER_API_DESKTOP)
+            #pragma require WaveVote
+            #pragma require QuadShuffle
+            #define _SM6_QUAD 1
+            #endif
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarForward.hlsl"
             ENDHLSL
         }
 
-		Pass
+        Pass
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
-			//ZTest Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull [_Cull]
+            //ZTest Off
+            ColorMask 0
 
             HLSLPROGRAM
             #pragma only_renderers vulkan
@@ -92,7 +92,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
             ZWrite [_ZWrite]
-			Cull [_Cull]
+            Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
@@ -106,29 +106,29 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             ENDHLSL
         }
 
- 		Pass
-		{
-			
-			Name "ShadowCaster"
-			Tags { "LightMode"="ShadowCaster" }
+        Pass
+        {
+            
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
 
-			ZWrite [_ZWrite]
-			Cull Off
-			ZTest LEqual
-			AlphaToMask Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull Off
+            ZTest LEqual
+            AlphaToMask Off
+            ColorMask 0
 
-			HLSLPROGRAM
+            HLSLPROGRAM
             #pragma only_renderers vulkan
-			
-			#pragma vertex vert
-			#pragma fragment frag
+            
+            #pragma vertex vert
+            #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "LitMASInclude/ShadowCaster.hlsl" 
 
-			ENDHLSL
-		}
+            ENDHLSL
+        }
 
         Pass
         {
@@ -156,11 +156,11 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         }
 
         Pass
-		{
-			
+        {
+            
             Name "BakedRaytrace"
             Tags{ "LightMode" = "BakedRaytrace" }
-			HLSLPROGRAM
+            HLSLPROGRAM
             #pragma only_renderers vulkan
 
             #include "LitMASInclude/BakedRayTrace.hlsl"
@@ -174,10 +174,10 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
         //Blend One Zero
-		//ZWrite On
-		ZTest LEqual
-		Offset 0 , 0
-		ColorMask RGBA
+        //ZWrite On
+        ZTest LEqual
+        Offset 0 , 0
+        ColorMask RGBA
         LOD 100
 
         Pass
@@ -185,8 +185,8 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             HLSLPROGRAM
             #pragma exclude_renderers vulkan
 
@@ -198,23 +198,23 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #define LITMAS_FEATURE_LIGHTMAPPING
             #define LITMAS_FEATURE_TP
             #define LITMAS_FEATURE_EMISSION
-			//#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			//#pragma require QuadShuffle
-			//#define _SM6_QUAD 1
-			//#endif
+            //#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+            //#pragma require QuadShuffle
+            //#define _SM6_QUAD 1
+            //#endif
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarForward.hlsl"
             ENDHLSL
         }
 
-		Pass
+        Pass
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
-			//ZTest Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull [_Cull]
+            //ZTest Off
+            ColorMask 0
 
             HLSLPROGRAM
             #pragma exclude_renderers vulkan            
@@ -231,7 +231,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
             ZWrite [_ZWrite]
-			Cull [_Cull]
+            Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
@@ -245,28 +245,28 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             ENDHLSL
         }
 
- 		Pass
-		{
-			
-			Name "ShadowCaster"
-			Tags { "LightMode"="ShadowCaster" }
+        Pass
+        {
+            
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
 
-			ZWrite [_ZWrite]
-			Cull Off
-			ZTest LEqual
-			AlphaToMask Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull Off
+            ZTest LEqual
+            AlphaToMask Off
+            ColorMask 0
 
-			HLSLPROGRAM
+            HLSLPROGRAM
             #pragma exclude_renderers vulkan			
-			#pragma vertex vert
-			#pragma fragment frag
+            #pragma vertex vert
+            #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "LitMASInclude/ShadowCaster.hlsl" 
 
-			ENDHLSL
-		}
+            ENDHLSL
+        }
 
         Pass
         {
@@ -293,11 +293,11 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         }
 
         Pass
-		{
-			
+        {
+            
             Name "BakedRaytrace"
             Tags{ "LightMode" = "BakedRaytrace" }
-			HLSLPROGRAM
+            HLSLPROGRAM
             #pragma exclude_renderers vulkan
             #include "LitMASInclude/BakedRayTrace.hlsl"
 
@@ -306,7 +306,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
     }
 
     //CustomEditor "LitMASGUI"
-	CustomEditor "UnityEditor.LitMASIMGUI"
+    CustomEditor "UnityEditor.LitMASIMGUI"
     //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }

@@ -2,6 +2,7 @@
 #define POSESPACE_INCLUDED
 
 #define HitArrayCount 32
+#define HitMatrixRowCount HitArrayCount * 3
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Macros.hlsl"
 
@@ -13,13 +14,14 @@
 
 TEXTURE2D(_HitRamp); SAMPLER(sampler_HitRamp);
 
-inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitArrayCount], int NumberOfHits )
+inline half2 GetClosestImpactUV( half3 Posespace, half4 EllipsoidPosArray[HitMatrixRowCount], int NumberOfHits )
 {
     half HitDistance = 1;
     half3 closestHit = half3(0,0,0);
-    for ( int i = 0; i <NumberOfHits; i++ ){
-        half3 LocalPosP = half3(Posespace - (EllipsoidPosArray[i][0][3],EllipsoidPosArray[i][1][3],EllipsoidPosArray[i][2][3]));
-        half3 localspace = mul( LocalPosP , (half3x3)EllipsoidPosArray[i] ).xyz;
+    UNITY_LOOP for ( int i = 0; i < NumberOfHits; i++ ){
+        half3x4 EllipsoidPos = half3x4(EllipsoidPosArray[3*i],EllipsoidPosArray[3*i+1],EllipsoidPosArray[3*i+2]); 
+        half3 LocalPosP = half3(Posespace - half3(EllipsoidPos[0][3],EllipsoidPos[1][3],EllipsoidPos[2][3]));
+        half3 localspace = mul( LocalPosP , (half3x3)EllipsoidPos ).xyz;
         half3 currentdist = saturate(  length( localspace));
         closestHit = currentdist < HitDistance ? localspace : closestHit;
         HitDistance =  min( HitDistance, currentdist );

@@ -19,20 +19,20 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
         [Header(This should be 0 for skinned meshes)]
         _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
 
-		[HideInInspector]_Surface ("Surface Type", float) = 0
-		[HideInInspector]_BlendSrc ("Blend Source", float) = 1
-		[HideInInspector]_BlendDst ("Blend Destination", float) = 0
-		[HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
-		[HideInInspector]_Cull ("Cull Side", float) = 2
+        [HideInInspector]_Surface ("Surface Type", float) = 0
+        [HideInInspector]_BlendSrc ("Blend Source", float) = 1
+        [HideInInspector]_BlendDst ("Blend Destination", float) = 0
+        [HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
+        [HideInInspector]_Cull ("Cull Side", float) = 2
     }
     SubShader
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
         //Blend One Zero
-		//ZWrite On
-		ZTest LEqual
-		Offset 0 , 0
-		ColorMask RGBA
+        //ZWrite On
+        ZTest LEqual
+        Offset 0 , 0
+        ColorMask RGBA
         LOD 100
 
 
@@ -41,10 +41,10 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             HLSLPROGRAM
-			#pragma only_renderers vulkan
+            #pragma only_renderers vulkan
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 5.0
@@ -53,28 +53,28 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             #define LITMAS_FEATURE_TS_NORMALS
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_SSR
-			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			#pragma require WaveVote
-			#pragma require QuadShuffle
-			#define _SM6_QUAD 1
-			#endif
+            #if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+            #pragma require WaveVote
+            #pragma require QuadShuffle
+            #define _SM6_QUAD 1
+            #endif
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "LitMASInclude/ShaderInjector/VertexColorAOForward.hlsl"
             //
             ENDHLSL
         }
 
-		Pass
+        Pass
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
-			//ZTest Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull [_Cull]
+            //ZTest Off
+            ColorMask 0
 
             HLSLPROGRAM
-			#pragma only_renderers vulkan
+            #pragma only_renderers vulkan
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
@@ -87,13 +87,13 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
         {
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
             HLSLPROGRAM
-			#pragma only_renderers vulkan
+            #pragma only_renderers vulkan
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
@@ -102,30 +102,30 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             ENDHLSL
         }
 
- 		Pass
-		{
-			
-			Name "ShadowCaster"
-			Tags { "LightMode"="ShadowCaster" }
+        Pass
+        {
+            
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
 
-			ZWrite [_ZWrite]
-			Cull Off
-			ZTest LEqual
-			AlphaToMask Off
+            ZWrite [_ZWrite]
             Cull Off
-			ColorMask 0
+            ZTest LEqual
+            AlphaToMask Off
+            Cull Off
+            ColorMask 0
 
-			HLSLPROGRAM
-			#pragma only_renderers vulkan
-			#pragma vertex vert
-			#pragma fragment frag
+            HLSLPROGRAM
+            #pragma only_renderers vulkan
+            #pragma vertex vert
+            #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "LitMASInclude/ShadowCaster.hlsl"
 
-			ENDHLSL
-		}
+            ENDHLSL
+        }
 
         Pass
         {
@@ -133,11 +133,11 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             Tags { "LightMode" = "Meta" }
 
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
+            ZWrite [_ZWrite]
             Cull Off
 
             HLSLPROGRAM
-			#pragma only_renderers vulkan
+            #pragma only_renderers vulkan
 
             #define _NORMAL_DROPOFF_TS 1
             #define _EMISSION
@@ -154,12 +154,12 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
         }
 
         Pass
-		{
-			
+        {
+            
             Name "BakedRaytrace"
             Tags{ "LightMode" = "BakedRaytrace" }
-			HLSLPROGRAM
-			#pragma only_renderers vulkan
+            HLSLPROGRAM
+            #pragma only_renderers vulkan
 
             #include "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
 
@@ -172,10 +172,10 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
         //Blend One Zero
-		//ZWrite On
-		ZTest LEqual
-		Offset 0 , 0
-		ColorMask RGBA
+        //ZWrite On
+        ZTest LEqual
+        Offset 0 , 0
+        ColorMask RGBA
         LOD 100
 
 
@@ -184,10 +184,10 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             HLSLPROGRAM
-			#pragma exclude_renderers vulkan
+            #pragma exclude_renderers vulkan
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 5.0
@@ -196,27 +196,27 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             #define LITMAS_FEATURE_TS_NORMALS
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_SSR
-			//#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			//#pragma require QuadShuffle
-			//#define _SM6_QUAD 1
-			//#endif
+            //#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
+            //#pragma require QuadShuffle
+            //#define _SM6_QUAD 1
+            //#endif
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "LitMASInclude/ShaderInjector/VertexColorAOForward.hlsl"
             //
             ENDHLSL
         }
 
-		Pass
+        Pass
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
-			//ZTest Off
-			ColorMask 0
+            ZWrite [_ZWrite]
+            Cull [_Cull]
+            //ZTest Off
+            ColorMask 0
 
             HLSLPROGRAM
-			#pragma exclude_renderers vulkan
+            #pragma exclude_renderers vulkan
             
             #pragma vertex vert
             #pragma fragment frag
@@ -230,13 +230,13 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
         {
             Name "DepthNormals"
             Tags {"Lightmode" = "DepthNormals"}
-			ZWrite [_ZWrite]
-			Cull [_Cull]
+            ZWrite [_ZWrite]
+            Cull [_Cull]
             //ZTest Off
             //ColorMask 0
 
             HLSLPROGRAM
-			#pragma exclude_renderers vulkan
+            #pragma exclude_renderers vulkan
 
             #pragma vertex vert
             #pragma fragment frag
@@ -246,31 +246,31 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             ENDHLSL
         }
 
- 		Pass
-		{
-			
-			Name "ShadowCaster"
-			Tags { "LightMode"="ShadowCaster" }
+        Pass
+        {
+            
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
 
-			ZWrite [_ZWrite]
-			Cull Off
-			ZTest LEqual
-			AlphaToMask Off
+            ZWrite [_ZWrite]
             Cull Off
-			ColorMask 0
+            ZTest LEqual
+            AlphaToMask Off
+            Cull Off
+            ColorMask 0
 
-			HLSLPROGRAM
-			#pragma exclude_renderers vulkan
-			
-			#pragma vertex vert
-			#pragma fragment frag
+            HLSLPROGRAM
+            #pragma exclude_renderers vulkan
+            
+            #pragma vertex vert
+            #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "LitMASInclude/ShadowCaster.hlsl"
 
-			ENDHLSL
-		}
+            ENDHLSL
+        }
 
         Pass
         {
@@ -278,11 +278,11 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             Tags { "LightMode" = "Meta" }
 
             Blend [_BlendSrc] [_BlendDst]
-			ZWrite [_ZWrite]
+            ZWrite [_ZWrite]
             Cull Off
 
             HLSLPROGRAM
-			#pragma exclude_renderers vulkan
+            #pragma exclude_renderers vulkan
 
             #define _NORMAL_DROPOFF_TS 1
             #define _EMISSION
@@ -299,12 +299,12 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
         }
 
         Pass
-		{
-			
+        {
+            
             Name "BakedRaytrace"
             Tags{ "LightMode" = "BakedRaytrace" }
-			HLSLPROGRAM
-			#pragma exclude_renderers vulkan
+            HLSLPROGRAM
+            #pragma exclude_renderers vulkan
 
             #include "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
 
@@ -312,7 +312,7 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
         }
     }
     //CustomEditor "LitMASGUI"
-	CustomEditor "UnityEditor.LitMASIMGUI"
+    CustomEditor "UnityEditor.LitMASIMGUI"
     //CustomEditor "UnityEditor.ShaderGraphLitGUI"
     Fallback "Hidden/InternalErrorShader"
 }
