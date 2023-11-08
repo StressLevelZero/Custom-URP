@@ -2,7 +2,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
 {
     Properties
     {
-        [ForceReload][MainTexture] _BaseMap("Texture", 2D) = "white" {}
+        [MainTexture] _BaseMap("Texture", 2D) = "white" {}
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
         _PenMap("Pen Texture", 2D) = "black" {}
         [ToggleUI] _PenMono("Pen Monochrome", float) = 0

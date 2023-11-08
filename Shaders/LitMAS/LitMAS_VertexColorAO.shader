@@ -3,7 +3,7 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
 {
     Properties
     {
-        [ForceReload][MainTexture] _BaseMap("Texture", 2D) = "white" {}
+        [MainTexture] _BaseMap("Texture", 2D) = "white" {}
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
         [ToggleUI] _Normals("Normal Map enabled", Float) = 0
         [NoScaleOffset][Normal] _BumpMap ("Normal map", 2D) = "bump" {}

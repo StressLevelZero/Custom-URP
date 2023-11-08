@@ -3,7 +3,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 {
     Properties
     {
-        [ForceReload][Toggle(_EXPENSIVE_TP)] _Expensive("Fix Derivative Seams (expensive)", float) = 0
+        [Toggle(_EXPENSIVE_TP)] _Expensive("Fix Derivative Seams (expensive)", float) = 0
         [NoScaleOffset][MainTexture] _BaseMap("Texture", 2D) = "white" {}
         _UVScaler("Texture Scale", Float) = 1
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
