@@ -73,8 +73,14 @@ namespace UnityEngine.Rendering.Universal
             //    Debug.Log("Null Sky was Set");
             //}
 
-            if (!isNullSky.value && SkyTexture.overrideState) SkyManager.SetSkyTexture(SkyTexture.value);
-            else SkyManager.CheckSky();
+            if (SkyTexture.overrideState && !isNullSky.value && SkyTexture.value)
+            {
+                SkyManager.SetSkyTexture(SkyTexture.value);
+            }
+            else
+            {
+                SkyManager.CheckSky();
+            }
 
 
             // Only check if skytexture.value is null once and cache the result.
