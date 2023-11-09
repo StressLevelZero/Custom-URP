@@ -48,7 +48,7 @@ namespace UnityEngine.Rendering.Universal
         public MinFloatParameter GlobalStaticLightMultiplier = new MinFloatParameter(1f, .1f);
         public ColorParameter VolumetricAlbedo = new ColorParameter(Color.white,false);
         [HideInInspector]
-        public BoolParameter isNullSky = new BoolParameter(false);
+        public BoolParameter isNullSky = new BoolParameter(true);
 
         //public BoolParameter testBool = new BoolParameter(false);
 

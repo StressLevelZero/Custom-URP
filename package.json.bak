@@ -5,6 +5,7 @@
   "unity": "2021.2",
   "unityRelease": "0a19",
   "displayName": "SLZ Universal RP",
+  "hideInEditor": false,
   "dependencies": {
     "com.unity.mathematics": "1.2.1",
     "com.unity.burst": "1.5.0",
