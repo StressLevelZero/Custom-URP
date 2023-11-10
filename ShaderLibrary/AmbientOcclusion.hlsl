@@ -8,15 +8,15 @@
 
 // SLZ MODIFIED // Handle shaders with non-dynamic _SCREEN_SPACE_OCCLUSION
 
-#if defined(DYNAMIC_SCREEN_SPACE_OCCLUSION)
-	#define BRANCH_SCREEN_SPACE_OCCLUSION _SCREEN_SPACE_OCCLUSION
-#else
-	#if defined(_SCREEN_SPACE_OCCLUSION)
-		#define BRANCH_SCREEN_SPACE_OCCLUSION true
-	#else
-		#define BRANCH_SCREEN_SPACE_OCCLUSION false
-	#endif
-#endif
+//#if defined(DYNAMIC_SCREEN_SPACE_OCCLUSION)
+//	#define BRANCH_SCREEN_SPACE_OCCLUSION _SCREEN_SPACE_OCCLUSION
+//#else
+//	#if defined(_SCREEN_SPACE_OCCLUSION)
+//		#define BRANCH_SCREEN_SPACE_OCCLUSION true
+//	#else
+//		#define BRANCH_SCREEN_SPACE_OCCLUSION false
+//	#endif
+//#endif
 
 // END SLZ MODIFIED
 
@@ -41,8 +41,8 @@ AmbientOcclusionFactor GetScreenSpaceAmbientOcclusion(float2 normalizedScreenSpa
 	AmbientOcclusionFactor aoFactor;
 	aoFactor.directAmbientOcclusion = 1;
 	aoFactor.indirectAmbientOcclusion = 1;
-	#if !defined(_SURFACE_TYPE_TRANSPARENT)
-	UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+	#if !defined(_SURFACE_TYPE_TRANSPARENT) && defined(_SCREEN_SPACE_OCCLUSION)
+	//UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{
 		float ssao = SampleAmbientOcclusion(normalizedScreenSpaceUV);
 	
@@ -74,9 +74,9 @@ AmbientOcclusionFactor GetScreenSpaceAmbientOcclusionDir(InputData inputData)
 	AmbientOcclusionFactor aoFactor;
 	aoFactor.directAmbientOcclusion = 1;
 	aoFactor.indirectAmbientOcclusion = 1;
-	#if !defined(_SURFACE_TYPE_TRANSPARENT)
+	#if !defined(_SURFACE_TYPE_TRANSPARENT) && defined(_SCREEN_SPACE_OCCLUSION)
     
-	if (BRANCH_SCREEN_SPACE_OCCLUSION)
+	//if (BRANCH_SCREEN_SPACE_OCCLUSION)
     {
         float4 ssao = SampleAmbientOcclusion(inputData.normalizedScreenSpaceUV);
 	

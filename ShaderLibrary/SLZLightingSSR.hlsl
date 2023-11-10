@@ -2,16 +2,16 @@
  * Stress Level Zero Lighting functions
  */   
 
-#ifndef SLZ_PBR_LIGHTING_SSR
+#if !defined(SLZ_PBR_LIGHTING_SSR) && !defined(SHADER_API_MOBILE)
 #define SLZ_PBR_LIGHTING_SSR
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSR.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSRGlobals.hlsl"
 
-#if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
-#define _ADDITIONAL_LIGHTS false
-#endif
+//#if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
+//#define _ADDITIONAL_LIGHTS false
+//#endif
 
 half4 CalcFogFactors(real3 viewDirectionWS, real fogFactor)
 {
@@ -102,12 +102,13 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
     SSRColor *= SSR.a * SSRLerp;
 #endif
 
-    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    //UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    #if defined(_SCREEN_SPACE_OCCLUSION)
     {
         reflectionProbe *= indSSAO;
         SSRColor.rgb *= indSSAO;
     }
-
+    #endif
     real surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
     real3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
     real fresnelTerm = (1.0h - saturate(fragData.NoV));
@@ -120,6 +121,7 @@ void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout 
 
     specular += reflectionProbe;
 }
+
 
 
 
@@ -152,7 +154,8 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     //Apply SSAO to "indirect" sources (not really indirect, but that's what unity calls baked and image based lighting)
     AmbientOcclusionFactor ao = (AmbientOcclusionFactor)0;
 
-    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    //UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    #if defined(_SCREEN_SPACE_OCCLUSION)
     {
         
         ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
@@ -161,7 +164,8 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         diffuse *= ao.indirectAmbientOcclusion;
         specular *= ao.indirectAmbientOcclusion;
     }
-
+    #endif
+    
     //-------------------------------------------------------------------------------------------------
     // Realtime light calculations
     //-------------------------------------------------------------------------------------------------
@@ -170,7 +174,8 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
     SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion);
 
-    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    //UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    #if defined(_ADDITIONAL_LIGHTS)
     {
         uint pixelLightCount = GetAdditionalLightsCount();
 
@@ -179,7 +184,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
         LIGHT_LOOP_END
     }
-
+    #endif
 
 
     //-------------------------------------------------------------------------------------------------

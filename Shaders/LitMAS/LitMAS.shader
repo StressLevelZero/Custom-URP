@@ -34,7 +34,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 		ZTest LEqual
 		Offset 0 , 0
 		ColorMask RGBA
-		LOD 100
+		//LOD 100
 
 		Pass
 		{
@@ -55,8 +55,8 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 			#define LITMAS_FEATURE_SSR
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 			#if defined(SHADER_API_DESKTOP)
-			#pragma require WaveVote
-			#pragma require QuadShuffle
+			//#pragma require WaveVote
+			//#pragma require QuadShuffle
 			//#pragma shader_feature _SM6_QUAD
 			#define _SM6_QUAD 1
 			#endif
@@ -171,7 +171,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 		ZTest LEqual
 		Offset 0 , 0
 		ColorMask RGBA
-		LOD 100
+		//LOD 100
 
 		HLSLINCLUDE
 		//

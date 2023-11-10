@@ -15,9 +15,9 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/GlobalIllumination.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
-#if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
-#define _ADDITIONAL_LIGHTS false
-#endif
+//#if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
+//#define _ADDITIONAL_LIGHTS false
+//#endif
 
 #if !defined(UNITY_COMMON_INCLUDED) //Get my IDE to recognize half, this won't ever get compiled since I just included Common.hlsl 
     #define half half
@@ -140,7 +140,7 @@ struct SLZAnisoSpecLightInfo
  */
 half3 SLZSafeHalf3Normalize(half3 value)
 {
-    float lenSqr = max(dot(value, value), REAL_MIN);
+    float lenSqr = dot((float)value, (float)value);
     return value * rsqrt(lenSqr); 
 }
 
@@ -894,9 +894,7 @@ void SLZImageBasedSpecular(half3 diffuse, inout half3 specular, half3 reflection
     half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(diffuse);
     half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(fragData.NoV, surfData.occlusion, surfData.roughness);
     half3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion) * LitSpecularOcclusion;
-#if defined(SLZ_SSR)
 
-#endif
     half surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
     half3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
     half fresnelTerm = (1.0h - saturate(fragData.NoV));
@@ -904,10 +902,12 @@ void SLZImageBasedSpecular(half3 diffuse, inout half3 specular, half3 reflection
     fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
     half3 IBSpec = half3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
     
-    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    //UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    #if defined(_SCREEN_SPACE_OCCLUSION)
     {
         reflectionProbe *= indSSAO;
     }
+    #endif
     
     specular += IBSpec * reflectionProbe;
 }
@@ -952,11 +952,12 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, const SLZFragData f
     Light mainLight = GetMainLight(fragData.shadowCoord, fragData.position, fragData.shadowMask);
     half3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, mainLight);
 
-    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    //UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    #if defined(_SCREEN_SPACE_OCCLUSION)
     {
         diffuseBRDF *= directSSAO;
     }
-    
+    #endif
     
     //If the object doesn't have a lightmap, do a specular highlight for EITHER the directional light, if it exists, or the spherical harmonics L1 band
     #if !defined(LIGHTMAP_ON) && !defined(SLZ_DISABLE_BAKED_SPEC)
@@ -988,10 +989,13 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, const SLZFragData f
 void SLZAddLight(inout half3 diffuse, inout half3 specular, const SLZFragData fragData, const SLZSurfData surfData, Light addLight, half directSSAO)
 {
     half3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, addLight);
-    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    //UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    #if defined(_SCREEN_SPACE_OCCLUSION)
     {
         diffuseBRDF *= directSSAO;
     }
+    #endif
+
     diffuse += diffuseBRDF;
     SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, addLight.direction);
     specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
@@ -1034,7 +1038,8 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     //Apply SSAO to "indirect" sources (not halfly indirect, but that's what unity calls baked and image based lighting) 
     AmbientOcclusionFactor ao = (AmbientOcclusionFactor)0;
     
-    UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    //UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
+    #if defined(_SCREEN_SPACE_OCCLUSION)
     {
         ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
         if (surfaceType > 0) ao.indirectAmbientOcclusion = 1; 
@@ -1042,6 +1047,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
         diffuse *= ao.indirectAmbientOcclusion;
         specular *= ao.indirectAmbientOcclusion;
     }
+    #endif
     
     //-------------------------------------------------------------------------------------------------
     // halftime light calculations
@@ -1051,7 +1057,8 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
     SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion); 
     
-    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    //UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    #if defined(_ADDITIONAL_LIGHTS)
     {
         uint pixelLightCount = GetAdditionalLightsCount();
 
@@ -1060,6 +1067,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
         SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
         LIGHT_LOOP_END
     }
+    #endif
     
 
 
