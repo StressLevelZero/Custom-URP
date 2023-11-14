@@ -56,9 +56,11 @@ struct SSRExtraData
   * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
   * @param         indSSAO   Indirect screenspace ambient occlusion, not used if SSAO isn't enabled
   */
-void SLZImageBasedSpecularSSR(inout real3 specular, inout real3 SSRColor, inout real SSRLerp, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, SSRExtraData ssrExtra, half indSSAO)
+void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 SSRColor, inout real SSRLerp, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, SSRExtraData ssrExtra, half indSSAO)
 {
-    real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, 1.0h);
+    half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(diffuse);
+    half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(fragData.NoV, surfData.occlusion, surfData.roughness);
+    real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion) * LitSpecularOcclusion;
 
     
    
@@ -197,7 +199,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     float oldVertDepth = ssrExtra.lastClipPos.z / ssrExtra.lastClipPos.w;
     float ddzOld = GetDepthDerivativeSum(oldVertDepth);
 
-    SLZImageBasedSpecularSSR(specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
+    SLZImageBasedSpecularSSR(diffuse.rgb, specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
     real horizOcclusion = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
     specular *= horizOcclusion;
     SSR.rgb *= horizOcclusion;
