@@ -444,6 +444,13 @@ public class VolumetricRendering : MonoBehaviour
 //#if !UNITY_EDITOR
         Intialize();
 //#endif
+        SceneManager.activeSceneChanged += ChangedActiveScene;
+    }
+
+    private void ChangedActiveScene(Scene current, Scene next)
+    {
+        Debug.Log("Reloaded Sky");
+        SkyManager.CheckSky();
     }
 
     // bool createdLightProjectionTexture = false;
