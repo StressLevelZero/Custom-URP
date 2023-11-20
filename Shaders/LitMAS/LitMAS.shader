@@ -111,7 +111,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 			ZWrite [_ZWrite]
 			ZTest LEqual
 			
-			Cull Off
+			Cull [_Cull]
 			ColorMask 0
 
 			HLSLPROGRAM
@@ -132,7 +132,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 			Tags { "LightMode" = "Meta" }
 			Blend [_BlendSrc] [_BlendDst]
 			ZWrite [_ZWrite]
-			Cull Back
+			Cull Off
 
 			HLSLPROGRAM
 			#pragma only_renderers vulkan
@@ -252,7 +252,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 			ZWrite [_ZWrite]
 			ZTest LEqual
 			
-			Cull Off
+			Cull [_Cull]
 			ColorMask 0
 
 			HLSLPROGRAM

@@ -112,7 +112,7 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
             Tags { "LightMode"="ShadowCaster" }
  
             ZWrite [_ZWrite]
-            Cull Off
+            Cull [_Cull]
             ZTest LEqual
             AlphaToMask Off
             ColorMask 0

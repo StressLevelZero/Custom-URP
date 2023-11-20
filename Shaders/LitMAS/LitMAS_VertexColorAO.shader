@@ -109,7 +109,7 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
             Tags { "LightMode"="ShadowCaster" }
 
             ZWrite [_ZWrite]
-            Cull Off
+            Cull [_Cull]
             ZTest LEqual
             AlphaToMask Off
             Cull Off

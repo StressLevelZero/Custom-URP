@@ -114,7 +114,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			Name "ShadowCaster"
 			Tags { "LightMode"="ShadowCaster" }
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull [_Cull]
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0
@@ -251,7 +251,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			Name "ShadowCaster"
 			Tags { "LightMode"="ShadowCaster" }
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull [_Cull]
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0

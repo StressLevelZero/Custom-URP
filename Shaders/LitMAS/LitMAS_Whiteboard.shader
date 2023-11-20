@@ -99,7 +99,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
             Tags { "LightMode"="ShadowCaster" }
 
             ZWrite [_ZWrite]
-            Cull Off
+            Cull [_Cull]
             ZTest LEqual
             AlphaToMask Off
             ColorMask 0
