@@ -416,7 +416,9 @@ half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float cl
     half fresnelTerm = Pow4(1.0 - NoV);
 
     half3 indirectDiffuse = bakedGI;
-    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, 1.0h);
+    half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(bakedGI);
+    half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(NoV, occlusion, brdfData.roughness);
+    half3 indirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfData.perceptualRoughness, AOSpecularOcclusion) * LitSpecularOcclusion;
     half3 color = EnvironmentBRDF(brdfData, indirectDiffuse, indirectSpecular, fresnelTerm);
     BlendFluorescence(color, half4(bakedGI,0), brdfData);
     if (IsOnlyAOLightingFeatureEnabled())
@@ -425,7 +427,7 @@ half3 GlobalIllumination(BRDFData brdfData, BRDFData brdfDataClearCoat, float cl
     }
 
 #if defined(_CLEARCOAT) || defined(_CLEARCOATMAP)
-    half3 coatIndirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfDataClearCoat.perceptualRoughness, 1.0h);
+    half3 coatIndirectSpecular = GlossyEnvironmentReflection(reflectVector, positionWS, brdfDataClearCoat.perceptualRoughness, AOSpecularOcclusion) * LitSpecularOcclusion;
     // TODO: "grazing term" causes problems on full roughness
     half3 coatColor = EnvironmentBRDFClearCoat(brdfDataClearCoat, clearCoatMask, coatIndirectSpecular, fresnelTerm);
 
