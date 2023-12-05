@@ -107,7 +107,7 @@ namespace UnityEngine.Rendering.Universal
             //else SkyManager.CheckSky();
         }
 
-#if UNITY_EDITOR
+#if false //UNITY_EDITOR
         // Only check if SkyTexture.value is null in editor and serialize the result.
         // For some reason, checking if the texture inside of a CubemapParameter is null causes a 0.15ms of Loading.IsObjectAvailable if it actually is null.
         private void OnValidate()
