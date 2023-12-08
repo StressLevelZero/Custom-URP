@@ -269,7 +269,7 @@ half4 frag(VertOut i) : SV_Target
 
 	//#!INJECT_POINT VOLUMETRIC_FOG
 	//#!INJECT_DEFAULT
-	color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
+	color = MixFogSurf(color, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
 	color = VolumetricsSurf(color, fragData.position, _Surface);
 	//#!INJECT_END
 	return color;

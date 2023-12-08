@@ -139,8 +139,9 @@ struct SLZAnisoSpecLightInfo
  */
 half3 SLZSafeHalf3Normalize(half3 value)
 {
-    float lenSqr = max(dot(value, value), REAL_MIN);
-    return value * rsqrt(lenSqr); 
+    float3 fltVal = (float3)value;
+    float lenSqr = max(dot(fltVal, fltVal), FLT_MIN);
+    return fltVal * rsqrt(lenSqr); 
 }
 
 

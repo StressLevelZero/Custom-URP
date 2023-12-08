@@ -41,6 +41,13 @@ namespace UnityEditor.Rendering.Universal
             public static GUIContent SSRMinMip = EditorGUIUtility.TrTextContent("SSR Lowest Mip", "Sets the lowest mip level in the depth pyramid SSR rays will test against to find a hit. Increasing this value will make the SSR more pixelated, and hopefully take less iterations to find a hit");
             public static GUIContent SSRTemporalWeight = EditorGUIUtility.TrTextContent("SSR Temporal Weight", "Sets the factor to lerp between the SSR color calculated by the fragment with the ssr color read at the fragments position last frame");
 
+            //public static GUIContent volumetricSettingsText = EditorGUIUtility.TrTextContent("Volumetrics", "Settings that control volumetric rendering.");
+            //public static GUIContent enableVolumetrics = EditorGUIUtility.TrTextContent("Enable Volumetrics", "Turn on volumetric rendering and enable shader variants that sample volumetrics");
+            //public static GUIContent volumetricData = EditorGUIUtility.TrTextContent("Volumetric Data", "Asset containing misc. settings relating to the resolution and quality of the volumetrics");
+            //public static GUIContent reprojectionAmount = EditorGUIUtility.TrTextContent("Reprojection Amount", "???");
+            //public static GUIContent sliceDistributionUniformity = EditorGUIUtility.TrTextContent("Slice Uniformity", "Power curve that squashes Z-axis of the volumetrics to get more z-resolution closer to the camera");
+            //public static GUIContent froxelBlur = EditorGUIUtility.TrTextContent("Froxel Blur", "Secondary resampling of the clipmap to hide pixelization");
+
             // END SLZ MODIFIED
 
             // Quality

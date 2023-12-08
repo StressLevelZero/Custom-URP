@@ -572,6 +572,13 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] float m_SsrHitRadius = 0.05f;
         [SerializeField] float m_SsrTemporalWeight = 0.5f;
 
+        //[SerializeField] bool m_EnableVolumetrics;
+        //
+        //[SerializeField] VolumetricData m_VolumetricData;
+        //[SerializeField] float m_ReprojectionAmount = 0.95f;
+        //[SerializeField] float m_SliceDistributionUniformity = 0.5f;
+        //[SerializeField] VolumetricRendering.BlurType m_FroxelBlur = VolumetricRendering.BlurType.None;
+
         // END SLZ MODIFIED
 
         // Note: A lut size of 16^3 is barely usable with the HDR grading mode. 32 should be the
@@ -2050,6 +2057,35 @@ namespace UnityEngine.Rendering.Universal
             get { return m_SsrTemporalWeight; }
             set { m_SsrTemporalWeight = value; }
         }
+
+        //public bool enableVolumetrics
+        //{
+        //    get { return m_EnableVolumetrics; }
+        //    set { m_EnableVolumetrics = value; }
+        //}
+        //
+        //public VolumetricData volumetricData
+        //{
+        //    get { return m_VolumetricData; }
+        //    set { m_VolumetricData = value; }
+        //}
+        //public float reprojectionAmount
+        //{
+        //    get { return m_ReprojectionAmount; }
+        //    set { m_ReprojectionAmount = value; }
+        //}
+        //
+        //public float sliceDistributionUniformity
+        //{
+        //    get { return m_SliceDistributionUniformity; }
+        //    set { m_SliceDistributionUniformity = value; }
+        //}
+        //
+        //public VolumetricRendering.BlurType froxelBlur
+        //{
+        //    get { return m_FroxelBlur; }
+        //    set { m_FroxelBlur = value; }
+        //}
 
         // END SLZ MODIFIED
     }

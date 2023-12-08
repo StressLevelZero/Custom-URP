@@ -260,7 +260,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		{
 			break;
 		}
-		linearDepth = linearDepth > 0.999999 ? 9999 : linearDepth;
+		linearDepth = linearDepth > 0.999999 ? 1.#INF : linearDepth;
 		//float sampleDepth = -mul(worldToDepth, float4(reflectedRay.xyz, 1)).z;
 		float sampleDepth = -reflectedRay.z;
 		float realDepth = linearDepth * _ProjectionParams.z;
@@ -283,7 +283,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		
 		bool inLargeRadius = depthDifference < largeRadius;
 		bool inHitRadius = depthDifference < dynHitRadius;
-		bool isMinMip = mipLevel <= _SSRMinMip+1;
+		bool isMinMip = mipLevel <= _SSRMinMip;
 		bool isRayInFront = sampleDepth < realDepth;
 		
 		
@@ -291,7 +291,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
 		// If the ray never hits, this position will be used instead of falling back
 		// to the cubemap. This fills holes behind objects less obviously than sampling
 		// from the cubemap
-		if (!isRayInFront && storeLastPos)
+		if (!isRayInFront && storeLastPos && isMinMip)
 		{
 			finalPos = reflectedRay;
 		}
@@ -475,23 +475,42 @@ float4 getSSRColor(SSRData data)
 	
 	#if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
     
-	reflection.a = rayHit;
-	
+	reflection.a = fade;
+
     float4 colorX = QuadReadAcrossX(reflection);
+
     float4 colorY = QuadReadAcrossY(reflection);
+
     float4 colorD = QuadReadAcrossDiagonal(reflection);
-    float4 kernel = float4(0.5 * reflection.a, 0.2 * colorX.a, 0.2 * colorY.a, 0.1 * colorD.a);
+
+	
+	
+	// Fake tone-mapping. When there is a single extremely bright pixel in the quad, averaging the color will result in all pixels being mostly the
+	// color of that pixel. This results in 2x2 pixelization when rays graze light sources. Dumb solution is to scale the intensity of the other 
+	// pixels to be no brighter than double the brightness of the current pixel.
+	float maxColor = max(max(reflection.r,reflection.g),reflection.b);
+	float maxColorX = QuadReadAcrossX(maxColor);
+	float maxColorY = QuadReadAcrossY(maxColor);
+	float maxColorD = QuadReadAcrossDiagonal(maxColor);
+	maxColor = 2 * max(maxColor, 1);
+	colorX = colorX * (min(maxColorX, maxColor) / maxColorX);
+	colorY = colorY * (min(maxColorY, maxColor) / maxColorY);
+	colorD = colorD * (min(maxColorD, maxColor) / maxColorD);
+	
+	float4 kernelWeights = float4(0.4, 0.225, 0.225, 0.15);
+	float4 fadeQuad = float4(reflection.a, colorX.a, colorY.a, colorD.a);
+	float4 kernel = (fadeQuad) * kernelWeights;
 	float weight = kernel.x + kernel.y + kernel.z + kernel.w;
     float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;
        
     reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
     
-	float fadeX = QuadReadAcrossX(fade);
-	float fadeY = QuadReadAcrossY(fade);
-	float fadeD = QuadReadAcrossDiagonal(fade);
+	//float fadeX = QuadReadAcrossX(fade);
+	//float fadeY = QuadReadAcrossY(fade);
+	//float fadeD = QuadReadAcrossDiagonal(fade);
 	
 	
-	fade = weight > 0.01 ? dot(float4(fade, fadeX, fadeY, fadeD), kernel) / weight : fade;
+	//fade = weight > 0.01 ? dot(float4(fade, fadeX, fadeY, fadeD), kernel) / weight : fade;
 	
 	#endif
 	//fade = 1;

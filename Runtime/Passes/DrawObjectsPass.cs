@@ -70,14 +70,18 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
 #endif
 
+        static GlobalKeyword s_DrawProcedural = GlobalKeyword.Create("DRAW_SKY_PROCEDURAL");
+
         FilteringSettings m_FilteringSettings;
         RenderStateBlock m_RenderStateBlock;
         List<ShaderTagId> m_ShaderTagIdList = new List<ShaderTagId>();
         string m_ProfilerTag;
         ProfilingSampler m_ProfilingSampler;
         bool m_IsOpaque;
+        bool m_DrawSkybox;
 
-       
+        public bool canDrawSkybox;
+
         public bool vkVRSHackOn = false;
         public RTHandle colorTarget;
         RTHandle[] vrsColorTargets = new RTHandle[2];
@@ -164,6 +168,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
+            m_DrawSkybox = canDrawSkybox && renderingData.cameraData.camera.clearFlags == CameraClearFlags.Skybox;
             caller = renderingData.cameraData.renderer as UniversalRenderer;
             base.OnCameraSetup(cmd, ref renderingData);
         }
@@ -197,6 +202,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_PassData.m_FilteringSettings = m_FilteringSettings;
             m_PassData.m_ShaderTagIdList = m_ShaderTagIdList;
             m_PassData.m_ProfilingSampler = m_ProfilingSampler;
+            m_PassData.drawSkybox = m_DrawSkybox;
             m_PassData.pass = this;
             //m_PassData.m_UseMotionVectorData = useMotionVectorData;
             m_PassData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
@@ -246,6 +252,18 @@ namespace UnityEngine.Rendering.Universal.Internal
                 // TODO RENDERGRAPH: do this as a separate pass, so no need of calling OnExecute here...
                 data.pass.OnExecute(cmd);
 
+                //context.ExecuteCommandBuffer(cmd);
+
+                if (data.drawSkybox)
+                {
+                    Material skybox = RenderSettings.skybox;
+                    if (skybox != null)
+                    {
+                        cmd.EnableKeyword(s_DrawProcedural);
+                        cmd.DrawProcedural(Matrix4x4.identity, RenderSettings.skybox, 0, MeshTopology.Triangles, 3, 1);
+                        cmd.DisableKeyword(s_DrawProcedural);
+                    }
+                }
                 context.ExecuteCommandBuffer(cmd);
                 cmd.Clear();
 
@@ -317,7 +335,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             internal bool m_ShouldTransparentsReceiveShadows;
 
             internal DrawObjectsPass pass;
-
+            internal bool drawSkybox;
             // SLZ MODIFIED
             internal bool m_UseMotionVectorData;
             // END SLZ MODIFIED

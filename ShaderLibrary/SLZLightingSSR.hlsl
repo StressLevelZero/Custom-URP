@@ -207,7 +207,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     float3 output = surfData.occlusion * (surfData.albedo * diffuse) + surfData.emission;
     output = surfaceType == 1 ? output * surfData.alpha : output; //Premultiply diffuse by alpha if surface is transparent
     output += surfData.occlusion * specular;
-    if (true)//UNITY_BRANCH if (ssrExtra.temporalWeight == 0 || !isWithinDepthError || SSRLerp < 0.0008 || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
+    if (true)//ssrExtra.temporalWeight == 0 || !isWithinDepthError || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
         output += surfData.occlusion * SSR.rgb;
     }
@@ -242,8 +242,6 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 
     //Do fog and volumetrics here to avoid sampling the volumetrics twice
 
-    output = MixFog(output, -fragData.viewDir, ssrExtra.fogFactor);
-
 //#if defined(_VOLUMETRICS_ENABLED)
 //    output = volColor.rgb + output * volColor.a;
 //#endif
@@ -257,6 +255,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         surfData.alpha *= horizOcclusion;
 	}
 	float4 finalColor = float4(output, surfData.alpha);
+    finalColor = MixFogSurf(finalColor, -fragData.viewDir, ssrExtra.fogFactor, surfaceType);
     finalColor = VolumetricsSurf(finalColor, fragData.position, surfaceType);
 
     return finalColor;//surfData.occlusion* (surfData.albedo * diffuse + specular) + surfData.emission;

@@ -44,7 +44,7 @@
 
 //#!INJECT_BEGIN VOLUMETRIC_FOG 0
 	#if !defined(_SSR_ENABLED)
-		color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
+		color = MixFogSurf(color, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif

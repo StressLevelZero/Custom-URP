@@ -75,10 +75,15 @@ namespace UnityEditor.Rendering.Universal
         // SLZ MODIFIED
         public SerializedProperty enableSSR { get; }
         public SerializedProperty maxSSRSteps { get; }
-
         public SerializedProperty ssrMinMip { get; }
         public SerializedProperty ssrHitRadius { get; }
         public SerializedProperty ssrTemporalWeight { get; }
+
+        //public SerializedProperty enableVolumetrics { get; }
+        //public SerializedProperty volumetricData { get; }
+        //public SerializedProperty reprojectionAmount { get; }//= 0.95f;
+        //public SerializedProperty sliceDistributionUniformity { get; }//= 0.5f;
+        //public SerializedProperty froxelBlur { get; }//= VolumetricRendering.BlurType.None;
         // END SLZ MODIFIED
 
 #if ADAPTIVE_PERFORMANCE_2_0_0_OR_NEWER
@@ -173,6 +178,12 @@ namespace UnityEditor.Rendering.Universal
             ssrMinMip = serializedObject.FindProperty("m_SsrMinMip");
             ssrHitRadius = serializedObject.FindProperty("m_SsrHitRadius");
             ssrTemporalWeight = serializedObject.FindProperty("m_SsrTemporalWeight");
+
+            //enableVolumetrics = serializedObject.FindProperty("m_EnableVolumetrics");
+            //volumetricData = serializedObject.FindProperty("m_VolumetricData");
+            //reprojectionAmount = serializedObject.FindProperty("m_ReprojectionAmount");
+            //sliceDistributionUniformity = serializedObject.FindProperty("m_SliceDistributionUniformity");
+            //froxelBlur = serializedObject.FindProperty("m_FroxelBlur");
             // END SLZ MODIFIED
         }
 

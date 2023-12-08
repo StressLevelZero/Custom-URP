@@ -132,7 +132,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 			Tags { "LightMode" = "Meta" }
 			Blend [_BlendSrc] [_BlendDst]
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull Back
 
 			HLSLPROGRAM
 			#pragma only_renderers vulkan

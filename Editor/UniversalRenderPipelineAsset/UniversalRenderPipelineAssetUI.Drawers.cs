@@ -144,9 +144,24 @@ namespace UnityEditor.Rendering.Universal
                 // END SLZ MODIFIED
 
                 EditorGUI.EndDisabledGroup();
+                
                 EditorGUILayout.PropertyField(serialized.supportsTerrainHolesProp, Styles.supportsTerrainHolesText);
             }
         }
+
+        //static void DrawVolumetrics(SerializedUniversalRenderPipelineAsset serialized, Editor ownerEditor)
+        //{
+        //   // EditorGUILayout.PropertyField(serialized.enableVolumetrics, Styles.enableVolumetrics);
+        //
+        //    //EditorGUI.BeginDisabledGroup(!serialized.enableVolumetrics.boolValue);
+        //    //++EditorGUI.indentLevel;
+        //    EditorGUILayout.PropertyField(serialized.volumetricData, Styles.volumetricData);
+        //    EditorGUILayout.Slider(serialized.reprojectionAmount, 0, 1, Styles.reprojectionAmount);
+        //    EditorGUILayout.Slider(serialized.sliceDistributionUniformity, 0, 1, Styles.sliceDistributionUniformity);
+        //    EditorGUILayout.PropertyField(serialized.froxelBlur, Styles.froxelBlur);
+        //    //--EditorGUI.indentLevel;
+        //    //EditorGUI.EndDisabledGroup();
+        //}
 
         static void DrawRenderingAdditional(SerializedUniversalRenderPipelineAsset serialized, Editor ownerEditor)
         {

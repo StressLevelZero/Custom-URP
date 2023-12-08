@@ -613,13 +613,13 @@ namespace UnityEngine.Rendering.Universal
 
             //SLZ - Enable "motion vector data" (prev obj to world matricies) for SSR so we can get prev frame's pixel pos for temporal accumulation
             m_RenderOpaqueForwardPass.useMotionVectorData = renderingData.cameraData.enableSSR;
-
+            m_RenderTransparentForwardPass.canDrawSkybox = true;
             // Bullshit hacks go! Turn on render target duplication to signal to the Vulkan VRS plugin that framebuffer objects created for these passes need VRS attachments
 
-           
-            m_DepthNormalPrepass.vkVRSHackOn = true;
-            m_RenderOpaqueForwardPass.vkVRSHackOn = true;
-            m_RenderTransparentForwardPass.vkVRSHackOn = true;
+
+            m_DepthNormalPrepass.vkVRSHackOn = false;
+            m_RenderOpaqueForwardPass.vkVRSHackOn = false;
+            m_RenderTransparentForwardPass.vkVRSHackOn = false;
 
             //TODO: This should probably happen in the SLZGlobals pass, not here
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
@@ -639,7 +639,7 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_RenderOpaqueForwardPass);
 
                 // TODO: Do we need to inject transparents and skybox when rendering depth only camera? They don't write to depth.
-                EnqueuePass(m_DrawSkyboxPass);
+                //EnqueuePass(m_DrawSkyboxPass);
 #if ADAPTIVE_PERFORMANCE_2_1_0_OR_NEWER
                 if (!needTransparencyPass)
                     return;
@@ -1250,11 +1250,11 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(renderOpaqueForwardPass);
             }
 
-            if (camera.clearFlags == CameraClearFlags.Skybox && cameraData.renderType != CameraRenderType.Overlay)
-            {
-                if (RenderSettings.skybox != null || (camera.TryGetComponent(out Skybox cameraSkybox) && cameraSkybox.material != null))
-                    EnqueuePass(m_DrawSkyboxPass);
-            }
+            //if (camera.clearFlags == CameraClearFlags.Skybox && cameraData.renderType != CameraRenderType.Overlay)
+            //{
+            //    if (RenderSettings.skybox != null || (camera.TryGetComponent(out Skybox cameraSkybox) && cameraSkybox.material != null))
+            //        EnqueuePass(m_DrawSkyboxPass);
+            //}
 
             // If a depth texture was created we necessarily need to copy it, otherwise we could have render it to a renderbuffer.
             // Also skip if Deferred+RenderPass as CameraDepthTexture is used and filled by the GBufferPass
