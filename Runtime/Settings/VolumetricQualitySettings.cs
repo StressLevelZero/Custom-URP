@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Unity.Mathematics;
-using log4net.Core;
+
 
 namespace UnityEngine.Rendering.Universal
 {
