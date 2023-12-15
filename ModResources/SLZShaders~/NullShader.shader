@@ -252,7 +252,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -853,7 +853,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -1143,7 +1143,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -1415,7 +1415,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -1812,7 +1812,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -2082,7 +2082,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -2406,7 +2406,7 @@ Shader "SLZ/Nullman"
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -2881,7 +2881,7 @@ Shader "SLZ/Nullman"
 			};
         
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -3101,7 +3101,7 @@ Shader "SLZ/Nullman"
 			};
         
 			CBUFFER_START(UnityPerMaterial)
-			half4 EllipsoidPosArray[HitMatrixRowCount];
+			half4x4 EllipsoidPosArray[HitMatrixCount];
 			float4 _BaseMap_ST;
 			float4 _Emission;
 			int _NumberOfHits;
@@ -3281,7 +3281,7 @@ Node;AmplifyShaderEditor.SimpleMinOpNode;165;841.048,-143.3738;Inherit;False;2;0
 Node;AmplifyShaderEditor.PowerNode;131;-566.3386,-757.3566;Inherit;False;True;2;0;FLOAT;0;False;1;FLOAT;5;False;1;FLOAT;0
 Node;AmplifyShaderEditor.OneMinusNode;145;133.857,-646.8608;Inherit;False;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.RangedFloatNode;19;-429.9197,844.2775;Inherit;False;Constant;_Float0;Float 0;4;0;Create;True;0;0;0;False;0;False;0.5;0;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.Matrix4X4Node;154;-808.881,-1025.135;Inherit;False;Property;EllipsoidPosArray[HitArrayCount];EllipsoidPosArray;12;0;Create;False;0;0;0;True;0;False;1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1;0;1;FLOAT4x4;0
+Node;AmplifyShaderEditor.Matrix4X4Node;154;-808.881,-1025.135;Inherit;False;Property;EllipsoidPosArray[HitMatrixCount];EllipsoidPosArray;12;0;Create;False;0;0;0;True;0;False;1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1;0;1;FLOAT4x4;0
 Node;AmplifyShaderEditor.RangedFloatNode;16;-246.9198,844.2775;Inherit;False;Property;_DisplacementAmount;Displacement Amount;5;0;Create;True;0;0;0;False;0;False;0;0.004;0;0;0;1;FLOAT;0
 Node;AmplifyShaderEditor.RangedFloatNode;87;-1090.788,52.81657;Inherit;False;Property;_WireScale;Wire Scale;3;0;Create;True;0;0;0;False;0;False;3;2.3;0;0;0;1;FLOAT;0
 Node;AmplifyShaderEditor.TextureCoordinatesNode;90;-718.9076,-50.80401;Inherit;False;0;-1;2;3;2;SAMPLER2D;;False;0;FLOAT2;1,1;False;1;FLOAT2;0,0;False;5;FLOAT2;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4

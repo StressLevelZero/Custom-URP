@@ -28,6 +28,7 @@ struct Vertex
 //#!INJECT_POINT UNIFORMS
 
 CBUFFER_START( UnityPerMaterial )
+	//#!INJECT_POINT MATERIAL_CBUFFER_EARLY
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 	//#!INJECT_POINT MATERIAL_CBUFFER

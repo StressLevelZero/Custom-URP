@@ -141,6 +141,12 @@ TEXTURE2D(_EmissionMap);
 // End Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
 
 CBUFFER_START(UnityPerMaterial)
+// Begin Injection MATERIAL_CBUFFER_EARLY from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
+    half4x4 EllipsoidPosArray[HitMatrixCount];
+    int _NumberOfHits;
+    half4 _HitColor;
+
+// End Injection MATERIAL_CBUFFER_EARLY from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
     float4 _BaseMap_ST;
     half4 _BaseColor;
 // Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
@@ -154,11 +160,6 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-    int _NumberOfHits;
-    half4 _HitColor;
-    half4 EllipsoidPosArray[HitMatrixRowCount];
-// End Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
     int _Surface;
 CBUFFER_END
 

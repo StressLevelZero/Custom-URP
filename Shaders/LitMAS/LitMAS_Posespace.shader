@@ -28,6 +28,7 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         [HideInInspector]_BlendDst ("Blend Destination", float) = 0
         [HideInInspector][ToggleUI] _ZWrite ("ZWrite", float) = 1
         [HideInInspector]_Cull ("Cull Side", float) = 2
+        //[HideInInspector]EllipsoidPosArray("EllipsoidPosArray", Vector) = (0,0,0,0)
     }
     SubShader
     {
