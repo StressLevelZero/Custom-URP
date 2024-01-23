@@ -6,6 +6,8 @@
 
 #if defined(SHADER_API_MOBILE)
 	#pragma multi_compile _  _ADDITIONAL_LIGHTS_VERTEX	
+	#pragma multi_compile_fragment _ _ADDITIONAL_LIGHTS
+	#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
 #else
 	#pragma multi_compile_fragment _ _MAIN_LIGHT_SHADOWS_CASCADE
 	#pragma multi_compile_fragment _ _SHADOWS_SOFT

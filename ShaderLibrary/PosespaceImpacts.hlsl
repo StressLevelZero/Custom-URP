@@ -4,6 +4,8 @@
 #define HitArrayCount 32
 #define HitMatrixRowCount HitArrayCount * 3
 
+//#define PACKED_HITPOS
+
 #if defined(PACKED_HITPOS)
     #define HitMatrixCount (HitMatrixRowCount) / 4  // (32 * 3) / 4 = 24
 #else
@@ -25,7 +27,8 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
 {
     half HitDistance = 1;
     half3 closestHit = half3(0,0,0);
-    UNITY_LOOP for ( uint i = 0; i < NumberOfHits; i++ ){
+    uint minHits = min(NumberOfHits, HitArrayCount);
+    for ( uint i = 0; i < minHits; i++ ) {
         //TODO: Unpack half3x4 from 4x4 array. This works, but just use 4x4 array for now since I don't have time to validate this
 #if defined(PACKED_HITPOS)
         uint2 row1Coords = uint2((i * 3u) >> 2, (i * 3u) & 3u);
