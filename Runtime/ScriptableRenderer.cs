@@ -822,8 +822,10 @@ namespace UnityEngine.Rendering.Universal
                 return ClearFlag.All;
 
             // XRTODO: remove once we have visible area of occlusion mesh available
+            // XRTODON'T: there's no reason to force a color clear in VR if set to skybox, we've modified the XR occlusion pass to also write color
             if (cameraClearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null && cameraData.postProcessEnabled && cameraData.xr.enabled)
-                return ClearFlag.All;
+                return ClearFlag.DepthStencil;
+                //return ClearFlag.All;
 
             if ((cameraClearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null) ||
                 cameraClearFlags == CameraClearFlags.Nothing)

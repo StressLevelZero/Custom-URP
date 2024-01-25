@@ -141,7 +141,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 if (drawSkybox)
                 {
                     Material skybox = RenderSettings.skybox;
-                    if (skybox != null)
+                    if (skybox)
                     {
                         cmd.EnableKeyword(s_DrawProcedural);
                         cmd.DrawProcedural(Matrix4x4.identity, RenderSettings.skybox, 0, MeshTopology.Triangles, 3, 1);
