@@ -709,7 +709,7 @@ namespace SLZ.SLZEditorTools
             public int height;
             public int depth;
         }
-
+        /*
         [MenuItem("Tools/Test Create Vol3d")]
         public static void TestSave3DTex()
         {
@@ -722,6 +722,7 @@ namespace SLZ.SLZEditorTools
                 WriteTex3DToVol3D(texture, path);
             }
         }
+        */
         public static void WriteTex3DToVol3D(Texture3D tex, string path)
         {
             NativeArray<byte>[] data = new NativeArray<byte>[tex.mipmapCount];

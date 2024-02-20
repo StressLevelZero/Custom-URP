@@ -14,7 +14,7 @@ namespace SLZ.URPModResources
 {
     public class RenderPipelineUpdater
     {
-        static string coreBranch = "master";
+        static string coreBranch = "Bonelab";
         static string urpBranch = "Bonelab";
         /// <summary>
         /// Updates the Core and Universal RP for the user. Gets the latest commit hashes from git,
