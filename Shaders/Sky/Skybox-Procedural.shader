@@ -1,6 +1,6 @@
 // Unity built-in shader source. Copyright (c) 2016 Unity Technologies. MIT license (see license.txt)
 
-Shader "Skybox/SLZ Procedural" {
+Shader "SLZ/Skybox/SLZ Procedural" {
 Properties {
     //[KeywordEnum(None, Simple, High Quality)] _SunDisk ("Sun", Int) = 2
     _SunSize ("Sun Size", Range(0,1)) = 0.01

@@ -1,4 +1,4 @@
-Shader "hidden/VolumetricPreview"
+Shader "Hidden/VolumetricPreview"
 {
     Properties
     {

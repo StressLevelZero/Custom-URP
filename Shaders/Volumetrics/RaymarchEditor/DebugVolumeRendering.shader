@@ -1,4 +1,4 @@
-﻿Shader "hidden/DebugVolumeRendering"
+﻿Shader "Hidden/DebugVolumeRendering"
 {
 	Properties
 	{

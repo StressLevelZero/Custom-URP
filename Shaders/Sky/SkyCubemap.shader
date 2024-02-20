@@ -1,4 +1,4 @@
-Shader "Skybox/SLZ Cubemap"
+Shader "SLZ/Skybox/SLZ Cubemap"
 {
     Properties
     {
