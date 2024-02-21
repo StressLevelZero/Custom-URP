@@ -17,7 +17,7 @@ MonoBehaviour:
       type: 3}
   m_RendererFeatures:
   - {fileID: 3137130856118801803}
-  m_RendererFeatureMap: 8bd5e074e453892bca4723a0c5343f370d79617a4d11069487fac3c3b8c3a72c
+  m_RendererFeatureMap: 8bd5e074e453892b
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -87,7 +87,7 @@ MonoBehaviour:
     AfterOpaque: 0
     Source: 1
     NormalSamples: 1
-    Intensity: 0.25
+    Intensity: 0.05
     DirectLightingStrength: 0.25
-    Radius: 0.01
+    Radius: 0.035
     SampleCount: 4

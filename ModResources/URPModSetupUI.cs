@@ -59,7 +59,7 @@ namespace SLZ.URPModResources
             root.Add(btnAmplify);
         }
     }
-
+    /*
     public class URPModUpdateShaderUI : EditorWindow
     {
         private int numButtons = 1;
@@ -149,5 +149,6 @@ namespace SLZ.URPModResources
             });
         }
     }
+    */
 }
 #endif
