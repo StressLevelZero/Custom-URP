@@ -78,10 +78,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 
 // Begin Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection INCLUDES from Injection_Impacts.hlsl ----------------------------------------------------------
-#include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/PosespaceImpacts.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PosespaceImpacts.hlsl"
 // End Injection INCLUDES from Injection_Impacts.hlsl ----------------------------------------------------------
 // Begin Injection INCLUDES from Injection_SSR.hlsl ----------------------------------------------------------
 #if !defined(SHADER_API_MOBILE)
@@ -141,6 +141,11 @@ TEXTURE2D(_EmissionMap);
 // End Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
 
 CBUFFER_START(UnityPerMaterial)
+// Begin Injection MATERIAL_CBUFFER_EARLY from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
+	half4x4 EllipsoidPosArray[HitMatrixCount];
+	int _NumberOfHits;
+	half4 _HitColor;
+// End Injection MATERIAL_CBUFFER_EARLY from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 // Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
@@ -148,11 +153,6 @@ float4 _DetailMap_ST;
 half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-	half4x4 EllipsoidPosArray[HitArrayCount];
-	int _NumberOfHits;
-	half4 _HitColor;
-// End Injection MATERIAL_CBUFFER from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
 	half  _Emission;
 	half4 _EmissionColor;
@@ -360,7 +360,7 @@ half4 frag(VertOut i) : SV_Target
 
 // Begin Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
 	#if !defined(_SSR_ENABLED)
-		color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
+		color = MixFogSurf(color, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif

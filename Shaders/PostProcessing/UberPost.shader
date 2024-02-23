@@ -116,7 +116,7 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
         #define PaperWhite              _HDROutputLuminanceParams.z
         #define OneOverPaperWhite       _HDROutputLuminanceParams.w
 
-        float2 DistortUV(float2 uv)
+		float2 DistortUV(float2 uv, float offset)
         {
             // Note: this variant should never be set with XR
             #if _DISTORTION
@@ -124,7 +124,7 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
                 uv = (uv - 0.5) * DistScale + 0.5;
                 float2 ruv = DistAxis * (uv - 0.5 - DistCenter);
                 float ru = length(float2(ruv));
-
+                float ruorg = pow(ru,5);
                 UNITY_BRANCH
                 if (DistIntensity > 0.0)
                 {
@@ -137,9 +137,15 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
                     ru = rcp(ru) * DistTheta * atan(ru * DistSigma);
                     uv = uv + ruv * (ru - 1.0);
                 }
+
+				//TODO: Should switch this to our RGB dithering to just do one sample and simplfy the dithering
+                float2 dither;
+                dither.x = ApplyDithering(0.5, uv, TEXTURE2D_ARGS(_BlueNoise_Texture, sampler_PointRepeat), DitheringScale, DitheringOffset+offset).x;
+                dither.y = ApplyDithering(0.5, uv, TEXTURE2D_ARGS(_BlueNoise_Texture, sampler_PointRepeat), DitheringScale, DitheringOffset+.5+offset).x;    
+
+                uv += (dither - 0.5) * ruorg * 20; //Should add some variables to control the amount of dithering here. Hardcoded for now.
             }
             #endif
-
             return uv;
         }
 
@@ -148,7 +154,7 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
             UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
             float2 uv = SCREEN_COORD_APPLY_SCALEBIAS(UnityStereoTransformScreenSpaceTex(input.texcoord));
-            float2 uvDistorted = DistortUV(uv);
+            float2 uvDistorted = DistortUV(uv, 0);
 
             half3 color = (0.0).xxx;
 
@@ -160,9 +166,9 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
                 float2 end = uv - coords * dot(coords, coords) * ChromaAmount;
                 float2 delta = (end - uv) / 3.0;
 
-                half r = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, SCREEN_COORD_REMOVE_SCALEBIAS(uvDistorted)                ).x;
-                half g = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, SCREEN_COORD_REMOVE_SCALEBIAS(DistortUV(delta + uv)      )).y;
-                half b = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, SCREEN_COORD_REMOVE_SCALEBIAS(DistortUV(delta * 2.0 + uv))).z;
+				half r = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearMirror, SCREEN_COORD_REMOVE_SCALEBIAS(uvDistorted                      )).x;
+                half g = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearMirror, SCREEN_COORD_REMOVE_SCALEBIAS(DistortUV(delta + uv,0.333)      )).y;
+                half b = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearMirror, SCREEN_COORD_REMOVE_SCALEBIAS(DistortUV(delta * 2.0 + uv,0.666))).z;
 
                 color = half3(r, g, b);
             }

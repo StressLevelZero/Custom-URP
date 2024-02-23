@@ -106,7 +106,7 @@ ENDHLSL
             Tags { "LightMode"="ShadowCaster" }
 
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull [_Cull]
             ZWrite On
             ZTest LEqual
             AlphaToMask Off

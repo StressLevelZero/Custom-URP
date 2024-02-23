@@ -70,7 +70,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         }
 #endif
 
-        static GlobalKeyword s_DrawProcedural = GlobalKeyword.Create("DRAW_SKY_PROCEDURAL");
+        
 
         FilteringSettings m_FilteringSettings;
         RenderStateBlock m_RenderStateBlock;
@@ -100,6 +100,10 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         // SLZ MODIFIED
         public bool useMotionVectorData;
+        static GlobalKeyword s_DrawProcedural = GlobalKeyword.Create("DRAW_SKY_PROCEDURAL");
+        static readonly int s_WorldSpaceLightPos0 = Shader.PropertyToID("_WorldSpaceLightPosSun");
+        static readonly int s_LightColor0 = Shader.PropertyToID("_LightColorSun");
+
         // END SLZ MODIFIED
 
         /// <summary>
@@ -257,10 +261,25 @@ namespace UnityEngine.Rendering.Universal.Internal
                 if (data.drawSkybox)
                 {
                     Material skybox = RenderSettings.skybox;
-                    if (skybox != null)
+                    if (skybox)
                     {
+                        Light sun = RenderSettings.sun;
+                        Vector4 sunDir;
+                        Vector4 lightColor;
+                        if (sun && sun.isActiveAndEnabled)
+                        {
+                            sunDir = -sun.transform.forward;
+                            lightColor = (Vector4)sun.color * sun.intensity;
+                        }
+                        else 
+                        { 
+                            sunDir = new Vector4(0,0,-1,0);
+                            lightColor = Color.black;
+                        }
+                        skybox.SetVector(s_WorldSpaceLightPos0, sunDir);
+                        skybox.SetVector(s_LightColor0, lightColor);
                         cmd.EnableKeyword(s_DrawProcedural);
-                        cmd.DrawProcedural(Matrix4x4.identity, RenderSettings.skybox, 0, MeshTopology.Triangles, 3, 1);
+                        cmd.DrawProcedural(Matrix4x4.identity, skybox, 0, MeshTopology.Triangles, 3, 1);
                         cmd.DisableKeyword(s_DrawProcedural);
                     }
                 }

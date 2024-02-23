@@ -1,8 +1,8 @@
-Shader "Skybox/SLZ Cubemap"
+Shader "SLZ/Skybox/SLZ Cubemap"
 {
     Properties
     {
-        _SkyTex ("Sky Texture", CUBE) = "black" {}
+        _Tex ("Sky Texture", CUBE) = "black" {}
         [HDR] _SkyColor ("Sky Color", Color) = (1,1,1,1)
         _Rotation ("Rotation", Range(0,360)) = 0
         [Toggle(USE_DIST_FOG)]_UseFog ("Apply Distance Fog", Int) = 0
@@ -13,7 +13,8 @@ Shader "Skybox/SLZ Cubemap"
     {
         Tags {"Queue"="Background" "RenderType"="Background" "PreviewType"="Skybox"}
         Blend One Zero
-		ZWrite Off
+        ZWrite Off
+        ZClip Off
         Cull Off
 
 
@@ -73,8 +74,8 @@ Shader "Skybox/SLZ Cubemap"
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            TEXTURECUBE(_SkyTex);
-            SamplerState sampler_SkyTex;
+            TEXTURECUBE(_Tex);
+            SamplerState sampler_Tex;
             //CBUFFER_START(UnityPerMaterial)
             half4 _SkyColor;
             float _FogDist;
@@ -140,14 +141,14 @@ Shader "Skybox/SLZ Cubemap"
                     viewDir.x * i.rotMatrix.x + viewDir.z * i.rotMatrix.y,
                     viewDir.y, 
                     viewDir.x * i.rotMatrix.z + viewDir.z * i.rotMatrix.w);
-                half4 col = SAMPLE_TEXTURECUBE_LOD(_SkyTex, sampler_SkyTex, viewDir2, 0);
+                half4 col = SAMPLE_TEXTURECUBE_LOD(_Tex, sampler_Tex, viewDir2, 0);
                 col *= _SkyColor;
                 #if defined(USE_DIST_FOG)
                     col.rgb = MixFog(col.rgb, viewDir, i.wPos_xyz_fog_x.w);
                 #endif
                 col = Volumetrics(col, i.wPos_xyz_fog_x.xyz);
                 #else
-                half4 col = SAMPLE_TEXTURECUBE_LOD(_SkyTex, sampler_SkyTex, i.uv0, 0);
+                half4 col = SAMPLE_TEXTURECUBE_LOD(_Tex, sampler_Tex, i.uv0, 0);
                 col *= _SkyColor;
                 #endif
 

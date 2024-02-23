@@ -108,6 +108,7 @@ SAMPLER(sampler_DetailMap);
 //#!INJECT_POINT UNIFORMS
 
 CBUFFER_START(UnityPerMaterial)
+	//#!INJECT_POINT MATERIAL_CBUFFER_EARLY
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 	//#!INJECT_POINT MATERIAL_CBUFFER
@@ -263,7 +264,7 @@ half4 frag(VertOut i) : SV_Target
 
 	//#!INJECT_POINT LIGHTING_CALC
 	//#!INJECT_DEFAULT
-		color.rgb = SLZPBRFragment(fragData, surfData, _Surface);
+		color = SLZPBRFragment(fragData, surfData, _Surface);
 	//#!INJECT_END
 
 

@@ -1,6 +1,6 @@
 // Unity built-in shader source. Copyright (c) 2016 Unity Technologies. MIT license (see license.txt)
 
-Shader "Skybox/SLZ Procedural" {
+Shader "SLZ/Skybox/SLZ Procedural" {
 Properties {
     //[KeywordEnum(None, Simple, High Quality)] _SunDisk ("Sun", Int) = 2
     _SunSize ("Sun Size", Range(0,1)) = 0.01
@@ -31,6 +31,7 @@ SubShader {
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/FullscreenSky.hlsl"
+
 		
         #define _SUNDISK_HIGH_QUALITY
 
@@ -40,6 +41,24 @@ SubShader {
         uniform half _SunSizeConvergence;
         uniform half3 _SkyTint;
         uniform half _AtmosphereThickness;
+        //CBUFFER_START(UnityLighting)
+
+        //CBUFFER_END
+    #if defined(DRAW_SKY_PROCEDURAL)
+        uniform half4 _WorldSpaceLightPosSun;
+        uniform half4 _LightColorSun;
+    #else
+
+    CBUFFER_START(UnityLighting)
+
+
+    half4 _WorldSpaceLightPos0;
+    
+    CBUFFER_END
+        half4 _LightColor0;
+        #define _WorldSpaceLightPosSun _WorldSpaceLightPos0
+        #define _LightColorSun _LightColor0
+    #endif
 
     #if defined(UNITY_COLORSPACE_GAMMA)
         #define GAMMA 2
@@ -280,7 +299,7 @@ SubShader {
                 {
                     half height = length(samplePoint);
                     half depth = exp(kScaleOverScaleDepth * (kInnerRadius - height));
-                    half lightAngle = dot(_MainLightPosition.xyz, samplePoint) / height;
+                    half lightAngle = dot(_WorldSpaceLightPosSun.xyz, samplePoint) / height;
                     half cameraAngle = dot(eyeRay, samplePoint) / height;
                     half scatter = (startOffset + depth*(scale(lightAngle) - scale(cameraAngle)));
                     half3 attenuate = exp(-clamp(scatter, 0.0, kMAX_SCATTER) * (kInvWavelength * kKr4PI + kKm4PI));
@@ -301,7 +320,7 @@ SubShader {
                 // Calculate the ray's starting position, then calculate its scattering offset
                 
                 half cameraAngle = dot(-eyeRay, pos);
-                half lightAngle = dot(_MainLightPosition.xyz, pos);
+                half lightAngle = dot(_WorldSpaceLightPosSun.xyz, pos);
                 half cameraScale = scale(cameraAngle);
                 half lightScale = scale(lightAngle);
                 half cameraOffset = depth*cameraScale;
@@ -332,15 +351,15 @@ SubShader {
             // 2. in case of gamma and SKYBOX_COLOR_IN_TARGET_COLOR_SPACE: do sqrt right away instead of doing that in fshader
 
             half3 groundColor = _Exposure * (cIn + COLOR_2_LINEAR(_GroundColor) * cOut);
-            half3 skyColor    = _Exposure * (cIn * getRayleighPhase(_MainLightPosition.xyz, -eyeRay));
+            half3 skyColor    = _Exposure * (cIn * getRayleighPhase(_WorldSpaceLightPosSun.xyz, -eyeRay));
 
         #if SKYBOX_SUNDISK != SKYBOX_SUNDISK_NONE
             // The sun should have a stable intensity in its course in the sky. Moreover it should match the highlight of a purely specular material.
             // This matching was done using the standard shader BRDF1 on the 5/31/2017
             // Finally we want the sun to be always bright even in LDR thus the normalization of the lightColor for low intensity.
-            half lightColorIntensity = clamp(length(_MainLightColor.xyz), 0.25, 1);
+            half lightColorIntensity = clamp(length(_LightColorSun.xyz), 0.25, 1);
            
-            half3 sunColor    = kHDSundiskIntensityFactor * saturate(cOut) * _MainLightColor.xyz / lightColorIntensity;
+            half3 sunColor    = kHDSundiskIntensityFactor * saturate(cOut) * _LightColorSun.xyz / lightColorIntensity;
 
         #endif
     
@@ -368,7 +387,7 @@ SubShader {
         #if SKYBOX_SUNDISK != SKYBOX_SUNDISK_NONE
             if(y < 0.0)
             {
-                col += sunColor * calcSunAttenuation(_MainLightPosition.xyz, -ray);
+                col += sunColor * calcSunAttenuation(_WorldSpaceLightPosSun.xyz, -ray);
             }
         #endif
 

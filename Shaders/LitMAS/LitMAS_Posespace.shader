@@ -119,7 +119,7 @@ ENDHLSL
 			Tags { "LightMode"="ShadowCaster" }
  
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull [_Cull]
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0
@@ -239,7 +239,7 @@ ENDHLSL
 			Tags { "LightMode"="ShadowCaster" }
  
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull [_Cull]
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0

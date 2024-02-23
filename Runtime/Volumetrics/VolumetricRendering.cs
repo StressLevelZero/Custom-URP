@@ -77,6 +77,9 @@ public class VolumetricRendering : MonoBehaviour
     // a clipmap update. Instead, set a bool that triggers the clipmaps to try to update every
     // frame until the volumtric registry contains >0 volumes
     bool VolumetricRegisterEmpty;
+    
+    [HideInInspector] public bool VolumetricRegisterForceRefresh = false;
+
 
     // Debug counter to print a message every x frames
     int debugHeartBeatCount = 30;
@@ -441,7 +444,7 @@ public class VolumetricRendering : MonoBehaviour
 //#if !UNITY_EDITOR
         Intialize();
 //#endif
-    }
+    }   
 
     // bool createdLightProjectionTexture = false;
     // void CheckCookieList()
@@ -586,6 +589,7 @@ public class VolumetricRendering : MonoBehaviour
 
         FroxelBufferA = new RenderTexture(rtdiscrpt);
         FroxelBufferA.name = activeCam.name + "_FroxelBufferA";
+
         FroxelBufferA.Create();
 
         //Ugh... extra android buffer mess. Can I use a custom RT double buffer instead?
@@ -694,6 +698,7 @@ public class VolumetricRendering : MonoBehaviour
         SetBlurUniforms(true);
 
         hasInitialized = true;
+        VolumetricRegisters.RegisterVolumetricRenderer(this);
         //RenderPipelineManager.beginCameraRendering += UpdatePreRender;
     }
 
@@ -847,7 +852,7 @@ public class VolumetricRendering : MonoBehaviour
     void CheckClipmap() //Check distance from previous sample and recalulate if over threshold. TODO: make it resample chunks
     {
 
-        if (Vector3.Distance(ClipmapCurrentPos, activeCam.transform.position) > volumetricData.ClipmapResampleThreshold || VolumetricRegisterEmpty)
+        if (Vector3.Distance(ClipmapCurrentPos, activeCam.transform.position) > volumetricData.ClipmapResampleThreshold || VolumetricRegisterEmpty || VolumetricRegisterForceRefresh)
         {
             //TODO: seperate the frames where this is rendered
             UpdateClipmaps();
@@ -873,6 +878,7 @@ public class VolumetricRendering : MonoBehaviour
         }
         UpdateClipmap(Clipmap.Near);
         UpdateClipmap(Clipmap.Far);
+        if (VolumetricRegisterForceRefresh) VolumetricRegisterForceRefresh = false;
     }
 
     public enum Clipmap { Near,Far};
@@ -1409,6 +1415,7 @@ public class VolumetricRendering : MonoBehaviour
 #endif
         ReleaseAssets();
         CleanupCameraData();
+        VolumetricRegisters.UnregisterVolumetricRenderer(this);
     }
 
     public void enable()
@@ -1687,6 +1694,7 @@ public class VolumetricRendering : MonoBehaviour
 
     private void Reset()
     {
+        cam = GetComponentInChildren<Camera>();
         assignVaris();
     }
 

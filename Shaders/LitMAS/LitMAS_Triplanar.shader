@@ -113,7 +113,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 			Tags { "LightMode"="ShadowCaster" }
 
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull [_Cull]
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0
@@ -252,7 +252,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 			Tags { "LightMode"="ShadowCaster" }
 
 			ZWrite [_ZWrite]
-			Cull Off
+			Cull [_Cull]
 			ZTest LEqual
 			AlphaToMask Off
 			ColorMask 0
