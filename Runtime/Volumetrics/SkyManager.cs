@@ -107,7 +107,7 @@ public static class SkyManager
 
         if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom)
         {
-            if (RenderSettings.customReflection != null && RenderSettings.customReflection.GetType() == typeof(Cubemap)) SetSkyTexture(RenderSettings.customReflection);
+            if (RenderSettings.customReflectionTexture != null && RenderSettings.customReflectionTexture.GetType() == typeof(Cubemap)) SetSkyTexture(RenderSettings.customReflectionTexture);
             else SetSkyTexture(CoreUtils.blackCubeTexture);
         }
         else //DefaultReflectionMode.Skybox
