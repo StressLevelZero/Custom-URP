@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.UIElements;
 using Unity.Mathematics;
@@ -91,7 +93,7 @@ namespace UnityEngine.Rendering.Universal
             }
         }
     }
-
+#if UNITY_EDITOR
     [CustomEditor(typeof(VolumetricQualitySettings))]
     public class VolumetricSettingsUI : Editor
     {
@@ -245,4 +247,5 @@ namespace UnityEngine.Rendering.Universal
             return row;
         }
     }
+#endif
 }
