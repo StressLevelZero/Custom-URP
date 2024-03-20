@@ -132,7 +132,7 @@ namespace UnityEngine.Rendering.Universal
             int dynamicMinMip = (int)math.round(math.log2(((float)screenHeight) / SSRRes));
             SSRGlobalArray._SSRMinMip = math.max(dynamicMinMip + minMip, 0);
             float halfTan = math.tan(Mathf.Deg2Rad * (fov * 0.5f));
-            SSRGlobalArray._SSRDistScale = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScreenParams.y * UNITY_MATRIX_P._m11)
+            SSRGlobalArray._SSRDistScale = halfTan / (0.5f * (float)screenHeight); // rcp(0.5*_ScaledScreenParams.y * UNITY_MATRIX_P._m11)
             //Debug.Log("SSR scale: " + SSRGlobalArray[4]);
             return SSRGlobalArray;
            

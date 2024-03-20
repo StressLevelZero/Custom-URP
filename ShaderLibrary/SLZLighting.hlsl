@@ -635,6 +635,7 @@ half SLZDirectBRDFSpecularMobile(half NoH, half LoH, half NxH2, half roughness)
  */
 half3 SLZDirectBRDFSpecularHighQ(half NoH, half NoV, half NoL, half LoH, half roughness, half3 specColor)
 {
+    roughness = 0.999f * roughness + 0.001f; // remap to [0.01,1] to prevent specular aliasing
     half N = SLZGGXSpecularD(NoH, roughness);
     half D  = SLZSmithVisibility(NoV, NoL, roughness);
     half3 F   = SLZSchlickFresnel(LoH, specColor);

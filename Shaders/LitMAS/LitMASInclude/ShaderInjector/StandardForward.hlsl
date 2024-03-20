@@ -241,7 +241,7 @@ half4 frag(VertOut i) : SV_Target
 	normalMap = SAMPLE_TEXTURE2D(_BumpMap, sampler_BaseMap, uv_main);
 	normalTS = UnpackNormal(normalMap);
 	normalTS = _Normals ? normalTS : half3(0, 0, 1);
-	geoSmooth = _Normals ? normalMap.b : 1.0;
+	geoSmooth = _Normals ? 1.0 - normalMap.b : 1.0;
 	smoothness = saturate(smoothness + geoSmooth - 1.0);
 // End Injection NORMAL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
 

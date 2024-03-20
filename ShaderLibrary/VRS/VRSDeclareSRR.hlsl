@@ -93,13 +93,13 @@ float2 GetShadingRateFromCoords(uint2 screenCoords)
 
 float2 GetShadingRateNormalizedUV(float2 normalizedScreenUVs)
 {
-	uint2 screenCoords = normalizedScreenUVs * (_ScreenParams.xy * _SRImageTileSize.zw);
+	uint2 screenCoords = normalizedScreenUVs * (_ScaledScreenParams.xy * _SRImageTileSize.zw);
 	return GetShadingRateFromCoords(screenCoords);
 }
 
 uint GetShadingIndexNormalizedUV(float2 normalizedScreenUVs)
 {
-	uint2 screenCoords = normalizedScreenUVs * (_ScreenParams.xy * _SRImageTileSize.zw);
+	uint2 screenCoords = normalizedScreenUVs * (_ScaledScreenParams.xy * _SRImageTileSize.zw);
 	return GetShadingIndex(screenCoords);
 }
 

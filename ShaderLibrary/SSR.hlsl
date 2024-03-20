@@ -474,7 +474,7 @@ float4 getSSRColor(SSRData data)
 	}
 	
 	#if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
-    
+    reflection.rgb *= reflection.rgb;
 	reflection.a = fade;
 
     float4 colorX = QuadReadAcrossX(reflection);
@@ -488,14 +488,14 @@ float4 getSSRColor(SSRData data)
 	// Fake tone-mapping. When there is a single extremely bright pixel in the quad, averaging the color will result in all pixels being mostly the
 	// color of that pixel. This results in 2x2 pixelization when rays graze light sources. Dumb solution is to scale the intensity of the other 
 	// pixels to be no brighter than double the brightness of the current pixel.
-	float maxColor = max(max(reflection.r,reflection.g),reflection.b);
-	float maxColorX = QuadReadAcrossX(maxColor);
-	float maxColorY = QuadReadAcrossY(maxColor);
-	float maxColorD = QuadReadAcrossDiagonal(maxColor);
-	maxColor = 2 * max(maxColor, 1);
-	colorX = colorX * (min(maxColorX, maxColor) / maxColorX);
-	colorY = colorY * (min(maxColorY, maxColor) / maxColorY);
-	colorD = colorD * (min(maxColorD, maxColor) / maxColorD);
+	//float maxColor = max(max(reflection.r,reflection.g),reflection.b);
+	//float maxColorX = QuadReadAcrossX(maxColor);
+	//float maxColorY = QuadReadAcrossY(maxColor);
+	//float maxColorD = QuadReadAcrossDiagonal(maxColor);
+	//maxColor = 2 * max(maxColor, 1);
+	//colorX = colorX * (min(maxColorX, maxColor) / maxColorX);
+	//colorY = colorY * (min(maxColorY, maxColor) / maxColorY);
+	//colorD = colorD * (min(maxColorD, maxColor) / maxColorD);
 	
 	float4 kernelWeights = float4(0.4, 0.225, 0.225, 0.15);
 	float4 fadeQuad = float4(reflection.a, colorX.a, colorY.a, colorD.a);
@@ -504,7 +504,7 @@ float4 getSSRColor(SSRData data)
     float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;
        
     reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
-    
+    reflection.rgb = sqrt(reflection.rgb);
 	//float fadeX = QuadReadAcrossX(fade);
 	//float fadeY = QuadReadAcrossY(fade);
 	//float fadeD = QuadReadAcrossDiagonal(fade);
@@ -609,7 +609,7 @@ float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, con
 	sOrigin.z += 2 * slope.x + FLT_MIN;
 	sOrigin.z += 2 * slope.y + FLT_MIN;
 	*/
-	sOrigin.z = sOrigin.z + float((2 << _SSRMinMip)) * (ddz)+1e-6;
+	sOrigin.z = sOrigin.z + float((2 << _SSRMinMip)) * (ddz)+1e-4;
 #endif	
 	//float dot1 = abs(dot(wRay, viewDir));
 	//sOrigin.z += HALF_MIN * noise;
@@ -670,7 +670,7 @@ float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, con
 	int maxMip = clamp(_HiZHighestMip, 0, 14);
 
 	bool oddStep = true;
-	for (int i = 0; (i < steps) && !hit && onScreen; i++)
+	for (int i = 0; (i < 100) && !hit && onScreen; i++)
 	{
 		sCurrPos = sOrigin + s_min * sRay; // interpolate/extrapolate the marcher's postion from the origin along the ray using the lerp factor calculated last iteration
 		onScreen = sCurrPos.x >= 1 && sCurrPos.x <= _HiZDim.x && sCurrPos.y >= 1 && sCurrPos.y <= _HiZDim.y;
@@ -689,11 +689,11 @@ float3 GetRayHit(const float3 wPos, const float3 wRay, const float3 viewDir, con
 		hit = mipLevel == _SSRMinMip && s.z <= s_min && s.w >= s_min;
 		bool increaseMip = s_min_new < s.z;
 		bool decreaseMip = !increaseMip;
-		increaseMip = increaseMip && oddStep;
+		//increaseMip = increaseMip && oddStep;
 		//decreaseMip = decreaseMip && s.w > s_min;
-		mipLevel = increaseMip ? min(mipLevel + 1, maxMip) : mipLevel;
-		mipLevel = decreaseMip ? max(mipLevel - 1, _SSRMinMip) : mipLevel;
-		oddStep = !oddStep;
+		mipLevel = increaseMip ? min(mipLevel + 1, maxMip) : max(mipLevel - 1, _SSRMinMip);
+		//mipLevel = decreaseMip ? max(mipLevel - 1, _SSRMinMip) : mipLevel;
+		//oddStep = !oddStep;
 
 		s_min_new = min(s_min_new, s.z);
 		s_min = max(s_min_new, s_min);

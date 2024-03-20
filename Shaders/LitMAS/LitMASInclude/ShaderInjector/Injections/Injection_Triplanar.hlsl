@@ -68,7 +68,7 @@
 		normalTS = UnpackNormal(normalMap);
 		normalTS = _Normals ? normalTS : half3(0, 0, 1);
 		normalTS = _RotateUVs ? half3(normalTS.y, -normalTS.x, normalTS.z) : normalTS;
-		geoSmooth = _Normals ? normalMap.b : 1.0;
+		geoSmooth = _Normals ? 1.0 - normalMap.b : 1.0;
 		smoothness = saturate(smoothness + geoSmooth - 1.0);
 
 //#!INJECT_END
