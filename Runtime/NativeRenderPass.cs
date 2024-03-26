@@ -650,7 +650,7 @@ namespace UnityEngine.Rendering.Universal
         private RenderPassDescriptor InitializeRenderPassDescriptor(ref CameraData cameraData, ScriptableRenderPass renderPass)
         {
             RenderTextureDescriptor targetRT;
-            if (!renderPass.overrideCameraTarget || (renderPass.colorAttachmentHandle.rt == null && renderPass.depthAttachmentHandle.rt == null))
+            if (!renderPass.overrideCameraTarget)// || (renderPass.colorAttachmentHandle.rt == null && renderPass.depthAttachmentHandle.rt == null))
             {
                 targetRT = cameraData.cameraTargetDescriptor;
 

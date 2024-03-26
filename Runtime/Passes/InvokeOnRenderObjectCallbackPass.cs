@@ -8,15 +8,16 @@ namespace UnityEngine.Rendering.Universal
 
     internal class InvokeOnRenderObjectCallbackPass : ScriptableRenderPass
     {
-        static RTHandle[] target = new RTHandle[0];
+        //static RTHandle[] target = new RTHandle[0];
         public InvokeOnRenderObjectCallbackPass(RenderPassEvent evt)
         {
             base.profilingSampler = new ProfilingSampler(nameof(InvokeOnRenderObjectCallbackPass));
             renderPassEvent = evt;
+			skipRenderPassAttachmentSetup = true;
             //TODO: should we fix and re-enable native render pass for this pass?
             // Currently disabled because when the callback is empty it causes an empty Begin/End RenderPass block, which causes artifacts on Vulkan
             useNativeRenderPass = false;
-            ConfigureTarget(target);
+            //ConfigureTarget(target);
         }
 
         /// <inheritdoc/>

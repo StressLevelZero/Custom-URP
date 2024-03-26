@@ -1387,7 +1387,10 @@ namespace UnityEngine.Rendering.Universal
 
             // if any pass was injected, the "automatic" store optimization policy will disable the optimized load actions
             if (count > 0 && m_StoreActionsOptimizationSetting == StoreActionsOptimization.Auto)
+            {
+                //Debug.LogError("URP found injected pass, disabling load-store optimization!");
                 m_UseOptimizedStoreActions = false;
+            }
         }
 
         /// <summary>
@@ -1523,7 +1526,9 @@ namespace UnityEngine.Rendering.Universal
             // Note: we only check color buffers. This is only technically correct because for shadowmaps and depth only passes
             // we bind depth as color and Unity handles it underneath. so we never have a situation that all color buffers are null and depth is bound.
             uint validColorBuffersCount = RenderingUtils.GetValidColorBufferCount(renderPass.colorAttachments);
-            if (validColorBuffersCount == 0)
+
+            // SLZ MODIFIED - Also early exit if we specify the render pass shouldn't touch the attachment setup
+            if (validColorBuffersCount == 0 || renderPass.skipRenderPassAttachmentSetup)
                 return;
 
             // We use a different code path for MRT since it calls a different version of API SetRenderTarget

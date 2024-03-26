@@ -177,6 +177,13 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         static public RTHandle k_CameraTarget = RTHandles.Alloc(BuiltinRenderTextureType.CameraTarget);
 
+        ///-------------------------------------------------------------------
+        /// SLZ MODIFIED
+        /// Add option to skip expensive renderpass attachment setup when we know we don't want to
+        /// change the rendertarget or the pass is non-rendering
+        /// ------------------------------------------------------------------
+        public bool skipRenderPassAttachmentSetup { get; set; }
+
         /// <summary>
         /// The event when the render pass executes.
         /// </summary>

@@ -54,7 +54,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 			#define LITMAS_FEATURE_EMISSION
 			#define LITMAS_FEATURE_SSR
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#if defined(SHADER_API_DESKTOP)
+			#if defined(SHADER_API_DESKTOP) && defined(_SLZ_SSR_ENABLED) && !defined(_NO_SSR)
 			#pragma require WaveVote
 			#pragma require QuadShuffle
 			//#pragma shader_feature _SM6_QUAD

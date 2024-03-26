@@ -181,20 +181,20 @@ namespace UnityEngine.Rendering.Universal.Internal
         public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
         {
 
-            if (vkVRSHackOn && caller != null && caller.s_IsUsingVkVRS)
-            {
-                // Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
-                vrsColorTargets[0] = vrsColorTargets[1] = colorTarget;
-                //vrsColorTargets[2] = dummyRTH;
-                ConfigureTarget(vrsColorTargets, depthTarget);
-
-                //ConfigureColorStoreAction(RenderBufferStoreAction.DontCare, 1);
-            }
-            else
+            //if (vkVRSHackOn && caller != null && caller.s_IsUsingVkVRS)
+            //{
+            //    // Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
+            //    vrsColorTargets[0] = vrsColorTargets[1] = colorTarget;
+            //    //vrsColorTargets[2] = dummyRTH;
+            //    ConfigureTarget(vrsColorTargets, depthTarget);
+            //
+            //    //ConfigureColorStoreAction(RenderBufferStoreAction.DontCare, 1);
+            //}
+            //else
             {
                 enableFoveatedRendering = false;
                 // if VRS was enabled previously, then the target will remain until reset
-                ResetTarget();
+                //ResetTarget();
             }
         }
 

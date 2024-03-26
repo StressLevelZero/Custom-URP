@@ -6,7 +6,7 @@ namespace UnityEngine.Rendering.Universal
 
     internal class TransparentSettingsPass : ScriptableRenderPass
     {
-        static RTHandle[] target = new RTHandle[0];
+        //static RTHandle[] target = new RTHandle[0];
         bool m_shouldReceiveShadows;
 
         const string m_ProfilerTag = "Transparent Settings Pass";
@@ -17,7 +17,8 @@ namespace UnityEngine.Rendering.Universal
             base.profilingSampler = new ProfilingSampler(nameof(TransparentSettingsPass));
             renderPassEvent = evt;
             m_shouldReceiveShadows = shadowReceiveSupported;
-            ConfigureTarget(target);
+			skipRenderPassAttachmentSetup = true;
+            //ConfigureTarget(target);
         }
 
         public bool Setup(ref RenderingData renderingData)

@@ -474,7 +474,7 @@ float4 getSSRColor(SSRData data)
 	}
 	
 	#if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
-    reflection.rgb *= reflection.rgb;
+    reflection.rgb = sqrt(reflection.rgb);
 	reflection.a = fade;
 
     float4 colorX = QuadReadAcrossX(reflection);
@@ -497,14 +497,15 @@ float4 getSSRColor(SSRData data)
 	//colorY = colorY * (min(maxColorY, maxColor) / maxColorY);
 	//colorD = colorD * (min(maxColorD, maxColor) / maxColorD);
 	
-	float4 kernelWeights = float4(0.4, 0.225, 0.225, 0.15);
+	float4 kernelWeights = float4(0.5, 0.185, 0.185, 0.13);
 	float4 fadeQuad = float4(reflection.a, colorX.a, colorY.a, colorD.a);
 	float4 kernel = (fadeQuad) * kernelWeights;
 	float weight = kernel.x + kernel.y + kernel.z + kernel.w;
     float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;
        
     reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
-    reflection.rgb = sqrt(reflection.rgb);
+	
+    reflection.rgb = reflection.rgb * reflection.rgb;
 	//float fadeX = QuadReadAcrossX(fade);
 	//float fadeY = QuadReadAcrossY(fade);
 	//float fadeD = QuadReadAcrossDiagonal(fade);
