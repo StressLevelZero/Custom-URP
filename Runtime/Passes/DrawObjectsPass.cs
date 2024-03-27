@@ -306,7 +306,9 @@ namespace UnityEngine.Rendering.Universal.Internal
                 // SLZ MODIFIED
                 if (data.m_UseMotionVectorData)
                 {
-                    drawSettings.perObjectData = drawSettings.perObjectData | PerObjectData.MotionVectors;
+					// Was used for sampling the color of the fragment from the previous frame. Not doing temporal averaging anymore
+					// This breaks GPU instancing and causes batching issues
+                    //drawSettings.perObjectData = drawSettings.perObjectData | PerObjectData.MotionVectors;
                 }
                 // END SLZ MODIFIED
 
