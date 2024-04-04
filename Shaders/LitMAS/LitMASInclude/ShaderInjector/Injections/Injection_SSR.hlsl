@@ -17,10 +17,10 @@
 //#!INJECT_END
 
 //#!INJECT_BEGIN VERTEX_END 0
-	#if defined(_SSR_ENABLED)
-		float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
-		o.lastVertex = mul(prevVP, lastWPos);
-	#endif
+	//#if defined(_SSR_ENABLED)
+	//	float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
+	//	o.lastVertex = mul(prevVP, lastWPos);
+	//#endif
 //#!INJECT_END
 
 //#!INJECT_BEGIN LIGHTING_CALC 0
@@ -28,12 +28,12 @@
 		half4 noiseRGBA = GetScreenNoiseRGBA(fragData.screenUV);
 
 		SSRExtraData ssrExtra;
-		ssrExtra.meshNormal = i.normXYZ_tanX.xyz;
-		ssrExtra.lastClipPos = i.lastVertex;
+		ssrExtra.meshNormal = UNPACK_NORMAL(i);
+		//ssrExtra.lastClipPos = i.lastVertex;
 		ssrExtra.temporalWeight = _SSRTemporalMul;
 		ssrExtra.depthDerivativeSum = 0;
 		ssrExtra.noise = noiseRGBA;
-		ssrExtra.fogFactor = i.uv0XY_bitZ_fog.w;
+		ssrExtra.fogFactor = UNPACK_FOG(i);
 
 		color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
 		color.rgb = max(0, color.rgb);
@@ -44,7 +44,7 @@
 
 //#!INJECT_BEGIN VOLUMETRIC_FOG 0
 	#if !defined(_SSR_ENABLED)
-		color = MixFogSurf(color, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
+		color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif

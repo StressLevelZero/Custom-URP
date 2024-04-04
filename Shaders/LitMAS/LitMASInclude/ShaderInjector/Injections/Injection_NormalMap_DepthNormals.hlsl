@@ -9,30 +9,33 @@
 //#!INJECT_END
 
 //#!INJECT_BEGIN INTERPOLATORS 4
-	//#!TEXCOORD float4 tanYZ_bitXY 1
-	//#!TEXCOORD float4 uv0XY_bitZ_fog 1
+	//#!TEXCOORD float4 tanXYZ_btSign 1
+	//#!TEXCOORD float2 uv0XY 1
 //#!INJECT_END
 
 //#!INJECT_BEGIN VERTEX_NORMAL 0
-	VertexNormalInputs ntb = GetVertexNormalInputs(v.normal, v.tangent);
-	o.normalWS = float4(ntb.normalWS, ntb.tangentWS.x);
-	o.tanYZ_bitXY = float4(ntb.tangentWS.yz, ntb.bitangentWS.xy);
-	o.uv0XY_bitZ_fog.zw = ntb.bitangentWS.zz;
-	o.uv0XY_bitZ_fog.xy = TRANSFORM_TEX(v.uv0, _BaseMap);
+	half3 wNorm = (TransformObjectToWorldNormal(v.normal));
+	half3 wTan = (TransformObjectToWorldDir(v.tangent.xyz));
+	half tanSign = v.tangent.w * GetOddNegativeScale();
+	o.normalWS = float4(wNorm, 1);
+	o.tanXYZ_btSign = float4(wTan, tanSign);
+	o.uv0XY.xy = TRANSFORM_TEX(v.uv0, _BaseMap);
 //#!INJECT_END
 
 //#!INJECT_BEGIN FRAG_NORMALS 0
-	half4 normalMap = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, i.uv0XY_bitZ_fog.xy);
+	half4 normalMap = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, i.uv0XY.xy);
 	half3 normalTS = UnpackNormal(normalMap);
 	normalTS = _Normals ? normalTS : half3(0, 0, 1);
 
-
+	half3 normalWS = i.normalWS.xyz;
+	half3 tangentWS = i.tanXYZ_btSign.xyz;
+	half3 bitangentWS = cross(normalWS, tangentWS) * i.tanXYZ_btSign.w;
 	half3x3 TStoWS = half3x3(
-		i.normalWS.w, i.tanYZ_bitXY.z, i.normalWS.x,
-		i.tanYZ_bitXY.x, i.tanYZ_bitXY.w, i.normalWS.y,
-		i.tanYZ_bitXY.y, i.uv0XY_bitZ_fog.z, i.normalWS.z
+		tangentWS.x, bitangentWS.x, normalWS.x,
+		tangentWS.y, bitangentWS.y, normalWS.y,
+		tangentWS.z, bitangentWS.z, normalWS.z
 		);
-	half3 normalWS = mul(TStoWS, normalTS);
+	normalWS = mul(TStoWS, normalTS);
 	normalWS = normalize(normalWS);
 
 	normals = half4(EncodeWSNormalForNormalsTex(normalWS),0);

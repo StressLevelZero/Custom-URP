@@ -35,8 +35,8 @@ struct v2f
 	float4 vertex : SV_POSITION;
 	float4 normalWS : NORMAL;
 // Begin Injection INTERPOLATORS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	float4 tanYZ_bitXY : TEXCOORD0;
-	float4 uv0XY_bitZ_fog : TEXCOORD1;
+	float4 tanXYZ_btSign : TEXCOORD0;
+	float2 uv0XY : TEXCOORD1;
 // End Injection INTERPOLATORS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 	UNITY_VERTEX_OUTPUT_STEREO
@@ -80,11 +80,12 @@ v2f vert(appdata v)
 	o.vertex = TransformObjectToHClip(v.vertex.xyz);
 
 // Begin Injection VERTEX_NORMAL from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	VertexNormalInputs ntb = GetVertexNormalInputs(v.normal, v.tangent);
-	o.normalWS = float4(ntb.normalWS, ntb.tangentWS.x);
-	o.tanYZ_bitXY = float4(ntb.tangentWS.yz, ntb.bitangentWS.xy);
-	o.uv0XY_bitZ_fog.zw = ntb.bitangentWS.zz;
-	o.uv0XY_bitZ_fog.xy = TRANSFORM_TEX(v.uv0, _BaseMap);
+	half3 wNorm = (TransformObjectToWorldNormal(v.normal));
+	half3 wTan = (TransformObjectToWorldDir(v.tangent.xyz));
+	half tanSign = v.tangent.w * GetOddNegativeScale();
+	o.normalWS = float4(wNorm, 1);
+	o.tanXYZ_btSign = float4(wTan, tanSign);
+	o.uv0XY.xy = TRANSFORM_TEX(v.uv0, _BaseMap);
 // End Injection VERTEX_NORMAL from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
 
 	return o;
@@ -99,17 +100,19 @@ half4 frag(v2f i) : SV_Target
    half4 normals = half4(0, 0, 0, 1);
 
 // Begin Injection FRAG_NORMALS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	half4 normalMap = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, i.uv0XY_bitZ_fog.xy);
+	half4 normalMap = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, i.uv0XY.xy);
 	half3 normalTS = UnpackNormal(normalMap);
 	normalTS = _Normals ? normalTS : half3(0, 0, 1);
 
-
+	half3 normalWS = i.normalWS.xyz;
+	half3 tangentWS = i.tanXYZ_btSign.xyz;
+	half3 bitangentWS = cross(normalWS, tangentWS) * i.tanXYZ_btSign.w;
 	half3x3 TStoWS = half3x3(
-		i.normalWS.w, i.tanYZ_bitXY.z, i.normalWS.x,
-		i.tanYZ_bitXY.x, i.tanYZ_bitXY.w, i.normalWS.y,
-		i.tanYZ_bitXY.y, i.uv0XY_bitZ_fog.z, i.normalWS.z
+		tangentWS.x, bitangentWS.x, normalWS.x,
+		tangentWS.y, bitangentWS.y, normalWS.y,
+		tangentWS.z, bitangentWS.z, normalWS.z
 		);
-	half3 normalWS = mul(TStoWS, normalTS);
+	normalWS = mul(TStoWS, normalTS);
 	normalWS = normalize(normalWS);
 
 	normals = half4(EncodeWSNormalForNormalsTex(normalWS),0);

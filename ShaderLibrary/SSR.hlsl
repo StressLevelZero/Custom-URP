@@ -424,7 +424,13 @@ float4 getSSRColor(SSRData data)
 	#if defined(SSR_POST_OPAQUE)
 		uvs = ComputeGrabScreenPos(CameraToScreenPosCheap(finalPosClip));
 	#else
-		float4 finalPosWorld = mul(UNITY_MATRIX_I_V, finalPos);
+		
+		//float4 finalPosWorld = mul(UNITY_MATRIX_I_V, finalPos);
+		float4 finalPosWorld = float4(
+	mul(
+		transpose((float3x3)UNITY_MATRIX_V),
+		(finalPos.xyz)
+	) + _WorldSpaceCameraPos, 1);
 		float4 finalPosClip = mul(prevVP, finalPosWorld);
 		uvs = ComputeGrabScreenPos(finalPosClip.xyw);
 	#endif

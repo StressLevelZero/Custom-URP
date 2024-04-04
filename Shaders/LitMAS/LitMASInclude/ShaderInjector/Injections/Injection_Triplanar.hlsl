@@ -26,8 +26,7 @@
 
 
 //#!INJECT_BEGIN VERTEX_NORMALS 0
-	o.normXYZ_tanX = half4(TransformObjectToWorldNormal(v.normal, false), 0);
-	o.uv0XY_bitZ_fog.z = v.tangent.w; //Avoid optimization that would remove the tangent from the vertex input (causes issues)
+	o.normXYZ_tanZ = half4(TransformObjectToWorldNormal(v.normal, false), v.tangent.z); //Avoid optimization that would remove the tangent from the vertex input (causes issues)
 //#!INJECT_END
 
 
@@ -42,15 +41,15 @@
 		
 		#if defined(_EXPENSIVE_TP)
 			tpDerivatives tpDD;
-			GetDirectionalDerivatives(i.wPos, tpDD);
+			GetDirectionalDerivatives( UNPACK_WPOS(i), tpDD);
 			half2 ddxTP, ddyTP;
-			GetTPUVExpensive(uvTP, ddxTP, ddyTP, TStoWsTP, i.wPos, normalize(i.normXYZ_tanX.xyz), tpDD);
+			GetTPUVExpensive(uvTP, ddxTP, ddyTP, TStoWsTP, UNPACK_WPOS(i), normalize(UNPACK_NORMAL(i)), tpDD);
 			ddxTP = _RotateUVs ? half2(-ddxTP.y, ddxTP.x) : ddxTP;
 			ddyTP = _RotateUVs ? half2(-ddyTP.y, ddyTP.x) : ddyTP;
 			half2 ddxMain = ddxTP * scale;
 			half2 ddyMain = ddyTP * scale;
 		#else
-			GetTPUVCheap(uvTP, TStoWsTP, i.wPos, normalize(i.normXYZ_tanX.xyz));
+			GetTPUVCheap(uvTP, TStoWsTP, UNPACK_WPOS(i), normalize(UNPACK_NORMAL(i)));
 		#endif
 		
 		uvTP = _RotateUVs ? float2(-uvTP.y, uvTP.x) : uvTP;
@@ -76,7 +75,7 @@
 //#!INJECT_BEGIN DETAIL_MAP 0
 		/*-Triplanar---------------------------------------------------------------------------------------------------------*/
 		float2 uv_detail = mad(uvTP, _DetailMap_ST.xx, _DetailMap_ST.zw);
-		uv_detail = _DetailsuseLocalUVs ? mad(float2(i.uv0XY_bitZ_fog.xy), _DetailMap_ST.xy, _DetailMap_ST.zw) : uv_detail;
+		uv_detail = _DetailsuseLocalUVs ? mad(float2(UNPACK_UV0(i)), _DetailMap_ST.xy, _DetailMap_ST.zw) : uv_detail;
 #if defined(_EXPENSIVE_TP)
 		half2 ddxDetail = ddx(uv_detail);
 		half2 ddyDetail = ddy(uv_detail);

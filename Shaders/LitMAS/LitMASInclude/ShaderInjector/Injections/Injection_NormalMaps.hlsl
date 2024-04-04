@@ -1,13 +1,16 @@
 
 //#!INJECT_BEGIN INTERPOLATORS 4
-	//#!TEXCOORD half4 tanYZ_bitXY 1
+	////#!TEXCOORD half4 tanXYZ_ 1
 //#!INJECT_END
 
 //#!INJECT_BEGIN VERTEX_NORMALS 0
-	VertexNormalInputs ntb = GetVertexNormalInputs(v.normal, v.tangent);
-	o.normXYZ_tanX = half4(ntb.normalWS, ntb.tangentWS.x);
-	o.tanYZ_bitXY = half4(ntb.tangentWS.yz, ntb.bitangentWS.xy);
-	o.uv0XY_bitZ_fog.z = ntb.bitangentWS.z;
+	//VertexNormalInputs ntb = GetVertexNormalInputs(v.normal, v.tangent);
+	half3 wNorm = (TransformObjectToWorldNormal(v.normal));
+	half3 wTan = (TransformObjectToWorldDir(v.tangent.xyz));
+	half tanSign = v.tangent.w * GetOddNegativeScale();
+	o.normXYZ_tanZ = half4(wNorm, wTan.z);
+	o.uv0XY_tanXY.zw = wTan.xy;
+	o.SHVertLights_btSign.w = tanSign;
 //#!INJECT_END
 
 //#!INJECT_BEGIN NORMAL_MAP 0
@@ -25,11 +28,14 @@
 //#!INJECT_END
 
 //#!INJECT_BEGIN NORMAL_TRANSFORM 0
-	half3 normalWS = i.normXYZ_tanX.xyz;
+	half3 normalWS = UNPACK_NORMAL(i);
+	half3 tangentWS = UNPACK_TANGENT(i);
+	half3 bitangentWS = cross(normalWS, tangentWS) * UNPACK_BITANGENT_SIGN(i);
+	
 	half3x3 TStoWS = half3x3(
-		i.normXYZ_tanX.w, i.tanYZ_bitXY.z, normalWS.x,
-		i.tanYZ_bitXY.x, i.tanYZ_bitXY.w, normalWS.y,
-		i.tanYZ_bitXY.y, i.uv0XY_bitZ_fog.z, normalWS.z
+		tangentWS.x, bitangentWS.x, normalWS.x,
+		tangentWS.y, bitangentWS.y, normalWS.y,
+		tangentWS.z, bitangentWS.z, normalWS.z
 		);
 	normalWS = mul(TStoWS, normalTS);
 	normalWS = normalize(normalWS);

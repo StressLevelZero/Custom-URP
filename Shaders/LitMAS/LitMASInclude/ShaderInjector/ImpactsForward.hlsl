@@ -105,27 +105,35 @@ struct VertIn
 struct VertOut
 {
 	float4 vertex       : SV_POSITION;
-	float4 uv0XY_bitZ_fog : TEXCOORD0;
+	float4 uv0XY_tanXY : TEXCOORD0;
 #if defined(LIGHTMAP_ON) || defined(DYNAMICLIGHTMAP_ON)
 	float4 uv1 : TEXCOORD1;
 #endif
-	half4 SHVertLights : TEXCOORD2;
-	half4 normXYZ_tanX : TEXCOORD3;
-	float3 wPos : TEXCOORD4;
+	half4 SHVertLights_btSign : TEXCOORD2;
+	half4 normXYZ_tanZ : TEXCOORD3;
+	float4 wPos_fog : TEXCOORD4;
 
 // Begin Injection INTERPOLATORS from Injection_SSR.hlsl ----------------------------------------------------------
 	float4 lastVertex : TEXCOORD5;
 // End Injection INTERPOLATORS from Injection_SSR.hlsl ----------------------------------------------------------
 // Begin Injection INTERPOLATORS from Injection_NormalMaps.hlsl ----------------------------------------------------------
-	half4 tanYZ_bitXY : TEXCOORD6;
+	////#!TEXCOORD half4 tanXYZ_ 1
 // End Injection INTERPOLATORS from Injection_NormalMaps.hlsl ----------------------------------------------------------
 // Begin Injection INTERPOLATORS from Injection_Impacts.hlsl ----------------------------------------------------------
-	float3 unskinnedObjPos : TEXCOORD7;
+	float3 unskinnedObjPos : TEXCOORD6;
 // End Injection INTERPOLATORS from Injection_Impacts.hlsl ----------------------------------------------------------
 
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 		UNITY_VERTEX_OUTPUT_STEREO
 };
+
+#define UNPACK_UV0(i) i.uv0XY_tanXY.xy
+#define UNPACK_NORMAL(i) i.normXYZ_tanZ.xyz
+#define UNPACK_TANGENT(i) half3(i.uv0XY_tanXY.zw, i.normXYZ_tanZ.w)
+#define UNPACK_BITANGENT_SIGN(i) i.SHVertLights_btSign.w
+#define UNPACK_WPOS(i) i.wPos_fog.xyz
+#define UNPACK_FOG(i) i.wPos_fog.w
+#define UNPACK_VERTLIGHTS(i) i.SHVertLights_btSign.xyz
 
 TEXTURE2D(_BaseMap);
 SAMPLER(sampler_BaseMap);
@@ -182,9 +190,9 @@ VertOut vert(VertIn v)
 	UNITY_TRANSFER_INSTANCE_ID(v, o);
 	UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-	o.wPos = TransformObjectToWorld(v.vertex.xyz);
-	o.vertex = TransformWorldToHClip(o.wPos);
-	o.uv0XY_bitZ_fog.xy = v.uv0.xy;
+	o.wPos_fog.xyz = TransformObjectToWorld(v.vertex.xyz);
+	o.vertex = TransformWorldToHClip(o.wPos_fog.xyz);
+	o.uv0XY_tanXY.xy = v.uv0.xy;
 
 #if defined(LIGHTMAP_ON) || defined(DIRLIGHTMAP_COMBINED)
 	OUTPUT_LIGHTMAP_UV(v.uv1.xy, unity_LightmapST, o.uv1.xy);
@@ -196,27 +204,30 @@ VertOut vert(VertIn v)
 
 	// Exp2 fog
 	half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
-	o.uv0XY_bitZ_fog.w = unity_FogParams.x * clipZ_0Far;
+	o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
 
 // Begin Injection VERTEX_NORMALS from Injection_NormalMaps.hlsl ----------------------------------------------------------
-	VertexNormalInputs ntb = GetVertexNormalInputs(v.normal, v.tangent);
-	o.normXYZ_tanX = half4(ntb.normalWS, ntb.tangentWS.x);
-	o.tanYZ_bitXY = half4(ntb.tangentWS.yz, ntb.bitangentWS.xy);
-	o.uv0XY_bitZ_fog.z = ntb.bitangentWS.z;
+	//VertexNormalInputs ntb = GetVertexNormalInputs(v.normal, v.tangent);
+	half3 wNorm = (TransformObjectToWorldNormal(v.normal));
+	half3 wTan = (TransformObjectToWorldDir(v.tangent.xyz));
+	half tanSign = v.tangent.w * GetOddNegativeScale();
+	o.normXYZ_tanZ = half4(wNorm, wTan.z);
+	o.uv0XY_tanXY.zw = wTan.xy;
+	o.SHVertLights_btSign.w = tanSign;
 // End Injection VERTEX_NORMALS from Injection_NormalMaps.hlsl ----------------------------------------------------------
 
-	o.SHVertLights = 0;
+
 	// Calculate vertex lights and L2 probe lighting on quest 
-	o.SHVertLights.xyz = VertexLighting(o.wPos, o.normXYZ_tanX.xyz);
+	o.SHVertLights_btSign.xyz = VertexLighting(UNPACK_WPOS(o), UNPACK_NORMAL(o));
 #if !defined(LIGHTMAP_ON) && !defined(DYNAMICLIGHTMAP_ON) && defined(SHADER_API_MOBILE)
-	o.SHVertLights.xyz += SampleSHVertex(o.normXYZ_tanX.xyz);
+	o.SHVertLights_btSign.xyz += SampleSHVertex(o.normXYZ_tanZ.xyz);
 #endif
 
 // Begin Injection VERTEX_END from Injection_SSR.hlsl ----------------------------------------------------------
-	#if defined(_SSR_ENABLED)
-		float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
-		o.lastVertex = mul(prevVP, lastWPos);
-	#endif
+	//#if defined(_SSR_ENABLED)
+	//	float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
+	//	o.lastVertex = mul(prevVP, lastWPos);
+	//#endif
 // End Injection VERTEX_END from Injection_SSR.hlsl ----------------------------------------------------------
 // Begin Injection VERTEX_END from Injection_Impacts.hlsl ----------------------------------------------------------
 	o.unskinnedObjPos = v.uv1.xyz;
@@ -233,8 +244,9 @@ half4 frag(VertOut i) : SV_Target
 /*---Read Input Data---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
-	float2 uv_main = mad(float2(i.uv0XY_bitZ_fog.xy), _BaseMap_ST.xy, _BaseMap_ST.zw);
-	float2 uv_detail = mad(float2(i.uv0XY_bitZ_fog.xy), _DetailMap_ST.xy, _DetailMap_ST.zw);
+	float2 uv0 = UNPACK_UV0(i);
+	float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
+	float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
 	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 
@@ -294,11 +306,14 @@ half4 frag(VertOut i) : SV_Target
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
 // Begin Injection NORMAL_TRANSFORM from Injection_NormalMaps.hlsl ----------------------------------------------------------
-	half3 normalWS = i.normXYZ_tanX.xyz;
+	half3 normalWS = UNPACK_NORMAL(i);
+	half3 tangentWS = UNPACK_TANGENT(i);
+	half3 bitangentWS = cross(normalWS, tangentWS) * UNPACK_BITANGENT_SIGN(i);
+	
 	half3x3 TStoWS = half3x3(
-		i.normXYZ_tanX.w, i.tanYZ_bitXY.z, normalWS.x,
-		i.tanYZ_bitXY.x, i.tanYZ_bitXY.w, normalWS.y,
-		i.tanYZ_bitXY.y, i.uv0XY_bitZ_fog.z, normalWS.z
+		tangentWS.x, bitangentWS.x, normalWS.x,
+		tangentWS.y, bitangentWS.y, normalWS.y,
+		tangentWS.z, bitangentWS.z, normalWS.z
 		);
 	normalWS = mul(TStoWS, normalTS);
 	normalWS = normalize(normalWS);
@@ -317,9 +332,9 @@ half4 frag(VertOut i) : SV_Target
 
 
 	#if defined(LIGHTMAP_ON)
-		SLZFragData fragData = SLZGetFragData(i.vertex, i.wPos, normalWS, i.uv1.xy, i.uv1.zw, i.SHVertLights.xyz);
+		SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, i.uv1.xy, i.uv1.zw, UNPACK_VERTLIGHTS(i));
 	#else
-		SLZFragData fragData = SLZGetFragData(i.vertex, i.wPos, normalWS, float2(0, 0), float2(0, 0), i.SHVertLights.xyz);
+		SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, float2(0, 0), float2(0, 0), UNPACK_VERTLIGHTS(i));
 	#endif
 
 	half4 emission = half4(0,0,0,0);
@@ -343,12 +358,12 @@ half4 frag(VertOut i) : SV_Target
 		half4 noiseRGBA = GetScreenNoiseRGBA(fragData.screenUV);
 
 		SSRExtraData ssrExtra;
-		ssrExtra.meshNormal = i.normXYZ_tanX.xyz;
-		ssrExtra.lastClipPos = i.lastVertex;
+		ssrExtra.meshNormal = UNPACK_NORMAL(i);
+		//ssrExtra.lastClipPos = i.lastVertex;
 		ssrExtra.temporalWeight = _SSRTemporalMul;
 		ssrExtra.depthDerivativeSum = 0;
 		ssrExtra.noise = noiseRGBA;
-		ssrExtra.fogFactor = i.uv0XY_bitZ_fog.w;
+		ssrExtra.fogFactor = UNPACK_FOG(i);
 
 		color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
 		color.rgb = max(0, color.rgb);
@@ -360,7 +375,7 @@ half4 frag(VertOut i) : SV_Target
 
 // Begin Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
 	#if !defined(_SSR_ENABLED)
-		color = MixFogSurf(color, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
+		color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif

@@ -38,7 +38,7 @@ half3 invertFogLerp(half fogIntensity, half3 mipFog, half3 finalColor)
 struct SSRExtraData
 {
     real3 meshNormal; 
-    float4 lastClipPos;
+    //float4 lastClipPos;
     float temporalWeight;
     float depthDerivativeSum;
     real4 noise;
@@ -191,8 +191,8 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 SSR = real3(0, 0, 0);
     real SSRLerp = 0;
 
-    float oldVertDepth = ssrExtra.lastClipPos.z / ssrExtra.lastClipPos.w;
-    float ddzOld = GetDepthDerivativeSum(oldVertDepth);
+    //float oldVertDepth = ssrExtra.lastClipPos.z / ssrExtra.lastClipPos.w;
+    //float ddzOld = GetDepthDerivativeSum(oldVertDepth);
 
     SLZImageBasedSpecularSSR(diffuse, specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
     real horizOcclusion = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
@@ -200,11 +200,11 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     SSR.rgb *= horizOcclusion;
     
     //SSRLerp *= saturate(dot(-fragData.viewDir, ))
-    float2 oldScreenUV = SLZComputeNDCFromClip(ssrExtra.lastClipPos);
+    //float2 oldScreenUV = SLZComputeNDCFromClip(ssrExtra.lastClipPos);
    
-    float oldDepth = LOAD_TEXTURE2D_X(_PrevHiZ0Texture, oldScreenUV.xy * _HiZDim.xy).r;
+    //float oldDepth = LOAD_TEXTURE2D_X(_PrevHiZ0Texture, oldScreenUV.xy * _HiZDim.xy).r;
+    //bool isWithinDepthError = abs(oldDepth - oldVertDepth) < 2 * ddzOld + HALF_MIN;
     
-    bool isWithinDepthError = abs(oldDepth - oldVertDepth) < 2 * ddzOld + HALF_MIN;
     //float4 volColor = GetVolumetricColor(fragData.position);
     float3 output = surfData.occlusion * (surfData.albedo * diffuse) + surfData.emission;
     output = surfaceType == 1 ? output * surfData.alpha : output; //Premultiply diffuse by alpha if surface is transparent

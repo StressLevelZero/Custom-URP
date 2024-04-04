@@ -110,13 +110,13 @@ struct VertIn
 struct VertOut
 {
 	float4 vertex       : SV_POSITION;
-	float4 uv0XY_bitZ_fog : TEXCOORD0;
+	float4 uv0XY_tanXY : TEXCOORD0;
 #if defined(LIGHTMAP_ON) || defined(DYNAMICLIGHTMAP_ON)
 	float4 uv1 : TEXCOORD1;
 #endif
-	half4 SHVertLights : TEXCOORD2;
-	half4 normXYZ_tanX : TEXCOORD3;
-	float3 wPos : TEXCOORD4;
+	half4 SHVertLights_btSign : TEXCOORD2;
+	half4 normXYZ_tanZ : TEXCOORD3;
+	float4 wPos_fog : TEXCOORD4;
 
 // Begin Injection INTERPOLATORS from Injection_SSR.hlsl ----------------------------------------------------------
 	float4 lastVertex : TEXCOORD5;
@@ -125,6 +125,14 @@ struct VertOut
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 		UNITY_VERTEX_OUTPUT_STEREO
 };
+
+#define UNPACK_UV0(i) i.uv0XY_tanXY.xy
+#define UNPACK_NORMAL(i) i.normXYZ_tanZ.xyz
+#define UNPACK_TANGENT(i) half3(i.uv0XY_tanXY.zw, i.normXYZ_tanZ.w)
+#define UNPACK_BITANGENT_SIGN(i) i.SHVertLights_btSign.w
+#define UNPACK_WPOS(i) i.wPos_fog.xyz
+#define UNPACK_FOG(i) i.wPos_fog.w
+#define UNPACK_VERTLIGHTS(i) i.SHVertLights_btSign.xyz
 
 TEXTURE2D(_BaseMap);
 SAMPLER(sampler_BaseMap);
@@ -182,9 +190,9 @@ VertOut vert(VertIn v)
 	UNITY_TRANSFER_INSTANCE_ID(v, o);
 	UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-	o.wPos = TransformObjectToWorld(v.vertex.xyz);
-	o.vertex = TransformWorldToHClip(o.wPos);
-	o.uv0XY_bitZ_fog.xy = v.uv0.xy;
+	o.wPos_fog.xyz = TransformObjectToWorld(v.vertex.xyz);
+	o.vertex = TransformWorldToHClip(o.wPos_fog.xyz);
+	o.uv0XY_tanXY.xy = v.uv0.xy;
 
 #if defined(LIGHTMAP_ON) || defined(DIRLIGHTMAP_COMBINED)
 	OUTPUT_LIGHTMAP_UV(v.uv1.xy, unity_LightmapST, o.uv1.xy);
@@ -196,25 +204,24 @@ VertOut vert(VertIn v)
 
 	// Exp2 fog
 	half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
-	o.uv0XY_bitZ_fog.w = unity_FogParams.x * clipZ_0Far;
+	o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
 
 // Begin Injection VERTEX_NORMALS from Injection_Triplanar.hlsl ----------------------------------------------------------
-	o.normXYZ_tanX = half4(TransformObjectToWorldNormal(v.normal, false), 0);
-	o.uv0XY_bitZ_fog.z = v.tangent.w; //Avoid optimization that would remove the tangent from the vertex input (causes issues)
+	o.normXYZ_tanZ = half4(TransformObjectToWorldNormal(v.normal, false), v.tangent.z); //Avoid optimization that would remove the tangent from the vertex input (causes issues)
 // End Injection VERTEX_NORMALS from Injection_Triplanar.hlsl ----------------------------------------------------------
 
-	o.SHVertLights = 0;
+
 	// Calculate vertex lights and L2 probe lighting on quest 
-	o.SHVertLights.xyz = VertexLighting(o.wPos, o.normXYZ_tanX.xyz);
+	o.SHVertLights_btSign.xyz = VertexLighting(UNPACK_WPOS(o), UNPACK_NORMAL(o));
 #if !defined(LIGHTMAP_ON) && !defined(DYNAMICLIGHTMAP_ON) && defined(SHADER_API_MOBILE)
-	o.SHVertLights.xyz += SampleSHVertex(o.normXYZ_tanX.xyz);
+	o.SHVertLights_btSign.xyz += SampleSHVertex(o.normXYZ_tanZ.xyz);
 #endif
 
 // Begin Injection VERTEX_END from Injection_SSR.hlsl ----------------------------------------------------------
-	#if defined(_SSR_ENABLED)
-		float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
-		o.lastVertex = mul(prevVP, lastWPos);
-	#endif
+	//#if defined(_SSR_ENABLED)
+	//	float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
+	//	o.lastVertex = mul(prevVP, lastWPos);
+	//#endif
 // End Injection VERTEX_END from Injection_SSR.hlsl ----------------------------------------------------------
 	return o;
 }
@@ -238,15 +245,15 @@ half4 frag(VertOut i) : SV_Target
 		
 		#if defined(_EXPENSIVE_TP)
 			tpDerivatives tpDD;
-			GetDirectionalDerivatives(i.wPos, tpDD);
+			GetDirectionalDerivatives( UNPACK_WPOS(i), tpDD);
 			half2 ddxTP, ddyTP;
-			GetTPUVExpensive(uvTP, ddxTP, ddyTP, TStoWsTP, i.wPos, normalize(i.normXYZ_tanX.xyz), tpDD);
+			GetTPUVExpensive(uvTP, ddxTP, ddyTP, TStoWsTP, UNPACK_WPOS(i), normalize(UNPACK_NORMAL(i)), tpDD);
 			ddxTP = _RotateUVs ? half2(-ddxTP.y, ddxTP.x) : ddxTP;
 			ddyTP = _RotateUVs ? half2(-ddyTP.y, ddyTP.x) : ddyTP;
 			half2 ddxMain = ddxTP * scale;
 			half2 ddyMain = ddyTP * scale;
 		#else
-			GetTPUVCheap(uvTP, TStoWsTP, i.wPos, normalize(i.normXYZ_tanX.xyz));
+			GetTPUVCheap(uvTP, TStoWsTP, UNPACK_WPOS(i), normalize(UNPACK_NORMAL(i)));
 		#endif
 		
 		uvTP = _RotateUVs ? float2(-uvTP.y, uvTP.x) : uvTP;
@@ -293,7 +300,7 @@ half4 frag(VertOut i) : SV_Target
 // Begin Injection DETAIL_MAP from Injection_Triplanar.hlsl ----------------------------------------------------------
 		/*-Triplanar---------------------------------------------------------------------------------------------------------*/
 		float2 uv_detail = mad(uvTP, _DetailMap_ST.xx, _DetailMap_ST.zw);
-		uv_detail = _DetailsuseLocalUVs ? mad(float2(i.uv0XY_bitZ_fog.xy), _DetailMap_ST.xy, _DetailMap_ST.zw) : uv_detail;
+		uv_detail = _DetailsuseLocalUVs ? mad(float2(UNPACK_UV0(i)), _DetailMap_ST.xy, _DetailMap_ST.zw) : uv_detail;
 #if defined(_EXPENSIVE_TP)
 		half2 ddxDetail = ddx(uv_detail);
 		half2 ddyDetail = ddy(uv_detail);
@@ -330,14 +337,14 @@ half4 frag(VertOut i) : SV_Target
 /*---------------------------------------------------------------------------------------------------------------------------*/
 	
 	#if !defined(SHADER_API_MOBILE) && !defined(LITMAS_FEATURE_TP) // Specular antialiasing based on normal derivatives. Only on PC to avoid cost of derivatives on Quest
-		smoothness = min(smoothness, SLZGeometricSpecularAA(i.normXYZ_tanX.xyz));
+		smoothness = min(smoothness, SLZGeometricSpecularAA(UNPACK_NORMAL(i)));
 	#endif
 
 
 	#if defined(LIGHTMAP_ON)
-		SLZFragData fragData = SLZGetFragData(i.vertex, i.wPos, normalWS, i.uv1.xy, i.uv1.zw, i.SHVertLights.xyz);
+		SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, i.uv1.xy, i.uv1.zw, UNPACK_VERTLIGHTS(i));
 	#else
-		SLZFragData fragData = SLZGetFragData(i.vertex, i.wPos, normalWS, float2(0, 0), float2(0, 0), i.SHVertLights.xyz);
+		SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, float2(0, 0), float2(0, 0), UNPACK_VERTLIGHTS(i));
 	#endif
 
 	half4 emission = half4(0,0,0,0);
@@ -361,12 +368,12 @@ half4 frag(VertOut i) : SV_Target
 		half4 noiseRGBA = GetScreenNoiseRGBA(fragData.screenUV);
 
 		SSRExtraData ssrExtra;
-		ssrExtra.meshNormal = i.normXYZ_tanX.xyz;
-		ssrExtra.lastClipPos = i.lastVertex;
+		ssrExtra.meshNormal = UNPACK_NORMAL(i);
+		//ssrExtra.lastClipPos = i.lastVertex;
 		ssrExtra.temporalWeight = _SSRTemporalMul;
 		ssrExtra.depthDerivativeSum = 0;
 		ssrExtra.noise = noiseRGBA;
-		ssrExtra.fogFactor = i.uv0XY_bitZ_fog.w;
+		ssrExtra.fogFactor = UNPACK_FOG(i);
 
 		color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
 		color.rgb = max(0, color.rgb);
@@ -378,7 +385,7 @@ half4 frag(VertOut i) : SV_Target
 
 // Begin Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
 	#if !defined(_SSR_ENABLED)
-		color = MixFogSurf(color, -fragData.viewDir, i.uv0XY_bitZ_fog.w, _Surface);
+		color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif
