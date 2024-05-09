@@ -487,6 +487,8 @@ public class VolumetricRendering : MonoBehaviour
 
     void CheckOverrideVolumes() //TODO: Is there a better way to do this?
     {
+        UniversalRenderPipeline.UpdateVolumeFramework(activeCam, activeCamData);
+
         var stack = VolumeManager.instance.stack;
 
         var Volumetrics = stack.GetComponent<Volumetrics>();

@@ -638,7 +638,7 @@ namespace UnityEngine.Rendering.Universal
 #endif
         }
 
-        static void UpdateVolumeFramework(Camera camera, UniversalAdditionalCameraData additionalCameraData)
+        public static void UpdateVolumeFramework(Camera camera, UniversalAdditionalCameraData additionalCameraData)
         {
             using var profScope = new ProfilingScope(null, ProfilingSampler.Get(URPProfileId.UpdateVolumeFramework));
 
