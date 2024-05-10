@@ -336,21 +336,13 @@ half3 MixFogColor(real3 fragColor, real3 fogColor, float3 viewDirectionWS, float
 half4 MixFogColorSurf(real4 fragColor, float3 viewDirectionWS, float fogFactor, int surface)
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
-    half fogIntensity = ComputeFogIntensity(fogFactor);
-	
-    half3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
+    real fogIntensity = ComputeFogIntensity(fogFactor);
+
+    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
     if (surface == 1) // 1 = Transparent, which is actually alpha premultiplied.
     {
         mipFog *= fragColor.a;
     }
-	
-	switch (blendMode)
-	{
-		case (2): mipFog = (0.0).xxx; break; // Additive - lerp to 0
-		case (3): mipFog = (1.0).xxx; break; // Multiplicative - lerp to 1
-		default: break;
-	}
-	
     fragColor.rgb = lerp(mipFog, fragColor.rgb, fogIntensity);
 #endif
     return fragColor;

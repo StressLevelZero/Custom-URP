@@ -77,6 +77,53 @@ Shader "SLZ/SLZ Unlit"
                 return o;
             }
 
+            /* @brief Blend volumetrics with control for the surface type.
+             *
+             * @param color       Final surface color
+             * @param positionWS  World-space position of the fragment
+             * @param surfaceType Enum of the surface type, where 0: opaque, 1: transparent (alpha premultiplied), 2: fade (alpha blend) 
+             * @return color blended towards the volumetric color if the surface is opaque, or blended towards transparency otherwise
+             */
+            half4 VolumetricsBlend(half4 color, float3 positionWS, int blendMode) {
+            
+            #if defined(_VOLUMETRICS_ENABLED)
+            
+                half4 FroxelColor = GetVolumetricColor(positionWS);
+            	
+                FroxelColor.rgb = blendMode == 1 ? FroxelColor.rgb * color.a : FroxelColor.rgb;
+                half3 fadeOutVal = blendMode == 4 ? 1.0.xxx : 0.0.xxx;
+            	color.rgb = lerp(fadeOutVal,color.rgb, FroxelColor.a);
+                if (blendMode < 3)
+                {
+            	    color.rgb += FroxelColor.rgb;
+                }
+            #endif
+                return color;
+            }
+
+            half4 MixFogColorBlend(real4 fragColor, float3 viewDirectionWS, float fogFactor, int blendMode)
+            {
+            #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+                half fogIntensity = ComputeFogIntensity(fogFactor);
+            	
+                half3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
+                if (blendMode == 1) // 1 = Transparent, which is actually alpha premultiplied.
+                {
+                    mipFog *= fragColor.a;
+                }
+            	
+            	switch (blendMode)
+            	{
+            		case (3): mipFog = (0.0).xxx; break; // Additive - lerp to 0
+            		case (4): mipFog = (1.0).xxx; break; // Multiplicative - lerp to 1
+            		default: break;
+            	}
+            	
+                fragColor.rgb = lerp(mipFog, fragColor.rgb, fogIntensity);
+            #endif
+                return fragColor;
+            }
+
             half4 frag(v2f i) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
@@ -85,8 +132,8 @@ Shader "SLZ/SLZ Unlit"
                 // apply fog
                 float3 viewDir = i.wPos - _WorldSpaceCameraPos;
 
-                col.rgb = MixFogColorSurf(col, viewDir, i.uv_fogFactor.z, _BlendMode);
-                col = Volumetrics(col, i.wPos);
+                col.rgb = MixFogColorBlend(col, viewDir, i.uv_fogFactor.z, _BlendMode);
+                col = VolumetricsBlend(col, i.wPos, _BlendMode);
 
                 return col;
             }
