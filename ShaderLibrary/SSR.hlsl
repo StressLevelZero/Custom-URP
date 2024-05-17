@@ -503,7 +503,7 @@ float4 getSSRColor(SSRData data)
 	//colorY = colorY * (min(maxColorY, maxColor) / maxColorY);
 	//colorD = colorD * (min(maxColorD, maxColor) / maxColorD);
 	
-	float4 kernelWeights = float4(0.5, 0.185, 0.185, 0.13);
+	float4 kernelWeights = float4(0.25, 0.25, 0.25, 0.25);//float4(0.5, 0.185, 0.185, 0.13);
 	float4 fadeQuad = float4(reflection.a, colorX.a, colorY.a, colorD.a);
 	float4 kernel = (fadeQuad) * kernelWeights;
 	float weight = kernel.x + kernel.y + kernel.z + kernel.w;

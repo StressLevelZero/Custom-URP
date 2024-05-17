@@ -8,26 +8,7 @@ namespace UnityEngine.Rendering.Universal
 {
     public class CamExtVolumetricData : CameraDataExtension, IDisposable
     {
-        public static CamExtVolumetricData TryGet(CameraDataExtSet dataSet, int type)
-        {
-            CameraDataExtension extData = dataSet.GetExtension(type);
-            if (extData == null) 
-            {
-                CamExtVolumetricData newRt = new CamExtVolumetricData(type);
-                dataSet.AddExtension(newRt);
-                return newRt;
-            }
-#if UNITY_EDITOR
-            if (extData.GetType() != typeof(CamExtVolumetricData)) 
-            {
-                Debug.LogError("Per-Camera data extensions: Tried to get CamExtVolumetricData with type ID " + type + ", but found type " + extData.GetType().Name + " for that ID!");
-                return null;
-            }
-#endif
-
-            return extData as CamExtVolumetricData;
-        }
-
+        const int thisType = (int)CamDataExtType.VOLUMETRICS;
 
         public VolumetricData volumetricData;
         public float reprojectionAmount = 0.95f;
@@ -39,21 +20,19 @@ namespace UnityEngine.Rendering.Universal
         public float meanFreePath = 15.0f;
         public float StaticLightMultiplier = 1.0f;
 
-        public CamExtVolumetricData(int type)
-        {
-            this.type = type;
-            volumetricData = new VolumetricData();
-        }
+        public Vector3 lastClipmapUpdatePos;
 
-        public CamExtVolumetricData(CamDataExtType type)
-        {
-            this.type = (int)type;
-            volumetricData = new VolumetricData();
-        }
+        RenderTexture ClipmapBufferA;
+        RenderTexture ClipmapBufferB;
+        RenderTexture ClipmapBufferC;
 
-        public CamExtVolumetricData(int type, Camera cam)
+        RenderTexture FroxelBufferA;
+        RenderTexture FroxelBufferB;
+
+        public CamExtVolumetricData() { }
+        public override void Construct(Camera cam)
         {
-            this.type = type;
+            base.SetCamera(cam);
             VolumetricRendering volSettings = cam.GetComponent<VolumetricRendering>();
             if (volSettings != null)
             {
@@ -65,7 +44,21 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
+        public CamExtVolumetricData(Camera cam) : base(cam)
+        {
+            Construct(cam);
+        }
 
+        public CamExtVolumetricData(Camera cam, VolumetricRendering volSettings) : base(cam)
+        {
+            if (volSettings != null)
+            {
+                volumetricData = volSettings.volumetricData;
+                reprojectionAmount = volSettings.reprojectionAmount;
+                sliceDistributionUniformity = volSettings.SliceDistributionUniformity;
+                FroxelBlur = volSettings.FroxelBlur;
+            }
+        }
 
         public override void Dispose()
         {

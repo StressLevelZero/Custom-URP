@@ -58,7 +58,7 @@ namespace UnityEngine.Rendering.Universal
         internal void PushFogShaderParameters()
         {
             hasSetGlobals = true;
-            Shader.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value) ); //ExtinctionFromMeanFreePath
+            Shader.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value)); //ExtinctionFromMeanFreePath
             Shader.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
             Shader.SetGlobalFloat(m_FogBaseHeight, FogBaseHeight.value);
             Shader.SetGlobalFloat(m_FogMaxHeight, FogMaxHeight.value);
@@ -73,8 +73,14 @@ namespace UnityEngine.Rendering.Universal
             //    Debug.Log("Null Sky was Set");
             //}
 
-            if (!isNullSky.value && SkyTexture.overrideState) SkyManager.SetSkyTexture(SkyTexture.value);
-            else SkyManager.CheckSky();
+            if (SkyTexture.overrideState && !isNullSky.value && SkyTexture.value)
+            {
+                SkyManager.SetSkyTexture(SkyTexture.value);
+            }
+            else
+            {
+                SkyManager.CheckSky();
+            }
 
 
             // Only check if skytexture.value is null once and cache the result.
@@ -101,7 +107,28 @@ namespace UnityEngine.Rendering.Universal
             //else SkyManager.CheckSky();
         }
 
-#if UNITY_EDITOR
+        public void SetGlobalsOnCmdBuffer(CommandBuffer cmd)
+        {
+            cmd.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value)); //ExtinctionFromMeanFreePath
+            cmd.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
+            cmd.SetGlobalFloat(m_FogBaseHeight, FogBaseHeight.value);
+            cmd.SetGlobalFloat(m_FogMaxHeight, FogMaxHeight.value);
+            cmd.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
+            // same as SkyManager.SetSkyMips
+            cmd.SetGlobalVector(SkyManager.ID_MipFogParam, new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
+            if (SkyTexture.overrideState && !isNullSky.value && SkyTexture.value)
+            {
+                cmd.SetGlobalTexture(SkyManager.ID_SkyTexture, SkyTexture.value);
+                cmd.SetGlobalInt(SkyManager.ID_SkyMipCount, SkyTexture.value.mipmapCount);
+            }
+            else
+            {
+                SkyManager.CheckSky();
+            }
+
+        }
+
+#if false //UNITY_EDITOR
         // Only check if SkyTexture.value is null in editor and serialize the result.
         // For some reason, checking if the texture inside of a CubemapParameter is null causes a 0.15ms of Loading.IsObjectAvailable if it actually is null.
         private void OnValidate()

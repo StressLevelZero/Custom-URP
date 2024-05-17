@@ -231,7 +231,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
 				if (m_UseRT)
 				{
-					destination = m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera, "Opaque");
+					destination = m_PermanentDest.GetRTHandle(ref descriptor);
 				}
 				else if (destination == null || destination.rt == null)
 				{
@@ -459,7 +459,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 				}
 				if (true)
 				{
-					destination = renderGraph.ImportTexture(m_PermanentDest.GetRTHandle(descriptor, renderingData.cameraData.camera, "Opaque"));
+					destination = renderGraph.ImportTexture(m_PermanentDest.GetRTHandle(ref descriptor));
 				}
 				else
 				{

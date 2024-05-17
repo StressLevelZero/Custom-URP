@@ -8,32 +8,31 @@ namespace UnityEngine.Rendering.Universal
 {
     public class CamExtSwapBufferNames : CameraDataExtension, IDisposable
     {
-        public static CamExtSwapBufferNames TryGet(CameraDataExtSet dataSet, int type)
+        public CamExtSwapBufferNames() { }
+        public static CamExtSwapBufferNames TryGet(CameraDataExtSet dataSet)
         {
-            CameraDataExtension extData = dataSet.GetExtension(type);
+            CamExtSwapBufferNames extData = dataSet.GetExtension<CamExtSwapBufferNames>();
             if (extData == null)
             {
-                CamExtSwapBufferNames newNames = new CamExtSwapBufferNames(type, dataSet.camera);
-                dataSet.AddExtension(newNames);
-                return newNames;
+                extData = new CamExtSwapBufferNames(dataSet.camera);
+                dataSet.AddExtension(extData);
             }
-#if UNITY_EDITOR
-            if (extData.GetType() != typeof(CamExtSwapBufferNames))
-            {
-                Debug.LogError("Per-Camera data extensions: Tried to get CamExtSwapBufferNames with type ID " + type + ", but found type " + extData.GetType().Name + " for that ID!");
-                return null;
-            }
-#endif
-            return extData as CamExtSwapBufferNames;
+
+            return extData;
         }
 
         public string ColorBufferNameA;
         public string ColorBufferNameB;
         public string NormalBufferName;
 
-        public CamExtSwapBufferNames(int type, Camera cam)
+        public CamExtSwapBufferNames(Camera cam) : base(cam)
         {
-            this.type = type;
+            Construct(cam);
+        }
+
+        public override void Construct(Camera cam)
+        {
+            base.SetCamera(cam);
             string hash = cam.GetHashCode().ToString("X8");
             ColorBufferNameA = "_CameraColorAttachmentA" + hash;
             ColorBufferNameB = "_CameraColorAttachmentB" + hash;

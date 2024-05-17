@@ -6,74 +6,34 @@ using UnityEngine;
 
 namespace UnityEngine.Rendering.Universal
 {
-    public class PersistentRT : CameraDataExtension, IDisposable
+    public partial class PersistentRT : CameraDataExtension, IDisposable
     {
-        public static PersistentRT TryGet(CameraDataExtSet dataSet, int type)
-        {
-            CameraDataExtension extData = dataSet.GetExtension(type);
-            if (extData == null) 
-            {
-                PersistentRT newRt = new PersistentRT(type);
-                dataSet.AddExtension(newRt);
-                return newRt;
-            }
-#if UNITY_EDITOR
-            if (extData.GetType() != typeof(PersistentRT)) 
-            {
-                Debug.LogError("Per-Camera data extensions: Tried to get PersistentRT with type ID " + type + ", but found type " + extData.GetType().Name + " for that ID!");
-                return null;
-            }
-#endif
-
-            return extData as PersistentRT;
-        }
-
 
         public RenderTexture renderTexture;
         public RTHandle handle;
 
-        public PersistentRT(int type)
+        public PersistentRT()
         {
-            this.type = type;
-            
+
         }
 
-        public PersistentRT(CamDataExtType type)
+        public PersistentRT(Camera cam) : base(cam)
         {
-            this.type = (int)type;
+
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void UpdateRT(in RenderTextureDescriptor desc, in string name = "", in string name2 = "")
+
+        public PersistentRT(in RenderTextureDescriptor desc, Camera cam) : base(cam)
         {
-
-            if (renderTexture != null)
-            {
-               
-                if (desc.width == renderTexture.width &&
-                    desc.height == renderTexture.height &&
-                    desc.volumeDepth == renderTexture.volumeDepth &&
-                    desc.graphicsFormat == renderTexture.graphicsFormat &&
-                    desc.depthStencilFormat == renderTexture.depthStencilFormat &&
-                    desc.msaaSamples == renderTexture.antiAliasing &&
-                    desc.enableRandomWrite == renderTexture.enableRandomWrite
-                    )
-                {
-                    return;
-                }
-                else
-                {
-                    clearRT();
-                }
-            }
-
-            //Debug.Log("New RenderTexture?");
             renderTexture = new RenderTexture(desc);
-            renderTexture.name = string.Format("PersistentRT {0} {1}", name, name2);
-            handle = RTHandles.Alloc(renderTexture);
+        }
+
+        public override void Construct(Camera cam)
+        {
+            base.SetCamera(cam);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void UpdateRT(in RenderTextureDescriptor desc, Camera camera, in string name2 = "")
+        public void UpdateRT(ref RenderTextureDescriptor desc)
         {
 
             if (renderTexture != null)
@@ -90,23 +50,26 @@ namespace UnityEngine.Rendering.Universal
                 {
                     return;
                 }
-                else
-                {
-                    clearRT();
-                }
+                renderTexture.Release();
+                renderTexture.descriptor = desc;
+                renderTexture.Create();
             }
+            else
+            {
+                renderTexture = new RenderTexture(desc);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                renderTexture.name = this.name;
+#endif
+                handle = RTHandles.Alloc(renderTexture);
 
-            //Debug.Log("New RenderTexture?");
-            renderTexture = new RenderTexture(desc);
-            renderTexture.name = string.Format("PersistentRT {0} {1}", camera.name, name2);
-            handle = RTHandles.Alloc(renderTexture);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void UpdateRT(Span<RenderTextureDescriptor> desc, in string name = "", in string name2 = "")
+        public void UpdateRT(ReadOnlySpan<RenderTextureDescriptor> desc)
         {
 
-            if (renderTexture != null)
+            if (renderTexture)
             {
 
                 if (desc[0].width == renderTexture.width &&
@@ -119,62 +82,45 @@ namespace UnityEngine.Rendering.Universal
                 {
                     return;
                 }
-                else
-                {
-                    clearRT();
-                }
+
+                renderTexture.Release();
+                renderTexture.descriptor = desc[0];
+                renderTexture.Create();
             }
-
-            Debug.Log("New RenderTexture?");
-            renderTexture = new RenderTexture(desc[0]);
-            renderTexture.name = string.Format("PersistentRT {0} {1}", name, name2);
-            handle = RTHandles.Alloc(renderTexture);
+            else
+            {
+                renderTexture = new RenderTexture(desc[0]);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                renderTexture.name = this.name;
+#endif
+                handle = RTHandles.Alloc(renderTexture);
+            }
         }
 
 
-        public RenderTexture GetRenderTexture(in RenderTextureDescriptor desc, string name = "", string name2 = "")
+        public RenderTexture GetRenderTexture(ref RenderTextureDescriptor desc)
         {
-            UpdateRT(in desc, "", "");
+            UpdateRT(ref desc);
             return renderTexture;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public RTHandle GetRTHandle(in RenderTextureDescriptor desc, string name = "", string name2 = "")
+        public RTHandle GetRTHandle(ref RenderTextureDescriptor desc)
         {
-            UpdateRT(in desc, name, name2);
+            UpdateRT(ref desc);
             return handle;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public RTHandle GetRTHandle(in RenderTextureDescriptor desc, Camera camera, string name2 = "")
+        public RenderTexture GetRenderTexture(ReadOnlySpan<RenderTextureDescriptor> desc)
         {
-            UpdateRT(in desc, camera, name2);
-            return handle;
-        }
-
-        public RenderTexture GetRenderTexture(Span<RenderTextureDescriptor> desc, string name = "", string name2 = "")
-        {
-            UpdateRT(desc, name, name2);
+            UpdateRT(desc);
             return renderTexture;
-        }
-
-        public RTHandle GetRTHandle(Span<RenderTextureDescriptor> desc, string name = "", string name2 = "")
-        {
-            UpdateRT(desc, name, name2);
-            return handle;
         }
 
         public override void Dispose()
         {
-            clearRT();
-        }
-
-        public void clearRT()
-        {
             if (renderTexture != null)
             {
-                //RTHandles.Release(handle);
-                renderTexture.DiscardContents();
                 renderTexture.Release();
 #if UNITY_EDITOR
                 if (Application.isPlaying)
@@ -190,5 +136,17 @@ namespace UnityEngine.Rendering.Universal
 #endif
             }
         }
+    }
+
+    public class PrevOpaqueRT : PersistentRT
+    {
+        public PrevOpaqueRT() { }
+        public PrevOpaqueRT(Camera cam) : base(cam) { }
+    }
+
+    public class PrevHiZRT : PersistentRT
+    {
+        public PrevHiZRT() { }
+        public PrevHiZRT(Camera cam) : base(cam) { }
     }
 }

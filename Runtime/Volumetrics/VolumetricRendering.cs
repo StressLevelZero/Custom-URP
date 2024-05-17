@@ -10,32 +10,39 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.XR;
 using Unity.Profiling;
+using System.Runtime.CompilerServices;
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 class VolumeRenderingUtils //Importing some functions from HDRP to have simular terms   
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float MeanFreePathFromExtinction(float extinction)
     {
         return 1.0f / extinction;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float ExtinctionFromMeanFreePath(float meanFreePath)
     {
         return 1.0f / meanFreePath;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 AbsorptionFromExtinctionAndScattering(float extinction, Vector3 scattering)
     {
         return new Vector3(extinction, extinction, extinction) - scattering;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 ScatteringFromExtinctionAndAlbedo(float extinction, Vector3 albedo)
     {
         return extinction * albedo;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 AlbedoFromMeanFreePathAndScattering(float meanFreePath, Vector3 scattering)
     {
         return meanFreePath * scattering;

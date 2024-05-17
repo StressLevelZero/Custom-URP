@@ -846,7 +846,7 @@ namespace UnityEngine.Rendering.Universal
             colorDescriptor.autoGenerateMips = false;
             colorDescriptor.depthBufferBits = (int)DepthBits.None;
             CamExtSwapBufferNames bufferNames;
-            bufferNames = CamExtSwapBufferNames.TryGet(cameraExtData, (int)CamDataExtType.BUFFER_NAMES);
+            bufferNames = CamExtSwapBufferNames.TryGet(cameraExtData);
             if (m_dontPoolRTs)
             {
                 m_ColorBufferSystem.SetCameraSettingsUnique(colorDescriptor, FilterMode.Bilinear, bufferNames.ColorBufferNameA, bufferNames.ColorBufferNameB);
@@ -1288,8 +1288,8 @@ namespace UnityEngine.Rendering.Universal
                 // 
                 // RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueColor, descriptor, filterMode, TextureWrapMode.Clamp, name: "_CameraOpaqueTexture");
                 // m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, m_OpaqueColor, downsamplingMethod);
-                
-                PersistentRT opaqueRT = PersistentRT.TryGet(cameraExtData, (int)CamDataExtType.CAMERA_OPAQUE);
+
+                PrevOpaqueRT opaqueRT = cameraExtData.GetOrCreateExtension<PrevOpaqueRT>();
                 //RTPermanentHandle opaqueHandle = SLZGlobals.instance.PerCameraOpaque.GetHandle(camera);
                 m_CopyColorPass.Setup(m_ActiveCameraColorAttachment, opaqueRT, downsamplingMethod, cameraData.requiresColorPyramid);
 

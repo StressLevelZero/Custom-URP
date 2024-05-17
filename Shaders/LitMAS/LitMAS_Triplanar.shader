@@ -39,7 +39,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 		Offset 0 , 0
 		ColorMask RGBA
         LOD 100
-
+        
         Pass
         {
             Name "Forward"
@@ -48,6 +48,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 			ZWrite [_ZWrite]
 			Cull [_Cull]
             HLSLPROGRAM
+            
             //#pragma use_dxc
             #pragma only_renderers vulkan
             #pragma vertex vert
@@ -62,6 +63,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 			#pragma require QuadShuffle
 			#define _SM6_QUAD 1
 			#endif
+
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarForward.hlsl"
             ENDHLSL

@@ -59,6 +59,8 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 			#pragma require QuadShuffle
 			//#pragma shader_feature _SM6_QUAD
 			#define _SM6_QUAD 1
+			#else
+			
 			#endif
 
 			#include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"

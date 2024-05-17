@@ -16,9 +16,9 @@ public static class SkyManager
 {
     public static Texture skytexture;
 
-    static readonly int ID_SkyTexture = Shader.PropertyToID("_SkyTexture");
-    static readonly int ID_SkyMipCount = Shader.PropertyToID("_SkyMipCount");
-    static readonly int ID_MipFogParam = Shader.PropertyToID("_MipFogParameters");
+    public static readonly int ID_SkyTexture = Shader.PropertyToID("_SkyTexture");
+    public static readonly int ID_SkyMipCount = Shader.PropertyToID("_SkyMipCount");
+    public static readonly int ID_MipFogParam = Shader.PropertyToID("_MipFogParameters");
     
     static SkyManager()
     {
@@ -35,7 +35,10 @@ public static class SkyManager
     
     private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        CheckSky();
+        if (mode == LoadSceneMode.Single)
+        {
+            RegenerateSkyTexture();
+        }
     }
     
     
@@ -45,7 +48,7 @@ public static class SkyManager
         Debug.Log(mode + " : " +scene);
         if (!EditorApplication.isUpdating && !EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            CheckSky();
+            RegenerateSkyTexture();
         }
         else
         {
@@ -55,11 +58,21 @@ public static class SkyManager
     
     static void DelayedCheckSky()
     {
-        CheckSky();
+        RegenerateSkyTexture();
         EditorApplication.delayCall -= DelayedCheckSky;
     }
-#endif
 
+
+#endif
+    static void RegenerateSkyTexture()
+    {
+        if (RenderSettings.defaultReflectionMode != DefaultReflectionMode.Custom)
+        {
+            if (skytexture) Object.Destroy(skytexture);
+            skytexture = null;
+            GenerateSkyTexture();
+        }
+    }
 
     static void GenerateSkyTexture()
     {
@@ -99,11 +112,6 @@ public static class SkyManager
     }
     static public void CheckSky()
     {
-        //Debug.Log("Running CheckSky");
-        if (skytexture == null)
-        {
-            GenerateSkyTexture();
-        }
 
         if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom)
         {
@@ -112,12 +120,17 @@ public static class SkyManager
         }
         else //DefaultReflectionMode.Skybox
         {
+            if (skytexture == null)
+            {
+                GenerateSkyTexture();
+            }
+
             if (skytexture != null)
             {
                 SetSkyTexture(skytexture);
             }
             else SetSkyTexture(CoreUtils.blackCubeTexture);
-        }        
+        }
     }
 
     static public void SetSkyMips(Vector4 MipFogParam)

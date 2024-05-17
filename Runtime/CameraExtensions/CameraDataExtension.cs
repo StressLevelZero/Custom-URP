@@ -17,11 +17,34 @@ namespace UnityEngine.Rendering.Universal
     }
 
     /// <summary>
-    /// Interface for per-camera data that can be stored in a CameraDataExtensions object
+    /// Base clase for per-camera data that can be stored in a CameraDataExtensions object
     /// </summary>
     public abstract class CameraDataExtension : IDisposable
     {
-        public int type;
+        public Camera camera;
+        public string name;
+
+        public CameraDataExtension()
+        {
+
+        }
+
+        public CameraDataExtension(Camera cam)
+        {
+            SetCamera(cam);
+        }
+
+        public void SetCamera(Camera cam)
+        {
+            this.camera = cam;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // For debugging purposes, we need a distinct name for this object
+            this.name = $"{camera.name} {this.GetType().Name}";
+#endif
+        }
+
+        public abstract void Construct(Camera cam);
+
         public abstract void Dispose();
     }
 
@@ -33,24 +56,20 @@ namespace UnityEngine.Rendering.Universal
         private bool disposing = false;
         Camera m_Camera;
         public Camera camera{ get { return m_Camera; } }
-        Dictionary<int, CameraDataExtension> extensions = new Dictionary<int, CameraDataExtension>();
+        Dictionary<Type, CameraDataExtension> extensions = new Dictionary<Type, CameraDataExtension>();
 
         public CameraDataExtSet(Camera camera)
         {
             this.m_Camera = camera;
         }
-        public CameraDataExtension GetExtension(CamDataExtType extensionID)
-        {
-            return GetExtension((int) extensionID);
-        }
 
-        public CameraDataExtension GetExtension(int extensionID)
+        public T GetExtension<T>() where T : CameraDataExtension
         {
             if (disposing) return null;
             CameraDataExtension ext;
-            if (extensions.TryGetValue(extensionID, out ext))
+            if (extensions.TryGetValue(typeof(T), out ext))
             {
-                return ext;
+                return ext as T;
             }
             else
             {
@@ -58,23 +77,40 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
-        public bool AddExtension(CameraDataExtension ext)
+        public T GetOrCreateExtension<T>() where T : CameraDataExtension, new()
+        {
+            if (disposing) return null;
+            CameraDataExtension ext;
+            if (extensions.TryGetValue(typeof(T), out ext))
+            {
+                return ext as T;
+            }
+            else
+            {
+                T newExt = new T();
+                newExt.Construct(this.camera);
+                extensions.Add(typeof(T), newExt);
+                return newExt;
+            }
+        }
+
+        public bool AddExtension<T>(T ext) where T : CameraDataExtension
         {
             if (disposing) return false;
-            if (ext != null && !extensions.ContainsKey(ext.type))
+            if (ext != null && !extensions.ContainsKey(typeof(T)))
             {
-                extensions.Add(ext.type, ext);
+                extensions.Add(typeof(T), ext);
                 return true;
             }
             return false;
         }
 
-        public bool RemoveExtension(ref CameraDataExtension ext)
+        public bool RemoveExtension<T> (ref T ext) where T : CameraDataExtension
         {
             if (disposing) return false;
-            if (ext != null && extensions.ContainsKey(ext.type))
+            if (ext != null && extensions.ContainsKey(typeof(T)))
             {
-                extensions.Remove(ext.type);
+                extensions.Remove(typeof(T));
                 return true;
             }
             return false;

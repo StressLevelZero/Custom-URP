@@ -99,7 +99,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             descriptor.sRGB = false;
             descriptor.enableRandomWrite = false;
             ref CameraData camData = ref renderingData.cameraData;
-            destination.UpdateRT(descriptor, camData.camera, "PrevHiZ");
+            destination.UpdateRT(ref descriptor);
             
             //cmd.GetTemporaryRT(destination.id, descriptor, FilterMode.Point);
         }

@@ -252,6 +252,8 @@ namespace UnityEngine.Rendering.Universal
 
     public class SLZGlobalsSetPass : ScriptableRenderPass
     {
+
+
         //static RTHandle[] target = new RTHandle[0];
         private bool enableSSR;
         private bool requireHiZ;
@@ -265,8 +267,8 @@ namespace UnityEngine.Rendering.Universal
         private float cameraFar;
         int opaqueTexSizeFrac = 1;
         private Camera camera;
-        private PersistentRT prevOpaque;
-        private PersistentRT prevHiZ;
+        private PrevOpaqueRT prevOpaque;
+        private PrevHiZRT prevHiZ;
 
         SLZGlobalsData passData;
         public SLZGlobalsSetPass(RenderPassEvent evt)
@@ -283,7 +285,7 @@ namespace UnityEngine.Rendering.Universal
             // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
             if (camData.enableSSR)
             {
-                prevOpaque = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.CAMERA_OPAQUE);
+                prevOpaque = camDataExtSet.GetOrCreateExtension<PrevOpaqueRT>();
                 //prevHiZ = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.HI_Z); // EXPERIMENT: use quad averaging instead of temporal averaging and avoid extra RT + blit + jank previous frame SSR estimation
                 camData.camera.depthTextureMode |= DepthTextureMode.MotionVectors | DepthTextureMode.Depth;
             }
@@ -405,8 +407,8 @@ namespace UnityEngine.Rendering.Universal
         {
             CameraData camData = renderingData.cameraData;
             CameraDataExtSet camDataExtSet = CameraExtDataPool.Instance.GetCameraDataSet(camera);
-            prevOpaque = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.CAMERA_OPAQUE);
-            prevHiZ = PersistentRT.TryGet(camDataExtSet, (int)CamDataExtType.HI_Z);
+            prevOpaque = camDataExtSet.GetOrCreateExtension<PrevOpaqueRT>();
+            prevHiZ = camDataExtSet.GetOrCreateExtension<PrevHiZRT>();
             // Hack to tell unity to store previous frame object to world vectors...
             // Not used by SRP to enable motion vectors or depth but somehow still necessary :(
             if (camData.enableSSR)
