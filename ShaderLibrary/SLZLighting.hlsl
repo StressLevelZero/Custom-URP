@@ -793,10 +793,15 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, const SLZ
             #endif
             
             #if !defined(_SLZ_DISABLE_BAKED_SPEC)
+                // the length of lmDirection controls the strength of the directionality. 
+                // Baking a lightmap in a white furnace yields a length of 0.66.
+                // Interpolate specular towards 0 as the length approaches this value
+                half directionality = saturate((length(lmDirection) - 0.66h) / (1.0h - 0.66h));
                 lmDirection = SLZSafeHalf3Normalize(lmDirection); //length not 1
                 SLZDirectSpecLightInfo lightInfo = SLZGetDirectLightInfo(frag, lmDirection);
                 half3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf, frag);
-                specular += lmDiffuse * lmSpecular * lightInfo.NoL;
+                
+                specular += lmDiffuse * lmSpecular * lightInfo.NoL * directionality;
             #endif
     #endif
     
