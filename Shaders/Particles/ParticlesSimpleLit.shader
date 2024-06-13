@@ -142,6 +142,15 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
             #pragma multi_compile_fog
             #pragma multi_compile _ _VOLUMETRICS_ENABLED
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
+            //#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            //#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            //#pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
+            //#pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            //#pragma multi_compile_fragment _ _LIGHT_COOKIES
+            //#pragma multi_compile _ _FORWARD_PLUS
+            //#pragma multi_compile _ EVALUATE_SH_MIXED EVALUATE_SH_VERTEX
+            //#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
 
             // -------------------------------------
             // Unity defined keywords
@@ -157,8 +166,8 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 
             // -------------------------------------
             // Includes
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitForwardPass.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitForwardPass.hlsl"
             ENDHLSL
         }
 
@@ -173,7 +182,7 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
         //    {
         //        "LightMode" = "UniversalGBuffer"
         //    }
-		//		//
+		//
         //    // -------------------------------------
         //    // Render State Commands
         //    ZWrite[_ZWrite]
@@ -214,7 +223,7 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
         //    #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
         //    //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
         //    //#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
-        //    #pragma multi_compile_fragment _ _SHADOWS_SOFT
+        //    #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
         //    #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
         //    #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
 		//
@@ -231,8 +240,8 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 		//
         //    // -------------------------------------
         //    // Includes
-        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
-        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitGBufferPass.hlsl"
+        //    #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+        //    #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitGBufferPass.hlsl"
         //    ENDHLSL
         //}
 
@@ -274,7 +283,7 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 
             // -------------------------------------
             // Includes
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesDepthOnlyPass.hlsl"
             ENDHLSL
         }
@@ -315,100 +324,100 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 
             // -------------------------------------
             // Includes
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesDepthNormalsPass.hlsl"
             ENDHLSL
         }
         // ------------------------------------------------------------------
         //  Scene view outline pass.
-        //Pass
-        //{
-        //    Name "SceneSelectionPass"
-        //    Tags
-        //    {
-        //        "LightMode" = "SceneSelectionPass"
-        //    }
-		//
-        //    // -------------------------------------
-        //    // Render State Commands
-        //    BlendOp Add
-        //    Blend One Zero
-        //    ZWrite On
-        //    Cull Off
-		//
-        //    HLSLPROGRAM
-        //    #define PARTICLES_EDITOR_META_PASS
-        //    #pragma target 2.0
-		//
-        //    // -------------------------------------
-        //    // Shader Stages
-        //    #pragma vertex vertParticleEditor
-        //    #pragma fragment fragParticleSceneHighlight
-		//
-        //    // -------------------------------------
-        //    // Particle Keywords
-        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
-        //    #pragma shader_feature_local _FLIPBOOKBLENDING_ON
-		//
-        //    // -------------------------------------
-        //    // Unity defined keywords
-        //    #pragma multi_compile_instancing
-        //    #pragma instancing_options procedural:ParticleInstancingSetup
-        //    #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
-		//
-        //    // -------------------------------------
-        //    // Includes
-        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
-        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
-		//
-        //    ENDHLSL
-        //}
-		//
-        //// ------------------------------------------------------------------
-        ////  Scene picking buffer pass.
-        //Pass
-        //{
-        //    Name "ScenePickingPass"
-        //    Tags
-        //    {
-        //        "LightMode" = "Picking"
-        //    }
-		//
-        //    // -------------------------------------
-        //    // Render State Commands
-        //    BlendOp Add
-        //    Blend One Zero
-        //    ZWrite On
-        //    Cull Off
-		//
-        //    HLSLPROGRAM
-        //    #define PARTICLES_EDITOR_META_PASS
-        //    #pragma target 2.0
-		//
-        //    // -------------------------------------
-        //    // Shader Stages
-        //    #pragma vertex vertParticleEditor
-        //    #pragma fragment fragParticleScenePicking
-		//
-        //    // -------------------------------------
-        //    // Particle Keywords
-        //    #pragma shader_feature_local_fragment _ALPHATEST_ON
-        //    #pragma shader_feature_local _FLIPBOOKBLENDING_ON
-		//
-        //    // -------------------------------------
-        //    // Unity defined keywords
-        //    #pragma multi_compile_instancing
-        //    #pragma instancing_options procedural:ParticleInstancingSetup
-        //    #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
-		//
-        //    // -------------------------------------
-        //    // Includes
-        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
-        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
-		//
-        //    ENDHLSL
-        //}
-		//
+        Pass
+        {
+            Name "SceneSelectionPass"
+            Tags
+            {
+                "LightMode" = "SceneSelectionPass"
+            }
+
+            // -------------------------------------
+            // Render State Commands
+            BlendOp Add
+            Blend One Zero
+            ZWrite On
+            Cull Off
+
+            HLSLPROGRAM
+            #define PARTICLES_EDITOR_META_PASS
+            #pragma target 2.0
+
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex vertParticleEditor
+            #pragma fragment fragParticleSceneHighlight
+
+            // -------------------------------------
+            // Particle Keywords
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
+            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+
+            // -------------------------------------
+            // Unity defined keywords
+            #pragma multi_compile_instancing
+            #pragma instancing_options procedural:ParticleInstancingSetup
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+
+            // -------------------------------------
+            // Includes
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
+
+            ENDHLSL
+        }
+
+        // ------------------------------------------------------------------
+        //  Scene picking buffer pass.
+        Pass
+        {
+            Name "ScenePickingPass"
+            Tags
+            {
+                "LightMode" = "Picking"
+            }
+
+            // -------------------------------------
+            // Render State Commands
+            BlendOp Add
+            Blend One Zero
+            ZWrite On
+            Cull Off
+
+            HLSLPROGRAM
+            #define PARTICLES_EDITOR_META_PASS
+            #pragma target 2.0
+
+            // -------------------------------------
+            // Shader Stages
+            #pragma vertex vertParticleEditor
+            #pragma fragment fragParticleScenePicking
+
+            // -------------------------------------
+            // Particle Keywords
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
+            #pragma shader_feature_local _FLIPBOOKBLENDING_ON
+
+            // -------------------------------------
+            // Unity defined keywords
+            #pragma multi_compile_instancing
+            #pragma instancing_options procedural:ParticleInstancingSetup
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
+
+            // -------------------------------------
+            // Includes
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesEditorPass.hlsl"
+
+            ENDHLSL
+        }
+
         //Pass
         //{
         //    Name "Universal2D"
@@ -438,7 +447,7 @@ Shader "Universal Render Pipeline/Particles/Simple Lit"
 		//
         //    // -------------------------------------
         //    // Includes
-        //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
+        //    #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLitInput.hlsl"
         //    #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Universal2D.hlsl"
         //    ENDHLSL
         //}

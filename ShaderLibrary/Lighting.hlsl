@@ -185,12 +185,21 @@ half3 VertexLighting(float3 positionWS, half3 normalWS)
 
 #ifdef _ADDITIONAL_LIGHTS_VERTEX
     uint lightsCount = GetAdditionalLightsCount();
+    uint meshRenderingLayers = GetMeshRenderingLayer();
+
     LIGHT_LOOP_BEGIN(lightsCount)
         Light light = GetAdditionalLight(lightIndex, positionWS);
-        // SLZ MODIFIED // Light.color is a half4, cast to half3 if not fluorescent
-        half3or4_fl lightColor = (half3or4_fl)light.color * light.distanceAttenuation;
-        // END SLZ MODIFIED
-        vertexLightColor += LightingLambert(lightColor, light.direction, normalWS);
+
+#ifdef _LIGHT_LAYERS
+		if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+		{
+			// SLZ MODIFIED // Light.color is a half4, cast to half3 if not fluorescent
+			half3or4_fl lightColor = (half3or4_fl)light.color * light.distanceAttenuation;
+			// END SLZ MODIFIED
+			vertexLightColor += LightingLambert(lightColor, light.direction, normalWS);
+		}
+
     LIGHT_LOOP_END
 #endif
 

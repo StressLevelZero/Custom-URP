@@ -123,6 +123,8 @@ namespace UnityEngine.Rendering.Universal
         /// <inheritdoc/>
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
+            if (UniversalRenderer.IsOffscreenDepthTexture(in renderingData.cameraData))
+                return;
             if (!GetMaterials())
             {
                 Debug.LogErrorFormat("{0}.AddRenderPasses(): Missing material. {1} render pass will not be added.", GetType().Name, name);
@@ -150,7 +152,7 @@ namespace UnityEngine.Rendering.Universal
         }
 
         // The SSAO Pass
-        private class ScreenSpaceAmbientOcclusionPass : ScriptableRenderPass
+        internal class ScreenSpaceAmbientOcclusionPass : ScriptableRenderPass
         {
             // Properties
             private bool isRendererDeferred => m_Renderer != null && m_Renderer is UniversalRenderer && ((UniversalRenderer)m_Renderer).renderingModeRequested == RenderingMode.Deferred;
@@ -180,9 +182,10 @@ namespace UnityEngine.Rendering.Universal
             // Constants
             private const int k_FinalTexID = 3;
             private const string k_SSAOTextureName = "_ScreenSpaceOcclusionTexture";
-            private const string k_SSAOAmbientOcclusionParamName = "_AmbientOcclusionParam";
+            private const string k_AmbientOcclusionParamName = "_AmbientOcclusionParam";
 
             // Statics
+            internal static readonly int s_AmbientOcclusionParamID = Shader.PropertyToID(k_AmbientOcclusionParamName);
             private static readonly int s_SSAOParamsID = Shader.PropertyToID("_SSAOParams");
             private static readonly int s_SSAOBlueNoiseParamsID = Shader.PropertyToID("_SSAOBlueNoiseParams");
             private static readonly int s_LastKawasePass = Shader.PropertyToID("_LastKawasePass");
@@ -519,7 +522,7 @@ namespace UnityEngine.Rendering.Universal
                     }
 
                     // Set the global SSAO Params
-                    cmd.SetGlobalVector(k_SSAOAmbientOcclusionParamName, new Vector4(0f, 0f, 0f, m_CurrentSettings.DirectLightingStrength));
+                    cmd.SetGlobalVector(s_AmbientOcclusionParamID, new Vector4(1f, 0f, 0f, m_CurrentSettings.DirectLightingStrength));
                 }
             }
 

@@ -1,16 +1,16 @@
 {
   "name": "com.unity.render-pipelines.universal",
   "description": "SLZ's modified URP",
-  "version": "8148.1.8",
-  "unity": "2022.2",
+  "version": "8148.1.9",
+  "unity": "2022.3",
   "displayName": "SLZ Universal RP",
   "hideInEditor": false,
   "dependencies": {
 	"com.unity.collections": "1.2.4",
     "com.unity.mathematics": "1.2.1",
-    "com.unity.burst": "1.8.4",
-    "com.unity.render-pipelines.core": "14.0.8",
-    "com.unity.shadergraph": "14.0.8"
+    "com.unity.burst": "1.8.9",
+    "com.unity.render-pipelines.core": "14.0.11",
+    "com.unity.shadergraph": "14.0.11",
   },
   "keywords": [
     "graphics",

@@ -23,7 +23,7 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         public const string k_ShaderTagName = "UniversalPipeline";
 
-        private static class Profiling
+        internal static class Profiling
         {
             private static Dictionary<int, ProfilingSampler> s_HashSamplerCache = new Dictionary<int, ProfilingSampler>();
             public static readonly ProfilingSampler unknownSampler = new ProfilingSampler("Unknown");
@@ -129,11 +129,6 @@ namespace UnityEngine.Rendering.Universal
             get => (SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES2) ? 4 : 8;
         }
 
-        // These limits have to match same limits in Input.hlsl
-        internal const int k_MaxVisibleAdditionalLightsMobileShaderLevelLessThan45 = 16;
-        internal const int k_MaxVisibleAdditionalLightsMobile = 32;
-        internal const int k_MaxVisibleAdditionalLightsNonMobile = 256;
-
         /// <summary>
         /// The max number of additional lights that can can affect each GameObject.
         /// </summary>
@@ -144,11 +139,11 @@ namespace UnityEngine.Rendering.Universal
                 // Must match: Input.hlsl, MAX_VISIBLE_LIGHTS
                 bool isMobile = GraphicsSettings.HasShaderDefine(BuiltinShaderDefine.SHADER_API_MOBILE);
                 if (isMobile && (SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES2 || (SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3 && Graphics.minOpenGLESVersion <= OpenGLESVersion.OpenGLES30)))
-                    return k_MaxVisibleAdditionalLightsMobileShaderLevelLessThan45;
+                    return ShaderOptions.k_MaxVisibleLightCountLowEndMobile;
 
                 // GLES can be selected as platform on Windows (not a mobile platform) but uniform buffer size so we must use a low light count.
                 return (isMobile || SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLCore || SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES2 || SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3)
-                    ? k_MaxVisibleAdditionalLightsMobile : k_MaxVisibleAdditionalLightsNonMobile;
+                    ? ShaderOptions.k_MaxVisibleLightCountMobile : ShaderOptions.k_MaxVisibleLightCountDesktop;
             }
         }
 
@@ -204,8 +199,7 @@ namespace UnityEngine.Rendering.Universal
 
             // Initial state of the RTHandle system.
             // We initialize to screen width/height to avoid multiple realloc that can lead to inflated memory usage (as releasing of memory is delayed).
-            // Note: Use legacy DR control. Can be removed once URP integrates with core package DynamicResolutionHandler
-            RTHandles.Initialize(Screen.width, Screen.height, useLegacyDynamicResControl: true);
+            RTHandles.Initialize(Screen.width, Screen.height);
 
             GraphicsSettings.useScriptableRenderPipelineBatching = asset.useSRPBatcher;
 
@@ -320,7 +314,7 @@ namespace UnityEngine.Rendering.Universal
 
             // When HDR is active we render UI overlay per camera as we want all UI to be calibrated to white paper inside a single pass
             // for performance reasons otherwise we render UI overlay after all camera
-            SupportedRenderingFeatures.active.rendersUIOverlay = HDROutputIsActive();
+            SupportedRenderingFeatures.active.rendersUIOverlay = HDROutputForAnyDisplayIsActive();
 
             // TODO: Would be better to add Profiling name hooks into RenderPipelineManager.
             // C#8 feature, only in >= 2020.2
@@ -362,6 +356,13 @@ namespace UnityEngine.Rendering.Universal
             if (DebugManager.instance.isAnyDebugUIActive)
                 UniversalRenderPipelineDebugDisplaySettings.Instance.UpdateFrameTiming();
 #endif
+
+            // URP uses the camera's allowDynamicResolution flag to decide if useDynamicScale should be enabled for camera render targets.
+            // However, the RTHandle system has an additional setting that controls if useDynamicScale will be set for render targets allocated via RTHandles.
+            // In order to avoid issues at runtime, we must make the RTHandle system setting consistent with URP's logic. URP already synchronizes the setting
+            // during initialization, but unfortunately it's possible for external code to overwrite the setting due to RTHandle state being global.
+            // The best we can do to avoid errors in this situation is to ensure the state is set to the correct value every time we perform rendering.
+            RTHandles.SetHardwareDynamicResolutionState(true);
 
             SortCameras(cameras);
 #if UNITY_2021_1_OR_NEWER
@@ -479,14 +480,41 @@ namespace UnityEngine.Rendering.Universal
 
                 camera.targetTexture = temporaryRT ? temporaryRT : destination;
 
-                if (standardRequest != null)
+
+                using (ListPool<Camera>.Get(out var tmp))
                 {
-                    Render(context, new Camera[] { camera });
+                    tmp.Add(camera);
+                    if (standardRequest != null)
+                    {
+                        Render(context, tmp.ToArray());
+                    }
+                    else
+                    {
+                        using (new ProfilingScope(null, Profiling.Pipeline.beginContextRendering))
+                        {
+                            BeginContextRendering(context, tmp);
+                        }
+
+                        using (new ProfilingScope(null, Profiling.Pipeline.beginCameraRendering))
+                        {
+                            BeginCameraRendering(context, camera);
+                        }
+
+                        camera.gameObject.TryGetComponent<UniversalAdditionalCameraData>(out var additionalCameraData);
+                        RenderSingleCameraInternal(context, camera, ref additionalCameraData);
+
+                        using (new ProfilingScope(null, Profiling.Pipeline.endCameraRendering))
+                        {
+                            EndCameraRendering(context, camera);
+                        }
+
+                        using (new ProfilingScope(null, Profiling.Pipeline.endContextRendering))
+                        {
+                            EndContextRendering(context, tmp);
+                        }
+                    }
                 }
-                else
-                {
-                    RenderSingleCameraInternal(context, camera);
-                }
+                
 
                 if(temporaryRT)
                 {
@@ -538,6 +566,11 @@ namespace UnityEngine.Rendering.Universal
                 camera.gameObject.TryGetComponent(out additionalCameraData);
             // END SLZ MODIFIED
 
+            RenderSingleCameraInternal(context, camera, ref additionalCameraData);
+        }
+
+        internal static void RenderSingleCameraInternal(ScriptableRenderContext context, Camera camera, ref UniversalAdditionalCameraData additionalCameraData)
+        {
             if (additionalCameraData != null && additionalCameraData.renderType != CameraRenderType.Base)
             {
                 Debug.LogWarning("Only Base cameras can be rendered with standalone RenderSingleCamera. Camera will be skipped.");
@@ -550,7 +583,7 @@ namespace UnityEngine.Rendering.Universal
             if (asset.useAdaptivePerformance)
                 ApplyAdaptivePerformance(ref cameraData);
 #endif
-            RenderSingleCamera(context, ref cameraData, cameraData.postProcessEnabled);
+            RenderSingleCamera(context, ref cameraData);
         }
 
         static bool TryGetCullingParameters(CameraData cameraData, out ScriptableCullingParameters cullingParams)
@@ -576,8 +609,7 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         /// <param name="context">Render context used to record commands during execution.</param>
         /// <param name="cameraData">Camera rendering data. This might contain data inherited from a base camera.</param>
-        /// <param name="anyPostProcessingEnabled">True if at least one camera has post-processing enabled in the stack, false otherwise.</param>
-        static void RenderSingleCamera(ScriptableRenderContext context, ref CameraData cameraData, bool anyPostProcessingEnabled)
+        static void RenderSingleCamera(ScriptableRenderContext context, ref CameraData cameraData)
         {
             Camera camera = cameraData.camera;
             var renderer = cameraData.renderer;
@@ -647,7 +679,7 @@ namespace UnityEngine.Rendering.Universal
                 // Do NOT use cameraData after 'InitializeRenderingData'. CameraData state may diverge otherwise.
                 // RenderingData takes a copy of the CameraData.
                 var cullResults = context.Cull(ref cullingParameters);
-                InitializeRenderingData(asset, ref cameraData, ref cullResults, anyPostProcessingEnabled, cmd, out var renderingData);
+                InitializeRenderingData(asset, ref cameraData, ref cullResults, cmd, out var renderingData);
 #if ADAPTIVE_PERFORMANCE_2_0_0_OR_NEWER
                 if (asset.useAdaptivePerformance)
                     ApplyAdaptivePerformance(ref renderingData);
@@ -710,6 +742,8 @@ namespace UnityEngine.Rendering.Universal
             List<Camera> cameraStack = (supportsCameraStacking) ? baseCameraAdditionalData?.cameraStack : null;
 
             bool anyPostProcessingEnabled = baseCameraAdditionalData != null && baseCameraAdditionalData.renderPostProcessing;
+            bool mainHdrDisplayOutputActive = HDROutputForMainDisplayIsActive();
+
             int rendererCount = asset.m_RendererDataList.Length;
 
             // We need to know the last active camera in the stack to be able to resolve
@@ -832,7 +866,23 @@ namespace UnityEngine.Rendering.Universal
                 // update the base camera flag so that the scene depth is stored if needed by overlay cameras later in the frame
                 baseCameraData.postProcessingRequiresDepthTexture |= cameraStackRequiresDepthForPostprocessing;
 
-                RenderSingleCamera(context, ref baseCameraData, anyPostProcessingEnabled);
+                // Check whether the camera stack final output is HDR
+                // This is equivalent of UniversalCameraData.isHDROutputActive but without necessiting the base camera to be the last camera in the stack.
+                bool hdrDisplayOutputActive = mainHdrDisplayOutputActive;
+#if ENABLE_VR && ENABLE_XR_MODULE
+                // If we are rendering to xr then we need to look at the XR Display rather than the main non-xr display.
+                if (xrPass.enabled)
+                    hdrDisplayOutputActive = xrPass.isHDRDisplayOutputActive;
+#endif
+                bool finalOutputHDR = asset.supportsHDR && hdrDisplayOutputActive // Check whether any HDR display is active and the render pipeline asset allows HDR rendering
+                    && baseCamera.targetTexture == null && (baseCamera.cameraType == CameraType.Game || baseCamera.cameraType == CameraType.VR) // Check whether the stack outputs to a screen
+                    && baseCameraData.allowHDROutput; // Check whether the base camera allows HDR output
+
+                // Update stack-related parameters
+                baseCameraData.stackAnyPostProcessingEnabled = anyPostProcessingEnabled;
+                baseCameraData.stackLastCameraOutputToHDR = finalOutputHDR;
+
+                RenderSingleCamera(context, ref baseCameraData);
                 using (new ProfilingScope(null, Profiling.Pipeline.endCameraRendering))
                 {
                     EndCameraRendering(context, baseCamera);
@@ -858,7 +908,7 @@ namespace UnityEngine.Rendering.Universal
                             CameraData overlayCameraData = baseCameraData;
                             overlayCameraData.camera = currCamera;
                             overlayCameraData.baseCamera = baseCamera;
-
+                            
                             UpdateCameraStereoMatrices(currAdditionalCameraData.camera, xrPass);
 
                             using (new ProfilingScope(null, Profiling.Pipeline.beginCameraRendering))
@@ -873,10 +923,13 @@ namespace UnityEngine.Rendering.Universal
 
                             bool lastCamera = i == lastActiveOverlayCameraIndex;
                             InitializeAdditionalCameraData(currCamera, currAdditionalCameraData, lastCamera, ref overlayCameraData);
+                            
+                            overlayCameraData.stackAnyPostProcessingEnabled = anyPostProcessingEnabled;
+                            overlayCameraData.stackLastCameraOutputToHDR = finalOutputHDR;
 
                             xrLayout.ReconfigurePass(overlayCameraData.xr, currCamera);
 
-                            RenderSingleCamera(context, ref overlayCameraData, anyPostProcessingEnabled);
+                            RenderSingleCamera(context, ref overlayCameraData);
 
                             using (new ProfilingScope(null, Profiling.Pipeline.endCameraRendering))
                             {
@@ -917,11 +970,6 @@ namespace UnityEngine.Rendering.Universal
             baseCameraData.pixelHeight = (int)System.Math.Round(camPixelRect.height + camPixelRect.y) - (int)System.Math.Round(camPixelRect.y);
             baseCameraData.aspectRatio = (float)baseCameraData.pixelWidth / (float)baseCameraData.pixelHeight;
 
-            bool isDefaultXRViewport = (!(Math.Abs(xrViewport.x) > 0.0f || Math.Abs(xrViewport.y) > 0.0f ||
-                Math.Abs(xrViewport.width) < xr.renderTargetDesc.width ||
-                Math.Abs(xrViewport.height) < xr.renderTargetDesc.height));
-            baseCameraData.isDefaultViewport = baseCameraData.isDefaultViewport && isDefaultXRViewport;
-
             // Update cameraData cameraTargetDescriptor for XR. This descriptor is mainly used for configuring intermediate screen space textures
             var originalTargetDesc = baseCameraData.cameraTargetDescriptor;
             baseCameraData.cameraTargetDescriptor = xr.renderTargetDesc;
@@ -930,8 +978,19 @@ namespace UnityEngine.Rendering.Universal
                 baseCameraData.cameraTargetDescriptor.graphicsFormat = originalTargetDesc.graphicsFormat;
             }
             baseCameraData.cameraTargetDescriptor.msaaSamples = originalTargetDesc.msaaSamples;
-            baseCameraData.cameraTargetDescriptor.width = baseCameraData.pixelWidth;
-            baseCameraData.cameraTargetDescriptor.height = baseCameraData.pixelHeight;
+
+            if (baseCameraData.isDefaultViewport)
+            {
+                // When viewport is default, intermediate textures created with this descriptor will have dynamic resolution enabled.
+                baseCameraData.cameraTargetDescriptor.useDynamicScale = true;
+            }
+            else
+            {
+                // Some effects like Vignette computes aspect ratio from width and height. We have to take viewport into consideration if it is not default viewport.
+                baseCameraData.cameraTargetDescriptor.width = baseCameraData.pixelWidth;
+                baseCameraData.cameraTargetDescriptor.height = baseCameraData.pixelHeight;
+				baseCameraData.cameraTargetDescriptor.useDynamicScale = false;
+            }
         }
 
         static void UpdateVolumeFramework(Camera camera, UniversalAdditionalCameraData additionalCameraData)
@@ -1055,7 +1114,7 @@ namespace UnityEngine.Rendering.Universal
             bool needsAlphaChannel = Graphics.preserveFramebufferAlpha;
 
             cameraData.hdrColorBufferPrecision = asset ? asset.hdrColorBufferPrecision : HDRColorBufferPrecision._32Bits;
-            cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, cameraData.renderScale,
+            cameraData.cameraTargetDescriptor = CreateRenderTextureDescriptor(camera, ref cameraData,
                 cameraData.isHdrEnabled, cameraData.hdrColorBufferPrecision, msaaSamples, needsAlphaChannel, cameraData.requiresOpaqueTexture);
             if (cameraData.cameraTargetDescriptor.depthStencilFormat == GraphicsFormat.D32_SFloat_S8_UInt) cameraData.cameraTargetDescriptor.depthStencilFormat = UniversalRenderer.k_DepthStencilFormat;
         }
@@ -1281,6 +1340,7 @@ namespace UnityEngine.Rendering.Universal
 
             cameraData.backgroundColor = CoreUtils.ConvertSRGBToActiveColorSpace(backgroundColorSRGB);
 
+
             // SLZ MODIFIED // Set volumetric parameters
 
             ///----------------------------------------------------------------------------------------
@@ -1316,10 +1376,14 @@ namespace UnityEngine.Rendering.Universal
             cameraData.SSRHitRadius = asset.ssrHitRadius;
             cameraData.SSRTemporalWeight = asset.ssrTemporalWeight;
             // END SLZ MODIFIED
+
+            cameraData.stackAnyPostProcessingEnabled = cameraData.postProcessEnabled;
+            cameraData.stackLastCameraOutputToHDR = cameraData.isHDROutputActive;
+
         }
 
         static void InitializeRenderingData(UniversalRenderPipelineAsset settings, ref CameraData cameraData, ref CullingResults cullResults,
-            bool anyPostProcessingEnabled, CommandBuffer cmd, out RenderingData renderingData)
+            CommandBuffer cmd, out RenderingData renderingData)
         {
             using var profScope = new ProfilingScope(null, Profiling.Pipeline.initializeRenderingData);
 
@@ -1364,7 +1428,7 @@ namespace UnityEngine.Rendering.Universal
             renderingData.cameraData = cameraData;
             InitializeLightData(settings, visibleLights, mainLightIndex, out renderingData.lightData);
             InitializeShadowData(settings, visibleLights, mainLightCastShadows, additionalLightsCastShadows && !renderingData.lightData.shadeAdditionalLightsPerVertex, isForwardPlus, out renderingData.shadowData);
-            InitializePostProcessingData(settings, out renderingData.postProcessingData);
+            InitializePostProcessingData(settings, cameraData.stackLastCameraOutputToHDR, out renderingData.postProcessingData);
 
             // SLZ MODIFIED // Set up volumetrics
             SetupVolumetricConstants(cameraData);
@@ -1373,7 +1437,7 @@ namespace UnityEngine.Rendering.Universal
             renderingData.supportsDynamicBatching = settings.supportsDynamicBatching;
 
             renderingData.perObjectData = GetPerObjectLightFlags(renderingData.lightData.additionalLightsCount, isForwardPlus);
-            renderingData.postProcessingEnabled = anyPostProcessingEnabled;
+            renderingData.postProcessingEnabled = cameraData.stackAnyPostProcessingEnabled;
             renderingData.commandBuffer = cmd;
 
             CheckAndApplyDebugSettings(ref renderingData);
@@ -1464,13 +1528,13 @@ namespace UnityEngine.Rendering.Universal
             shadowData.isKeywordSoftShadowsEnabled = false;
         }
 
-        static void InitializePostProcessingData(UniversalRenderPipelineAsset settings, out PostProcessingData postProcessingData)
+        static void InitializePostProcessingData(UniversalRenderPipelineAsset settings, bool isHDROutputActive, out PostProcessingData postProcessingData)
         {
             postProcessingData.gradingMode = settings.supportsHDR
                 ? settings.colorGradingMode
                 : ColorGradingMode.LowDynamicRange;
 
-            if (HDROutputIsActive())
+            if (isHDROutputActive)
                 postProcessingData.gradingMode = ColorGradingMode.HighDynamicRange;
 
             postProcessingData.lutSize = settings.colorGradingLutSize;
@@ -1516,15 +1580,15 @@ namespace UnityEngine.Rendering.Universal
             switch (renderingSettings.taaDebugMode)
             {
                 case DebugDisplaySettingsRendering.TaaDebugMode.ShowClampedHistory:
-                    taaSettings.frameInfluence = 0;
+                    taaSettings.m_FrameInfluence = 0;
                     break;
 
                 case DebugDisplaySettingsRendering.TaaDebugMode.ShowRawFrame:
-                    taaSettings.frameInfluence = 1;
+                    taaSettings.m_FrameInfluence = 1;
                     break;
 
                 case DebugDisplaySettingsRendering.TaaDebugMode.ShowRawFrameNoJitter:
-                    taaSettings.frameInfluence = 1;
+                    taaSettings.m_FrameInfluence = 1;
                     taaSettings.jitterScale = 0;
                     break;
             }
@@ -1808,7 +1872,7 @@ namespace UnityEngine.Rendering.Universal
         /// Checks if the hardware (main display and platform) and the render pipeline support HDR.
         /// </summary>
         /// <returns>True if the main display and platform support HDR and HDR output is enabled on the platform.</returns>
-        internal static bool HDROutputIsActive()
+        internal static bool HDROutputForMainDisplayIsActive()
         {
             bool hdrOutputSupported = SystemInfo.hdrDisplaySupportFlags.HasFlag(HDRDisplaySupportFlags.Supported) && asset.supportsHDR;
             bool hdrOutputActive = HDROutputSettings.main.available && HDROutputSettings.main.active;
@@ -1816,13 +1880,35 @@ namespace UnityEngine.Rendering.Universal
             return !Application.isMobilePlatform && hdrOutputSupported && hdrOutputActive;
         }
 
+        // We only want to enable HDR Output for the game view once
+        // since the game itself might want to control this
+        internal bool enableHDROnce = true;
+
+        /// <summary>
+        /// Checks if any of the display devices we can output to are HDR capable and enabled.
+        /// </summary>
+        /// <returns>Return true if any of the display devices we can output HDR to have enabled HDR output</returns>
+        internal static bool HDROutputForAnyDisplayIsActive()
+        {
+            bool hdrDisplayOutputActive = HDROutputForMainDisplayIsActive();
+#if ENABLE_VR && ENABLE_XR_MODULE
+            // If we are rendering to xr then we need to look at the XR Display rather than the main non-xr display.
+            if (XRSystem.displayActive)
+            {
+                hdrDisplayOutputActive |= XRSystem.isHDRDisplayOutputActive;
+            }
+#endif
+
+            return hdrDisplayOutputActive;
+        }
+
         /// <summary>
         /// Configures the render pipeline to render to HDR output or disables HDR output.
         /// </summary>
 #if UNITY_2021_1_OR_NEWER
-        static void SetHDRState(List<Camera> cameras)
+        void SetHDRState(List<Camera> cameras)
 #else
-        static void SetHDRState(Camera[] cameras)
+        void SetHDRState(Camera[] cameras)
 #endif
         {
             bool hdrOutputActive = HDROutputSettings.main.available && HDROutputSettings.main.active;
@@ -1851,10 +1937,11 @@ namespace UnityEngine.Rendering.Universal
                     requestedHDRModeChange = hdrOutputActive;
                     HDROutputSettings.main.RequestHDRModeChange(false);
                 }
-                else
+                else if (enableHDROnce)
                 {
                     requestedHDRModeChange = !hdrOutputActive;
                     HDROutputSettings.main.RequestHDRModeChange(true);
+                    enableHDROnce = false;
                 }
             }
 
@@ -1872,12 +1959,11 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
-        internal static void GetHDROutputLuminanceParameters(Tonemapping tonemapping, out Vector4 hdrOutputParameters)
+        internal static void GetHDROutputLuminanceParameters(HDROutputUtils.HDRDisplayInformation hdrDisplayInformation, ColorGamut hdrDisplayColorGamut, Tonemapping tonemapping, out Vector4 hdrOutputParameters)
         {
-            float minNits = HDROutputSettings.main.minToneMapLuminance;
-            float maxNits = HDROutputSettings.main.maxToneMapLuminance;
-            float paperWhite = HDROutputSettings.main.paperWhiteNits;
-            //ColorPrimaries colorPrimaries = ColorGamutUtility.GetColorPrimaries(HDROutputSettings.main.displayColorGamut);
+            float minNits = hdrDisplayInformation.minToneMapLuminance;
+            float maxNits = hdrDisplayInformation.maxToneMapLuminance;
+            float paperWhite = hdrDisplayInformation.paperWhiteNits;
 
             if (!tonemapping.detectPaperWhite.value)
             {

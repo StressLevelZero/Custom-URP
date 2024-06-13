@@ -82,7 +82,9 @@ namespace UnityEngine.Rendering.Universal
         {
             SetDirty();
 #if UNITY_EDITOR
-            if (m_RendererFeatures.Contains(null))
+            // Only validate ScriptableRendererFeatures when all scripts have finished compiling (to avoid false-negatives
+            // when ScriptableRendererFeatures haven't been compiled before this check).
+            if (!EditorApplication.isCompiling && m_RendererFeatures.Contains(null))
                 ValidateRendererFeatures();
 #endif
         }
@@ -150,7 +152,7 @@ namespace UnityEngine.Rendering.Universal
             // Collect valid, compiled sub-assets
             foreach (var asset in subassets)
             {
-                if (asset == null || asset.GetType().BaseType != typeof(ScriptableRendererFeature)) continue;
+                if (asset == null || !asset.GetType().IsSubclassOf(typeof(ScriptableRendererFeature))) continue;
                 AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out var guid, out long localId);
                 loadedAssets.Add(localId, asset);
                 debugOutput += $"-{asset.name}\n--localId={localId}\n";
@@ -200,8 +202,24 @@ namespace UnityEngine.Rendering.Universal
 
         internal bool DuplicateFeatureCheck(Type type)
         {
-            var isSingleFeature = type.GetCustomAttribute(typeof(DisallowMultipleRendererFeature));
-            return isSingleFeature != null && m_RendererFeatures.Select(renderFeature => renderFeature.GetType()).Any(t => t == type);
+            Attribute isSingleFeature = type.GetCustomAttribute(typeof(DisallowMultipleRendererFeature));
+            if (isSingleFeature == null)
+                return false;
+
+            if (m_RendererFeatures == null)
+                return false;
+
+            for (int i = 0; i < m_RendererFeatures.Count; i++)
+            {
+                ScriptableRendererFeature feature = m_RendererFeatures[i];
+                if (feature == null)
+                    continue;
+
+                if (feature.GetType() == type)
+                    return true;
+            }
+
+            return false;
         }
 
         private static object GetUnusedAsset(ref List<long> usedIds, ref Dictionary<long, object> assets)

@@ -38,8 +38,8 @@ half SampleAmbientOcclusion(float2 normalizedScreenSpaceUV)
 AmbientOcclusionFactor GetScreenSpaceAmbientOcclusion(float2 normalizedScreenSpaceUV)
 {
 	AmbientOcclusionFactor aoFactor;
-	aoFactor.directAmbientOcclusion = 1;
-	aoFactor.indirectAmbientOcclusion = 1;
+	aoFactor.directAmbientOcclusion = half(1.0);
+	aoFactor.indirectAmbientOcclusion = half(1.0);
 	#if !defined(_SURFACE_TYPE_TRANSPARENT)
 	UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
 	{

@@ -1,4 +1,5 @@
 # Changelog
+
 All notable changes to this package will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
@@ -8,6 +9,124 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 Version Updated
 The version number for this package has increased due to a version update of a related graphics package.
+
+## [14.0.10] - 2024-04-03
+
+This version is compatible with Unity 2022.3.24f1.
+
+### Changed
+- The Auto option in SH Evaluation Mode, in the URP Asset, now chooses Per Vertex instead of Per Pixel on mobile and similar devices.
+
+### Fixed
+- Fixed sRGB conversion without PostProcessing.
+- Fixed an issue with missing variant in builds when using Strict Variant Matching and Deferred Rendering.
+- Fixed RenderRequest using wrong renderer.
+- Fixed an issue where downsampled SSAO had serious artefacts on Android.
+- Fixed an issue where Screen Space Decals keyword was missing when Strip  Unused Variants was turned off.
+- Added UI features to encourage the use of Rendering Layers in URP to control selective lighting, instead of using culling mask. The former works across Deferred, Forward and Forward+, while the latter only works with Forward.
+- Fixed incorrect alpha-clip behavior on transparent surfaces.
+- Fixed an issue where using Alpha Clipped shaders and Depth Priming resulted in invisible objects.
+- Ensure motion vector depth buffer is valid for cameras with motion vectors enabled.
+- Fixed an issue where keywords were incorrectly enabled/disabled when shadows were enabled in the URP Asset and "Transparent Receive Shadows" was disabled on the renderer.
+- SSAO is now rendered in deferred when no light is present.
+- Early exit from URP RendererFeatures if they require color and is rendered to a depth on target.
+- Reflection probes now works correctly using mip maps with forward+.
+- Preview cameras now skip render objects.
+- Reflection probes are now sorted in the correct order.
+- Fixed an issue where setting light position, direction and shadow bias allocated due to using strings instead of integers.
+- Motion Vector pass can now render after opaques. It correctly follows its depth dependency in pass order.
+- Disabled depth priming for cameras with depth only render targets.
+- Added logic to enforce consistent hardware dynamic resolution settings during rendering to avoid issues when external code changes the global setting.
+- Fixed an issue where an incorrect WorldToCamera matrix was used in the main and additional light shadow passes.
+- Fixed an issue where errors appeared due to _CameraDepthTexture_TexelSize being added to DeclareDepthTexture.
+- Fixed an issue where logging an error gave a NullReferenceException for Server Builds.
+- Fixed false-negative missing RendererFeatures errors.
+- Restore `EditorGUIUtility.labelWidth` to default after drawing MaterialHeaderScopes.
+- Fix shadow flickering when using Screen Space shadows and have depth priming enabled
+- Fixed the NativeRenderPass camera target MSAA logic to match the non-NRP path
+- Fix depth buffer disappearing after using SwapColorBuffer
+
+## [14.0.9] - 2023-12-21
+
+This version is compatible with Unity 2022.3.18f1.
+
+### Changed
+- Vulkan URP will use MSAA samples count fallback from player settings. Prior to this x2 fallback would have been to upgrade to x4.
+- Improved renderViewportScale for XR intermediate textures.
+- Improved runtime performance by adding checks for _ALPHATEST_ON when rendering depth, shadows and depth normals.
+
+### Fixed
+- Fixed per-vertex light layers.
+- Added workarounds for MSAA-specific visual artifacts on materials that use alpha clipping in unexpected ways.
+- Fixed an issue causing decals to be culled erroneously when using the Screen Space technique.
+- Fixed an issue where Rendering Layers didn't work properly when opening a project.
+- Disabled Motion Blur effect in EditMode to keep the game view clear while editing. Motion Blur works as before in PlayMode and standalone builds.
+- Fixed _WorldSpaceCameraPos is not set correctly in XR Multipass.
+- Fixed Color Grading Mode set to Low Dynamic Range on one camera in the stack despite HDR output active.
+- Fixed an issue where building a project using deferred with batchmode and nographics resulted in incorrect variant stripping.
+- Fixed an issue where Unlit shaders would not output correct normals when using deferred and Accurate GBuffer Normals.
+- Fixed HDR Debug Views break the native render pass when enabled once.
+- Updated the documentation to mention that the Screen Space decal technique does not support blending of normals when using the Deferred rendering path with Accurate G-Buffer Normals enabled. The Automatic decal technique now prefers the D-Buffer technique if Accurate G-Buffer Normals are enabled.
+- Fixed partially corrupted Android screen when Vulkan display rotation during rendering is enabled.
+- Use local random state for post-processing.
+- Fixed SH vertex evaluation mode in URPLit shader graph.
+- Fixed FXAA resulting in a too-dark image when using in combination with HDR output, and bilinear/nearest-neightbor upscaling.
+- Fixed an issue where screen space decals would not calculate ambient lighting correctly.
+- The Fullscreen Render Feature doesn't cause rendering layers to run in the depth normals prepass anymore.
+- Fixed an issue where Light Layers did not check scene lighting setting when enabling the keyword.
+
+## [14.0.8] - 2023-09-27
+
+This version is compatible with Unity 2022.3.11f1.
+
+### Fixed
+- Fixed TAA resource leak on entering/exiting the playmode.
+- Fixed rare iOS shader building failure due to URP Lit Forward Pass shader varyings struct variable mismatch
+- Fixed an issue with broken documentation links.
+- Stripped BlitHDROverlay from build if HDR output is not allowed and stripping unused shader is allowed.
+- Fixed an issue where switching Volume Update modes between Every Frame and Via Scripting gave an error.
+- Fixed, URP & core package leaking materials when entering/exiting Play Mode.
+- Fixed for the UI being drawn twice in some scenarios.
+- Fixed an issue where assets were incorrectly being saved when making builds.
+- Fixed incorrect MSAA sample count when using Deferred renderer but rendering to a target texture.
+- Fixed ShaderGraph preview window not showing anything when using DepthNormals pass.
+- 2D - Remove serialization and cache vertices and indices for sprite lights causing bloat in prefabs.
+- Changed the ScreenSpace Decals sorting criteria to None to fix flickering issues.
+- Fixed redundant blit is used due to postFX, although it is disabled in rendererData.
+- Support DOTS_INSTANCING in DebugReplacement shader.
+- Fixed a bug where color space conversion is applied twice in URP in specific conditions (HDR Output and Debug HDR Views enabled).
+- Fixed using RenderTextureSubElement.Stencil in URP not binding properly.
+- Fixed error message in filtered view when decals are enabled.
+- Fixed Screen space Overlay UI rendered at the wrong size for scaling mode "Constant Pixel Size" or "Constant Physical Size", when HDR output is active.
+- Fixed WebGL1 throwing errors when using depth copy texture.
+- Fixed typo in RenderSingleCamera obsolete message.
+- 2D - Fixed additional draw call when Foremost Sorting Layer is enabled during unlit.
+- Fixed removal of renderer features if a renderer feature is missing.
+- Fixed data-driven lens-flare occlusion and y-flip on opengl.
+- Fixed an issue where rendering layers keywords were not enabled correctly when using Decals & SSAO in Deferred.
+- Fixed an issue where incorrect Shader Keyword Prefiltering was used with SSAO when AfterOpaque was used.
+- Fixed Native RenderPass errors when using RenderingLayers.
+- Fixed exception for missing _Color Shader Property.
+- Fixed runtime performance drops when multiple views that uses incompatible RTHandle descriptors are rendered within a frame.
+- Fixed an issue where Shader ID's weren't reset properly in the DepthNormals pass.
+- Fixed black screen issue when using URP hardware Dynamic Resolution with DX12.
+- Fixed Native RenderPass errors when using RendererFeature which is executed in between GBuffer and Deferred Lighting passes.
+- Fixed color and depth mismatch when scaling is on.
+- Fixed an issue where IndexOutOfRangeException was thrown when creating a stacked camera from script.
+- Fixed an issue where NullReferenceException was thrown when camera prefab referenced a camera outside the prefab in the camera stack.
+- Fixed an issue where settings would disappear when deleting a child Camera of the Main Camera.
+- Fixed an issue where additional lights were not rendering correctly when using a mix of shadow settings in deferred.
+- Added GBuffer (fill) passes to ComplexLit and Unlit shader to prevent GBuffer data holes.
+- Fixed render texture memory leak when rtHandle realloc failed to be added to pool.
+- Fixed an issue where it wasn't possible to add a Renderer Feature on a renderer if another feature had a missing/broken script.
+- Fixed an issue with Screen Space Decals where dark artefacts appeared in the editor.
+- Fixed an issue where reflection probes were not updating correctly when using Forward+.
+- Fixed an issue causing 'implicit truncation of vector type' warning when using ShaderGraph shaders in the Forward+ Rendering Path.
+- Fixed HDR Output can't be turned off via the `HDROutputSettings` API in the editor.
+- Add Shader Keywords for Soft Shadow quality levels and disable per-light quality level on untethered XR platforms
+- Fix IndexOutOfRangeException error when using Native RenderPass on Deferred
+- Fixed an issue where selecting a stacked camera caused the editor to freeze and sometimes crash.
+- Fixed TAA Very High option flicker.
 
 ## [14.0.7] - 2023-05-23
 
@@ -786,7 +905,7 @@ This version is compatible with Unity 2022.2.0a14.
 - Fixed an issue where Terrain hole Shader changes were missing. [Case 1179808](https://issuetracker.unity3d.com/issues/terrain-brush-tool-is-not-drawing-when-paint-holes-is-selected).
 - Fixed an issue where the Shader Graph `SceneDepth` node didn't work with XR single-pass (double-wide) rendering. See [case 1123069](https://issuetracker.unity3d.com/issues/lwrp-vr-shadergraph-scenedepth-doesnt-work-in-single-pass-rendering).
 - Fixed Unlit and BakedLit shader compilations in the meta pass.
-- Fixed an issue where the Bokeh Depth of Field shader would fail to compile on PS4.
+- Fixed an issue where the Bokeh Depth of Field shader would fail to compile on a console platform.
 - Fixed an issue where the Scene lighting button didn't work when you used the 2D Renderer.
 - Fixed a performance regression when you used the 2D Renderer.
 - Fixed an issue where the Freeform 2D Light gizmo didn't correctly show the Falloff offset.
@@ -1377,7 +1496,7 @@ Read/write XRGraphicsConfig -> Read-only XRGraphics interface to XRSettings.
 
 ### Fixed
 - Post-processing now works with VR on PC.
-- PS4 compiler error
+- Console platform compiler error
 - Fixed VR multiview rendering by forcing MSAA to be off. There's a current issue in engine that breaks MSAA and Texture2DArray.
 - Fixed UnityPerDraw CB layout
 - GLCore compute buffer compiler error

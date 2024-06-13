@@ -387,6 +387,10 @@ namespace UnityEngine.Rendering.Universal
             bias = -distanceFadeNear / (fadeDistance - distanceFadeNear);
         }
 
+        private static int _ShadowBias = Shader.PropertyToID("_ShadowBias");
+        private static int _LightDirection = Shader.PropertyToID("_LightDirection");
+        private static int _LightPosition = Shader.PropertyToID("_LightPosition");
+
         /// <summary>
         /// Sets up the shadow bias, light direction and position for rendering.
         /// </summary>
@@ -395,15 +399,44 @@ namespace UnityEngine.Rendering.Universal
         /// <param name="shadowBias"></param>
         public static void SetupShadowCasterConstantBuffer(CommandBuffer cmd, ref VisibleLight shadowLight, Vector4 shadowBias)
         {
-            cmd.SetGlobalVector("_ShadowBias", shadowBias);
+            SetShadowBias(cmd, shadowBias);
 
             // Light direction is currently used in shadow caster pass to apply shadow normal offset (normal bias).
             Vector3 lightDirection = -shadowLight.localToWorldMatrix.GetColumn(2);
-            cmd.SetGlobalVector("_LightDirection", new Vector4(lightDirection.x, lightDirection.y, lightDirection.z, 0.0f));
+            SetLightDirection(cmd, lightDirection);
 
             // For punctual lights, computing light direction at each vertex position provides more consistent results (shadow shape does not change when "rotating the point light" for example)
             Vector3 lightPosition = shadowLight.localToWorldMatrix.GetColumn(3);
-            cmd.SetGlobalVector("_LightPosition", new Vector4(lightPosition.x, lightPosition.y, lightPosition.z, 1.0f));
+            SetLightPosition(cmd, lightPosition);
+        }
+
+        internal static void SetShadowBias(CommandBuffer cmd, Vector4 shadowBias)
+        {
+            cmd.SetGlobalVector(ShaderPropertyId.shadowBias, shadowBias);
+        }
+
+        internal static void SetLightDirection(CommandBuffer cmd, Vector3 lightDirection)
+        {
+            cmd.SetGlobalVector(ShaderPropertyId.lightDirection, new Vector4(lightDirection.x, lightDirection.y, lightDirection.z, 0.0f));
+        }
+
+        internal static void SetLightPosition(CommandBuffer cmd, Vector3 lightPosition)
+        {
+            cmd.SetGlobalVector(ShaderPropertyId.lightPosition, new Vector4(lightPosition.x, lightPosition.y, lightPosition.z, 1.0f));
+        }
+
+        internal static void SetCameraPosition(CommandBuffer cmd, Vector3 worldSpaceCameraPos)
+        {
+            cmd.SetGlobalVector(ShaderPropertyId.worldSpaceCameraPos, worldSpaceCameraPos);
+        }
+
+        internal static void SetWorldToCameraMatrix(CommandBuffer cmd, Matrix4x4 viewMatrix)
+        {
+            // There's an inconsistency in handedness between unity_matrixV and unity_WorldToCamera
+            // Unity changes the handedness of unity_WorldToCamera (see Camera::CalculateMatrixShaderProps)
+            // we will also change it here to avoid breaking existing shaders. (case 1257518)
+            Matrix4x4 worldToCameraMatrix = Matrix4x4.Scale(new Vector3(1.0f, 1.0f, -1.0f)) * viewMatrix;
+            cmd.SetGlobalMatrix(ShaderPropertyId.worldToCameraMatrix, worldToCameraMatrix);
         }
 
         private static RenderTextureDescriptor GetTemporaryShadowTextureDescriptor(int width, int height, int bits)
@@ -543,6 +576,94 @@ namespace UnityEngine.Rendering.Universal
             }
 
             return softShadows;
+        }
+
+        internal static bool SupportsPerLightSoftShadowQuality()
+        {
+            #if ENABLE_VR && ENABLE_VR_MODULE
+            #if PLATFORM_WINRT || PLATFORM_ANDROID
+                // We are using static branches on Quest2 + HL for performance reasons
+                return !PlatformAutoDetect.isXRMobile;
+            #endif
+            #endif
+            return true;
+        }
+
+        internal static void SetPerLightSoftShadowKeyword(CommandBuffer cmd, bool hasSoftShadows)
+        {
+            if (SupportsPerLightSoftShadowQuality())
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadows, hasSoftShadows);
+        }
+
+        internal static void SetSoftShadowQualityShaderKeywords(CommandBuffer cmd, ref ShadowData shadowData)
+        {
+            CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadows, shadowData.isKeywordSoftShadowsEnabled);
+            if (SupportsPerLightSoftShadowQuality())
+            {
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsLow, false);
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsMedium, false);
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsHigh, false);
+            }
+            else
+            {
+                if (shadowData.isKeywordSoftShadowsEnabled && UniversalRenderPipeline.asset?.softShadowQuality == SoftShadowQuality.Low)
+                {
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsLow, true);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsMedium, false);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsHigh, false);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadows, false);
+                }
+                else if (shadowData.isKeywordSoftShadowsEnabled && UniversalRenderPipeline.asset?.softShadowQuality == SoftShadowQuality.Medium)
+                {
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsLow, false);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsMedium, true);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsHigh, false);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadows, false);
+                }
+                else if (shadowData.isKeywordSoftShadowsEnabled && UniversalRenderPipeline.asset?.softShadowQuality == SoftShadowQuality.High)
+                {
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsLow, false);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsMedium, false);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadowsHigh, true);
+                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.SoftShadows, false);
+                }
+            }
+        }
+
+        internal static bool IsValidShadowCastingLight(ref LightData lightData, int i)
+        {
+            if (i == lightData.mainLightIndex)
+                return false;
+
+            ref VisibleLight shadowLight = ref lightData.visibleLights.UnsafeElementAt(i);
+
+            // Directional and light shadows are not supported in the shadow map atlas
+            if (shadowLight.lightType == LightType.Directional)
+                return false;
+
+            Light light = shadowLight.light;
+            return light != null && light.shadows != LightShadows.None && !Mathf.Approximately(light.shadowStrength, 0.0f);
+        }
+
+        internal static int GetPunctualLightShadowSlicesCount(in LightType lightType)
+        {
+            switch (lightType)
+            {
+                case LightType.Spot:
+                    return 1;
+                case LightType.Point:
+                    return 6;
+                default:
+                    return 0;
+            }
+        }
+
+        internal const int kMinimumPunctualLightHardShadowResolution = 8;
+        internal const int kMinimumPunctualLightSoftShadowResolution = 16;
+        // Minimal shadow map resolution required to have meaningful shadows visible during lighting
+        internal static int MinimalPunctualLightShadowResolution(bool softShadow)
+        {
+            return softShadow ? kMinimumPunctualLightSoftShadowResolution : kMinimumPunctualLightHardShadowResolution;
         }
     }
 }

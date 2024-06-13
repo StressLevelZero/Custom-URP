@@ -89,6 +89,11 @@ namespace UnityEngine.Rendering.Universal.Internal
         UniversalRenderer caller; // Keep a reference to the current running renderer so we can check if VRS is enabled on it during the configuration stage
 
         /// <summary>
+        /// Used to indicate if the active target of the pass is the back buffer
+        /// </summary>
+        public bool m_IsActiveTargetBackBuffer; // TODO: Remove this when we remove non-RG path
+
+        /// <summary>
         /// Used to indicate whether transparent objects should receive shadows or not.
         /// </summary>
         public bool m_ShouldTransparentsReceiveShadows;
@@ -135,6 +140,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_RenderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
             m_IsOpaque = opaque;
             m_ShouldTransparentsReceiveShadows = false;
+            m_IsActiveTargetBackBuffer = false;
 
             if (stencilState.enabled)
             {
@@ -202,11 +208,13 @@ namespace UnityEngine.Rendering.Universal.Internal
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             m_PassData.m_IsOpaque = m_IsOpaque;
+            m_PassData.m_RenderingData = renderingData;
             m_PassData.m_RenderStateBlock = m_RenderStateBlock;
             m_PassData.m_FilteringSettings = m_FilteringSettings;
             m_PassData.m_ShaderTagIdList = m_ShaderTagIdList;
             m_PassData.m_ProfilingSampler = m_ProfilingSampler;
             m_PassData.drawSkybox = m_DrawSkybox;
+            m_PassData.m_IsActiveTargetBackBuffer = m_IsActiveTargetBackBuffer;
             m_PassData.pass = this;
             //m_PassData.m_UseMotionVectorData = useMotionVectorData;
             m_PassData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
@@ -238,6 +246,14 @@ namespace UnityEngine.Rendering.Universal.Internal
                 // w is used for knowing whether the object is opaque(1) or alpha blended(0)
                 Vector4 drawObjectPassData = new Vector4(0.0f, 0.0f, 0.0f, (data.m_IsOpaque) ? 1.0f : 0.0f);
                 cmd.SetGlobalVector(s_DrawObjectPassDataPropID, drawObjectPassData);
+
+#if ENABLE_VR && ENABLE_XR_MODULE
+                if (data.m_RenderingData.cameraData.xr.enabled && data.m_IsActiveTargetBackBuffer)
+                {
+                    cmd.SetViewport(data.m_RenderingData.cameraData.xr.GetViewport());
+                }
+#endif
+
                 // scaleBias.x = flipSign
                 // scaleBias.y = scale
                 // scaleBias.z = bias
@@ -354,6 +370,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             internal ProfilingSampler m_ProfilingSampler;
 
             internal bool m_ShouldTransparentsReceiveShadows;
+			internal bool m_IsActiveTargetBackBuffer;
 
             internal DrawObjectsPass pass;
             internal bool drawSkybox;
@@ -388,6 +405,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                 passData.m_ProfilingSampler = m_ProfilingSampler;
 
                 passData.m_ShouldTransparentsReceiveShadows = m_ShouldTransparentsReceiveShadows;
+                passData.m_IsActiveTargetBackBuffer = m_IsActiveTargetBackBuffer;
 
                 passData.pass = this;
 

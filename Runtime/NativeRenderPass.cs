@@ -160,6 +160,10 @@ namespace UnityEngine.Rendering.Universal
                 var samples = pass.overrideCameraTarget ? GetFirstAllocatedRTHandle(pass).rt.descriptor.msaaSamples :
                     (cameraData.targetTexture != null ? cameraData.targetTexture.descriptor.msaaSamples : cameraData.cameraTargetDescriptor.msaaSamples);
 
+                bool rendererSupportsMSAA = cameraData.renderer != null && cameraData.renderer.supportedRenderingFeatures.msaa;
+                if (!cameraData.camera.allowMSAA || !rendererSupportsMSAA)
+                    samples = 1;
+
                 // only override existing non destructive actions
                 for (int i = 0; i < m_FinalColorStoreAction.Length; ++i)
                 {
@@ -647,7 +651,7 @@ namespace UnityEngine.Rendering.Universal
             return CreateRenderPassHash(desc.w, desc.h, desc.depthID, desc.samples, hashIndex);
         }
 
-        private RenderPassDescriptor InitializeRenderPassDescriptor(ref CameraData cameraData, ScriptableRenderPass renderPass)
+        internal static void GetRenderTextureDescriptor(ref CameraData cameraData, ScriptableRenderPass renderPass, out RenderTextureDescriptor targetRT)
         {
             RenderTextureDescriptor targetRT;
             if (!renderPass.overrideCameraTarget)// || (renderPass.colorAttachmentHandle.rt == null && renderPass.depthAttachmentHandle.rt == null))
@@ -658,8 +662,8 @@ namespace UnityEngine.Rendering.Universal
                 // and it's new dimensions might not be reflected on the targetTexture. This also applies to camera stacks rendering to a target texture.
                 if (cameraData.targetTexture != null)
                 {
-                    targetRT.width = cameraData.pixelWidth;
-                    targetRT.height = cameraData.pixelHeight;
+                    targetRT.width = cameraData.scaledWidth;
+                    targetRT.height = cameraData.scaledHeight;
                 }
             }
             else
@@ -667,6 +671,11 @@ namespace UnityEngine.Rendering.Universal
                 var handle = GetFirstAllocatedRTHandle(renderPass);
                 targetRT = handle.rt != null ? handle.rt.descriptor : renderPass.depthAttachmentHandle.rt.descriptor;
             }
+        }
+
+        private RenderPassDescriptor InitializeRenderPassDescriptor(ref CameraData cameraData, ScriptableRenderPass renderPass)
+        {
+            GetRenderTextureDescriptor(ref cameraData, renderPass, out RenderTextureDescriptor targetRT);
 
             var depthTarget = renderPass.overrideCameraTarget ? renderPass.depthAttachmentHandle : cameraDepthTargetHandle;
             var depthID = (targetRT.graphicsFormat == GraphicsFormat.None && targetRT.depthStencilFormat != GraphicsFormat.None) ? renderPass.colorAttachmentHandle.GetHashCode() : depthTarget.GetHashCode();
