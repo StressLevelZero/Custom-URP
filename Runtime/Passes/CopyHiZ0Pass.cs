@@ -54,7 +54,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         private RTHandle source { get; set; }
         private PersistentRT destination { get; set; }
-        private RenderTargetHandle tempBuffer { get; set; }
+        //private RenderTargetHandle tempBuffer { get; set; }
         private RenderTextureDescriptor tempDescriptor;
 
         /// <summary>

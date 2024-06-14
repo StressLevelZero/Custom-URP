@@ -259,9 +259,9 @@ namespace UnityEngine.Rendering.Universal
                 // to handle the Terrain "Draw Instanced" scenario (Ono: case-1205332).
                 if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Vulkan)
                 {
-                    cmd.SetWireframe(false);
+                    //cmd.SetWireframe(false);
                     cmd.Blit(source, destination);
-                    cmd.SetWireframe(true);
+                    //cmd.SetWireframe(true);
                 }
                 else
                 {

@@ -92,7 +92,7 @@ float SoftParticles(float near, float far, float4 projection)
         float2 uv = UnityStereoTransformScreenSpaceTex(projection.xy / projection.w);
         uv = FoveatedRemapLinearToNonUniform(uv);
 
-        float rawDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_CameraDepthTexture, uv, 0).r;
+		float rawDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_PointClamp, uv, 0).r;
 
         float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(rawDepth, _ZBufferParams) : LinearDepthToEyeDepth(rawDepth);
         float thisZ = LinearEyeDepth(projection.z / projection.w, _ZBufferParams);
@@ -110,7 +110,7 @@ float SoftParticles(float near, float far, ParticleParams params)
         float2 uv = UnityStereoTransformScreenSpaceTex(params.projectedPosition.xy / params.projectedPosition.w);
         uv = FoveatedRemapLinearToNonUniform(uv);
 
-        float rawDepth = SAMPLE_TEXTURE2D_X(_CameraDepthTexture, sampler_CameraDepthTexture, uv).r;
+		float rawDepth = SAMPLE_TEXTURE2D_X(_CameraDepthTexture, sampler_PointClamp, uv).r;
         float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(rawDepth, _ZBufferParams) : LinearDepthToEyeDepth(rawDepth);
         float thisZ = LinearEyeDepth(params.positionWS.xyz, GetWorldToViewMatrix());
         fade = saturate(far * ((sceneZ - near) - thisZ));

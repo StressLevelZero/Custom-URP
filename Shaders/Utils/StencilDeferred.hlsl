@@ -164,7 +164,7 @@
                 unityLight.direction = _LightDirection;
                 unityLight.distanceAttenuation = 1.0;
                 unityLight.shadowAttenuation = 1.0;
-                unityLight.color = _LightColor.rgb;
+                unityLight.color = half4(_LightColor.rgb,1);
                 unityLight.layerMask = lightLayerMask;
 
                 if (!materialReceiveShadowsOff)

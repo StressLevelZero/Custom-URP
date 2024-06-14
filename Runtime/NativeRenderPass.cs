@@ -653,8 +653,7 @@ namespace UnityEngine.Rendering.Universal
 
         internal static void GetRenderTextureDescriptor(ref CameraData cameraData, ScriptableRenderPass renderPass, out RenderTextureDescriptor targetRT)
         {
-            RenderTextureDescriptor targetRT;
-            if (!renderPass.overrideCameraTarget)// || (renderPass.colorAttachmentHandle.rt == null && renderPass.depthAttachmentHandle.rt == null))
+            if (!renderPass.overrideCameraTarget || (renderPass.colorAttachmentHandle.rt == null && renderPass.depthAttachmentHandle.rt == null))
             {
                 targetRT = cameraData.cameraTargetDescriptor;
 

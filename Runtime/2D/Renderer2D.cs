@@ -442,7 +442,7 @@ namespace UnityEngine.Rendering.Universal
             m_LightCullResult.SetupCulling(ref cullingParameters, cameraData.camera);
         }
 
-        internal override void SwapColorBuffer(CommandBuffer cmd)
+        public override void SwapColorBuffer(CommandBuffer cmd)
         {
             m_ColorBufferSystem.Swap();
 
@@ -458,7 +458,7 @@ namespace UnityEngine.Rendering.Universal
             cmd.SetGlobalTexture("_AfterPostProcessTexture", m_ColorTextureHandle.nameID);
         }
 
-        internal override RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
+        public override RTHandle GetCameraColorFrontBuffer(CommandBuffer cmd)
         {
             return m_ColorBufferSystem.GetFrontBuffer(cmd);
         }
@@ -468,7 +468,7 @@ namespace UnityEngine.Rendering.Universal
             return m_ColorBufferSystem.GetBackBuffer(cmd);
         }
 
-        internal override void EnableSwapBufferMSAA(bool enable)
+        public override void EnableSwapBufferMSAA(bool enable)
         {
             m_ColorBufferSystem.EnableMSAA(enable);
         }
