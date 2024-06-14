@@ -64,6 +64,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             _BlendDst,
             _ZWrite,
             _Cull,
+            _HalfShade,
 
             // Triplanar properties
             _Expensive,
@@ -95,6 +96,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "_BlendDst",
             "_ZWrite",
             "_Cull",
+            "_HalfShade",
 
              // Triplanar properties
             "_Expensive",
@@ -199,6 +201,15 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                    
                     materialFields.Add(cullPopup);
                     drawProps.contentContainer.Add(cullPopup);
+                }
+                int halfShadeIdx = PropertyIdx(ref propTable, PName._HalfShade);
+                if (halfShadeIdx != -1)
+                {
+                    MaterialToggleField halfShadeToggle = new MaterialToggleField();
+                    halfShadeToggle.Initialize(props[halfShadeIdx], propIdx[halfShadeIdx], string.Empty, false);
+                    halfShadeToggle.onFloatValue = 0.0008148f;
+                    halfShadeToggle.label = "2x2 Shading Rate (Quest Only)";
+                    drawProps.contentContainer.Add(halfShadeToggle);
                 }
 
                 drawProps.contentContainer.Add(renderQueue);

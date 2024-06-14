@@ -8,7 +8,10 @@ namespace UnityEditor.SLZMaterialUI
 {
     public class MaterialToggleField : Toggle, BaseMaterialField
     {
-        
+        public float onFloatValue = 1.0f;
+        public float offFloatValue = 0.0f;
+        public int onIntValue = 1;
+        public int offIntValue = 0;
         public int shaderPropertyIdx;
         public int GetShaderPropIdx() { return shaderPropertyIdx; }
         public MaterialProperty materialProperty;
@@ -26,11 +29,11 @@ namespace UnityEditor.SLZMaterialUI
             bool state = false;
             if (isIntField)
             {
-                state = materialProperty.intValue != 0 ? true : false;
+                state = materialProperty.intValue != offIntValue ? true : false;
             }
             else
             {
-                state = materialProperty.floatValue > 0 ? true : false;
+                state = materialProperty.floatValue != offFloatValue ? true : false;
             }
 
             this.SetValueWithoutNotify(state);
@@ -62,14 +65,14 @@ namespace UnityEditor.SLZMaterialUI
             //BeforeChange.Invoke(evt);
             if (isIntField)
             {
-                materialProperty.intValue = evt.newValue ? 1 : 0;
+                materialProperty.intValue = evt.newValue ? onIntValue : offIntValue;
             }
             else
             {
-                materialProperty.floatValue = evt.newValue ? 1 : 0;
+                materialProperty.floatValue = evt.newValue ? onFloatValue : offFloatValue;
             }
             
-            if (keyword != null)
+            if (!string.IsNullOrEmpty(keyword))
             {
                 Object[] targets = materialProperty.targets;
                 int numMats = targets.Length;
@@ -88,7 +91,7 @@ namespace UnityEditor.SLZMaterialUI
         void SetKeywordOnTargets(bool value) 
         { 
         
-            if (keyword != null)
+            if (!string.IsNullOrEmpty(keyword))
             {
                 Object[] materials = materialProperty.targets;
                 int numMaterials = materials.Length;
