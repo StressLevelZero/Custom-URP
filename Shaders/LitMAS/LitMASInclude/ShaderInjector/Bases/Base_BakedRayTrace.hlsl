@@ -6,6 +6,28 @@
 
 //#!INJECT_POINT INCLUDES
 
+// Unity Tries to define half as min16float, which isn't handled by unity's interface with the shader compiler for raytracing.
+
+#ifdef half
+#undef half
+#define half float
+#endif
+
+#ifdef half2
+#undef half2
+#define half2 float2
+#endif
+
+#ifdef half3
+#undef half3
+#define half3 float3
+#endif
+
+#ifdef half4
+#undef half4
+#define half4 float4
+#endif
+
 #pragma raytracing BakeHit
 
 struct RayPayload
