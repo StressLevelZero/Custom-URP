@@ -176,7 +176,7 @@ float TanPhongConeAngle(const float roughness)
 
 float TanGGXConeAngle(const float roughness)
 {
-	/* proper formula
+	/* proper formula based on the derivation of the GGX CDF from https://patapom.com/blog/BRDF/PreIntegration/ 
 	float Xi = 0.244; // pick CDF at 0.244 (Lawrence 2002)
 	float mu = sqrt((1.0 - Xi) / (Xi * (roughness * roughness - 1.0) + 1.0));
 	float theta = acos(mu);
