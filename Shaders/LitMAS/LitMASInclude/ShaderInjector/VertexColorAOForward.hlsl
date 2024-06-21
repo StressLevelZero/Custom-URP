@@ -276,8 +276,8 @@ half4 frag(VertOut i) : SV_Target
 
 // Begin Injection DETAIL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
 		half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv_detail);
-		half3 detailTS = half3(2.0 * detailMap.ag - 1.0, 1.0);
-		normalTS = BlendNormal(normalTS, detailTS);
+		half3 detailTS = UnpackNormalAG(detailMap);
+		normalTS = normalize(BlendNormalRNM(normalTS, detailTS));
 // End Injection DETAIL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
 	   
 		smoothness = saturate(2.0 * detailMap.b * smoothness);

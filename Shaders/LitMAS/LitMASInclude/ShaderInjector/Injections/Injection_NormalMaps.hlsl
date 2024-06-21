@@ -23,8 +23,8 @@
 
 //#!INJECT_BEGIN DETAIL_MAP 0
 		half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv_detail);
-		half3 detailTS = half3(2.0 * detailMap.ag - 1.0, 1.0);
-		normalTS = BlendNormal(normalTS, detailTS);
+		half3 detailTS = UnpackNormalAG(detailMap);
+		normalTS = normalize(BlendNormalRNM(normalTS, detailTS));
 //#!INJECT_END
 
 //#!INJECT_BEGIN NORMAL_TRANSFORM 0

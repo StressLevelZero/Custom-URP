@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.UIElements;
+using SLZ.URPEditorBridge;
 using Unity.Collections;
 using Unity.Mathematics;
 using System.IO;
@@ -268,6 +269,7 @@ namespace SLZ.SLZEditorTools
 
         public static void ForceRebuild(Editor e)
         {
+            /* OLD - uses reflection to get at ActiveEditorTracker which is a field of an interface struct in the base editor class
             if (s_PropertyViewer == null)
             {
                 ReflectEditorTracker();
@@ -283,6 +285,10 @@ namespace SLZ.SLZEditorTools
                 ActiveEditorTracker activeEditorTracker = (ActiveEditorTracker) tracker;
                 activeEditorTracker.ForceRebuild();
             }
+            */
+
+            // NEW - use internal editor bridge to bypass reflection and directly get tracker
+            UIEditorBridge.GetActiveEditorTracker(e)?.ForceRebuild();
         }
     }
 }

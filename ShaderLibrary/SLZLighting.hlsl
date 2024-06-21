@@ -289,8 +289,12 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
         half3 halfDir = SLZSafeHalf3Normalize(lightDir + frag.viewDir);
         data.NoH = saturate(dot(frag.normal, halfDir));
         data.LoH = saturate(dot(lightDir, halfDir));
-        half3 NxH = cross(frag.normal, halfDir);
-        data.NxH2 = saturate(dot(NxH, NxH));
+        // Qualcomm started rounding <2^7 down to 0 when doing a cross on FP16 operands. Makes the NDF look like minecraft :(.
+        // Upcast to float, which completely defeats the point of using Lagrange's identity to replace NoH^2. 
+        // See https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)
+        // This is more expensive than just doing the normal GGX NDF calculations at full float, but I'm too lazy to switch everything over at the moment
+        half3 NxH = (half3)cross((float3)frag.normal, (float3)halfDir);
+        data.NxH2 = (half3)saturate(dot(NxH, NxH));
         data.NoL = saturate(dot(frag.normal, lightDir));
     #else
         data.NoV = abs(frag.NoV) + 1e-5;
@@ -438,7 +442,7 @@ half3 SLZDiffuseBDRF(const SLZFragData fragData, const SLZSurfData surfData, con
 half SLZGGXSpecularDMobile(half NoH, half NxH2, half roughness)
 {	
     half a = NoH * roughness;
-    half d = roughness / max(a * a + NxH2, REAL_MIN);
+    half d = roughness / max(a * a + NxH2, HALF_MIN);
     half d2 = (d * d * SLZ_INV_PI_half);
     return d2;
 }

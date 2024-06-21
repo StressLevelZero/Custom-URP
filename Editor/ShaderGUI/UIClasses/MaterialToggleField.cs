@@ -109,18 +109,17 @@ namespace UnityEditor.SLZMaterialUI
             bool state = false;
             if (isIntField)
             {
-                state = materialProperty.intValue != 0 ? true : false;
+                state = materialProperty.intValue == onIntValue ? true : false;
             }
             else
             {
-                state = materialProperty.floatValue > 0 ? true : false;
+                state = materialProperty.floatValue == onFloatValue ? true : false;
             }
-            if (this.value != state)
-            {
-                this.SetValueWithoutNotify(state);
-
-            }
+            //Debug.Log($"Update toggle {boundProp.name}, value: {state}");
+            this.SetValueWithoutNotify(state);
             this.showMixedValue = materialProperty.hasMixedValue;
+            this.style.color = Color.red;
+
             //MarkDirtyRepaint();
         }
     }

@@ -9,13 +9,15 @@ using static UnityEngine.UI.InputField;
 using Object = UnityEngine.Object;
 using System;
 using SLZ.SLZEditorTools;
+using SLZ.URPEditorBridge;
 using UnityEngine.Rendering;
+using UnityEngine.Experimental.Rendering;
 
 namespace UnityEditor.SLZMaterialUI
 {
     public class TextureField : VisualElement, BaseMaterialField
     {
-
+        public MaterialEditor thisEditor;
         public MaterialProperty textureProperty;
         public VisualElement leftAlignBox { get; private set; }
         public VisualElement rightAlignBox { get; private set; }
@@ -29,6 +31,8 @@ namespace UnityEditor.SLZMaterialUI
         Image thumbnail;
         bool isNormalMap;
         RenderTexture thumbnailRT;
+
+        public UIEMessageBox normalMapWarningBox;
 
         UnityEngine.Rendering.TextureDimension textureType;
 
@@ -59,14 +63,25 @@ namespace UnityEditor.SLZMaterialUI
             this.shaderPropertyIdx = texturePropertyIdx;
             this.isNormalMap = isNormalMap;
             this.defaultTexture = defaultTexture;
+            VisualElement root;
+            if (isNormalMap)
+            {
+                root = new VisualElement();
+                this.Add(root);
+            }
+            else
+            {
+                root = this;
+            }
+
             RegisterCallback<DetachFromPanelEvent>(evt => Dispose());
             leftAlignBox = new VisualElement();
             leftAlignBox.AddToClassList("materialGUILeftBox");
             rightAlignBox = new VisualElement();
             rightAlignBox.AddToClassList("materialGUIRightBox");
+            
 
-
-            style.flexDirection = FlexDirection.Row;
+            root.style.flexDirection = FlexDirection.Row;
             texObjField = new UnityEditor.UIElements.ObjectField();
             //List<SearchProvider> providers = new List<SearchProvider>() { new SearchProvider("sfklahlkjhsa", "hello") };
             //textureField.searchContext = new SearchContext(providers, "t:Texture2D", SearchFlags.Default);
@@ -180,10 +195,24 @@ namespace UnityEditor.SLZMaterialUI
             texObjField.SetValueWithoutNotify(currentValue);
 
             UpdateThumbnail();
-
             leftAlignBox.Add(texObjField);
-            Add(leftAlignBox);
-            Add(rightAlignBox);
+            root.Add(leftAlignBox);
+            root.Add(rightAlignBox);
+
+            if (isNormalMap)
+            {
+                normalMapWarningBox = new UIEMessageBox(MessageType.Warning, "Texture not imported as a normal map", "Fix Now", FixNormalMap);
+                normalMapWarningBox.style.display = textureProperty.textureValue != null && !textureProperty.hasMixedValue && 
+                    InternalEditorUtilityBridge.BumpMapTextureNeedsFixing(textureProperty) ? DisplayStyle.Flex : DisplayStyle.None;
+                this.Add(normalMapWarningBox);
+            }
+
+        }
+
+        void FixNormalMap()
+        {
+            InternalEditorUtilityBridge.FixNormalmapTexture(textureProperty);
+            normalMapWarningBox.style.display = DisplayStyle.None;
         }
 
         void OnObjectFieldChanged(ChangeEvent<Object> evt)
@@ -195,8 +224,9 @@ namespace UnityEditor.SLZMaterialUI
         {
             if (newValue == null || newValue is Texture)
             {
+                
                 currentValue = (Texture) newValue;
-
+                Debug.Log($"Called SetValueWithoutNotify On {textureProperty.name}, current value is now: {currentValue}");
                 if (currentValue == null && defaultTexture != null)
                 {
                     currentValue = defaultTexture;
@@ -207,8 +237,13 @@ namespace UnityEditor.SLZMaterialUI
                 texObjField.SetValueWithoutNotify(currentValue);
                 UpdateObjDelegate.Invoke(texObjField);
                 texObjField.showMixedValue = newValue == null;
+                if (isNormalMap)
+                {
+                    normalMapWarningBox.style.display = currentValue != null && 
+                        InternalEditorUtilityBridge.BumpMapTextureNeedsFixing(textureProperty) ? DisplayStyle.Flex : DisplayStyle.None;
+                }
             }
-            else throw new System.ArgumentException($"Expected object of type {typeof(Texture2D)}");
+            else throw new System.ArgumentException($"Expected object of type {typeof(Texture)}");
         }
 
         public Object value
@@ -231,11 +266,11 @@ namespace UnityEditor.SLZMaterialUI
 
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {
-            bool valueChanged = currentValue != boundProp.textureValue;
+            //Debug.Log($"Called UpdateMaterialProperty On {boundProp.name}, current: {textureProperty.textureValue}, new: {boundProp.textureValue}");
+            bool valueChanged = boundProp.textureValue != currentValue;
             textureProperty = boundProp;
             if (valueChanged)
             {
-               
                 currentValue = boundProp.textureValue;
                 texObjField.SetValueWithoutNotify(currentValue);
                 UpdateThumbnail();
@@ -254,7 +289,8 @@ namespace UnityEditor.SLZMaterialUI
 
         static Material s_blitMaterial;
         static LocalKeyword[] dimKeywords;
-        static LocalKeyword normalMapKeyword;
+        static LocalKeyword normalMapKeywordRG;
+        static LocalKeyword normalMapKeywordAG;
         static int prop_Blit2D = Shader.PropertyToID("_Blit2D");
         static int prop_Blit2DArray = Shader.PropertyToID("_Blit2DArray");
         static int prop_BlitCube = Shader.PropertyToID("_BlitCube");
@@ -270,7 +306,8 @@ namespace UnityEditor.SLZMaterialUI
             dimKeywords[(int)TextureDimension.Cube - 2] = new LocalKeyword(blitShader, "DIM_CUBE");
             dimKeywords[(int)TextureDimension.CubeArray - 2] = new LocalKeyword(blitShader, "DIM_CUBEARRAY");
             dimKeywords[(int)TextureDimension.Tex3D - 2] = new LocalKeyword(blitShader, "DIM_3D");
-            normalMapKeyword = new LocalKeyword(blitShader, "NORMAL_MAP");
+            normalMapKeywordRG = new LocalKeyword(blitShader, "NORMAL_MAP_RG");
+            normalMapKeywordAG = new LocalKeyword(blitShader, "NORMAL_MAP_AG");
         }
         void BlitTextureIcon(RenderTexture icon, Texture tex, TextureDimension texType)
         {
@@ -334,13 +371,21 @@ namespace UnityEditor.SLZMaterialUI
             }
             if (isNormalMap)
             {
-                s_blitMaterial.EnableKeyword(normalMapKeyword);
+                if (isNormalAG(tex.graphicsFormat))
+                {
+                    s_blitMaterial.EnableKeyword(normalMapKeywordAG);
+                }
+                else
+                {
+                    s_blitMaterial.EnableKeyword(normalMapKeywordRG);
+                }
             }
             Graphics.Blit(tex, icon, s_blitMaterial);
             RenderTexture.active = active;
             if (isNormalMap)
             {
-                s_blitMaterial.DisableKeyword(normalMapKeyword);
+                s_blitMaterial.DisableKeyword(normalMapKeywordRG);
+                s_blitMaterial.DisableKeyword(normalMapKeywordAG);
             }
             switch (texType)
             {
@@ -359,6 +404,24 @@ namespace UnityEditor.SLZMaterialUI
                 case TextureDimension.Tex3D:
                     s_blitMaterial.SetTexture(prop_Blit3D, null);
                     break;
+            }
+
+            bool isNormalAG(GraphicsFormat fmt)
+            {
+                switch (fmt)
+                {
+                    case (GraphicsFormat.RGBA_BC7_SRGB):
+                    case (GraphicsFormat.RGBA_BC7_UNorm):
+                    case (GraphicsFormat.RGBA_DXT5_SRGB):
+                    case (GraphicsFormat.RGBA_DXT5_UNorm):
+                        return true;
+                    case (GraphicsFormat.RG_BC5_SNorm):
+                    case (GraphicsFormat.RG_BC5_UNorm):
+                    case (GraphicsFormat.RGB_BC6H_SFloat):
+                    case (GraphicsFormat.RGB_BC6H_UFloat):
+                        return false;
+                    default: return false;
+                }
             }
         }
     }

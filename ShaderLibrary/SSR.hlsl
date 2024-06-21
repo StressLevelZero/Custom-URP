@@ -153,7 +153,7 @@ float3 CameraToScreenPosCheap(const float3 pos)
 /** @brief Computes the tangent of the half-angle of the cone that encompasses the
  *  Phong specular lobe. Used for determining the range of random ray directions and
  *  the mip level from the color pyramid to sample. Formula is derived from 
- *  Lawrence 2002 "Importance Sampling of the Phong Reflectance Mode". Lawrence
+ *  Lawrence 2002 "Importance Sampling of the Phong Reflectance Model". Lawrence
  *  gives the angle between perfect specular and random ray as arccos(u^(1/(n+1))
  *  where u is a random value and n is the phong power. Uludag 2014 "Hi-Z 
  *  Screen-Space Cone-Traced Refections" sets u to a constant of 0.244 to 
@@ -168,9 +168,23 @@ float3 CameraToScreenPosCheap(const float3 pos)
  */
 float TanPhongConeAngle(const float roughness)
 {
-	float roughness2 = roughness; // already using roughness^2? doesn't look even close to right when given perceptual roughness^2, and perceptual roughness == sqrt(roughness)? wtf?
-	float alpha = roughness2 / (2 - roughness2); //a = 1 / (n + 1) = 1 / ((2/r - 2) + 1) = r / (2 - r)
-	return rcp(1 - (2.5 * INV_PI) * alpha) - 1.0;
+	//float roughness2 = roughness * roughness; // already using roughness^2? doesn't look even close to right when given perceptual roughness^2, and perceptual roughness == sqrt(roughness)? wtf?
+	//float alpha = roughness2 / (2 - roughness2); //a = 1 / (n + 1) = 1 / ((2/r - 2) + 1) = r / (2 - r)
+	//return rcp(1 - (2.5 * INV_PI) * alpha) - 1.0;
+	return tan(1.25 * roughness);
+}
+
+float TanGGXConeAngle(const float roughness)
+{
+	/* proper formula
+	float Xi = 0.244; // pick CDF at 0.244 (Lawrence 2002)
+	float mu = sqrt((1.0 - Xi) / (Xi * (roughness * roughness - 1.0) + 1.0));
+	float theta = acos(mu);
+	float tangent = tan(theta);
+	return tangent;
+	*/
+	/* cheap estimation */
+	return 0.55 * roughness;
 }
 
 /** @brief Scales SSR step size based on distance and angle such that a step moves the ray by about one pixel in 2D screenspace
@@ -375,12 +389,13 @@ float4 getSSRColor(SSRData data)
 
 	// Random offset to the ray, based on roughness
 	// Expensive!
-	float rayTanAngle = TanPhongConeAngle(
-		lerp(data.perceptualRoughness, 
-			data.perceptualRoughness * data.perceptualRoughness, 
-			smoothstep(0.1, 0.4, data.perceptualRoughness)
-	)); //half the angle because random scatter looks bad, rely on the color pyramid for blur 
-	float3 rayNoise = rayTanAngle * (2*data.noise.rgb - 1);
+	float rayTanAngle = TanGGXConeAngle(
+		//lerp(data.perceptualRoughness, 
+			data.perceptualRoughness * data.perceptualRoughness
+			//,smoothstep(0.1, 0.4, data.perceptualRoughness)
+		//)
+	);
+	float3 rayNoise = 2 * rayTanAngle * (2*data.noise.rgb - 1);
 	rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
 	data.rayDir += rayNoise;
 	data.rayDir.xyz = normalize(data.rayDir.xyz);
@@ -456,12 +471,12 @@ float4 getSSRColor(SSRData data)
 	//float lengthFade = smoothstep(1, 0, 2*(totalSteps / data.maxSteps)-1);
 	
 	float fade = saturate(2*(RdotV)) * xfade * yfade;
+
+	float roughRadius = rayTanAngle * totalDistance;
 	
-	float rayTanAngle2 = TanPhongConeAngle(data.perceptualRoughness * data.perceptualRoughness);
-	float roughRadius = rayTanAngle2 * totalDistance;
-	
+	// ratio of the cross-sectional radius of the roughness cone vs the height of the screen
 	float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
-	fade *= smoothstep(0.75, 0.5, roughRatio);
+	fade *= smoothstep(0.5, 0.25, roughRatio);
 	//roughRatio = rayHit > 0 ? roughRatio : data.perceptualRoughness * data.perceptualRoughness;
 	//uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
 	float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
@@ -508,8 +523,9 @@ float4 getSSRColor(SSRData data)
 	float4 kernel = (fadeQuad) * kernelWeights;
 	float weight = kernel.x + kernel.y + kernel.z + kernel.w;
     float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;
-       
-    reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
+	reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
+	reflection.a = fade;
+	//reflection = kernelWeights.x * reflection + kernelWeights.y * colorX + kernelWeights.z * colorY + kernelWeights.w * colorD;
 	
     reflection.rgb = reflection.rgb * reflection.rgb;
 	//float fadeX = QuadReadAcrossX(fade);
@@ -521,7 +537,7 @@ float4 getSSRColor(SSRData data)
 	
 	#endif
 	//fade = 1;
-	reflection.a = fade;
+	
 	//reflection.rgb = rayHit ? reflection.rgb : float3(1,0,1);
 	
 	//reflection *= _ProjectionParams.z;

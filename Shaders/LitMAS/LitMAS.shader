@@ -44,7 +44,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             HLSLPROGRAM
-            #pragma only_renderers vulkan
+            //#pragma only_renderers vulkan d3d12
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 5.0
@@ -78,7 +78,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             ColorMask 0
 
             HLSLPROGRAM
-            #pragma only_renderers vulkan
+            #pragma only_renderers vulkan d3d12
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
@@ -96,7 +96,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             //ColorMask 0
 
             HLSLPROGRAM
-            #pragma only_renderers vulkan
+            //#pragma only_renderers vulkan d3d12
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
@@ -117,7 +117,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             ColorMask 0
 
             HLSLPROGRAM
-            #pragma only_renderers vulkan
+            //#pragma only_renderers vulkan d3d12
             #pragma vertex vert
             #pragma fragment frag
 
@@ -137,7 +137,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             Cull Off
 
             HLSLPROGRAM
-            #pragma only_renderers vulkan
+            //#pragma only_renderers vulkan d3d12
             #define _NORMAL_DROPOFF_TS 1
             #define _EMISSION
             #define _NORMALMAP 1
@@ -157,7 +157,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             Name "BakedRaytrace"
             Tags{ "LightMode" = "BakedRaytrace" }
             HLSLPROGRAM
-            #pragma only_renderers vulkan
+            //#pragma only_renderers d3d12
             #pragma multi_compile _ _EMISSION_ON
             #include "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
 

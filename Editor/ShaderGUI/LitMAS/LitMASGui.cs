@@ -279,6 +279,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             if (NormalMapIdx != -1)
             {
                 TextureField NormalMap = new TextureField(props[NormalMapIdx], propIdx[NormalMapIdx], true);
+                NormalMap.thisEditor = this;
                 NormalMap.tooltip2 = LitMASGui_Tooltips.NormalMap.ToString();
                 baseProps.Add(NormalMap);
                 materialFields.Add(NormalMap);

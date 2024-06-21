@@ -28,6 +28,14 @@
     padding-bottom: 0px;
 }
 
+.messageBox {
+    background-color: var(--unity-colors-inspector_titlebar-background-hover);
+    border-color: var(--unity-colors-default-border);
+    border-width: 1px;
+    border-radius: 2px;
+    padding : 5px;
+}
+
 .textureFieldThumb {
     border-bottom-color: var(--unity-colors-button-border_accent);
     border-bottom-width: 1px;

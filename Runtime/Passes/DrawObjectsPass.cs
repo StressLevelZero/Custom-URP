@@ -217,7 +217,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_PassData.m_IsActiveTargetBackBuffer = m_IsActiveTargetBackBuffer;
             m_PassData.pass = this;
             //m_PassData.m_UseMotionVectorData = useMotionVectorData;
-            m_PassData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
+            //m_PassData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
             CameraSetup(renderingData.commandBuffer, m_PassData, ref renderingData);
             ExecutePass(context, m_PassData, ref renderingData, renderingData.cameraData.IsCameraProjectionMatrixFlipped());
         }

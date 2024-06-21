@@ -20,8 +20,11 @@ namespace UnityEditor.SLZMaterialUI
         public Shader shader;
         public List<BaseMaterialField> materialFields;
         public MaterialProperty[] materialProperties;
+        public VisualElement root;
         public virtual void UpdateUI()
         {
+            
+             
             UpdateProfiler.Begin();
             //Debug.Log("Called Update UI");
             materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
@@ -38,7 +41,14 @@ namespace UnityEditor.SLZMaterialUI
                     //Debug.Log("Updating with indices: " + materialFields[fIdx].GetShaderPropIdx() + " " + propIndex);
                     materialFields[fIdx].UpdateMaterialProperty(materialProperties[propIndex]);
             }
+           
             UpdateProfiler.End();
+            
+        }
+
+        public void RebuildUI()
+        {
+            ShaderGUIUtils.ForceRebuild(this);
         }
 
         public override bool UseDefaultMargins()
@@ -54,6 +64,7 @@ namespace UnityEditor.SLZMaterialUI
         /// <returns>true on success, false on failure</returns>
         public bool Initialize(VisualElement root, VisualElement window)
         {
+            this.root = root;
             materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
             PrepareMaterialPropertiesForAnimationMode(materialProperties, true);
 
@@ -83,8 +94,8 @@ namespace UnityEditor.SLZMaterialUI
              
             });
             root.Add(OnUpdate);
-            root.RegisterCallback<AttachToPanelEvent>(evt => Undo.undoRedoPerformed += UpdateUI);
-            root.RegisterCallback<DetachFromPanelEvent>(evt => Undo.undoRedoPerformed -= UpdateUI);
+            root.RegisterCallback<AttachToPanelEvent>(evt => Undo.undoRedoPerformed += RebuildUI);
+            root.RegisterCallback<DetachFromPanelEvent>(evt => Undo.undoRedoPerformed -= RebuildUI);
 
             return true;
         }

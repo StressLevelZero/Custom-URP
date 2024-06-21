@@ -28,7 +28,7 @@ Shader"Hidden/ShaderGUITextureIconBlit"
             #pragma editor_sync_compilation
 
             #pragma multi_compile_local DIM_2D DIM_2DARRAY DIM_CUBE DIM_CUBEARRAY DIM_3D
-            #pragma multi_compile_local _ NORMAL_MAP
+            #pragma multi_compile_local _ NORMAL_MAP_AG NORMAL_MAP_RG
 
             // Core.hlsl for XR dependencies
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -71,8 +71,10 @@ Shader"Hidden/ShaderGUITextureIconBlit"
                 col = SAMPLE_TEXTURE3D_LOD(_Blit3D, blitsampler_TrilinearClamp, float3(uv, 0.5), getManualLOD(uv, _BlitDim.xy));
                 #endif
     
-                #if defined(NORMAL_MAP)
-                col = float4(col.a, col.g, sqrt(col.a * col.a + col.g * col.g), 1);
+                #if defined(NORMAL_MAP_AG) || defined(NORMAL_MAP_RG)
+                col.rgb = UnpackNormalmapRGorAG(col);
+                col.g = -col.g;
+                col.rgb = 0.5 * col.rgb + 0.5;
                 col.rgb = pow(col.rgb, 2.2);
                 #endif
                 return float4(col.rgb, 1);
