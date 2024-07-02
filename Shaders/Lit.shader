@@ -182,7 +182,7 @@ ENDHLSL
             //--------------------------------------
             // GPU Instancing
 
-            //#pragma multi_compile_instancing
+            #pragma multi_compile_instancing
             //#pragma instancing_options renderinglayer
             //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 
@@ -224,7 +224,7 @@ ENDHLSL
             //--------------------------------------
             // GPU Instancing
 
-            //#pragma multi_compile_instancing
+            #pragma multi_compile_instancing
             //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 
             // -------------------------------------
@@ -353,7 +353,7 @@ ENDHLSL
 
             //--------------------------------------
             // GPU Instancing
-            //#pragma multi_compile_instancing
+            #pragma multi_compile_instancing
             //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 
             // -------------------------------------
@@ -436,6 +436,7 @@ ENDHLSL
             #pragma vertex UniversalVertexMeta
             #pragma fragment UniversalFragmentMetaLit
 
+            #pragma multi_compile_instancing
 
             // -------------------------------------
             // Material Keywords

@@ -128,7 +128,7 @@ void DepthNormalsFragment(
             float3 normalTS = SampleNormal(input.uv, TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
 
             #if defined(_DETAIL)
-                half detailMask = SAMPLE_TEXTURE2D(_DetailMask, sampler_DetailMask, input.uv).a; //Just disabling because we dont use deferred 
+                half detailMask = 1h;//SAMPLE_TEXTURE2D(_DetailMask, sampler_DetailMask, input.uv).a; //Just disabling because we dont use deferred 
                 float2 detailUv = input.uv;// * _DetailAlbedoMap_ST.xy + _DetailAlbedoMap_ST.zw;
                 normalTS = ApplyDetailNormal(detailUv, normalTS, detailMask);
             #endif

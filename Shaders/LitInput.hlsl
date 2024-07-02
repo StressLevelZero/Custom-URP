@@ -250,21 +250,21 @@ half3 ApplyDetailAlbedo(float2 detailUv, half3 albedo, half detailMask)
 
 half3 ApplyDetailNormal(float2 detailUv, half3 normalTS, half detailMask)
 {
-//#if defined(_DETAIL)
-//#if BUMP_SCALE_NOT_SUPPORTED
-//    half3 detailNormalTS = UnpackNormal(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv));
-//#else
-//    half3 detailNormalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv), _DetailNormalMapScale);
-//#endif
-//
-//    // With UNITY_NO_DXT5nm unpacked vector is not normalized for BlendNormalRNM
-//    // For visual consistancy we going to do in all cases
-//    detailNormalTS = normalize(detailNormalTS);
-//
-//    return lerp(normalTS, BlendNormalRNM(normalTS, detailNormalTS), detailMask); // todo: detailMask should lerp the angle of the quaternion rotation, not the normals
-//#else
+#if defined(_DETAIL)
+#if BUMP_SCALE_NOT_SUPPORTED
+    half3 detailNormalTS = UnpackNormal(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv));
+#else
+    half3 detailNormalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv), _DetailNormalMapScale);
+#endif
+
+    // With UNITY_NO_DXT5nm unpacked vector is not normalized for BlendNormalRNM
+    // For visual consistancy we going to do in all cases
+    detailNormalTS = normalize(detailNormalTS);
+
+    return lerp(normalTS, BlendNormalRNM(normalTS, detailNormalTS), detailMask); // todo: detailMask should lerp the angle of the quaternion rotation, not the normals
+#else
     return normalTS;
-//#endif
+#endif
 }
 
 half3 UnpackDetailNormal(half2 details)

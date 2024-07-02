@@ -5,7 +5,8 @@
 #pragma skip_variants FOG_LINEAR FOG_EXP
 
 #if defined(SHADER_API_MOBILE)
-	#define  _ADDITIONAL_LIGHTS_VERTEX
+	#define _ADDITIONAL_LIGHTS_VERTEX
+	#define _REFLECTION_PROBE_BOX_PROJECTION
 #else
 	#pragma multi_compile_fragment _ _MAIN_LIGHT_SHADOWS_CASCADE
 	#define _SHADOWS_SOFT 1

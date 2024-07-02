@@ -107,7 +107,7 @@ public static class SkyManager
         Object.Destroy(renderCam.gameObject);
 #endif
         skytexture = cubetex;
-        Debug.Log("Generated sky: " + cubetex.name );
+        //Debug.Log("Generated sky: " + cubetex.name );
 
     }
     static public void CheckSky()
