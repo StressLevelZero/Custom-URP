@@ -233,7 +233,7 @@ half3 ScaleDetailAlbedo(half3 detailAlbedo, half scale)
 half3 ApplyDetailAlbedo(float2 detailUv, half3 albedo, half detailMask)
 {
 #if defined(_DETAIL)
-    half3 detailAlbedo = 1;// SAMPLE_TEXTURE2D(_DetailAlbedoMap, sampler_DetailAlbedoMap, detailUv).rgb;
+    half3 detailAlbedo = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, detailUv).rrr;
 
     // In order to have same performance as builtin, we do scaling only if scale is not 1.0 (Scaled version has 6 additional instructions)
 #if defined(_DETAIL_SCALED)
@@ -248,13 +248,18 @@ half3 ApplyDetailAlbedo(float2 detailUv, half3 albedo, half detailMask)
 #endif
 }
 
+half3 UnpackDetailNormal(half2 details)
+{
+	return (half3(details, 1) * 2) - 1;
+}
+
 half3 ApplyDetailNormal(float2 detailUv, half3 normalTS, half detailMask)
 {
 #if defined(_DETAIL)
 #if BUMP_SCALE_NOT_SUPPORTED
-    half3 detailNormalTS = UnpackNormal(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv));
+    half3 detailNormalTS = UnpackDetailNormal((SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, detailUv)).ag);
 #else
-    half3 detailNormalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_DetailNormalMap, sampler_DetailNormalMap, detailUv), _DetailNormalMapScale);
+    half3 detailNormalTS = UnpackDetailNormal((SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, detailUv)).ag);
 #endif
 
     // With UNITY_NO_DXT5nm unpacked vector is not normalized for BlendNormalRNM
@@ -267,10 +272,7 @@ half3 ApplyDetailNormal(float2 detailUv, half3 normalTS, half detailMask)
 #endif
 }
 
-half3 UnpackDetailNormal(half2 details)
-{
-    return (half3(details, 1) * 2) - 1;
-}
+
 
 //Combining all the detail calculations into one function and doing a single sample
 void ApplyDetails(half2 detailUv, inout SurfaceData surfaceData, half detailMask) {
@@ -302,6 +304,8 @@ void ApplyDetails(half2 detailUv, inout SurfaceData surfaceData, half detailMask
     //
 #endif
 }
+
+
 
 inline void InitializeStandardLitSurfaceData(float2 uv, out SurfaceData outSurfaceData)
 {
