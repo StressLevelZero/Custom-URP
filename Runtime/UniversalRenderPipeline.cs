@@ -378,6 +378,9 @@ namespace UnityEngine.Rendering.Universal
                 }
                 else
                 {
+                    // SLZ MODIFIED - Move UpdateVolumeFramework before BeginCameraRendering so that our volumetrics have access to the post-processing volume stack
+                    UpdateVolumeFramework(camera, null);
+
                     using (new ProfilingScope(null, Profiling.Pipeline.beginCameraRendering))
                     {
                         BeginCameraRendering(renderContext, camera);
@@ -386,7 +389,6 @@ namespace UnityEngine.Rendering.Universal
                     //It should be called before culling to prepare material. When there isn't any VisualEffect component, this method has no effect.
                     VFX.VFXManager.PrepareCamera(camera);
 #endif
-                    UpdateVolumeFramework(camera, null);
 
                     RenderSingleCameraInternal(renderContext, camera);
 
@@ -827,13 +829,15 @@ namespace UnityEngine.Rendering.Universal
                     UpdateCameraStereoMatrices(baseCamera, xrPass);
                 }
 
+                // SLZ MODIFIED - Move UpdateVolumeFramework before BeginCameraRendering so that our volumetrics have access to the post-processing volume stack
+                UpdateVolumeFramework(baseCamera, baseCameraAdditionalData);
 
                 using (new ProfilingScope(null, Profiling.Pipeline.beginCameraRendering))
                 {
                     BeginCameraRendering(context, baseCamera);
                 }
                 // Update volumeframework before initializing additional camera data
-                UpdateVolumeFramework(baseCamera, baseCameraAdditionalData);
+                // UpdateVolumeFramework(baseCamera, baseCameraAdditionalData);
                 InitializeCameraData(baseCamera, baseCameraAdditionalData, !isStackedRendering, out var baseCameraData);
                 RenderTextureDescriptor originalTargetDesc = baseCameraData.cameraTargetDescriptor;
 
@@ -911,6 +915,9 @@ namespace UnityEngine.Rendering.Universal
                             
                             UpdateCameraStereoMatrices(currAdditionalCameraData.camera, xrPass);
 
+                            // SLZ MODIFIED - Move UpdateVolumeFramework before BeginCameraRendering so that our volumetrics have access to the post-processing volume stack
+                            UpdateVolumeFramework(currCamera, currAdditionalCameraData);
+
                             using (new ProfilingScope(null, Profiling.Pipeline.beginCameraRendering))
                             {
                                 BeginCameraRendering(context, currCamera);
@@ -919,7 +926,6 @@ namespace UnityEngine.Rendering.Universal
                             //It should be called before culling to prepare material. When there isn't any VisualEffect component, this method has no effect.
                             VFX.VFXManager.PrepareCamera(currCamera);
 #endif
-                            UpdateVolumeFramework(currCamera, currAdditionalCameraData);
 
                             bool lastCamera = i == lastActiveOverlayCameraIndex;
                             InitializeAdditionalCameraData(currCamera, currAdditionalCameraData, lastCamera, ref overlayCameraData);
