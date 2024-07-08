@@ -463,7 +463,7 @@ namespace UnityEngine.Rendering.Universal
             return m_ColorBufferSystem.GetFrontBuffer(cmd);
         }
 
-        internal override RTHandle GetCameraColorBackBuffer(CommandBuffer cmd)
+        public override RTHandle GetCameraColorBackBuffer(CommandBuffer cmd)
         {
             return m_ColorBufferSystem.GetBackBuffer(cmd);
         }
