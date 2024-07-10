@@ -6,7 +6,8 @@
 
 #if defined(SHADER_API_MOBILE)
 	#define _ADDITIONAL_LIGHTS_VERTEX
-	#define _REFLECTION_PROBE_BOX_PROJECTION
+	#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION
+	// wait on this until DXC gets multiview stereo support
 	//#pragma multi_compile _ _REFLECTION_PROBE_BLENDING
 #else
 	#pragma multi_compile_fragment _ _MAIN_LIGHT_SHADOWS_CASCADE

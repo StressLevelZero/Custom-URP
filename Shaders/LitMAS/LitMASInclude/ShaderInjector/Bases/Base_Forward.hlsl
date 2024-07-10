@@ -6,8 +6,7 @@
 
 #if defined(SHADER_API_MOBILE)
 	#define _ADDITIONAL_LIGHTS_VERTEX
-	//#pragma multi_compile _ _REFLECTION_PROBE_BLENDING
-	#define _REFLECTION_PROBE_BOX_PROJECTION 
+	#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION 
 	//#!INJECT_POINT MOBILE_DEFINES
 #else              
 	#pragma multi_compile_fragment  _  _MAIN_LIGHT_SHADOWS_CASCADE

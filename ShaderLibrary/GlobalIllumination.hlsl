@@ -216,10 +216,10 @@ half3 SampleLightmap(float2 staticLightmapUV, half3 normalWS)
 
 // END SLZ MODIFIED
 
-half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4 cubemapPositionWS, float4 boxMin, float4 boxMax)
+half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4 cubemapPositionWS, float3 boxMin, float3 boxMax)
 {
     // Is this probe using box projection?
-    if (cubemapPositionWS.w > 0.0f)
+	if (cubemapPositionWS.w > 0.0f)
     {
         float3 boxMinMax = (reflectionWS > 0.0f) ? boxMax.xyz : boxMin.xyz;
         half3 rbMinMax = half3(boxMinMax - positionWS) / reflectionWS;
@@ -237,17 +237,38 @@ half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4
     }
 }
 
+half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4 cubemapPositionWS, float4 boxMin, float4 boxMax)
+{
+    // Is this probe using box projection?
+	if (cubemapPositionWS.w > 0.0f)
+	{
+		float3 boxMinMax = (reflectionWS > 0.0f) ? boxMax.xyz : boxMin.xyz;
+		half3 rbMinMax = half3(boxMinMax - positionWS) / reflectionWS;
+
+		half fa = half(min(min(rbMinMax.x, rbMinMax.y), rbMinMax.z));
+
+		half3 worldPos = half3(positionWS - cubemapPositionWS.xyz);
+
+		half3 result = worldPos + reflectionWS * fa;
+		return result;
+	}
+	else
+	{
+		return reflectionWS;
+	}
+}
+
 // Obligatory IQuilez SDF
 float sdRoundBox(float3 worldPos, float3 boxMin, float3 boxMax, float radius)
 {
-  float3 center = 0.5 * (boxMin + boxMax);
-  float3 relativePos = worldPos - center;
-  float3 boxSize = max(0, 0.5 *( boxMax - boxMin) - 0.75 * radius);
-  float3 q = abs(relativePos) - boxSize;
-  return (length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0));
+    float3 center = 0.5 * (boxMin + boxMax);
+    float3 relativePos = worldPos - center;
+	float3 boxSize = max(0, 0.5 * (boxMax - boxMin) - radius);
+    float3 q = abs(relativePos) - boxSize;
+    return (length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0));
 }
 
-float CalculateProbeWeight(float3 positionWS, float4 probeBoxMin, float4 probeBoxMax)
+float CalculateProbeWeight(float3 positionWS, float3 probeBoxMin, float3 probeBoxMax, float blendDistance)
 {
     // SLZ MODIFIED // URP's blend distance is very stupid. This is mainly because it conflates blend distance and box projection.
     // This is likely done to minimize variables needed for the shader, but it causes issues.
@@ -258,7 +279,7 @@ float CalculateProbeWeight(float3 positionWS, float4 probeBoxMin, float4 probeBo
     // This lead to a juggle between two incorrect results of better reflections or better blending at design time. BAD, inconsistent, and hard to communicate best practices! 
     // This change biases towards the center of the box walls and offsets the edge slightly so it doesn't falloff unnaturally. It also avoids the sharp falloff on the edges.
     
-	float blendDistance = probeBoxMax.w;    
+	
     //float3 weightDir = max( (min(positionWS - probeBoxMin.xyz, probeBoxMax.xyz - positionWS) / blendDistance) + (blendDistance * .2f), 0);
 	//return  saturate(weightDir.x * weightDir.y * weightDir.z);
 	
@@ -269,6 +290,12 @@ float CalculateProbeWeight(float3 positionWS, float4 probeBoxMin, float4 probeBo
     // END SLZ MODIFIED
 
 }
+
+float CalculateProbeWeight(float3 positionWS, float4 probeBoxMin, float4 probeBoxMax)
+{
+	return CalculateProbeWeight(positionWS, probeBoxMin.xyz, probeBoxMax.xyz, probeBoxMax.w);
+}
+
 
 half CalculateProbeVolumeSqrMagnitude(float4 probeBoxMin, float4 probeBoxMax)
 {
@@ -315,6 +342,7 @@ half3 CalculateIrradianceFromReflectionProbes(half3 reflectVector, float3 positi
     half probe0Volume = CalculateProbeVolumeSqrMagnitude(unity_SpecCube0_BoxMin, unity_SpecCube0_BoxMax);
     half probe1Volume = CalculateProbeVolumeSqrMagnitude(unity_SpecCube1_BoxMin, unity_SpecCube1_BoxMax);
 
+    
     half volumeDiff = probe0Volume - probe1Volume;
     float importanceSign = unity_SpecCube1_BoxMin.w;
 
@@ -323,8 +351,12 @@ half3 CalculateIrradianceFromReflectionProbes(half3 reflectVector, float3 positi
     bool probe0Dominant = importanceSign > 0.0f || (importanceSign == 0.0f && volumeDiff < -0.0001h);
     bool probe1Dominant = importanceSign < 0.0f || (importanceSign == 0.0f && volumeDiff > 0.0001h);
 
-    float desiredWeightProbe0 = CalculateProbeWeight(positionWS, unity_SpecCube0_BoxMin, unity_SpecCube0_BoxMax);
-    float desiredWeightProbe1 = CalculateProbeWeight(positionWS, unity_SpecCube1_BoxMin, unity_SpecCube1_BoxMax);
+	float3 paddedProbe0Min = unity_SpecCube0_BoxMin.xyz - 0.25 * unity_SpecCube0_BoxMax.w;
+	float3 paddedProbe0Max = unity_SpecCube0_BoxMax.xyz + 0.25 * unity_SpecCube0_BoxMax.w;
+	float desiredWeightProbe0 = CalculateProbeWeight(positionWS, paddedProbe0Min, paddedProbe0Max, unity_SpecCube0_BoxMax.w);
+	float3 paddedProbe1Min = unity_SpecCube1_BoxMin.xyz - 0.25 * unity_SpecCube1_BoxMax.w;
+	float3 paddedProbe1Max = unity_SpecCube1_BoxMax.xyz + 0.25 * unity_SpecCube1_BoxMax.w;
+	float desiredWeightProbe1 = CalculateProbeWeight(positionWS, paddedProbe1Min, paddedProbe1Max, unity_SpecCube0_BoxMax.w);
 
     // Subject the probes weight if the other probe is dominant
     float weightProbe0 = probe1Dominant ? min(desiredWeightProbe0, 1.0f - desiredWeightProbe1) : desiredWeightProbe0;
@@ -336,13 +368,17 @@ half3 CalculateIrradianceFromReflectionProbes(half3 reflectVector, float3 positi
     // If neither is dominant this is not guaranteed - only normalize weights if totalweight exceeds 1.
     weightProbe0 /= max(totalWeight, 1.0f);
     weightProbe1 /= max(totalWeight, 1.0f);
-
+    
     // Sample the first reflection probe
+#if defined(UNITY_COMPILER_DXC) && defined(_SM6_WAVE)
+	if (WaveActiveAnyTrue(weightProbe0 > 0.01f))
+#else
     if (weightProbe0 > 0.01f)
+#endif
     {
         half3 reflectVector0 = reflectVector;
 #ifdef _REFLECTION_PROBE_BOX_PROJECTION
-        reflectVector0 = BoxProjectedCubemapDirection(reflectVector, positionWS, unity_SpecCube0_ProbePosition, unity_SpecCube0_BoxMin, unity_SpecCube0_BoxMax);
+        reflectVector0 = BoxProjectedCubemapDirection(reflectVector, positionWS, unity_SpecCube0_ProbePosition, paddedProbe0Min, paddedProbe0Max);
 #endif // _REFLECTION_PROBE_BOX_PROJECTION
 
         half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectVector0, mip));
@@ -351,11 +387,15 @@ half3 CalculateIrradianceFromReflectionProbes(half3 reflectVector, float3 positi
     }
 
     // Sample the second reflection probe
-    if (weightProbe1 > 0.01f)
+#if defined(UNITY_COMPILER_DXC) && defined(_SM6_WAVEVOTE)
+	if (WaveActiveAnyTrue(weightProbe1 > 0.01f))
+#else
+	if (weightProbe1 > 0.01f)
+#endif
     {
         half3 reflectVector1 = reflectVector;
 #ifdef _REFLECTION_PROBE_BOX_PROJECTION
-        reflectVector1 = BoxProjectedCubemapDirection(reflectVector, positionWS, unity_SpecCube1_ProbePosition, unity_SpecCube1_BoxMin, unity_SpecCube1_BoxMax);
+        reflectVector1 = BoxProjectedCubemapDirection(reflectVector, positionWS, unity_SpecCube1_ProbePosition, paddedProbe1Min, paddedProbe1Max);
 #endif // _REFLECTION_PROBE_BOX_PROJECTION
         half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube1, samplerunity_SpecCube1, reflectVector1, mip));
 
@@ -363,6 +403,8 @@ half3 CalculateIrradianceFromReflectionProbes(half3 reflectVector, float3 positi
     }
 #endif
 
+ 
+#if !defined(SHADER_API_MOBILE) // Don't do 3 samples on mobile
     // Use any remaining weight to blend to environment reflection cube map
     if (totalWeight < 0.99f)
     {
@@ -370,6 +412,7 @@ half3 CalculateIrradianceFromReflectionProbes(half3 reflectVector, float3 positi
 
         irradiance += (1.0f - totalWeight) * DecodeHDREnvironment(encodedIrradiance, _GlossyEnvironmentCubeMap_HDR);
     }
+#endif
 
     return irradiance;
 }
@@ -390,7 +433,11 @@ half3 GlossyEnvironmentReflection(half3 reflectVector, float3 positionWS, half p
     irradiance = CalculateIrradianceFromReflectionProbes(reflectVector, positionWS, perceptualRoughness, normalizedScreenSpaceUV);
 #else
 #ifdef _REFLECTION_PROBE_BOX_PROJECTION
-    reflectVector = BoxProjectedCubemapDirection(reflectVector, positionWS, unity_SpecCube0_ProbePosition, unity_SpecCube0_BoxMin, unity_SpecCube0_BoxMax);
+    float3 paddedProbe0Min = unity_SpecCube0_BoxMin.xyz - 0.25 * unity_SpecCube0_BoxMax.w;
+	float3 paddedProbe0Max = unity_SpecCube0_BoxMax.xyz + 0.25 * unity_SpecCube0_BoxMax.w;
+    half3 reflectVectorProj = BoxProjectedCubemapDirection(reflectVector, positionWS, unity_SpecCube0_ProbePosition, paddedProbe0Min, paddedProbe0Max);
+    half probeWeight =  CalculateProbeWeight(positionWS, paddedProbe0Min, paddedProbe0Max, unity_SpecCube0_BoxMax.w);
+    reflectVector = lerp(reflectVector, reflectVectorProj, probeWeight*probeWeight);
 #endif // _REFLECTION_PROBE_BOX_PROJECTION
     half mip = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
     half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectVector, mip));
