@@ -437,7 +437,8 @@ half3 GlossyEnvironmentReflection(half3 reflectVector, float3 positionWS, half p
 	float3 paddedProbe0Max = unity_SpecCube0_BoxMax.xyz + 0.25 * unity_SpecCube0_BoxMax.w;
     half3 reflectVectorProj = BoxProjectedCubemapDirection(reflectVector, positionWS, unity_SpecCube0_ProbePosition, paddedProbe0Min, paddedProbe0Max);
     half probeWeight =  CalculateProbeWeight(positionWS, paddedProbe0Min, paddedProbe0Max, unity_SpecCube0_BoxMax.w);
-    reflectVector = lerp(reflectVector, reflectVectorProj, probeWeight*probeWeight);
+    //reflectVector = probeWeight > 0 ? reflectVectorProj : reflectVector;
+    reflectVector = lerp(normalize(reflectVector), normalize(reflectVectorProj), probeWeight);
 #endif // _REFLECTION_PROBE_BOX_PROJECTION
     half mip = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
     half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectVector, mip));
