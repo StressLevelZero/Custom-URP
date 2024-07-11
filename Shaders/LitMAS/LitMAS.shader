@@ -60,11 +60,6 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma require QuadShuffle
             //#pragma shader_feature _SM6_QUAD
             #define _SM6_QUAD 1
-            #else
-             #pragma use_dxc vulkan
-             #pragma require WaveVote
-             #define _SM6_WAVEVOTE
-             #define _REFLECTION_PROBE_BLENDING
             #endif
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
