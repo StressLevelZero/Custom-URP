@@ -272,10 +272,10 @@ SubShader {
             far = aboveHorizon ? sqrt(kOuterRadius2 + kInnerRadius2 * eyeRay.y * eyeRay.y - kInnerRadius2) - kInnerRadius * eyeRay.y :
                                  (-kCameraHeight) / (min(-0.001, eyeRay.y));
 
-            half3 pos = cameraPos + far * eyeRay;
+            float3 pos = cameraPos + far * eyeRay;
             // Initialize the scattering loop variables
-            half sampleLength = far / kSamples;
-            half scaledLength = sampleLength * kScale;
+            float sampleLength = far / kSamples;
+            float scaledLength = sampleLength * kScale;
             float3 sampleRay = eyeRay * sampleLength;
             float3 samplePoint = cameraPos + sampleRay * 0.5;
             half depth = exp((-kCameraHeight) * ( aboveHorizon ? kScaleOverScaleDepth : 1.0/kScaleDepth));

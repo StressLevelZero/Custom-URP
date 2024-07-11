@@ -903,7 +903,7 @@ void SLZImageBasedSpecular(half3 diffuse, inout half3 specular, half3 reflection
 {
     half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(diffuse);
     half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(fragData.NoV, surfData.occlusion, surfData.roughness);
-    half3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion) * LitSpecularOcclusion;
+    half3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion, fragData.screenUV) * LitSpecularOcclusion;
 #if defined(SLZ_SSR)
 
 #endif
