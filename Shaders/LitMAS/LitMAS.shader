@@ -62,7 +62,6 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define _SM6_QUAD 1
             #else
             #define _REFLECTION_PROBE_BLENDING
-            #define SPECULAR_PROBE_BLEND_USE_DITHER
             #endif
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
