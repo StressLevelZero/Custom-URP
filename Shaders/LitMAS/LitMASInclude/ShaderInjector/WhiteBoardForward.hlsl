@@ -207,6 +207,7 @@ half4 frag(VertOut i) : SV_Target
 	float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
 	float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
+	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 
 
