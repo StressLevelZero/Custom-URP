@@ -73,7 +73,7 @@ namespace UnityEngine.Rendering.Universal
             //    Debug.Log("Null Sky was Set");
             //}
 
-            if (SkyTexture.overrideState && !isNullSky.value && SkyTexture.value)
+            if (SkyTexture.overrideState && SkyTexture.value)
             {
                 SkyManager.SetSkyTexture(SkyTexture.value);
             }
