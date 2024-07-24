@@ -64,7 +64,7 @@ public static class SkyManager
 
 
 #endif
-    static void RegenerateSkyTexture()
+    public static void RegenerateSkyTexture()
     {
         if (RenderSettings.defaultReflectionMode != DefaultReflectionMode.Custom)
         {
@@ -74,7 +74,7 @@ public static class SkyManager
         }
     }
 
-    static void GenerateSkyTexture()
+    public static void GenerateSkyTexture()
     {
         //Generate Skybox
         RenderTexture cubetex = new RenderTexture(256, 256, 1, RenderTextureFormat.DefaultHDR);
@@ -107,8 +107,7 @@ public static class SkyManager
         Object.Destroy(renderCam.gameObject);
 #endif
         skytexture = cubetex;
-        //Debug.Log("Generated sky: " + cubetex.name );
-
+        Debug.Log("Generated sky: " + cubetex.name );
     }
     static public void CheckSky()
     {
