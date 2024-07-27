@@ -1837,5 +1837,10 @@ namespace UnityEngine.Rendering.Universal
         {
             m_ColorBufferSystem.EnableMSAA(enable);
         }
+
+        public bool IsHandleSwapImage(RTHandle handle)
+        {
+            return m_ColorBufferSystem.IsFrontOrBackBuffer(handle);
+        }
     }
 }
