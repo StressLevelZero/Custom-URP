@@ -350,63 +350,64 @@ namespace UnityEngine.Rendering.Universal.Internal
 						Blitter.BlitCameraTexture(cmd, source, destination, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, copyColorMaterial, 0);//1
 						break;
 				}
-                if (reconstructTiles)
-                {
-                    cmd.DisableKeyword(_RECONSTRUCT_VRS_TILES);
-                }
-
-            }
-
-		   
-			if (requiresMips && mipLevels > 1)
-			{
-				int slices = 1;
-#if ENABLE_VR && ENABLE_XR_MODULE
-				if (xrEnabled)
+				if (reconstructTiles)
 				{
-					slices = 2;
+					cmd.DisableKeyword(_RECONSTRUCT_VRS_TILES);
 				}
+
+
+
+
+				if (requiresMips && mipLevels > 1)
+				{
+					int slices = 1;
+#if ENABLE_VR && ENABLE_XR_MODULE
+					if (xrEnabled)
+					{
+						slices = 2;
+					}
 #endif
 
-				m_SizeArray[0] = passData.size.width;
-				m_SizeArray[1] = passData.size.height;
-				m_SizeArray[2] = 0;
-				m_SizeArray[3] = 0;
+					m_SizeArray[0] = passData.size.width;
+					m_SizeArray[1] = passData.size.height;
+					m_SizeArray[2] = 0;
+					m_SizeArray[3] = 0;
 
 
-				RenderTargetIdentifier tempID = new RenderTargetIdentifier(s_TempBufferID);
-				cmd.GetTemporaryRT(s_TempBufferID, tempDesc, FilterMode.Bilinear);
-				
-				cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, m_SizeArray);
-		
-				cmd.SetComputeTextureParam(colorPyramidCompute, downsampleKernelID, s_DestID, tempID, 0);
-				cmd.SetComputeTextureParam(colorPyramidCompute, gaussianKernelID, s_SourceID, tempID, 0);
-				
-				for (int i = 1; i < mipLevels; i++)
-				{
-					
-					cmd.SetComputeTextureParam(colorPyramidCompute, downsampleKernelID, s_SourceID, destination, i - 1);
-
-					m_SizeArray[0] = math.max(m_SizeArray[0] >> 1, 1);
-					m_SizeArray[1] = math.max(m_SizeArray[1] >> 1, 1);
-					cmd.DispatchCompute(colorPyramidCompute, downsampleKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.00001f),
-					                                                             (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.00001f), slices);
+					RenderTargetIdentifier tempID = new RenderTargetIdentifier(s_TempBufferID);
+					cmd.GetTemporaryRT(s_TempBufferID, tempDesc, FilterMode.Bilinear);
 
 					cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, m_SizeArray);
-					
-					cmd.SetComputeTextureParam(colorPyramidCompute, gaussianKernelID, s_DestID, destination, i);
-					cmd.DispatchCompute(colorPyramidCompute, gaussianKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.0001f),
-					                                                           (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.0001f), slices);
+
+					cmd.SetComputeTextureParam(colorPyramidCompute, downsampleKernelID, s_DestID, tempID, 0);
+					cmd.SetComputeTextureParam(colorPyramidCompute, gaussianKernelID, s_SourceID, tempID, 0);
+
+					for (int i = 1; i < mipLevels; i++)
+					{
+
+						cmd.SetComputeTextureParam(colorPyramidCompute, downsampleKernelID, s_SourceID, destination, i - 1);
+
+						m_SizeArray[0] = math.max(m_SizeArray[0] >> 1, 1);
+						m_SizeArray[1] = math.max(m_SizeArray[1] >> 1, 1);
+						cmd.DispatchCompute(colorPyramidCompute, downsampleKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.00001f),
+																					 (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.00001f), slices);
+
+						cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, m_SizeArray);
+
+						cmd.SetComputeTextureParam(colorPyramidCompute, gaussianKernelID, s_DestID, destination, i);
+						cmd.DispatchCompute(colorPyramidCompute, gaussianKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.0001f),
+																				   (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.0001f), slices);
+
+					}
+
+					cmd.ReleaseTemporaryRT(s_TempBufferID);
 
 				}
-				
-				cmd.ReleaseTemporaryRT(s_TempBufferID);
-				
-			}
 
-			if (reconstructTiles)
-			{
-				cmd.DisableKeyword(_RECONSTRUCT_VRS_TILES);
+				if (reconstructTiles)
+				{
+					cmd.DisableKeyword(_RECONSTRUCT_VRS_TILES);
+				}
 			}
 		}
 
