@@ -7,8 +7,8 @@ Shader "SLZ/Decal Simple Lit"
         [HDR] _EmissionColor("Emission Color (RGB), Albedo Multiplier (A)", Color) = (0,0,0,1)
         _BakedMultiplier("Emission Baked Multiplier", Float) = 1.0
         [MainColor] _Color ("Baking Transparency Multiplier (A) (RGB unused)", Color) = (1, 1, 1, 0)
-        [HalfRateSlope]_Slope("Z Slope Factor", Float) = 0
-        _Offset("Z Offset", Float) = 0
+        [HalfRateSlope]_Slope("Z Slope Factor", Float) = -1.0008148
+        _Offset("Z Offset", Float) = -1
         //[HideInInspector]_TransparencyLM ("Lightmapping Transmission Texture", 2D) = "white" {}
     }
     SubShader
