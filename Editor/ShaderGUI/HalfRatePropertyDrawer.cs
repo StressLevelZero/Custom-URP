@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System;
-using static UnityEngine.Rendering.DebugUI.Table;
-using PlasticGui.Configuration.CloudEdition.Welcome;
 
 public class HalfRateDrawer : MaterialPropertyDrawer
 {
