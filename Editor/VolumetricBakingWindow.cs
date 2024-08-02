@@ -181,19 +181,29 @@ public class VolumetricBaking : EditorWindow
         {
             if (GUILayout.Button("Restart Editor in DX12"))
             {
-                if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
-                {
-                    Process unity = new Process();
-                    string projectPath = Path.GetDirectoryName(Application.dataPath);
-                    unity.StartInfo.FileName = EditorApplication.applicationPath;
-                    unity.StartInfo.Arguments = "-projectPath \"" + projectPath + "\" -force-d3d12";
-                    unity.Start();
-                    EditorApplication.Exit(0);
-                }
+                SwtichToDX12();
             }
         }
 
         //      EditorGUILayout.HelpBox("Some warning text", MessageType.Warning); //Todo: add warning box to window
+    }
+
+    public void SwtichToDX12()
+    {
+        //Debug.Log($"New API: {newAPI.ToString()}");
+
+        if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        {
+            Process cmd = new Process();
+            string projectPath = Path.GetDirectoryName(Application.dataPath);
+            string unity = EditorApplication.applicationPath;
+            cmd.StartInfo.FileName = "cmd.exe";
+            cmd.StartInfo.Arguments = $"/K timeout /t 7 & {unity} -projectPath \"{projectPath}\" -force-d3d12";
+            cmd.StartInfo.UseShellExecute = true;
+            cmd.Start();
+
+            EditorApplication.Exit(0);
+        }
     }
 
     float RefreshExposure(float Exposure)
