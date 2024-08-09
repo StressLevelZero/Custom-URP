@@ -46,6 +46,15 @@ Shader "SLZ/Decal Simple Lit"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 
+            // Don't sample from directional map
+            #if defined(DIRLIGHTMAP_COMBINED)
+                #undef DIRLIGHTMAP_COMBINED
+                #if !defined(LIGHTMAP_ON)
+                    #define LIGHTMAP_ON
+                #endif
+            #endif
+
+
             struct appdata
             {
                 float4 vertex : POSITION;
