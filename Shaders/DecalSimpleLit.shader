@@ -36,14 +36,11 @@ Shader "SLZ/Decal Simple Lit"
             #define SLZ_NO_SPECULAR
             #define SLZ_DISABLE_BAKED_SPEC
 
-            #pragma use_dxc vulkan
-            #define SLZ_HACKED_DXC
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
             #pragma skip_variants _REFLECTION_PROBE_BOX_PROJECTION
-            #pragma skip_variants DYNAMICLIGHTMAP_ON
-            #pragma skip_variants DIRLIGHTMAP_COMBINED
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
