@@ -216,12 +216,18 @@ half3 SampleLightmap(float2 staticLightmapUV, half3 normalWS)
 
 // END SLZ MODIFIED
 
+#if !defined(UNITY_COMPILER_DXC)
+
+#define select(comparison, trueVec, falseVec) comparison ? trueVec : falseVec
+
+#endif
+
 half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4 cubemapPositionWS, float3 boxMin, float3 boxMax)
 {
     // Is this probe using box projection?
     if (cubemapPositionWS.w > 0.0f)
     {
-        float3 boxMinMax = (reflectionWS > 0.0f) ? boxMax.xyz : boxMin.xyz;
+		float3 boxMinMax = select(reflectionWS > 0.0f, boxMax.xyz, boxMin.xyz);
         half3 rbMinMax = half3(boxMinMax - positionWS) / reflectionWS;
 
         half fa = half(min(min(rbMinMax.x, rbMinMax.y), rbMinMax.z));
@@ -242,7 +248,7 @@ half3 BoxProjectedCubemapDirection(half3 reflectionWS, float3 positionWS, float4
     // Is this probe using box projection?
     if (cubemapPositionWS.w > 0.0f)
     {
-        float3 boxMinMax = (reflectionWS > 0.0f) ? boxMax.xyz : boxMin.xyz;
+		float3 boxMinMax = select(reflectionWS > 0.0f, boxMax.xyz, boxMin.xyz);
         half3 rbMinMax = half3(boxMinMax - positionWS) / reflectionWS;
 
         half fa = half(min(min(rbMinMax.x, rbMinMax.y), rbMinMax.z));

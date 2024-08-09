@@ -9,6 +9,21 @@
 
 #if defined(STEREO_MULTIVIEW_ON) && (defined(SHADER_API_GLES3) || defined(SHADER_API_GLCORE) || defined(SHADER_API_VULKAN)) && !(defined(SHADER_API_SWITCH))
     #define UNITY_STEREO_MULTIVIEW_ENABLED
+	// SLZ MODIFIED - insert SPIR-V opcodes for multiview extension and capability when externally updated DXC is used
+	#if defined(UNITY_COMPILER_DXC) && defined(SLZ_DXC_UPDATED)
+	    [[vk::ext_capability(/*MultiView*/ 4439)]]
+        [[vk::ext_extension("SPV_KHR_multiview")]]
+		//#error Hacked DXC Enabled?
+		#define SLZ_DXC_MULTIVIEW
+		
+		// disgustingly cursed. The ViewIndex builtin cannot be written to, so we can't insert it into UNITY_VERTEX_INPUT_INSTANCE_ID as
+		// that gets put into the struct used as both the vertex output and fragment input. And because we're inserting instructions 
+		// manually, the compiler isn't going to strip it from the vertex output side even though no one is writing to it
+		// Redefine the POSITION semantic to have ViewIndex semantic appended to it
+		#if defined(STEREO_MULTIVIEW_ON)
+			#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : COLOR0
+		#endif
+	#endif
 #endif
 
 #if defined(UNITY_SINGLE_PASS_STEREO) || defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
@@ -186,7 +201,8 @@ CBUFFER_END
 #endif
 #endif
 
-#if defined(UNITY_STEREO_MULTIVIEW_ENABLED) && defined(SHADER_STAGE_VERTEX)
+// SLZ MODIFIED - Make multiview act like SPSI if using the DXC compiler. Don't declare the dummy cbuffer, and make unity_StereoEyeIndex a static uint
+#if defined(UNITY_STEREO_MULTIVIEW_ENABLED) && defined(SHADER_STAGE_VERTEX) && !defined(SLZ_DXC_MULTIVIEW)
 #define unity_StereoEyeIndex UNITY_VIEWID
 UNITY_DECLARE_MULTIVIEW(2);
 #elif defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)

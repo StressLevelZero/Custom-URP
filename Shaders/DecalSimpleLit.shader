@@ -36,6 +36,9 @@ Shader "SLZ/Decal Simple Lit"
             #define SLZ_NO_SPECULAR
             #define SLZ_DISABLE_BAKED_SPEC
 
+            #pragma use_dxc vulkan
+            #define SLZ_HACKED_DXC
+
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
             #pragma skip_variants _REFLECTION_PROBE_BOX_PROJECTION
