@@ -1,8 +1,10 @@
 using SLZ.SLZEditorTools;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -14,35 +16,49 @@ namespace SLZ.EditorPatcher
     /// </summary>
     internal static class CheckDXCInstall
     {
+        [MenuItem("Stress Level Zero/Graphics/Enable DXC Check")]
+        static void EnableDXCCheck()
+        {
+            EditorPrefs.SetBool("SkipDXCUpdate", false);
+            EditorUtility.DisplayDialog("DXC Update Check Enabled", "DXC update check enabled, restart editor to update", "Ok");
+        }
+
+
         [InitializeOnLoadMethod]
         static void Check()
         {
             // avoid running this method every domain reload
             if (SessionState.GetBool("DXCChecked", false))
             {
-                Debug.Log("Early Exit from CheckDXCInstall");
+                //Debug.Log("Early Exit from CheckDXCInstall");
+                return;
+            }
+
+            // skip if set in editorprefs
+            if (EditorPrefs.GetBool("SkipDXCUpdate", false))
+            {
+                URPConfigManager.Initialize();
+                if (Application.platform == RuntimePlatform.WindowsEditor) SetDXCIncludeState.Set(false);
                 return;
             }
 
             // I don't include linux or OSX libs for DXC, and I can't test them to make sure this works. Leave it to the user to update.
             if (Application.platform != RuntimePlatform.WindowsEditor && !Application.isBatchMode)
             {
-                bool skipWarning = EditorUtility.GetDialogOptOutDecision(DialogOptOutDecisionType.ForThisMachine, "DXCSkipNonWindowsWarning");
-
-                if (!skipWarning)
+                bool warnNonWin = EditorUtility.DisplayDialog($"DXC update requested",
+                      "The DirectX Shader Compiler needs to be manually updated to support Quest. " +
+                      "On non-windows platforms, this is not set up to update manually. " +
+                      "If you wish to use the DXC Compiler, download release 1.8.2407 from Microsoft's DXC github " +
+                      "(https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.8.2407). " +
+                      "Replace libdxcompiler.so and libdxil.so in (UnityEditorDir)/data/tools. " +
+                      "Additionally, in your project locate Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl and uncomment '#define SLZ_DXC_UPDATED' " +
+                      "to enable DXC compilation on Quest and enable other DXC features",
+                      "Dismiss",
+                      "Dismiss - Don't ask again for this machine"
+                      );
+                if (!warnNonWin)
                 {
-                    bool allow = EditorUtility.DisplayDialog($"DXC update requested",
-                          "The DirectX Shader Compiler needs to be manually updated to support Quest.\n\n" +
-                          "On non-windows platforms, this is not set up to update manually\n" +
-                          "If you wish to use the DXC Compiler, download release 1.8.2407 from Microsoft's DXC github " +
-                          "(https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.8.2407)." +
-                          "Replace libdxcompiler.so and libdxil.so in (Your Unity Editor Directory)/data/tools. " +
-                          "Additionally, in your project locate Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl and uncomment '#define SLZ_DXC_UPDATED' " +
-                          "to enable DXC compilation on Quest and enable other DXC features",
-                          "Dismiss",
-                          DialogOptOutDecisionType.ForThisMachine,
-                          "DXCSkipNonWindowsWarning"
-                          );
+                    EditorPrefs.SetBool("SkipDXCUpdate", true);
                 }
                 // Don't set DXCUpdateState.hlsl, leave that to the user
                 URPConfigManager.Initialize();
@@ -116,7 +132,7 @@ namespace SLZ.EditorPatcher
                         "Backups of the original dlls can be found in Editor/Data/Tools/DXC_Backup.\n\n" +
                         "If this is not updated, Quest will instead fall back to the FXC compiler.\n\n" +
                         "Before updating, close all other unity editor applications.",
-                        "Update",
+                        "Update and Quit",
                         "Quit",
                         "Proceed without updating"
                         );
@@ -126,11 +142,29 @@ namespace SLZ.EditorPatcher
             {
                 try
                 {
-                    UpdateDXC(localDxcPath, localDxilPath, unityDxcPath, unityDxilPath);
+
+                    bool updateSuccess = UpdateDXC(localDxcPath, localDxilPath, unityDxcPath, unityDxilPath, out string message);
+                    if (!updateSuccess)
+                    {
+                        string errMsg = $"DXC Update Failed:\n{message}\n\n" +
+                                "Close any other instance of the editor, and kill any remaining unity or unityshadercompiler processes from task manager!\n" +
+                                $"You may also try manually moving these files:\n{localDxcPath}\n{localDxilPath}\nTo:\n{unityDxcPath}\n{unityDxilPath}\n\n" +
+                                "Aborting!";
+                        Debug.LogError(message);
+                        if (!Application.isBatchMode)
+                        {
+                            EditorUtility.DisplayDialog("Failed to update DXC", errMsg, "Abort");
+                            Instagib();
+                            return;
+                        }
+                    }
                     URPConfigManager.Initialize();
+                    Instagib();
+                    return;
                 }
-                finally
+                catch (Exception ex)
                 {
+                    Debug.LogError($"Failed to Update DXC: {ex.Message}");
                     Instagib();
                 }
                 return;
@@ -140,48 +174,121 @@ namespace SLZ.EditorPatcher
                 Instagib();
                 return;
             }
-            else
+            else if (choice == 2)
             {
-                bool success = false;
-                try
-                {
-                    success = SetDXCIncludeState.Set(!unityNeedsUpdate);
-                }
-                finally
-                {
-                    if (!success)
-                    {
-                        Debug.LogError("ERROR: Updating DXCUpdateState.hlsl failed");
-                        if (!Application.isBatchMode)
-                        {
-                            EditorUtility.DisplayDialog("Missing critical shader include",
-                                "Unable to update critical shader include: Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl" +
-                                "\n\nExiting Unity to prevent shader corruption",
-                                "Abort");
-                        }
-                        Instagib();
-                    }
-                }
-                SessionState.SetBool("DXCChecked", true);
+                EditorUtility.DisplayDialog("Skipping DXC Update", "Skipping DXC Update. This message will not show again.\n\n" +
+                    "If you wish to update DXC at a future point, go to the menu bar->Stress Level Zero->Graphics->Enable DXC Check", "Ok");
+                EditorPrefs.SetBool("SkipDXCUpdate", true);
             }
+
+            bool success = false;
+            try
+            {
+                success = SetDXCIncludeState.Set(!unityNeedsUpdate);
+            }
+            finally
+            {
+                if (!success)
+                {
+                    Debug.LogError("ERROR: Updating DXCUpdateState.hlsl failed");
+                    if (!Application.isBatchMode)
+                    {
+                        EditorUtility.DisplayDialog("Missing critical shader include",
+                            "Unable to update critical shader include: Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl" +
+                            "\n\nExiting Unity to prevent shader corruption",
+                            "Abort");
+                    }
+                    Instagib();
+                }
+            }
+            SessionState.SetBool("DXCChecked", true);
         }
 
-        static void UpdateDXC(string inDXCPath, string inDXILPath, string outDXCPath, string outDXILPath)
+        static bool UpdateDXC(string inDXCPath, string inDXILPath, string outDXCPath, string outDXILPath, out string errMsg)
         {
+            //StringBuilder errBuilder = new StringBuilder();
             string backupPath = Path.Combine(Path.GetDirectoryName(outDXCPath), "DXC_Backup");
             Directory.CreateDirectory(backupPath);
             string backupDXC = Path.Combine(backupPath, "dxcompiler.dll");
             string backupDXIL = Path.Combine(backupPath, "dxil.dll");
 
-            if (!File.Exists(backupDXC)) File.Copy(outDXCPath, Path.Combine(backupPath, "dxcompiler.dll"));
-            if (!File.Exists(backupDXIL)) File.Copy(outDXILPath, Path.Combine(backupPath, "dxil.dll"));
+            if (!File.Exists(backupDXC))
+            {
+                try
+                {
+                    Debug.Log($"Backing up {outDXCPath} to {backupDXC}");
+                    File.Copy(outDXCPath, backupDXC);
+                }
+                catch (Exception ex)
+                {
+                    //Debug.Log($"Failed to backup dxcompiler.dll, aborting: {ex.Message}");
+                    errMsg = $"Failed to backup dxcompiler.dll, aborting: {ex.Message}";
+                    return false;
+                }
+            }
+            else
+            {
+                Debug.Log($"dxcompiler.dll already found at {backupDXC}, skipping backup");
+            }
 
+            if (!File.Exists(backupDXIL))
+            {
+                try
+                {
+                    Debug.Log($"Backing up {outDXILPath} to {backupDXIL}");
+                    File.Copy(outDXILPath, backupDXIL);
+                }
+                catch (Exception ex)
+                {
+                    errMsg = $"Failed to backup dxil.dll, aborting: {ex.Message}";
+                    return false;
+                }
+            }
+            else
+            {
+                Debug.Log($"dxil.dll already found at {backupDXIL}, skipping backup");
+            }
+
+            try
+            {
+                Debug.Log($"Ovewriting {outDXCPath} with {inDXCPath}");
+                File.Copy(inDXCPath, outDXCPath, true);
+            }
+            catch (Exception ex)
+            {
+                errMsg = $"Failed to overwrite dxcompiler.dll, aborting: {ex.Message}";
+                return false;
+            }
+            try
+            {
+                Debug.Log($"Ovewriting {outDXILPath} with {inDXILPath}");
+                File.Copy(inDXILPath, outDXILPath, true);
+            }
+            catch (Exception ex)
+            {
+                errMsg = $"Failed to overwrite dxil.dll, attempting to restore dxcompiler.dll and aborting: {ex.Message}";
+                try
+                {
+                    File.Copy(backupDXC, outDXCPath, true);
+                }
+                catch (Exception ex2)
+                {
+                    errMsg += $"\nFailed to restore dxcompiler.dll!: {ex2.Message}";
+                }
+                return false;
+            }
+
+            /* Update via cmd, less safe but allows us to copy the files after the editor has closed
+            string pause = Application.isBatchMode ? "" : "& pause";
             Process cmd = new Process();
             cmd.StartInfo.FileName = "cmd.exe";
-            cmd.StartInfo.Arguments = $"/c timeout /t 5 & copy /b/v/y {inDXCPath} {outDXCPath} & copy /b/v/y {inDXILPath} {outDXILPath}";
+            cmd.StartInfo.Arguments = $"/c timeout /t 5 & copy /b/v/y \"{inDXCPath}\" \"{outDXCPath}\" & copy /b/v/y \"{inDXILPath}\" \"{outDXILPath}\" {pause}";
             cmd.StartInfo.UseShellExecute = true;
-            cmd.StartInfo.CreateNoWindow = true;
+            cmd.StartInfo.CreateNoWindow = false;
             cmd.Start();
+            */
+            errMsg = "No error";
+            return true;
         }
 
 
@@ -195,5 +302,7 @@ namespace SLZ.EditorPatcher
             cmd.StartInfo.UseShellExecute = false;
             cmd.Start();
         }
+
+
     }
 }

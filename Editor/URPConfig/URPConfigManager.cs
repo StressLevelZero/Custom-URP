@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -34,18 +35,22 @@ namespace SLZ.SLZEditorTools
                 return;
             }
 
-           
-
             if (!Directory.Exists(packagePath))
             {
+                try
+                {
+                    string localPackage = Path.GetFullPath("Packages/com.unity.render-pipelines.universal/Editor/URPConfig/package~/com.stresslevelzero.urpconfig");
+                    DirectoryInfo localPkgInfo = new DirectoryInfo(localPackage);
+                    DirectoryInfo realPkgInfo = new DirectoryInfo(packagePath);
+                    Debug.Log($"Cloning:\n{localPkgInfo.FullName}\n{realPkgInfo.FullName}");
+                    realPkgInfo.Create();
 
-                string localPackage = Path.GetFullPath("Packages/com.unity.render-pipelines.universal/Editor/URPConfig/package~/com.stresslevelzero.urpconfig");
-                DirectoryInfo localPkgInfo = new DirectoryInfo(localPackage);
-                DirectoryInfo realPkgInfo = new DirectoryInfo(packagePath);
-                Debug.Log($"Cloning:\n{localPkgInfo.FullName}\n{realPkgInfo.FullName}");
-                realPkgInfo.Create();
-
-                CopyDirectory(localPkgInfo, realPkgInfo);
+                    CopyDirectory(localPkgInfo, realPkgInfo);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Failed to clone urpconfig package: {ex.Message}");
+                }
             }
             m_initialized = true;
             SessionState.SetBool("URPCfgInit", true);
