@@ -202,7 +202,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_SSR
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-
+           
             //#if defined(SHADER_API_DESKTOP)
             //#pragma require QuadShuffle
             //#define _SM6_QUAD 1
