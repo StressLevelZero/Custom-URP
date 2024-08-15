@@ -1,0 +1,2 @@
+DirectX Shader compiler release-1.8.2407 (8b0a41ba3612c15e8b7d5c84ba14a1cedd74badc)
+Built using modified SPIRV-Tools, where optimizations to remove inputs have been disabled to keep the interface unity expects. Changes are in the SPIRV-Tools-unityfix.patch patch file (from git terminal or bash in the SPIRV-Tools folder:  patch -p1 < SPIRV-Tools-unityfix.patch).

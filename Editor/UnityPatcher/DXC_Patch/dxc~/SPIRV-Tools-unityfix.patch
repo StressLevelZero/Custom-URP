@@ -1,0 +1,29 @@
+diff --git a/source/opt/aggressive_dead_code_elim_pass.cpp b/source/opt/aggressive_dead_code_elim_pass.cpp
+index 4737da5f..2f7be2e2 100644
+--- a/source/opt/aggressive_dead_code_elim_pass.cpp
++++ b/source/opt/aggressive_dead_code_elim_pass.cpp
+@@ -583,8 +583,9 @@ void AggressiveDCEPass::InitializeModuleScopeLiveInstructions() {
+         // Vulkan support outputs without an associated input, but not inputs
+         // without an associated output. Don't remove outputs unless explicitly
+         // allowed.
+-        if (!remove_outputs_ &&
+-            spv::StorageClass(storage_class) == spv::StorageClass::Output) {
++       if (spv::StorageClass(storage_class) == spv::StorageClass::Input ||
++            (!remove_outputs_ &&
++            spv::StorageClass(storage_class) == spv::StorageClass::Output)) {
+           AddToWorklist(var);
+         }
+       }
+diff --git a/source/opt/optimizer.cpp b/source/opt/optimizer.cpp
+index 4add68a2..e4592ac3 100644
+--- a/source/opt/optimizer.cpp
++++ b/source/opt/optimizer.cpp
+@@ -167,7 +167,7 @@ Optimizer& Optimizer::RegisterLegalizationPasses(bool preserve_interface) {
+           .RegisterPass(CreateDeadInsertElimPass())
+           .RegisterPass(CreateReduceLoadSizePass())
+           .RegisterPass(CreateAggressiveDCEPass(preserve_interface))
+-          .RegisterPass(CreateRemoveUnusedInterfaceVariablesPass())
++          //.RegisterPass(CreateRemoveUnusedInterfaceVariablesPass())
+           .RegisterPass(CreateInterpolateFixupPass())
+           .RegisterPass(CreateInvocationInterlockPlacementPass())
+           .RegisterPass(CreateOpExtInstWithForwardReferenceFixupPass());
