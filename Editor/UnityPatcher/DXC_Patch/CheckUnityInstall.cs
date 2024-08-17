@@ -129,14 +129,14 @@ namespace SLZ.EditorPatcher
                 {
 
                     choice = EditorUtility.DisplayDialogComplex($"DXC update requested ({installDXCVersion.ProductVersion}->{localDXCVersion.ProductVersion})",
-                        "The DirectX Shader Compiler needs to be updated to support Quest. Allow Update?\n\n" +
-                        "WARNING: This will replace dxcompiler.dll in your Unity Editor install, affecting all projects on this unity version. " +
-                        "Backups of the original dlls can be found in Editor/Data/Tools/DXC_Backup.\n\n" +
-                        "If this is not updated, Quest will instead fall back to the FXC compiler.\n\n" +
+                        "The DirectX Shader Compiler (DXC) needs to be updated to support Quest. Allow Update?\n\n" +
+                        "This will replace dxcompiler.dll in your Unity Editor install, affecting all projects on this unity version. " +
+                        "A backup of the original dll can be found in Editor/Data/Tools/DXC_Backup.\n\n" +
+                        "This is optional. If DXC is not updated Quest will instead use the default shader compiler, which is slower and missing some advanced features.\n\n" +
                         "Before updating, close all other unity editor applications.",
                         "Update and Quit",
                         "Quit",
-                        "Proceed without updating"
+                        "Don't Update"
                         );
                 }
             }
@@ -219,7 +219,14 @@ namespace SLZ.EditorPatcher
                 try
                 {
                     Debug.Log($"Backing up {outDXCPath} to {backupDXC}");
+                    //throw new UnauthorizedAccessException();
                     File.Copy(outDXCPath, backupDXC);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    UpdateDXCElevated(backupPath, backupDXC, inDXCPath, outDXCPath);
+                    errMsg = "";
+                    return true;
                 }
                 catch (Exception ex)
                 {
@@ -254,7 +261,14 @@ namespace SLZ.EditorPatcher
             try
             {
                 Debug.Log($"Ovewriting {outDXCPath} with {inDXCPath}");
+                //throw new UnauthorizedAccessException();
                 File.Copy(inDXCPath, outDXCPath, true);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                UpdateDXCElevated(backupPath, backupDXC, inDXCPath, outDXCPath);
+                errMsg = "";
+                return true;
             }
             catch (Exception ex)
             {
@@ -294,6 +308,20 @@ namespace SLZ.EditorPatcher
             return true;
         }
 
+        static void UpdateDXCElevated(string backupFolder, string backupPath, string inDXCPath, string outDXCPath)
+        {
+            string pause = Application.isBatchMode ? "" : "& pause";
+            bool backupExists = File.Exists(backupPath);
+            string backup = !backupExists ? $"mkdir {backupFolder} & copy \"{outDXCPath}\" /b/v/y \"{backupFolder}\" & " : "";
+            string command = $"{backup}copy /b/v/y \"{inDXCPath}\" \"{outDXCPath}\"";
+            string echo = command.Replace("&", "^&");
+            Process cmd = new Process();
+            cmd.StartInfo.FileName = "cmd.exe";
+            cmd.StartInfo.Arguments = $"/C {command} & echo {echo} {pause}";
+            cmd.StartInfo.UseShellExecute = true;
+            cmd.StartInfo.Verb = "RunAs";
+            cmd.Start();
+        }
 
         static void Instagib()
         {
