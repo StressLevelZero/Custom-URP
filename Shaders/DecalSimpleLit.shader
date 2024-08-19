@@ -41,6 +41,14 @@ Shader "SLZ/Decal Simple Lit"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
             #pragma skip_variants _REFLECTION_PROBE_BOX_PROJECTION
+			
+			// Don't sample from directional map
+            #if defined(DIRLIGHTMAP_COMBINED)
+                #undef DIRLIGHTMAP_COMBINED
+                #if !defined(LIGHTMAP_ON)
+                    #define LIGHTMAP_ON
+                #endif
+            #endif
 
             // Don't sample from directional map
             #if defined(DIRLIGHTMAP_COMBINED)
