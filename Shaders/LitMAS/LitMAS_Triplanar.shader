@@ -28,7 +28,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 		_BlendDst ("Blend Destination", float) = 0
 		[ToggleUI] _ZWrite ("ZWrite", float) = 1
 		_Cull ("Cull Side", float) = 2
-      
+        _HalfShade("Enable Vulkan Per-Draw Shading Rate Hack", float) = 0
     }
     SubShader
     {
@@ -36,7 +36,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         //Blend One Zero
 		//ZWrite On
 		ZTest LEqual
-		Offset 0 , 0
+		Offset [_HalfShade] , 0
 		ColorMask RGBA
         LOD 100
         

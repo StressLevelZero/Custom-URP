@@ -182,6 +182,26 @@ half SLZGeometricSpecularAA(half3 normal)
     return 1.0h - AARoughness;
 }
 
+/* Copied from .core/ShaderLibrary/CommonMaterial.hlsl
+ * Modified to use fine ddx/ddy
+ */
+float SLZGeometricNormalVariance(float3 geometricNormalWS, float screenSpaceVariance)
+{
+    float3 deltaU = ddx_fine(geometricNormalWS);
+    float3 deltaV = ddy_fine(geometricNormalWS);
+
+    return screenSpaceVariance * (dot(deltaU, deltaU) + dot(deltaV, deltaV));
+}
+
+/* Copied from .core/ShaderLibrary/CommonMaterial.hlsl
+ * Modified to use fine ddx/ddy
+ */
+float SLZGeometricNormalFiltering(float perceptualSmoothness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
+{
+    float variance = SLZGeometricNormalVariance(geometricNormalWS, screenSpaceVariance);
+    return NormalFiltering(perceptualSmoothness, variance, threshold);
+}
+
 //------------------------------------------------------------------------
 //------------------------------------------------------------------------
 // Automated Data Structure Population Functions
