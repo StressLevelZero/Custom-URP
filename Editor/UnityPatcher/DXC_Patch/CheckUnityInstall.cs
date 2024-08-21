@@ -38,7 +38,7 @@ namespace SLZ.EditorPatcher
             if (EditorPrefs.GetBool("SkipDXCUpdate", false))
             {
                 URPConfigManager.Initialize();
-                if (Application.platform == RuntimePlatform.WindowsEditor) SetDXCIncludeState.Set(false);
+                if (Application.platform == RuntimePlatform.WindowsEditor) SetDXCIncludeState.Set(false, 0, 0, 0, 0);
                 return;
             }
 
@@ -186,7 +186,13 @@ namespace SLZ.EditorPatcher
             bool success = false;
             try
             {
-                success = SetDXCIncludeState.Set(!unityNeedsUpdate);
+                Debug.Log($"DXC Version: {localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}");
+                success = SetDXCIncludeState.Set(!unityNeedsUpdate, 
+                    (uint)localDXCVersion.FileMajorPart, 
+                    (uint)localDXCVersion.FileMinorPart, 
+                    (uint)localDXCVersion.FileBuildPart,
+                    (uint)localDXCVersion.FilePrivatePart
+                    );
             }
             finally
             {

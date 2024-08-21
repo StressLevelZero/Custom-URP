@@ -9,7 +9,7 @@ namespace SLZ.EditorPatcher
     internal static class SetDXCIncludeState
     {
         static string packageName = "com.stresslevelzero.urpconfig";
-        public static bool Set(bool patched)
+        public static bool Set(bool patched, uint major, uint minor, uint patch, uint build)
         {
             Debug.Log($"Setting DXCUpdateState");
             URPConfigManager.Initialize();
@@ -23,7 +23,14 @@ namespace SLZ.EditorPatcher
 
             string comment = patched ? "" : "//";
             string file =
-                $"#ifndef SLZ_DXC_STATE\n\t#define SLZ_DXC_STATE\n\t{comment}#define SLZ_DXC_UPDATED\n#endif";
+                $"#ifndef SLZ_DXC_STATE\n" +
+                $"\t#define SLZ_DXC_STATE\n" +
+                $"\t{comment}#define SLZ_DXC_UPDATED\n" +
+                $"\t{comment}#define SLZ_DXC_VERSION_MAJOR {major}\n" +
+                $"\t{comment}#define SLZ_DXC_VERSION_MINOR {minor}\n" +
+                $"\t{comment}#define SLZ_DXC_VERSION_PATCH {patch}\n" +
+                $"\t{comment}#define SLZ_DXC_VERSION_BUILD {build}\n" +
+                $"#endif";
             File.WriteAllText(includePath, file);
 
             return true;
