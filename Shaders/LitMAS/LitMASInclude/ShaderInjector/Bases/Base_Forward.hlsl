@@ -249,7 +249,8 @@ half4 frag(VertOut i) : SV_Target
 	//#!INJECT_POINT SPEC_AA
 	//#!INJECT_DEFAULT
 	#if !defined(SHADER_API_MOBILE) && !defined(LITMAS_FEATURE_TP) // Specular antialiasing based on normal derivatives. Only on PC to avoid cost of derivatives on Quest
-		smoothness = min(smoothness, SLZGeometricSpecularAA(UNPACK_NORMAL(i)));
+		//smoothness = min(smoothness, SLZGeometricSpecularAA(UNPACK_NORMAL(i)));
+		smoothness = SLZGeometricNormalFiltering(smoothness, UNPACK_NORMAL(i), /*variance*/ 0.075, /*threshold*/ 0.2);
 	#endif
 	//#!INJECT_END
 
