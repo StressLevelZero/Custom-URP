@@ -1,2 +1,8 @@
 DirectX Shader compiler release-1.8.2407 (8b0a41ba3612c15e8b7d5c84ba14a1cedd74badc)
-Built using modified SPIRV-Tools, where optimizations to remove inputs have been disabled to keep the interface unity expects. Changes are in the SPIRV-Tools-unityfix.patch patch file (from git terminal or bash in the SPIRV-Tools folder:  patch -p1 < SPIRV-Tools-unityfix.patch).
+Built off of release-1.8.2407 commit 416fab6b5 (https://github.com/microsoft/DirectXShaderCompiler/commit/416fab6b5c4ba956a320d9131102304da995edfc).
+The SPIRV-Tools dependency was modified to undo some optimizations introduced since the DXC version Unity is currently using. These removed unused inputs from the shader, changing the interface in a way unity does not account for resulting in misalignment of the vertex data. Changes made are in the SPIRV-Tools-unityfix.patch patch file.
+
+If rebuilding this from source, apply SPIRV-Tools-unityfix.patch to the SPIRV-Tools folder (from git terminal or bash: patch -p1 < SPIRV-Tools-unityfix.patch). If using visual studio, select the x64-clang-cl-Release config, disable the LLVM_ENABLE_WARNINGS and SPIRV_WERRROR cmake variables, and add this to the command line arguments:
+-DCMAKE_CXX_FLAGS="/D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1 -Wno-unsafe-buffer-usage -Wno-c++98-compat" 
+
+Changes in VS 2022 17.10 to make mutex constructors constexpr causes a crash in this dll on our build machines. Force old behavior with _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR  (https://github.com/microsoft/STL/wiki/Changelog#vs-2022-1710)
