@@ -36,6 +36,10 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         ColorMask RGBA
         LOD 100
 
+        HLSLINCLUDE
+        #define LITMAS_FORCE_REIMPORT 1
+        ENDHLSL
+
         Pass
         {
             Blend [_BlendSrc] [_BlendDst]
