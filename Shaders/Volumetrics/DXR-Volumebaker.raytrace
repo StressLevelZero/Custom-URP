@@ -61,6 +61,7 @@ float3	Size = float3(1,1,1);
 
 // Output
 RWTexture3D<float4> g_Output;
+Texture3D<float4> g_Input;
 
 //Enviorment
 TextureCube  _SkyTexture;
@@ -311,25 +312,25 @@ float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx){
 
     float4 Accumulation = float4(0,0,0,0);
 
-       for (int j = startIdx; j < endIdx; j++) 
-        {
-            uint3 id =  DispatchRaysIndex().xyz;
-            float3 rayDirection = sphericalFibonacci(j, EnvLightSamples) + ( normalize(float3(rand(id.xyz+j),rand(id.xyz+j+33) , rand(id.xyz+j+120)) -.5) * 2 * (4*M_PI / EnvLightSamples) )  ;
+    for (int j = startIdx; j < endIdx; j++) 
+    {
+        uint3 id =  DispatchRaysIndex().xyz;
+        float3 rayDirection = sphericalFibonacci(j, EnvLightSamples) + ( normalize(float3(rand(id.xyz+j),rand(id.xyz+j+33) , rand(id.xyz+j+120)) -.5) * 2 * (4*M_PI / EnvLightSamples) )  ;
 
-            RayDesc ray;
-            ray.Origin    = VoxelWS;
-            ray.Direction = rayDirection;
-            ray.TMin      = 0.0f;
-            ray.TMax      = 100000;
+        RayDesc ray;
+        ray.Origin    = VoxelWS;
+        ray.Direction = rayDirection;
+        ray.TMin      = 0.0f;
+        ray.TMax      = 100000;
 
-            RayPayload payload;
-            payload.color = float4(0, 0, 0, 0);
+        RayPayload payload;
+        payload.color = float4(0, 0, 0, 0);
 
-            uint missShaderIndex = 1;
-            TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
-            
-            Accumulation += payload.color / EnvLightSamples ;
-        }
+        uint missShaderIndex = 1;
+        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+        
+        Accumulation += payload.color / EnvLightSamples;
+    }
     return Accumulation;
 }
 
@@ -346,17 +347,20 @@ float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx){
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    float3 launchIndex = DispatchRaysIndex().xyz ; //id
-    float3 launchDim = DispatchRaysDimensions().xyz; //whd
-    float3 VoxelWorldPosition = WPosition + Size * ( (launchIndex + 0.5 ) / launchDim );
+    uint3 launchIndex = DispatchRaysIndex().xyz ; //id
+    float3 launchDim = (float3)(DispatchRaysDimensions().xyz); //whd
+    float3 VoxelWorldPosition = WPosition + Size * ( ((float3)launchIndex + 0.5 ) / launchDim );
 
-	float4 LightAccumulation = g_Output[launchIndex];
+	float4 LightAccumulation = float4(0,0,0,0);
 
+    
 	int start = StartRayIdx;
 	int end = StartRayIdx + PerDispatchRayCount;
 	int maxIter = min(PointLightCount, end);
+    
 	for (int i = start; i < maxIter; i++) LightAccumulation += PointLightCast(VoxelWorldPosition, i);
 	
+    
 	start = max(0, start - (int)PointLightCount);
 	end -= PointLightCount;
 	maxIter = min(ConeLightCount, end);
@@ -364,14 +368,16 @@ void MainRayGenShader()
 
 	start = max(0, start - (int)ConeLightCount);
 	end -= ConeLightCount;
-	maxIter = min(DirLightCount, end);
+	maxIter = min(DirLightCount, end - 1);
 	for (int i = start; i < maxIter; i++)   LightAccumulation += DirLightCast(VoxelWorldPosition, i);
 
+    
 	start = max(0, start - (int)DirLightCount);
 	end -= (int)DirLightCount;
 	maxIter = min(EnvLightSamples, end);
     LightAccumulation += EnvCast(VoxelWorldPosition, start, maxIter);
 
+    
 	start = max(0, start - (int)EnvLightSamples);
 	end -= (int)EnvLightSamples;
 	maxIter = min(AreaLightSamples, end);
@@ -387,8 +393,8 @@ void MainRayGenShader()
 		maxIter = min(AreaLightSamples, end);
 		light++;
     }
-
+    
 
   //  LightAccumulation.a = 1; //filling alpha
-    g_Output[launchIndex] = LightAccumulation;
+    g_Output[launchIndex] =  g_Output[launchIndex] + LightAccumulation;
 }

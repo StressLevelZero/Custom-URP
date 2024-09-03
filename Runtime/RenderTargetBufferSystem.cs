@@ -66,6 +66,22 @@ namespace UnityEngine.Rendering.Universal.Internal
             return (m_AllowMSAA && backBuffer.msaa > 1) ? backBuffer.rtMSAA : backBuffer.rtResolve;
         }
 
+        // SLZ MODIFIED - FinalBlitPass needs to be able to tell if the handle passed to it is one of the swap chain images
+        public bool IsBackBuffer(RTHandle handle)
+        {
+            return (handle == backBuffer.rtMSAA) || (handle == backBuffer.rtResolve);
+        }
+
+        public bool IsFrontBuffer(RTHandle handle)
+        {
+            return (handle == frontBuffer.rtMSAA) || (handle == frontBuffer.rtResolve);
+        }
+
+        public bool IsFrontOrBackBuffer(RTHandle handle)
+        {
+            return IsBackBuffer(handle) || IsFrontBuffer(handle);
+        }
+        // END SLZ MODIFIED
         public RTHandle GetBackBuffer(CommandBuffer cmd)
         {
             ReAllocate(cmd);

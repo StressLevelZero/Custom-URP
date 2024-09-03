@@ -135,8 +135,8 @@ namespace UnityEngine.Rendering.Universal.Internal
             var cameraTargetHandle = RTHandleStaticHelpers.s_RTHandleWrapper;
 
             var cmd = renderingData.commandBuffer;
-
-            if (m_Source == cameraData.renderer.GetCameraColorFrontBuffer(cmd))
+            UniversalRenderer r = cameraData.renderer as UniversalRenderer;
+            if (r.IsHandleSwapImage(m_Source))//m_Source == cameraData.renderer.GetCameraColorFrontBuffer(cmd))
             {
                 m_Source = renderingData.cameraData.renderer.cameraColorTargetHandle;
             }

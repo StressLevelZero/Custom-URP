@@ -260,6 +260,7 @@ half4 frag(VertOut i) : SV_Target
 		uvTP = _RotateUVs ? float2(-uvTP.y, uvTP.x) : uvTP;
 		float2 uv_main = mad(uvTP, scale, _BaseMap_ST.zw);
 		half4 albedo = SLZ_SAMPLE_TP_MAIN(_BaseMap, sampler_BaseMap, uv_main);
+		albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 		half3 mas = SLZ_SAMPLE_TP_MAIN(_MetallicGlossMap, sampler_BaseMap, uv_main).rgb;
 
 // End Injection FRAG_READ_INPUTS from Injection_Triplanar.hlsl ----------------------------------------------------------
@@ -338,7 +339,8 @@ half4 frag(VertOut i) : SV_Target
 /*---------------------------------------------------------------------------------------------------------------------------*/
 	
 	#if !defined(SHADER_API_MOBILE) && !defined(LITMAS_FEATURE_TP) // Specular antialiasing based on normal derivatives. Only on PC to avoid cost of derivatives on Quest
-		smoothness = min(smoothness, SLZGeometricSpecularAA(UNPACK_NORMAL(i)));
+		//smoothness = min(smoothness, SLZGeometricSpecularAA(UNPACK_NORMAL(i)));
+		smoothness = SLZGeometricNormalFiltering(smoothness, UNPACK_NORMAL(i), /*variance*/ 0.075, /*threshold*/ 0.2);
 	#endif
 
 

@@ -5,7 +5,7 @@
 // with cs.SetTexture
 RWTexture3D<half4> _Source;
 uint4 _SourceDim;
-half4 _ClearColor;
+float4 _ClearColor;
 
 [numthreads(4,4,4)]
 void Clear3D (uint3 id : SV_DispatchThreadID)

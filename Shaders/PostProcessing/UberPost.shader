@@ -48,6 +48,8 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
         TEXTURE2D(_UserLut);
         TEXTURE2D(_BlueNoise_Texture);
         TEXTURE2D_X(_OverlayUITexture);
+		
+		SamplerState sampler_LinearMirror;
 
         float4 _Lut_Params;
         float4 _UserLut_Params;
@@ -135,11 +137,19 @@ Shader "Hidden/Universal Render Pipeline/UberPost"
                     ru = rcp(ru) * DistTheta * atan(ru * DistSigma);
                     uv = uv + ruv * (ru - 1.0);
                 }
-
+				
+				// SLZ MODIFIED - Apply dithering to barrel-distorted UV's for some reason. I didn't do this, and the original code
+				// was using the anti-banding dithering function. Internally that does linear to sRGB conversions which make no sense in
+				// this usecase, and at some point Unity modified the function to take extra parameters so this broke. The following is mostly just a copy of
+				// the dithering function but without the sRGB funkyness
+				
 				//TODO: Should switch this to our RGB dithering to just do one sample and simplfy the dithering
                 float2 dither;
-                dither.x = ApplyDithering(0.5, uv, TEXTURE2D_ARGS(_BlueNoise_Texture, sampler_PointRepeat), DitheringScale, DitheringOffset+offset).x;
-                dither.y = ApplyDithering(0.5, uv, TEXTURE2D_ARGS(_BlueNoise_Texture, sampler_PointRepeat), DitheringScale, DitheringOffset+.5+offset).x;    
+				float2 noise = SAMPLE_TEXTURE2D(_BlueNoise_Texture, sampler_PointRepeat, uv * DitheringScale + (DitheringOffset + offset)).rg * 2.0 - 1.0;
+				noise = FastSign(noise) * (1.0 - sqrt(1.0 - abs(noise)));
+				
+                dither.x = 0.5 + noise.r / 255.0;
+                dither.y = 0.5 + noise.g / 255.0;    
 
                 uv += (dither - 0.5) * ruorg * 20; //Should add some variables to control the amount of dithering here. Hardcoded for now.
             }

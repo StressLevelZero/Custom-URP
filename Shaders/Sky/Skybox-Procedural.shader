@@ -16,6 +16,7 @@ Properties {
 SubShader {
     Tags { "Queue"="Background" "RenderType"="Background" "PreviewType"="Skybox" }
     Cull Off ZWrite Off
+    Offset 0.0008148, 0
 
     Pass {
 

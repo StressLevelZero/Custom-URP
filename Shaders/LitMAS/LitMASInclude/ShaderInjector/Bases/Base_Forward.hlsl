@@ -193,6 +193,7 @@ half4 frag(VertOut i) : SV_Target
 	float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
 	float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
+	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 	//#!INJECT_END
 
@@ -248,7 +249,8 @@ half4 frag(VertOut i) : SV_Target
 	//#!INJECT_POINT SPEC_AA
 	//#!INJECT_DEFAULT
 	#if !defined(SHADER_API_MOBILE) && !defined(LITMAS_FEATURE_TP) // Specular antialiasing based on normal derivatives. Only on PC to avoid cost of derivatives on Quest
-		smoothness = min(smoothness, SLZGeometricSpecularAA(UNPACK_NORMAL(i)));
+		//smoothness = min(smoothness, SLZGeometricSpecularAA(UNPACK_NORMAL(i)));
+		smoothness = SLZGeometricNormalFiltering(smoothness, UNPACK_NORMAL(i), /*variance*/ 0.075, /*threshold*/ 0.2);
 	#endif
 	//#!INJECT_END
 

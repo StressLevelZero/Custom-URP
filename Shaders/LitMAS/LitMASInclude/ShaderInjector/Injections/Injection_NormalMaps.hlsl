@@ -43,6 +43,7 @@
 
 //#!INJECT_BEGIN SPEC_AA 0
 	#if !defined(SHADER_API_MOBILE) && !defined(LITMAS_FEATURE_TP) // Specular antialiasing based on normal derivatives. Only on PC to avoid cost of derivatives on Quest
-		smoothness = min(smoothness, SLZGeometricSpecularAA(normalWS));
+		//smoothness = min(smoothness, SLZGeometricSpecularAA(normalWS));
+		smoothness = SLZGeometricNormalFiltering(smoothness, normalWS, /*variance*/ 0.1, /*threshold*/ 0.2);
 	#endif
 //#!INJECT_END

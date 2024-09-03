@@ -237,11 +237,14 @@ half4 frag(VertOut i) : SV_Target
 /*---Read Input Data---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
+// Begin Injection FRAG_READ_INPUTS from Injection_VertexColorAO.hlsl ----------------------------------------------------------
+	// Need custom FRAG_READ_INPUTS so albedo.a doesn't get set to 1.0
 	float2 uv0 = UNPACK_UV0(i);
 	float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
 	float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
 	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
+// End Injection FRAG_READ_INPUTS from Injection_VertexColorAO.hlsl ----------------------------------------------------------
 
 
 
@@ -312,7 +315,8 @@ half4 frag(VertOut i) : SV_Target
 	
 // Begin Injection SPEC_AA from Injection_NormalMaps.hlsl ----------------------------------------------------------
 	#if !defined(SHADER_API_MOBILE) && !defined(LITMAS_FEATURE_TP) // Specular antialiasing based on normal derivatives. Only on PC to avoid cost of derivatives on Quest
-		smoothness = min(smoothness, SLZGeometricSpecularAA(normalWS));
+		//smoothness = min(smoothness, SLZGeometricSpecularAA(normalWS));
+		smoothness = SLZGeometricNormalFiltering(smoothness, normalWS, /*variance*/ 0.1, /*threshold*/ 0.2);
 	#endif
 // End Injection SPEC_AA from Injection_NormalMaps.hlsl ----------------------------------------------------------
 
