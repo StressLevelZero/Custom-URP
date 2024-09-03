@@ -353,7 +353,7 @@ namespace UnityEngine.Rendering.Universal
                 copyResolvedDepth: RenderingUtils.MultisampleDepthResolveSupported() && SystemInfo.supportsMultisampleAutoResolve && copyDepthAfterTransparents);
 
             // Motion vectors depend on the (copy) depth texture. Depth is reprojected to calculate motion vectors.
-            m_MotionVectorPass = new MotionVectorRenderPass(copyDepthEvent + 1, m_CameraMotionVecMaterial, m_ObjectMotionVecMaterial);
+            m_MotionVectorPass = new MotionVectorRenderPass(copyDepthEvent + 1, m_CameraMotionVecMaterial, m_ObjectMotionVecMaterial, data.opaqueLayerMask);
 
             m_DrawSkyboxPass = new DrawSkyboxPass(RenderPassEvent.BeforeRenderingSkybox);
             // SLZ MODIFIED

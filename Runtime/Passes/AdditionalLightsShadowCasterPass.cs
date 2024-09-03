@@ -861,6 +861,12 @@ namespace UnityEngine.Rendering.Universal.Internal
             // SLZ MODIFIED
             // Don't clear if the shadowcaster pass isn't used.
             //ConfigureClear(ClearFlag.All, Color.black);
+
+            // UUM-63146 - glClientWaitSync: Expected application to have kicked everything until job: 96089 (possibly by calling glFlush)" are thrown in the Android Player on some devices with PowerVR Rogue GE8320
+            // Resetting of target would clean up the color attachment buffers and depth attachment buffers, which inturn is preventing the leak in the said platform. This is likely a symptomatic fix, but is solving the problem for now.
+            if (Application.platform == RuntimePlatform.Android && PlatformAutoDetect.isRunningOnPowerVRGPU)
+                ResetTarget();
+
             if (m_CreateEmptyShadowmap)
             {
                 ConfigureClear(ClearFlag.None, Color.black);

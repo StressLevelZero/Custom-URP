@@ -68,7 +68,10 @@ half3or4_fl LightingSpecular(half3or4_fl lightColor, half3 lightDir, half3 norma
     float3 halfVec = SafeNormalize(float3(lightDir) + float3(viewDir));
     half NdotH = half(saturate(dot(normal, halfVec)));
     half modifier = pow(NdotH, smoothness);
+
+	// NOTE: In order to fix internal compiler error on mobile platforms, this needs to be float3
     half3or4_fl specularReflection = (half3or4_fl)specular * modifier;
+
     return lightColor * specularReflection;
 }
 // END SLZ MODIFIED
