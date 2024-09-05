@@ -175,7 +175,8 @@ namespace UnityEngine.Rendering.Universal
             for (var i = 0; i < batchCount; ++i)
             {
                 ref var layerBatch = ref s_LayerBatches[i];
-                var hasSpriteMask = SpriteMaskUtility.HasSpriteMaskInLayerRange(layerBatch.layerRange);
+                //var hasSpriteMask = SpriteMaskUtility.HasSpriteMaskInLayerRange(layerBatch.layerRange);
+                var hasSpriteMask = true;
                 layerBatch.useNormals = layerBatch.lightStats.useNormalMap || (anyNormals && hasSpriteMask);
             }
 

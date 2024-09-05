@@ -319,7 +319,7 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
         // Upcast to float, which completely defeats the point of using Lagrange's identity to replace NoH^2. 
         // See https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)
         // This is more expensive than just doing the normal GGX NDF calculations at full float, but I'm too lazy to switch everything over at the moment
-        float3 NxH = cross((half3)frag.normal, (half3)halfDir);
+        float3 NxH = cross((float3)frag.normal, (float3)halfDir);
         data.NxH2 = saturate(dot(NxH, NxH));
         data.NoL = saturate(dot(frag.normal, lightDir));
     #else
