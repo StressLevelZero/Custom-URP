@@ -11,6 +11,7 @@ using System.Reflection;
 
 namespace SLZ.SLZEditorTools
 {
+#if UNITY_2022_3_31 || UNITY_2022_3_37 || UNITY_2022_3_39
     class DynamicVariantStripper : IPreprocessShaders
     {
 
@@ -21,7 +22,7 @@ namespace SLZ.SLZEditorTools
         //{
         //    SetKW = typeof(ShaderKeywordSet).GetMethod("EnableKeywordName", BindingFlags.Static | BindingFlags.NonPublic);
         //}
-
+        
         public void OnProcessShader(Shader shader, ShaderSnippetData snippet, IList<ShaderCompilerData> data)
         {
             //Debug.Log("DYNAMIC VARIANT STRIPPER: Number of variants input " + data.Count);
@@ -84,5 +85,7 @@ namespace SLZ.SLZEditorTools
             }
             //Debug.Log("DYNAMIC VARIANT STRIPPER: Number of variants output " + data.Count);
         }
+        
     }
+#endif
 }
