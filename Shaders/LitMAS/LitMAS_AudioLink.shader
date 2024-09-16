@@ -304,7 +304,5 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 		}
 	}
 
-
-	CustomEditor "UnityEditor.ShaderGraphLitGUI"
-	Fallback "Hidden/InternalErrorShader"
+    CustomEditor "LitMASGUI"
 }
