@@ -1,5 +1,5 @@
 diff --git a/source/opt/aggressive_dead_code_elim_pass.cpp b/source/opt/aggressive_dead_code_elim_pass.cpp
-index 4737da5f..2f7be2e2 100644
+index 4737da5f..f1fa6965 100644
 --- a/source/opt/aggressive_dead_code_elim_pass.cpp
 +++ b/source/opt/aggressive_dead_code_elim_pass.cpp
 @@ -583,8 +583,9 @@ void AggressiveDCEPass::InitializeModuleScopeLiveInstructions() {
@@ -14,6 +14,50 @@ index 4737da5f..2f7be2e2 100644
            AddToWorklist(var);
          }
        }
+@@ -1001,6 +1002,7 @@ void AggressiveDCEPass::InitExtensions() {
+       "SPV_KHR_non_semantic_info",
+       "SPV_KHR_uniform_group_instructions",
+       "SPV_KHR_fragment_shader_barycentric",
++      "SPV_KHR_fragment_shading_rate",
+       "SPV_NV_bindless_texture",
+       "SPV_EXT_shader_atomic_float_add",
+       "SPV_EXT_fragment_shader_interlock",
+diff --git a/source/opt/local_access_chain_convert_pass.cpp b/source/opt/local_access_chain_convert_pass.cpp
+index 7ba75cb7..7abc02f5 100644
+--- a/source/opt/local_access_chain_convert_pass.cpp
++++ b/source/opt/local_access_chain_convert_pass.cpp
+@@ -427,6 +427,7 @@ void LocalAccessChainConvertPass::InitExtensions() {
+        "SPV_EXT_shader_image_int64", "SPV_KHR_non_semantic_info",
+        "SPV_KHR_uniform_group_instructions",
+        "SPV_KHR_fragment_shader_barycentric", "SPV_KHR_vulkan_memory_model",
++       "SPV_KHR_fragment_shading_rate",
+        "SPV_NV_bindless_texture", "SPV_EXT_shader_atomic_float_add",
+        "SPV_EXT_fragment_shader_interlock",
+        "SPV_NV_compute_shader_derivatives"});
+diff --git a/source/opt/local_single_block_elim_pass.cpp b/source/opt/local_single_block_elim_pass.cpp
+index d7a9295e..ae7c6869 100644
+--- a/source/opt/local_single_block_elim_pass.cpp
++++ b/source/opt/local_single_block_elim_pass.cpp
+@@ -287,6 +287,7 @@ void LocalSingleBlockLoadStoreElimPass::InitExtensions() {
+                                 "SPV_KHR_non_semantic_info",
+                                 "SPV_KHR_uniform_group_instructions",
+                                 "SPV_KHR_fragment_shader_barycentric",
++                                "SPV_KHR_fragment_shading_rate",
+                                 "SPV_KHR_vulkan_memory_model",
+                                 "SPV_NV_bindless_texture",
+                                 "SPV_EXT_shader_atomic_float_add",
+diff --git a/source/opt/local_single_store_elim_pass.cpp b/source/opt/local_single_store_elim_pass.cpp
+index 7cd6b0eb..0c40caeb 100644
+--- a/source/opt/local_single_store_elim_pass.cpp
++++ b/source/opt/local_single_store_elim_pass.cpp
+@@ -137,6 +137,7 @@ void LocalSingleStoreElimPass::InitExtensionAllowList() {
+                                 "SPV_KHR_non_semantic_info",
+                                 "SPV_KHR_uniform_group_instructions",
+                                 "SPV_KHR_fragment_shader_barycentric",
++                                "SPV_KHR_fragment_shading_rate",
+                                 "SPV_KHR_vulkan_memory_model",
+                                 "SPV_NV_bindless_texture",
+                                 "SPV_EXT_shader_atomic_float_add",
 diff --git a/source/opt/optimizer.cpp b/source/opt/optimizer.cpp
 index 4add68a2..e4592ac3 100644
 --- a/source/opt/optimizer.cpp
