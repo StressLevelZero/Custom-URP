@@ -13,6 +13,11 @@
 #define USE_FORWARD_PLUS 0
 #endif
 
+// SLZ MODIFIED
+#include "Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/HLSL2021Support.hlsl"
+// END SLZ MODIFIED
+
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Version.hlsl"

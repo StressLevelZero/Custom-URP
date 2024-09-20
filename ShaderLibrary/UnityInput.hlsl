@@ -9,7 +9,6 @@
 
 #if defined(STEREO_MULTIVIEW_ON) && (defined(SHADER_API_GLES3) || defined(SHADER_API_GLCORE) || defined(SHADER_API_VULKAN)) && !(defined(SHADER_API_SWITCH))
     #define UNITY_STEREO_MULTIVIEW_ENABLED
-	#include "Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl"
 
 	#if defined(UNITY_COMPILER_DXC) && !defined(SLZ_DXC_UPDATED)
 		#error Using DXC for multiview, but DXC not Updated (UnityInput.hlsl)
@@ -29,10 +28,8 @@
 		// manually, the compiler isn't going to strip it from the interpolator on the vertex output side even though no one is writing to it.
 		// Redefine the POSITION semantic to have ViewIndex semantic appended to it
 		// Abuses the fact that HLSL allows every semantic to be numbered, even ones where only one is allowed. Use POSITION0 instead of POSITION
-		// to prevent possible recursion in the macro.
-		#if defined(STEREO_MULTIVIEW_ON)
-			#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : COLOR0
-		#endif
+		// to prevent recursion in the macro.
+		#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : VIEWIDX
 	#endif
 #endif
 

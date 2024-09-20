@@ -12,20 +12,12 @@ using Debug = UnityEngine.Debug;
 namespace SLZ.EditorPatcher
 {
     /// <summary>
-    /// Updates Unity's DXC compiler dlls from local ones stored with this package
+    /// Checks the state of Unity's DXC compiler dlls to determine if they're up-to-date
     /// </summary>
     internal static class CheckDXCInstall
     {
-        [MenuItem("Stress Level Zero/Graphics/Enable DXC Check")]
-        static void EnableDXCCheck()
-        {
-            EditorPrefs.SetBool("SkipDXCUpdate", false);
-            EditorUtility.DisplayDialog("DXC Update Check Enabled", "DXC update check enabled, restart editor to update", "Ok");
-        }
-
-
         [InitializeOnLoadMethod]
-        static void Check()
+        static void CheckDXC()
         {
             // avoid running this method every domain reload
             if (SessionState.GetBool("DXCChecked", false))
@@ -34,6 +26,48 @@ namespace SLZ.EditorPatcher
                 return;
             }
 
+#if ERROR_SPOOKY_DONT_USE
+            CheckDXCSpooky();
+#else
+            CheckDXCSafe();
+#endif
+            SessionState.SetBool("DXCChecked", true);
+        }
+
+
+        static void CheckDXCSafe()
+        {
+            string unity = EditorApplication.applicationPath;
+            string toolsDir = Path.Combine(Path.GetDirectoryName(unity), "Data", "Tools");
+            string unityDxcPath = Path.Combine(toolsDir, "dxcompiler.dll");
+            // string unityDxilPath = Path.Combine(toolsDir, "dxil.dll");
+            bool unityDXCExists = File.Exists(unityDxcPath) /* && File.Exists(unityDxilPath) */;
+            FileVersionInfo installDXCVersion = unityDXCExists ? FileVersionInfo.GetVersionInfo(unityDxcPath) : null;
+            uint major = installDXCVersion != null ? (uint)installDXCVersion.FileMajorPart : 0;
+            uint minor = installDXCVersion != null ? (uint)installDXCVersion.FileMinorPart : 0;
+            uint build = installDXCVersion != null ? (uint)installDXCVersion.FileBuildPart : 0;
+            uint priv =  installDXCVersion != null ? (uint)installDXCVersion.FilePrivatePart : 0;
+            bool isUpdated = major >= 1 && minor >= 7;
+            URPConfigManager.Initialize();
+            SetDXCIncludeState.Set(isUpdated,major,minor,build,priv);
+        }
+
+        [MenuItem("Stress Level Zero/Graphics/Experimental/Upgrade DXC Compiler")]
+        static void ManualCheckDXC()
+        {
+            CheckDXCSpooky();
+        }
+
+        #region ERROR_SPOOKY_DONT_USE
+        [MenuItem("Stress Level Zero/Graphics/Experimental/Enable DXC Check")]
+        static void EnableDXCCheck()
+        {
+            EditorPrefs.SetBool("SkipDXCUpdate", false);
+            EditorUtility.DisplayDialog("DXC Update Check Enabled", "DXC update check enabled, restart editor to update", "Ok");
+        }
+
+        static void CheckDXCSpooky()
+        {
             // skip if set in editorprefs
             if (EditorPrefs.GetBool("SkipDXCUpdate", false))
             {
@@ -50,8 +84,8 @@ namespace SLZ.EditorPatcher
                       "On non-windows platforms, this is not set up to update manually as this package does not contain pre-compiled binaries. " +
                       "If you wish to use the DXC Compiler, clone release-1.8.2407 from Microsoft's DXC github " +
                       "(https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.8.2407). " +
-                      "Apply SPIRV-Tools-unityfix.patch to external/SPIRV-Tools and build:\n" +
-                      $"{Path.Combine(Path.GetFullPath("Packages/com.unity.render-pipelines.universal/Editor/UnityPatcher/DXC_Patch/dxc~"), "SPIRV-Tools-unityfix.patch")}\n" +
+                      "Apply the patch files included in the following directory and build:\n" +
+                      $"{Path.GetFullPath("Packages/com.unity.render-pipelines.universal/Editor/UnityPatcher/DXC_Patch/dxc~")}\n" +
                       "Replace libdxcompiler.so in your editor install with the one you've built. " +
                       "Additionally, in your project locate Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl and uncomment '#define SLZ_DXC_UPDATED' " +
                       "to enable DXC compilation on Quest and enable other DXC features",
@@ -230,7 +264,13 @@ namespace SLZ.EditorPatcher
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    UpdateDXCElevated(backupPath, backupDXC, inDXCPath, outDXCPath);
+                    UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
+                    errMsg = "";
+                    return true;
+                }
+                catch (IOException)
+                {
+                    UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, false, true);
                     errMsg = "";
                     return true;
                 }
@@ -272,7 +312,13 @@ namespace SLZ.EditorPatcher
             }
             catch (UnauthorizedAccessException)
             {
-                UpdateDXCElevated(backupPath, backupDXC, inDXCPath, outDXCPath);
+                UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
+                errMsg = "";
+                return true;
+            }
+            catch (IOException)
+            {
+                UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, false, true);
                 errMsg = "";
                 return true;
             }
@@ -314,18 +360,19 @@ namespace SLZ.EditorPatcher
             return true;
         }
 
-        static void UpdateDXCElevated(string backupFolder, string backupPath, string inDXCPath, string outDXCPath)
+        static void UpdateDXCCmd(string backupFolder, string backupPath, string inDXCPath, string outDXCPath, bool elevated, bool delay)
         {
             string pause = Application.isBatchMode ? "" : "& pause";
+            string timeout = delay ? "timeout /t 5 & " : "";
             bool backupExists = File.Exists(backupPath);
-            string backup = !backupExists ? $"mkdir {backupFolder} & copy \"{outDXCPath}\" /b/v/y \"{backupFolder}\" & " : "";
-            string command = $"{backup}copy /b/v/y \"{inDXCPath}\" \"{outDXCPath}\"";
+            string backup = !backupExists ? $"mkdir \"{backupFolder}\" & copy \"{outDXCPath}\" /b/v/y \"{backupFolder}\" & " : "";
+            string command = $"{timeout}{backup}copy /b/v/y \"{inDXCPath}\" \"{outDXCPath}\"";
             string echo = command.Replace("&", "^&");
             Process cmd = new Process();
             cmd.StartInfo.FileName = "cmd.exe";
-            cmd.StartInfo.Arguments = $"/C {command} & echo {echo} {pause}";
+            cmd.StartInfo.Arguments = $"/C {command} {pause}";
             cmd.StartInfo.UseShellExecute = true;
-            cmd.StartInfo.Verb = "RunAs";
+            if (elevated) cmd.StartInfo.Verb = "RunAs";
             cmd.Start();
         }
 
@@ -340,6 +387,6 @@ namespace SLZ.EditorPatcher
             cmd.Start();
         }
 
-
+#endregion // ERROR_SPOOKY_DONT_USE
     }
 }

@@ -58,8 +58,9 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define LITMAS_FEATURE_TS_NORMALS
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_SSR
-            //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #pragma use_dxc vulkan
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+
+            //#pragma use_dxc vulkan
 
             #if defined(SHADER_API_DESKTOP) && defined(_SLZ_SSR_ENABLED) && !defined(_NO_SSR)
             #pragma require WaveVote
