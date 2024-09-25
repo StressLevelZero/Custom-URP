@@ -3,7 +3,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 	Properties
 	{
 		[HideInInspector] _AlphaCutoff("Alpha Cutoff ", Range(0, 1)) = 0.5
-		 _EmissionColor("Emission Color", Color) = (0,0,0,0)
+		[HDR]_EmissionColor("Emission Color", Color) = (0,0,0,0)
 		[NoScaleOffset]_MainTex("Main Texture", 2D) = "white" {}
 		[NoScaleOffset]_EmissionMap("Emission Texture", 2D) = "white" {}
 
@@ -34,11 +34,11 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 		AlphaToMask Off
 		
 		HLSLINCLUDE
-		#pragma target 3.0
+		#pragma target 5.0
 
 		#pragma prefer_hlslcc gles
 		#pragma exclude_renderers d3d11_9x 
-		#pragma multi_compile
+		//#pragma multi_compile
 		
 		ENDHLSL
 
@@ -54,7 +54,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 			
 
 			HLSLPROGRAM
-
+			
 			#define _NORMAL_DROPOFF_TS 1
 			#pragma multi_compile_instancing
 			//#pragma multi_compile _ LOD_FADE_CROSSFADE
@@ -86,7 +86,8 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 			//#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
-			#include "Include/Particle/billboard.hlsl"
+			#include "include/billboard.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 			#define ASE_NEEDS_VERT_POSITION
 			#define ASE_NEEDS_VERT_NORMAL
 			#define ASE_NEEDS_FRAG_COLOR
@@ -94,9 +95,15 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 			#pragma shader_feature_local _SCALEDEPTHDITHER_ON
 			#pragma shader_feature_local_fragment _BRDFMAP
 
-			#ifndef SHADER_API_MOBILE
+			//#ifndef SHADER_API_MOBILE
 			#define ASE_DEPTH_WRITE_ON
+			#define ASE_EARLY_Z_DEPTH_OPTIMIZE
+			#if true //defined(SHADER_API_D3D11)
+			#define D3D11_CENTROID centroid
+			#else
+			#define D3D11_CENTROID  
 			#endif
+			//#endif
 
 			struct VertexInput
 			{
@@ -112,7 +119,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 
 			struct VertexOutput
 			{
-				float4 clipPos : SV_POSITION;
+				centroid float4 clipPos : SV_POSITION;
 				half4 vColor : COLOR;
 				half4 uv01 : TEXCOORD0;
 				half3 SH : TEXCOORD1;
@@ -145,11 +152,12 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 			Texture2D _MainTex; SamplerState sampler_MainTex;
 			Texture2D _EmissionMap; SamplerState sampler_EmissionMap;
 			Texture2D _MotionVectors; SamplerState sampler_MotionVectors;
-			TEXTURE2D_ARRAY(_SLZ_DitherTex2D);
+			
+			//TEXTURE2D_ARRAY(_SLZ_DitherTex2D);
 			int NoisePixels;
 			int _SLZ_TexSel;
 			int NoiseArraySize;
-			SAMPLER(sampler_SLZ_DitherTex2D);
+			//SAMPLER(sampler_SLZ_DitherTex2D);
 
 
 			inline float4 ASE_ComputeGrabScreenPos( float4 pos )
@@ -291,7 +299,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 				#endif
 				float2 depthDitherUV = ase_grabScreenPosNorm.xy * _ScreenParams.xy / NoisePixels;
 				float depthDitherIndex = fmod((float)_SLZ_TexSel + floor((float)NoiseArraySize * animFrame)  ,  (float)NoiseArraySize);
-				float clipOffset = (SAMPLE_TEXTURE2D_ARRAY( _SLZ_DitherTex2D, sampler_SLZ_DitherTex2D, depthDitherUV ,  depthDitherIndex).r - 0.5) * staticSwitch72;
+				float clipOffset = GetScreenNoiseR(ase_grabScreenPosNorm.xy) * staticSwitch72;//(SAMPLE_TEXTURE2D_ARRAY( _SLZ_DitherTex2D, sampler_SLZ_DitherTex2D, depthDitherUV ,  depthDitherIndex).r - 0.5) * staticSwitch72;
 				float offsetClipW = ( IN.clipPos.w + clipOffset);
 				
 				float3 Albedo = albedo.rgb;
@@ -572,19 +580,27 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
-			#include "Include/Particle/billboard.hlsl"
+			#include "include/billboard.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
+
 			#define ASE_NEEDS_VERT_POSITION
 			#define ASE_NEEDS_VERT_NORMAL
 			#pragma shader_feature_local _SCALEDEPTHDITHER_ON
 
-			#ifndef SHADER_API_MOBILE
+			//#ifndef SHADER_API_MOBILE
 			#define ASE_DEPTH_WRITE_ON
+			#define ASE_EARLY_Z_DEPTH_OPTIMIZE
+			#if defined(SHADER_API_D3D11)
+			#define D3D11_CENTROID centroid
+			#else
+			#define D3D11_CENTROID  
 			#endif
+			//#endif
 
 
 			struct VertexInput
 			{
-				float4 vertex : POSITION;
+				centroid float4 vertex : POSITION;
 				float3 ase_normal : NORMAL;
 				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord2 : TEXCOORD2;
@@ -595,7 +611,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 
 			struct VertexOutput
 			{
-				float4 clipPos : SV_POSITION;
+				D3D11_CENTROID float4 clipPos : SV_POSITION;
 				#if defined(ASE_NEEDS_FRAG_WORLD_POSITION)
 				float3 worldPos : TEXCOORD0;
 				#endif
@@ -613,35 +629,19 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 
 			CBUFFER_START(UnityPerMaterial)
 			float4 _Color;
+			float4 _EmissionColor;
 			float _UVMotionMultiplier;
 			float _Depth;
-			#ifdef _TRANSMISSION_ASE
-				float _TransmissionShadow;
-			#endif
-			#ifdef _TRANSLUCENCY_ASE
-				float _TransStrength;
-				float _TransNormal;
-				float _TransScattering;
-				float _TransDirect;
-				float _TransAmbient;
-				float _TransShadow;
-			#endif
-			#ifdef TESSELLATION_ON
-				float _TessPhongStrength;
-				float _TessValue;
-				float _TessMin;
-				float _TessMax;
-				float _TessEdgeLength;
-				float _TessMaxDisp;
-			#endif
+
 			CBUFFER_END
+			
 			sampler2D _MainTex;
 			sampler2D _MotionVectors;
-			TEXTURE2D_ARRAY(_SLZ_DitherTex2D);
+			//TEXTURE2D_ARRAY(_SLZ_DitherTex2D);
 			int NoisePixels;
 			int _SLZ_TexSel;
 			int NoiseArraySize;
-			SAMPLER(sampler_SLZ_DitherTex2D);
+			//SAMPLER(sampler_SLZ_DitherTex2D);
 
 
 			inline float4 ASE_ComputeGrabScreenPos( float4 pos )
@@ -743,7 +743,7 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 
 			half4 frag(	VertexOutput IN 
 						#ifdef ASE_DEPTH_WRITE_ON
-						,out float outputDepth : ASE_SV_DEPTH
+						,out D3D11_CENTROID float outputDepth : ASE_SV_DEPTH
 						#endif
 						 ) : SV_TARGET
 			{
@@ -780,8 +780,8 @@ Shader "SLZ/Particle/Motion Vector Billboard Correct Shadows"
 				#else
 				float staticSwitch72 = _Depth;
 				#endif
-				float temp_output_4_0_g44 = ( unityObjectToClipPos92.w + ( ( SAMPLE_TEXTURE2D_ARRAY( _SLZ_DitherTex2D, sampler_SLZ_DitherTex2D, ( (ase_grabScreenPosNorm).xy * ( (_ScreenParams).xy / NoisePixels ) ),(float)( ( _SLZ_TexSel + (int)( NoiseArraySize * IN.ase_texcoord3.xyz.y ) ) % NoiseArraySize ) ) - temp_cast_8 ) * staticSwitch72 ).r );
-				
+				float clipOffset = GetScreenNoiseR(ase_grabScreenPosNorm.xy) * staticSwitch72;
+				float temp_output_4_0_g44 = clipOffset;
 				float Alpha = (temp_output_11_0).a;
 				float AlphaClipThreshold = 0.5;
 				float AlphaClipThresholdShadow = 0.5;

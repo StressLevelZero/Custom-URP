@@ -1,9 +1,8 @@
 fileFormatVersion: 2
-guid: 97791a0150e87a14bbe1a5d46267be8a
+guid: 1fd1968cc39923a40b45f17c56067eb2
 ShaderImporter:
   externalObjects: {}
-  defaultTextures:
-  - g_tBRDFMap: {fileID: 2800000, guid: a3bdd83838d6c4b40aafefcae6402faf, type: 3}
+  defaultTextures: []
   nonModifiableTextures: []
   preprocessorOverride: 0
   userData: 
