@@ -9,13 +9,14 @@
 
 #if defined(STEREO_MULTIVIEW_ON) && (defined(SHADER_API_GLES3) || defined(SHADER_API_GLCORE) || defined(SHADER_API_VULKAN)) && !(defined(SHADER_API_SWITCH))
     #define UNITY_STEREO_MULTIVIEW_ENABLED
-
+	#include "Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl"
 	#if defined(UNITY_COMPILER_DXC) && !defined(SLZ_DXC_UPDATED)
 		#error Using DXC for multiview, but DXC not Updated (UnityInput.hlsl)
 	#endif
 
 	// SLZ MODIFIED - insert SPIR-V opcodes for multiview extension and capability when externally updated DXC is used
 	#if defined(UNITY_COMPILER_DXC) && defined(SLZ_DXC_UPDATED)
+		
 	    [[vk::ext_capability(/*MultiView*/ 4439)]]
         [[vk::ext_extension("SPV_KHR_multiview")]]
 		//#error Hacked DXC Enabled?
@@ -29,7 +30,8 @@
 		// Redefine the POSITION semantic to have ViewIndex semantic appended to it
 		// Abuses the fact that HLSL allows every semantic to be numbered, even ones where only one is allowed. Use POSITION0 instead of POSITION
 		// to prevent recursion in the macro.
-		#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : VIEWIDX
+		//#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : VIEWIDX
+		#define POSITION POSITION0; uint stereoTargetEyeIndexAsBlendIdx0 : SV_ViewID
 	#endif
 #endif
 

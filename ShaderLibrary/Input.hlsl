@@ -164,6 +164,9 @@ half4 _AdditionalLightsAttenuation[MAX_VISIBLE_LIGHTS];
 half4 _AdditionalLightsSpotDir[MAX_VISIBLE_LIGHTS];
 half4 _AdditionalLightsOcclusionProbes[MAX_VISIBLE_LIGHTS];
 float _AdditionalLightsLayerMasks[MAX_VISIBLE_LIGHTS]; // we want uint[] but Unity api does not support it.
+// SLZ MODIFIED - Index of the first important light. Used as a singular pixel light on quest
+int _ImportantLightIndex;
+// END SLZ MODIFIED
 #ifndef SHADER_API_GLES3
 CBUFFER_END
 #endif

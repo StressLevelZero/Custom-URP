@@ -191,6 +191,12 @@ namespace UnityEngine.Rendering.Universal
         /// True if additional lights enabled.
         /// </summary>
         public bool supportsAdditionalLights;
+
+        // SLZ MODIFIED - Add important additional light for quest.
+
+        public int importantAddLight;
+
+        // END SLZ MODIFIED
     }
 
 

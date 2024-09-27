@@ -68,7 +68,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             //#pragma shader_feature _SM6_QUAD
             #define _SM6_QUAD 1
             #endif
-
+            //#define _ADDITIONAL_LIGHTS
             #include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
 
             ENDHLSL

@@ -62,6 +62,7 @@
 #endif
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -85,6 +86,7 @@
 struct VertIn
 {
 	float4 vertex   : POSITION;
+	//uint stereoTargetEyeIndexAsBlendIdx0 : SV_ViewID;
 	float3 normal    : NORMAL;
 	float4 tangent   : TANGENT;
 	float4 uv0 : TEXCOORD0;
@@ -355,6 +357,11 @@ half4 frag(VertOut i) : SV_Target
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif
+	
 // End Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
+	//#if !defined(UNITY_COMPILER_DXC)
+	//return color * float4(1.1, 0.2, 1.1, 1);
+	//#else
 	return color;
+	//#endif
 }

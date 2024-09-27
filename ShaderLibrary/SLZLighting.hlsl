@@ -14,8 +14,12 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/GlobalIllumination.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
-#if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
-#define _ADDITIONAL_LIGHTS false
+#if defined(DYNAMIC_ADDITIONAL_LIGHTS)
+    #define BRANCH_ADDITIONAL_LIGHTS _ADDITIONAL_LIGHTS
+#elif defined(_ADDITIONAL_LIGHTS)
+    #define BRANCH_ADDITIONAL_LIGHTS true
+#else 
+    #define BRANCH_ADDITIONAL_LIGHTS false
 #endif
 
 #if !defined(UNITY_COMMON_INCLUDED) //Get my IDE to recognize half, this won't ever get compiled since I just included Common.hlsl 
@@ -25,9 +29,9 @@
     #define half4 half4
 #endif
 
-
-
-
+#if defined(SHADER_API_MOBILE)
+//#define SLZ_MONO_SPECULAR
+#endif
 
 //#define USE_MOBILE_BRDF 
 
@@ -123,6 +127,12 @@ struct SLZAnisoSpecLightInfo
     half BoH;
 };
 
+struct SLZMonoSpecInfo
+{
+	half4 colorMagnitude;
+	half3 direction;
+};
+
 //------------------------------------------------------------------------
 //------------------------------------------------------------------------
 // Basic Functions
@@ -202,13 +212,25 @@ float SLZGeometricNormalFiltering(float perceptualSmoothness, float3 geometricNo
     return NormalFiltering(perceptualSmoothness, variance, threshold);
 }
 
+void StoreMaxSpecularInfo(inout SLZMonoSpecInfo specInfo, half3 diffuse, half3 direction, half NoH)
+{
+	half magnitude = max(diffuse.r, max(diffuse.g, diffuse.b));
+	if (specInfo.colorMagnitude.a < magnitude)
+	{
+		specInfo.colorMagnitude = half4(diffuse, magnitude);
+		specInfo.direction = direction;
+	}
+}
+
 //------------------------------------------------------------------------
 //------------------------------------------------------------------------
 // Automated Data Structure Population Functions
 //------------------------------------------------------------------------
 //------------------------------------------------------------------------
 
-SLZFragData SLZGetFragData(float4 positionCS, float3 positionWS, float3 normalWS, float2 lightmapUV, float2 dynLightmapUV, half3 vertexLighting)
+SLZFragData
+	SLZGetFragData(
+	float4 positionCS, float3 positionWS, float3 normalWS, float2 lightmapUV, float2 dynLightmapUV, half3 vertexLighting)
 {
     SLZFragData data;
     data.position = positionWS;
@@ -805,7 +827,7 @@ half3 SLZApplyLightmapDirectionalityBRDFLUT(const half3 lightmapColor, const hal
  * @param         frag     Struct containing all relevant fragment data (lightmap uvs, normal and view vectors, etc)
  * @param         surf     struct containing PBR surface information for the specular calculations
  */
-void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, const SLZFragData frag, inout SLZSurfData surf)
+void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecInfo monoSpec, const SLZFragData frag, inout SLZSurfData surf)
 {
 
 
@@ -829,9 +851,13 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, const SLZ
                 half directionality = saturate((length(lmDirection) - 0.66h) / (1.0h - 0.66h));
                 lmDirection = SLZSafeHalf3Normalize(lmDirection); //length not 1
                 SLZDirectSpecLightInfo lightInfo = SLZGetDirectLightInfo(frag, lmDirection);
-                half3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf, frag);
-                
-                specular += lmDiffuse * lmSpecular * lightInfo.NoL * directionality;
+                #ifdef SLZ_MONO_SPECULAR
+                    StoreMaxSpecularInfo(monoSpec, lmDiffuse * directionality, lmDirection, lightInfo.NoH);
+                #else
+                    
+                    half3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf, frag);
+                    specular += lmDiffuse * lmSpecular * lightInfo.NoL * directionality;
+                #endif
             #endif
     #endif
     
@@ -842,12 +868,17 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, const SLZ
         #if defined(DIRLIGHTMAP_COMBINED) && !defined(SHADER_API_MOBILE)
             half4 dynDirectionalMap = SAMPLE_TEXTURE2D(unity_DynamicDirectionality, samplerunity_DynamicLightmap, frag.dynLightmapUV);
             half3 dynLmDirection = half(2.0) * dynDirectionalMap.rgb - half(1.0);
+            half dynDirectionality = saturate((length(dynLmDirection) - 0.66h) / (1.0h - 0.66h));
             dynLmDiffuse = SLZApplyLightmapDirectionality(dynLmDiffuse,dynLmDirection, frag.normal, dynDirectionalMap.w);
             #if !defined(_SLZ_DISABLE_BAKED_SPEC) && !defined(SLZ_NO_SPECULAR)
                 dynLmDirection = SLZSafeHalf3Normalize(dynLmDirection); //length not 1
                 SLZDirectSpecLightInfo dynLightInfo = SLZGetDirectLightInfo(frag, dynLmDirection);
-                half3 dynLmSpecular = SLZDirectBRDFSpecular(dynLightInfo, surf, frag);
-                specular += dynLmDiffuse * dynLmSpecular * dynLightInfo.NoL;
+                #ifdef SLZ_MONO_SPECULAR
+                    StoreMaxSpecularInfo(monoSpec, dynLmDiffuse * dynDirectionality, dynLmDirection, dynLightInfo.NoH);
+                #else
+                    half3 dynLmSpecular = SLZDirectBRDFSpecular(dynLightInfo, surf, frag);
+                    specular += dynLmDiffuse * dynLmSpecular * dynLightInfo.NoL * dynDirectionality;
+                #endif
             #endif
         #endif
     
@@ -983,7 +1014,7 @@ half SLZSpecularHorizonOcclusion(half3 normal, half3 reflectionDir)
  * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
  * @param         directSSAO Direct screen-space ambient occlusion factor       
  */
-void SLZMainLight(inout half3 diffuse, inout half3 specular, const SLZFragData fragData, const SLZSurfData surfData, half directSSAO)
+void SLZMainLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecInfo maxSpecular, const SLZFragData fragData, const SLZSurfData surfData, half directSSAO)
 {
     Light mainLight = GetMainLight(fragData.shadowCoord, fragData.position, fragData.shadowMask);
     half3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, mainLight);
@@ -1004,12 +1035,22 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, const SLZFragData f
             half3 dominantColor = isMainLight ? diffuseBRDF : max(half(0.0), diffuse);
             half NoLMul = SLZFakeSpecularFalloff(specInfo.NoL);
             NoLMul = isMainLight ? 1.0 : NoLMul;
-            specular += dominantColor * SLZDirectBRDFSpecular(specInfo, surfData, fragData) * NoLMul;
+            dominantColor *= NoLMul;
+            #if defined(SLZ_MONO_SPECULAR)
+                StoreMaxSpecularInfo(maxSpecular, dominantColor, dominantDir, specInfo.NoH);
+            #else
+                specular += dominantColor * SLZDirectBRDFSpecular(specInfo, surfData, fragData) * NoLMul;
+            #endif
         #elif !defined(DIRLIGHTMAP_COMBINED) || defined(SLZ_DISABLE_BAKED_SPEC)
             SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, mainLight.direction);
-            specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
+            #if defined(SLZ_MONO_SPECULAR)
+                StoreMaxSpecularInfo(maxSpecular, diffuseBRDF, mainLight.direction, specInfo.NoH);
+            #else
+                specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
+            #endif
         #endif
     #endif
+    
     diffuse += diffuseBRDF;
 }
 
@@ -1018,12 +1059,13 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, const SLZFragData f
  *
  * @param[in,out] diffuse   Running total of the diffuse light color
  * @param[in,out] specular  Running total of the specular color
+ * @param[in,out] maxSpecular Running max light source's direction and color (only used if SLZ_MONO_SPECULAR is defined)
  * @param         fragData  Struct containing all relevant fragment data (normal, position, etc)
  * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
  * @param         addLight  Struct containing the information about a given light (color, attenuation, shadowing, etc)
  * @param         directSSAO Direct screen-space ambient occlusion factor    
  */
-void SLZAddLight(inout half3 diffuse, inout half3 specular, const SLZFragData fragData, const SLZSurfData surfData, Light addLight, half directSSAO)
+void SLZAddLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecInfo maxSpecular, const SLZFragData fragData, const SLZSurfData surfData, Light addLight, half directSSAO)
 {
     half3 diffuseBRDF = SLZDiffuseBDRF(fragData, surfData, addLight);
     UNITY_BRANCH if (BRANCH_SCREEN_SPACE_OCCLUSION)
@@ -1032,10 +1074,22 @@ void SLZAddLight(inout half3 diffuse, inout half3 specular, const SLZFragData fr
     }
     diffuse += diffuseBRDF;
     #if !defined(SLZ_NO_SPECULAR)
-    SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, addLight.direction);
-    specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
+	    SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, addLight.direction);
+        #if defined(SLZ_MONO_SPECULAR)
+            StoreMaxSpecularInfo(maxSpecular, diffuseBRDF, addLight.direction, specInfo.NoH);
+        #else
+            specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
+        #endif
     #endif
 }
+
+
+struct ForwardPlusMacroFix
+{
+	float2 normalizedScreenSpaceUV;
+	float3 positionWS;
+};
+
 
 /**
  * Full PBR lighting calculation
@@ -1050,7 +1104,10 @@ void SLZAddLight(inout half3 diffuse, inout half3 specular, const SLZFragData fr
 half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType = 0)
 {
     half3 diffuse = half3(0.0h, 0.0h, 0.0h);
-    half3 specular = half3(0.0h, 0.0h, 0.0h);
+	half3 specular = half3(0.0h, 0.0h, 0.0h);
+   
+	SLZMonoSpecInfo monoSpecInfo = { half4(0, 0, 0, -1), (half3) 0 };
+
     //half2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
        
     #if defined(LIGHTMAP_ON) 
@@ -1058,7 +1115,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     // Lightmapping diffuse and specular calculations
     //-------------------------------------------------------------------------------------------------
         
-        SLZGetLightmapLighting(diffuse, specular, fragData, surfData);
+        SLZGetLightmapLighting(diffuse, specular, monoSpecInfo, fragData, surfData);
     
     #else 
     //-------------------------------------------------------------------------------------------------
@@ -1091,24 +1148,43 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     
     // For dynamic objects, this also does specular for probes if there is no main light, assuming the
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
-    SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion); 
+	SLZMainLight(diffuse, specular, monoSpecInfo, fragData, surfData, ao.directAmbientOcclusion);
+
     
-    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    #if SHADER_API_MOBILE
+    if (_ImportantLightIndex != -1)
+    {
+            Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), fragData.position);
+            //Light light = GetAdditionalLight(_ImportantLightIndex, fragData.position, fragData.shadowMask);
+            SLZAddLight(diffuse, specular, monoSpecInfo, fragData, surfData, light, ao.directAmbientOcclusion);
+    }
+    #else
+    [branch] if (BRANCH_ADDITIONAL_LIGHTS)
     {
         uint pixelLightCount = GetAdditionalLightsCount();
-
+        
+        #if USE_FORWARD_PLUS
+        ForwardPlusMacroFix inputData = {fragData.screenUV, fragData.position};
+        #endif
+        
         LIGHT_LOOP_BEGIN(pixelLightCount)
             Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
-            SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
+            SLZAddLight(diffuse, specular, monoSpecInfo, fragData, surfData, light, ao.directAmbientOcclusion);
         LIGHT_LOOP_END
     }
+    #endif
+
+
+
+#if defined(SLZ_MONO_SPECULAR)
+    SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, monoSpecInfo.direction);
+    specular += monoSpecInfo.colorMagnitude.rgb * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
+#endif
     
-
-
     //-------------------------------------------------------------------------------------------------
     // Image-based specular
     //-------------------------------------------------------------------------------------------------
-    #if !defined(SLZ_NO_SPECULAR)
+#if !defined(SLZ_NO_SPECULAR)
     half3 reflectionDir = SLZProbeReflectionDir(fragData, surfData);
     SLZImageBasedSpecular(diffuse,specular, reflectionDir, fragData, surfData, ao.indirectAmbientOcclusion);
     half occlusionFactor = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);

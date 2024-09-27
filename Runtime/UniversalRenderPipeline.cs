@@ -1395,8 +1395,14 @@ namespace UnityEngine.Rendering.Universal
 
             var isForwardPlus = cameraData.renderer is UniversalRenderer { renderingModeActual: RenderingMode.ForwardPlus };
             var visibleLights = cullResults.visibleLights;
-
+// SLZ MODIFIED - Store the index of the first light whose (hidden) render mode is "important" on quest so we can move its data to a static position
+            int importantLightIndex = -1;
+#if PLATFORM_ANDROID
+            int mainLightIndex = GetMainAndImportantLightIndex(settings, visibleLights, out importantLightIndex);
+            //Debug.Log($"Important Light Index: {importantLightIndex}");
+#else
             int mainLightIndex = GetMainLightIndex(settings, visibleLights);
+#endif
             bool mainLightCastShadows = false;
             bool additionalLightsCastShadows = false;
 
@@ -1433,6 +1439,9 @@ namespace UnityEngine.Rendering.Universal
             renderingData.cullResults = cullResults;
             renderingData.cameraData = cameraData;
             InitializeLightData(settings, visibleLights, mainLightIndex, out renderingData.lightData);
+#if PLATFORM_ANDROID
+            renderingData.lightData.importantAddLight = importantLightIndex;
+#endif
             InitializeShadowData(settings, visibleLights, mainLightCastShadows, additionalLightsCastShadows && !renderingData.lightData.shadeAdditionalLightsPerVertex, isForwardPlus, out renderingData.shadowData);
             InitializePostProcessingData(settings, cameraData.stackLastCameraOutputToHDR, out renderingData.postProcessingData);
 
@@ -1556,6 +1565,7 @@ namespace UnityEngine.Rendering.Universal
             int maxVisibleAdditionalLights = UniversalRenderPipeline.maxVisibleAdditionalLights;
 
             lightData.mainLightIndex = mainLightIndex;
+            lightData.importantAddLight = -1;
 
             if (settings.additionalLightsRenderingMode != LightRenderingMode.Disabled)
             {
@@ -1712,6 +1722,83 @@ namespace UnityEngine.Rendering.Universal
                     {
                         brightestLightIntensity = currLight.intensity;
                         brightestDirectionalLightIndex = i;
+                    }
+                }
+            }
+
+            return brightestDirectionalLightIndex;
+        }
+
+        // SLZ MODIFIED - Copy of GetMainLightIndex where we also search for the first "important" light.
+        // The performance on Quest of dynamically indexing into the light constant buffer arrays with indicies
+        // retrieved from unity_LightIndices0 is terrible. Adreno wants constant buffer accesses to be compile time constants!
+        // To have a single additional light in the pixel shader, we mark a light with the "important" rendermode
+        // and store its index. Then we copy that light's data to the last position in the light buffer so its data is in a
+        // compile-time constant position in the shader. The original light index is also passed to the shader so we don't
+        // double-add it as a vertex light.
+        static int GetMainAndImportantLightIndex(UniversalRenderPipelineAsset settings, NativeArray<VisibleLight> visibleLights, out int importantLightIndex)
+        {
+            using var profScope = new ProfilingScope(null, Profiling.Pipeline.getMainLightIndex);
+
+            importantLightIndex = -1;
+
+            int totalVisibleLights = visibleLights.Length;
+
+            if (totalVisibleLights == 0)// || settings.mainLightRenderingMode != LightRenderingMode.PerPixel)
+                return -1;
+
+            Light sunLight = RenderSettings.sun;
+            int brightestDirectionalLightIndex = -1;
+            float brightestLightIntensity = 0.0f;
+            int i = 0;
+            for (; i < totalVisibleLights; ++i)
+            {
+                ref VisibleLight currVisibleLight = ref visibleLights.UnsafeElementAtMutable(i);
+                Light currLight = currVisibleLight.light;
+
+                // Particle system lights have the light property as null. We sort lights so all particles lights
+                // come last. Therefore, if first light is particle light then all lights are particle lights.
+                // In this case we either have no main light or already found it.
+                if (currLight == null)
+                    break;
+
+                if (currVisibleLight.lightType == LightType.Directional)
+                {
+                    // Sun source needs be a directional light
+                    if (currLight == sunLight)
+                    {
+                        brightestDirectionalLightIndex = i;
+                        break;
+                    }
+
+                    // In case no sun light is present we will return the brightest directional light
+                    if (currLight.intensity > brightestLightIntensity)
+                    {
+                        brightestLightIntensity = currLight.intensity;
+                        brightestDirectionalLightIndex = i;
+                    }
+                }
+                if (importantLightIndex == -1 && currLight.renderMode == LightRenderMode.ForcePixel)
+                {
+                    importantLightIndex = i;
+                }
+            }
+            if (importantLightIndex == -1)
+            {
+                for (; i < totalVisibleLights; ++i)
+                {
+                    ref VisibleLight currVisibleLight = ref visibleLights.UnsafeElementAtMutable(i);
+                    Light currLight = currVisibleLight.light;
+
+                    // Particle system lights have the light property as null. We sort lights so all particles lights
+                    // come last. Therefore, if first light is particle light then all lights are particle lights.
+                    // In this case we either have no main light or already found it.
+                    if (currLight == null)
+                        break;
+                    if (currLight.renderMode == LightRenderMode.ForcePixel)
+                    {
+                        importantLightIndex = i;
+                        break;
                     }
                 }
             }

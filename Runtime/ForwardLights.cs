@@ -569,7 +569,27 @@ namespace UnityEngine.Rendering.Universal.Internal
                             lightIter++;
                         }
                     }
+                    // SLZ MODIFIED - copy the first important light to the last position in the arrays so that its accessable at a static address for the 2007-ass quest gpu
+                    if (lightData.importantAddLight != -1)
+                    {
+                        int lastIdx = m_AdditionalLightPositions.Length - 1;
 
+                        InitializeLightConstants(
+                               lights,
+                               lightData.importantAddLight,
+                               out m_AdditionalLightPositions[lastIdx],
+                               out m_AdditionalLightColors[lastIdx],
+                               out m_AdditionalLightAttenuations[lastIdx],
+                               out m_AdditionalLightSpotDirections[lastIdx],
+                               out m_AdditionalLightOcclusionProbeChannels[lastIdx],
+                               out uint lightLayerMask,
+                               out var isSubtractive);
+
+                        m_AdditionalLightsLayerMasks[lastIdx] = math.asfloat(lightLayerMask);
+                        m_AdditionalLightColors[lastIdx].w = isSubtractive ? 1f : 0f;
+                    }
+                    //Debug.Log("Set _ImportantLightIndex");
+                    cmd.SetGlobalInt("_ImportantLightIndex", lightData.importantAddLight);
                     cmd.SetGlobalVectorArray(LightConstantBuffer._AdditionalLightsPosition, m_AdditionalLightPositions);
                     cmd.SetGlobalVectorArray(LightConstantBuffer._AdditionalLightsColor, m_AdditionalLightColors);
                     cmd.SetGlobalVectorArray(LightConstantBuffer._AdditionalLightsAttenuation, m_AdditionalLightAttenuations);
@@ -583,6 +603,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             }
             else
             {
+                cmd.SetGlobalInt("_ImportantLightIndex", -1);
                 cmd.SetGlobalVector(LightConstantBuffer._AdditionalLightsCount, Vector4.zero);
             }
         }
