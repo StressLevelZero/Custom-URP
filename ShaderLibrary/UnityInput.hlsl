@@ -9,6 +9,30 @@
 
 #if defined(STEREO_MULTIVIEW_ON) && (defined(SHADER_API_GLES3) || defined(SHADER_API_GLCORE) || defined(SHADER_API_VULKAN)) && !(defined(SHADER_API_SWITCH))
     #define UNITY_STEREO_MULTIVIEW_ENABLED
+	#include "Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl"
+	#if defined(UNITY_COMPILER_DXC) && !defined(SLZ_DXC_UPDATED)
+		//#error Using DXC for multiview, but DXC not Updated (UnityInput.hlsl)
+	#endif
+
+	// SLZ MODIFIED - insert SPIR-V opcodes for multiview extension and capability when externally updated DXC is used
+	#if defined(UNITY_COMPILER_DXC) && defined(SLZ_DXC_UPDATED)
+		
+	    [[vk::ext_capability(/*MultiView*/ 4439)]]
+        [[vk::ext_extension("SPV_KHR_multiview")]]
+		//#error Hacked DXC Enabled?
+		#define SLZ_DXC_MULTIVIEW
+		#ifdef UNITY_INSTANCING_INCLUDED
+			#error UnityInstancing included before UnityInput
+		#endif
+		// disgustingly cursed. The ViewIndex builtin cannot be written to, so we can't insert it into UNITY_VERTEX_INPUT_INSTANCE_ID as
+		// that gets put into both the vertex input struct and the output interpolator struct. And because we're inserting instructions 
+		// manually, the compiler isn't going to strip it from the interpolator on the vertex output side even though no one is writing to it.
+		// Redefine the POSITION semantic to have ViewIndex semantic appended to it
+		// Abuses the fact that HLSL allows every semantic to be numbered, even ones where only one is allowed. Use POSITION0 instead of POSITION
+		// to prevent recursion in the macro.
+		//#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : VIEWIDX
+		#define POSITION POSITION0; uint stereoTargetEyeIndexAsBlendIdx0 : SV_ViewID
+	#endif
 #endif
 
 #if defined(UNITY_SINGLE_PASS_STEREO) || defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
@@ -186,7 +210,8 @@ CBUFFER_END
 #endif
 #endif
 
-#if defined(UNITY_STEREO_MULTIVIEW_ENABLED) && defined(SHADER_STAGE_VERTEX)
+// SLZ MODIFIED - Make multiview act like SPSI if using the DXC compiler. Don't declare the dummy cbuffer, and make unity_StereoEyeIndex a static uint
+#if defined(UNITY_STEREO_MULTIVIEW_ENABLED) && defined(SHADER_STAGE_VERTEX) && !defined(SLZ_DXC_MULTIVIEW)
 #define unity_StereoEyeIndex UNITY_VIEWID
 UNITY_DECLARE_MULTIVIEW(2);
 #elif defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)

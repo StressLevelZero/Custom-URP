@@ -36,6 +36,10 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         ColorMask RGBA
         LOD 100
 
+        HLSLINCLUDE
+        #define LITMAS_FORCE_REIMPORT 1
+        ENDHLSL
+
         Pass
         {
             Blend [_BlendSrc] [_BlendDst]
@@ -55,13 +59,16 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_SSR
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+
+            //#pragma use_dxc vulkan
+
             #if defined(SHADER_API_DESKTOP) && defined(_SLZ_SSR_ENABLED) && !defined(_NO_SSR)
             #pragma require WaveVote
             #pragma require QuadShuffle
             //#pragma shader_feature _SM6_QUAD
             #define _SM6_QUAD 1
             #endif
-
+            //#define _ADDITIONAL_LIGHTS
             #include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
 
             ENDHLSL
@@ -99,6 +106,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+
             #include "LitMASInclude/ShaderInjector/StandardDepthNormals.hlsl" 
             ENDHLSL
         }
@@ -123,6 +131,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+
             #include "LitMASInclude/ShadowCaster.hlsl"
             ENDHLSL
         }
@@ -146,6 +155,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+
             #include "LitMASInclude/ShaderInjector/StandardMeta.hlsl" 
             ENDHLSL
         }
@@ -197,7 +207,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_SSR
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-
+           
             //#if defined(SHADER_API_DESKTOP)
             //#pragma require QuadShuffle
             //#define _SM6_QUAD 1

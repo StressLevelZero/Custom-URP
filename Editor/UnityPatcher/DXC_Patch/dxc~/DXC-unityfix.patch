@@ -1,0 +1,44 @@
+diff --git a/lib/DxcSupport/HLSLOptions.cpp b/lib/DxcSupport/HLSLOptions.cpp
+index 94103077f..cf84e334a 100644
+--- a/lib/DxcSupport/HLSLOptions.cpp
++++ b/lib/DxcSupport/HLSLOptions.cpp
+@@ -471,6 +471,14 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
+     opts.TargetProfile = Args.getLastArgValue(OPT_target_profile);
+   }
+ 
++  // Force target to at least 6.5
++  if (!opts.TargetProfile.empty()) {
++    size_t tps = opts.TargetProfile.size();
++
++    if (tps == 6 && opts.TargetProfile[tps - 1] < '5')
++      const_cast<char *>(opts.TargetProfile.data())[tps - 1] = '5';
++  }
++
+   if (opts.IsLibraryProfile()) {
+     // Don't bother erroring out when entry is specified.  We weren't always
+     // doing this before, so doing so will break existing code.
+@@ -1176,8 +1184,8 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
+     opts.SpirvOptions.debugInfoLine = opts.SpirvOptions.debugInfoTool = true;
+   }
+ 
+-  opts.SpirvOptions.targetEnv =
+-      Args.getLastArgValue(OPT_fspv_target_env_EQ, "vulkan1.0");
++  opts.SpirvOptions.targetEnv = "vulkan1.2";
++     // Args.getLastArgValue(OPT_fspv_target_env_EQ, "vulkan1.2");
+ 
+   llvm::APInt maxId;
+ 
+diff --git a/tools/clang/tools/dxcompiler/DXCompiler.cpp b/tools/clang/tools/dxcompiler/DXCompiler.cpp
+index c54844144..21081bd52 100644
+--- a/tools/clang/tools/dxcompiler/DXCompiler.cpp
++++ b/tools/clang/tools/dxcompiler/DXCompiler.cpp
+@@ -53,6 +53,9 @@ void __CRTDECL operator delete(void *ptr,
+ #endif
+ 
+ static HRESULT InitMaybeFail() throw() {
++    #if !defined(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
++    #error _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR was not defined
++    #endif
+   HRESULT hr;
+   bool fsSetup = false, memSetup = false;
+   IFC(DxcInitThreadMalloc());

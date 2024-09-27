@@ -130,7 +130,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-    
+	SLZMonoSpecInfo fuckyou = (SLZMonoSpecInfo) 0;
 
 
 #if defined(LIGHTMAP_ON) 
@@ -138,7 +138,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     // Lightmapping diffuse and specular calculations
     //-------------------------------------------------------------------------------------------------
 
-    SLZGetLightmapLighting(diffuse, specular, fragData, surfData);
+    SLZGetLightmapLighting(diffuse, specular, fuckyou, fragData, surfData);
 
 #else 
     //-------------------------------------------------------------------------------------------------
@@ -167,10 +167,10 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     //-------------------------------------------------------------------------------------------------
     // Realtime light calculations
     //-------------------------------------------------------------------------------------------------
-
+	
     // For dynamic objects, this also does specular for probes if there is no main light, assuming the
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
-    SLZMainLight(diffuse, specular, fragData, surfData, ao.directAmbientOcclusion);
+	SLZMainLight(diffuse, specular, fuckyou, fragData, surfData, ao.directAmbientOcclusion);
 
     UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
     {
@@ -178,7 +178,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 
         LIGHT_LOOP_BEGIN(pixelLightCount)
             Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
-        SLZAddLight(diffuse, specular, fragData, surfData, light, ao.directAmbientOcclusion);
+		SLZAddLight(diffuse, specular, fuckyou, fragData, surfData, light, ao.directAmbientOcclusion);
         LIGHT_LOOP_END
     }
 
@@ -194,7 +194,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     //float oldVertDepth = ssrExtra.lastClipPos.z / ssrExtra.lastClipPos.w;
     //float ddzOld = GetDepthDerivativeSum(oldVertDepth);
 
-    SLZImageBasedSpecularSSR(diffuse, specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
+	SLZImageBasedSpecularSSR(diffuse, specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
     real horizOcclusion = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
     specular *= horizOcclusion;
     SSR.rgb *= horizOcclusion;

@@ -24,9 +24,13 @@
 
 // SLZ MODIFIED // handle shaders that don't use dynamic branching for certain keywords
 
-#if !defined (DYNAMIC_ADDITIONAL_LIGHTS)
-	#if !defined(_ADDITIONAL_LIGHTS)
-		#define _ADDITIONAL_LIGHTS false
+#if defined (DYNAMIC_ADDITIONAL_LIGHTS)
+    #define BRANCH_ADDITIONAL_LIGHTS _ADDITIONAL_LIGHTS
+#else
+	#if defined(_ADDITIONAL_LIGHTS)
+	    #define BRANCH_ADDITIONAL_LIGHTS true
+    #else
+		#define BRANCH_ADDITIONAL_LIGHTS false
 	#endif
 #endif
 
@@ -191,18 +195,20 @@ half3 VertexLighting(float3 positionWS, half3 normalWS)
     uint meshRenderingLayers = GetMeshRenderingLayer();
 
     LIGHT_LOOP_BEGIN(lightsCount)
-        Light light = GetAdditionalLight(lightIndex, positionWS);
-
+        int objLightIndex = GetPerObjectLightIndex(lightIndex);
+        if (objLightIndex != _ImportantLightIndex)
+        {
+            Light light = GetAdditionalPerObjectLight(objLightIndex, positionWS);
 #ifdef _LIGHT_LAYERS
-		if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+		    if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
-		{
-			// SLZ MODIFIED // Light.color is a half4, cast to half3 if not fluorescent
-			half3or4_fl lightColor = (half3or4_fl)light.color * light.distanceAttenuation;
-			// END SLZ MODIFIED
-			vertexLightColor += LightingLambert(lightColor, light.direction, normalWS);
-		}
-
+		    {
+		    	// SLZ MODIFIED // Light.color is a half4, cast to half3 if not fluorescent
+		    	half3or4_fl lightColor = (half3or4_fl)light.color * light.distanceAttenuation;
+		    	// END SLZ MODIFIED
+		    	vertexLightColor += LightingLambert(lightColor, light.direction, normalWS);
+		    }
+        }
     LIGHT_LOOP_END
 #endif
 
@@ -392,7 +398,7 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
                                                               surfaceData.clearCoatMask, specularHighlightsOff);
     }
 
-    if (_ADDITIONAL_LIGHTS)
+    if (BRANCH_ADDITIONAL_LIGHTS)
 	{
 		uint pixelLightCount = GetAdditionalLightsCount();
 	
@@ -428,6 +434,22 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
 		LIGHT_LOOP_END
     }
 
+    #if defined(_ADDITIONAL_LIGHTS_VERTEX)
+    if (_ImportantLightIndex != -1)
+    {
+            Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), inputData.positionWS);
+    
+            #if defined(_LIGHT_COOKIES)
+                half3 cookieColor = SampleAdditionalLightCookie((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), inputData.positionWS);
+                light.color *= cookieColor.rgbb;
+            #endif
+    
+            lightingData.additionalLightsColor += LightingPhysicallyBased(brdfData, brdfDataClearCoat, light,
+																			inputData.normalWS, inputData.viewDirectionWS,
+																			surfaceData.clearCoatMask, specularHighlightsOff);
+    }
+    #endif
+    
     #if defined(_ADDITIONAL_LIGHTS_VERTEX)
     lightingData.vertexLightingColor += inputData.vertexLighting * brdfData.diffuse;
     // SLZ MODIFIED // Add fluorescence from vertex lighting
@@ -494,7 +516,7 @@ half4 UniversalFragmentBlinnPhong(InputData inputData, SurfaceData surfaceData)
         lightingData.mainLightColor += CalculateBlinnPhong(mainLight, inputData, surfaceData);
     }
 
-    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    UNITY_BRANCH if (BRANCH_ADDITIONAL_LIGHTS)
 	{
 		uint pixelLightCount = GetAdditionalLightsCount();
 	

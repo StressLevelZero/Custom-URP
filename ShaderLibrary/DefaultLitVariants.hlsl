@@ -3,7 +3,7 @@
 //#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
 //#pragma multi_compile_fog
 #pragma skip_variants FOG_LINEAR FOG_EXP
-
+//#pragma multi_compile _ _FORWARD_PLUS
 #if defined(SHADER_API_MOBILE)
 	#define _ADDITIONAL_LIGHTS_VERTEX
 	#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION

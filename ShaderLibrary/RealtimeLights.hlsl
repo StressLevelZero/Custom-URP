@@ -243,7 +243,7 @@ int GetPerObjectLightIndex(uint index)
     // Take the "vec4" part into float4 tmp variable in order to force float4 math.
     // It appears indexing half4 as min16float4 on DX11 can fail. (dp4 {min16f})
     float4 tmp = unity_LightIndices[index / 4];
-    return int(tmp[index % 4]);
+    return int(tmp[index & 3]);
 #else
     // Fallback to GLES2. No bitfield magic here :(.
     // We limit to 4 indices per object and only sample unity_4LightIndices0.
