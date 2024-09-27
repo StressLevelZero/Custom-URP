@@ -25,7 +25,7 @@
 // SLZ MODIFIED // handle shaders that don't use dynamic branching for certain keywords
 
 #if defined (DYNAMIC_ADDITIONAL_LIGHTS)
-    #define BRANCH_ADDITIONAL_LIGHTS DYNAMIC_ADDITIONAL_LIGHTS
+    #define BRANCH_ADDITIONAL_LIGHTS _ADDITIONAL_LIGHTS
 #else
 	#if defined(_ADDITIONAL_LIGHTS)
 	    #define BRANCH_ADDITIONAL_LIGHTS true
@@ -438,6 +438,12 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
     if (_ImportantLightIndex != -1)
     {
             Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), inputData.positionWS);
+    
+            #if defined(_LIGHT_COOKIES)
+                half3 cookieColor = SampleAdditionalLightCookie((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), inputData.positionWS);
+                light.color *= cookieColor.rgbb;
+            #endif
+    
             lightingData.additionalLightsColor += LightingPhysicallyBased(brdfData, brdfDataClearCoat, light,
 																			inputData.normalWS, inputData.viewDirectionWS,
 																			surfaceData.clearCoatMask, specularHighlightsOff);

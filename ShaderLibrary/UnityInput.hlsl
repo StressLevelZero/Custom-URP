@@ -11,7 +11,7 @@
     #define UNITY_STEREO_MULTIVIEW_ENABLED
 	#include "Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl"
 	#if defined(UNITY_COMPILER_DXC) && !defined(SLZ_DXC_UPDATED)
-		#error Using DXC for multiview, but DXC not Updated (UnityInput.hlsl)
+		//#error Using DXC for multiview, but DXC not Updated (UnityInput.hlsl)
 	#endif
 
 	// SLZ MODIFIED - insert SPIR-V opcodes for multiview extension and capability when externally updated DXC is used

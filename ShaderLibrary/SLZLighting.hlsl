@@ -1151,10 +1151,20 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
 	SLZMainLight(diffuse, specular, monoSpecInfo, fragData, surfData, ao.directAmbientOcclusion);
 
     
-    #if SHADER_API_MOBILE
-    if (_ImportantLightIndex != -1)
+    #if defined(SHADER_API_MOBILE)
+    uint lightMask = 
+        (1 << (int)(unity_LightIndices[0].x - 1)) | 
+        (1 << (int)(unity_LightIndices[0].y - 1)) |
+        (1 << (int)(unity_LightIndices[0].z - 1));
+    
+    if (_ImportantLightIndex != -1 && 
+        ((1 << (int)(_ImportantLightIndex - 1)) & lightMask) != 0)
     {
             Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), fragData.position);
+            #if defined(_LIGHT_COOKIES)
+                half3 cookieColor = SampleAdditionalLightCookie((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), fragData.position);
+                light.color *= cookieColor.rgbb;
+            #endif
             //Light light = GetAdditionalLight(_ImportantLightIndex, fragData.position, fragData.shadowMask);
             SLZAddLight(diffuse, specular, monoSpecInfo, fragData, surfData, light, ao.directAmbientOcclusion);
     }

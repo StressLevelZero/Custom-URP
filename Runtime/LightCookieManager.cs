@@ -1051,6 +1051,15 @@ namespace UnityEngine.Rendering.Universal
                     worldToLights[bufIndex] = perp * worldToLights[bufIndex];
                 }
             }
+            if (lightData.importantAddLight != -1)
+            {
+                int importantIdx = lightData.importantAddLight;
+                int maxIdx = atlasUVRects.Length - 1;
+                lightTypes[maxIdx] = lightTypes[importantIdx];
+                worldToLights[maxIdx] = worldToLights[importantIdx];
+                atlasUVRects[maxIdx] = atlasUVRects[importantIdx];
+                cookieEnableBits[maxIdx] = cookieEnableBits[importantIdx];
+            }
 
             // Apply changes and upload to GPU
             m_AdditionalLightsCookieShaderData.Upload(cmd);
