@@ -28,12 +28,12 @@ namespace SLZ.SLZEditorTools
         [InitializeOnLoadMethod]
         public static void Initialize()
         {
-            Debug.Log("Running URP Config Manager Init");
             if (m_initialized || SessionState.GetBool("URPCfgInit", false))
             {
-                Debug.Log("Early Exit from URP Config Manager Init");
+                //Debug.Log("Early Exit from URP Config Manager Init");
                 return;
             }
+            Debug.Log("Running URP Config Manager Init");
 
             if (!Directory.Exists(packagePath))
             {

@@ -1,6 +1,7 @@
 using SLZ.SLZEditorTools;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using UnityEngine;
 
@@ -31,7 +32,12 @@ namespace SLZ.EditorPatcher
                 $"\t{comment}#define SLZ_DXC_VERSION_PATCH {patch}\n" +
                 $"\t{comment}#define SLZ_DXC_VERSION_BUILD {build}\n" +
                 $"#endif";
-            File.WriteAllText(includePath, file);
+            string original = File.ReadAllText(includePath);
+            if (!string.Equals(original, file, System.StringComparison.InvariantCulture))
+            {
+                Debug.Log($"DXCUpdateState needs to be updated!");
+                File.WriteAllText(includePath, file);
+            }
 
             return true;
         }
