@@ -14,7 +14,7 @@
 #endif
 
 // SLZ MODIFIED
-#define STUPID_CACHING_PREPROCESSOR 1
+#define STUPID_CACHING_PREPROCESSOR 2
 #include "Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/HLSL2021Support.hlsl"
 // END SLZ MODIFIED
