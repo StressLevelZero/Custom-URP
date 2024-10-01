@@ -14,21 +14,22 @@ public static class EndUnityIfPipelineUpdates
         var urpPkgInfo = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.render-pipelines.universal");
         var corePkgInfo = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.render-pipelines.core");
 
-        string currentUrpHash = urpPkgInfo.git != null ? urpPkgInfo.git.hash : "0";
-        string currentCoreHash = corePkgInfo.git != null ? corePkgInfo.git.hash : "0";
-        Debug.Log($"URP Git Hash: {currentUrpHash}");
-        Debug.Log($"SRP Core Git Hash: {currentCoreHash}");
+        string currentUrpHash = urpPkgInfo.version != null ? urpPkgInfo.version : "0";
+        string currentCoreHash = corePkgInfo.version != null ? corePkgInfo.version : "0";
+        //Debug.Log($"URP Git Hash: {currentUrpHash}");
+        //Debug.Log($"SRP Core Git Hash: {currentCoreHash}");
         string oldUrpHash = SessionState.GetString("URPHash", string.Empty);
         string oldCoreHash = SessionState.GetString("SRPCoreHash", string.Empty);
+
         if (string.IsNullOrEmpty(oldUrpHash))
         {
-            Debug.Log($"URP Git Hash: {currentUrpHash}"); 
+            Debug.Log($"URP Version: {currentUrpHash}"); 
             SessionState.SetString("URPHash", currentUrpHash);
             oldUrpHash = currentUrpHash;
         }
         if (string.IsNullOrEmpty(oldCoreHash))
         {
-            Debug.Log($"SRP Core Git Hash: {currentCoreHash}");
+            Debug.Log($"SRP Core version: {currentCoreHash}");
             SessionState.SetString("SRPCoreHash", currentCoreHash);
             oldCoreHash = currentCoreHash;
         }
