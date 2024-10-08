@@ -67,6 +67,12 @@
         float4 CameraMotionVector; //camera's motion per frame
         CBUFFER_END
         
+        // SH Used for sky occlusion
+// // Monochromatic Spherical Harmonics Coefficients (Only 9 total)
+		CBUFFER_START(MonoSHBuffer)
+			float _SHMonoCoefficients[9];
+		CBUFFER_END
+        
         
         
         //shared float SeqOffsetPrv; //z offseter
@@ -91,7 +97,21 @@
         shared int _SkyMipCount;
         
         
-        
+		float EvaluateMonochromaticSHL2(float3 normal)
+		{
+			// Monochromatic SH evaluation using the coefficients array
+			float shValue = _SHMonoCoefficients[0] +                             // L0 term (constant)
+							normal.y * _SHMonoCoefficients[1] +                  // L1 Y term (gradient)
+							normal.z * _SHMonoCoefficients[2] +                  // L1 Z term
+							normal.x * _SHMonoCoefficients[3] +                  // L1 X term
+							normal.x * normal.y * _SHMonoCoefficients[4] +       // L2 XY term
+							normal.y * normal.z * _SHMonoCoefficients[5] +       // L2 YZ term
+							(3.0 * normal.z * normal.z - 1.0) * _SHMonoCoefficients[6] +  // L2 Z² term
+							normal.x * normal.z * _SHMonoCoefficients[7] +       // L2 XZ term
+							(normal.x * normal.x - normal.y * normal.y) * _SHMonoCoefficients[8];  // L2 X² - Y² term
+
+			return shValue;
+		}
         // Returns the forward (central) direction of the current view in the world space.
         float3 GetViewForwardDir()
         {
@@ -113,7 +133,8 @@
         		float mipLevel = (1.0 - _MipFogParameters.z * saturate((fragDist - _MipFogParameters.x) / (_MipFogParameters.y - _MipFogParameters.x))) * (_SkyMipCount - 1);
         		// For the atmospheric scattering, we use the GGX convoluted version of the cubemap. That matches the of the idnex 0
         		//color *= SampleSkyTexture(-V, mipLevel, 0).rgb; // '_FogColor' is the tint
-        	    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb; // '_FogColor' is the tint
+        	    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb; // '_FogColor' is the tint	
+				color *= EvaluateMonochromaticSHL2(V); //Sky occlusion
         
         
         	return color;

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,8 +11,11 @@ public class VolumetricRegisters
     public static List<BakedVolumetricArea> volumetricAreas = new List<BakedVolumetricArea>();
 
     public static List<VolumetricRendering> volumetricRenderers = new List<VolumetricRendering>();
-
     
+    public static List<SkyOcclusionProbes> skyOcclusionProbes = new List<SkyOcclusionProbes>();
+
+    public static List<SkyOcclusionDataAsset> SkyOcclusionDataAssets = new List<SkyOcclusionDataAsset>();
+
     public static bool _meshObjectsNeedRebuilding = true;
 
 
@@ -59,6 +61,40 @@ public class VolumetricRegisters
         {
             VolumetricRenderer.VolumetricRegisterForceRefresh = true;
         }
+    }
+    
+    
+    public static void RegisterSkyOcclusionProbes(SkyOcclusionProbes skyOcclusionProbe)
+    {
+        if (!skyOcclusionProbes.Contains(skyOcclusionProbe) )
+        {
+            skyOcclusionProbes.Add(skyOcclusionProbe);
+            SkyManager.SkyOccCount = skyOcclusionProbes.Count;
+            RebuildSkyOccAssetList();
+        }
+    }
+    public static void UnregisterSkyOcclusionProbes(SkyOcclusionProbes skyOcclusionProbe)
+    {
+        if (skyOcclusionProbes.Contains(skyOcclusionProbe))
+        {
+            skyOcclusionProbes.Remove(skyOcclusionProbe);
+            SkyManager.SkyOccCount = skyOcclusionProbes.Count;
+            RebuildSkyOccAssetList();
+        }
+
+    }
+
+    public static void RebuildSkyOccAssetList()
+    {
+        SkyOcclusionDataAssets.Clear();
+        
+        foreach (SkyOcclusionProbes SOProbe in skyOcclusionProbes)
+        {
+            if (!SkyOcclusionDataAssets.Contains(SOProbe.SkyOcclusionDataAsset)) 
+                SkyOcclusionDataAssets.Add(SOProbe.SkyOcclusionDataAsset);
+        }
+
+        SkyManager.InitializeSkyOcclusion();
     }
 
 }

@@ -1,0 +1,182 @@
+// Combined Shader with Separate Scattering Buffer and Temporal Reprojection
+#pragma use_dxc vulkan
+#pragma kernel CombinedShader
+
+#define M_PI 3.1415926535897932384626433832795
+#define PI_x4 12.566370614359172953850573533118
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+RWTexture3D<float4> IntegratedResult;       // Output: Integrated volumetric lighting
+RWTexture3D<float4> ScatteringResult;       // Output: Per-voxel scattering for next frame
+Texture3D<float4> PreviousScattering;       // Input: Previous frame's per-voxel scattering
+SamplerState Custom_trilinear_clamp_sampler;
+SamplerState s_linear_clamp_sampler;
+
+Texture3D<float4> _VolumetricClipmapTexture;
+Texture3D<float4> _VolumetricClipmapTexture2;
+TextureCube<float4> _SkyTexture;
+
+shared float _GlobalExtinction;
+shared float _FogBaseHeight;
+shared float _FogMaxHeight;
+shared float _StaticLightMultiplier;
+float _ClipmapScale;
+float _ClipmapScale2;
+float3 _ClipmapPosition;
+
+CBUFFER_START(PerFrameCB)
+float4x4 _VBufferCoordToViewDirWS;
+float4x4 _PrevViewProjMatrix;
+float4x4 _ViewMatrix;
+float4x4 TransposedCameraProjectionMatrix;
+float4x4 CameraProjectionMatrix;
+float4 _VBufferDistanceEncodingParams;
+float4 _VBufferDistanceDecodingParams;
+float4 SeqOffset;
+float3 CameraPosition;
+float3 CameraMotionVector;
+CBUFFER_END
+
+float _VBufferUnitDepthTexelSpacing;
+shared float4 _MipFogParameters;
+shared int _SkyMipCount;
+
+shared float4 _GlobalScattering;
+
+float3 GetViewForwardDir()
+{
+    float4x4 viewMat = _ViewMatrix;
+    return -viewMat[2].xyz;
+}
+
+float3 GetViewUpDir()
+{
+    float4x4 viewMat = _ViewMatrix;
+    return viewMat[1].xyz;
+}
+
+float3 GetFogColor(float3 V, float fragDist)
+{
+    float3 color = float3(1,1,1);
+    float mipLevel = (1.0 - _MipFogParameters.z * saturate((fragDist - _MipFogParameters.x) / (_MipFogParameters.y - _MipFogParameters.x))) * (_SkyMipCount - 1);
+    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb;
+    return color;
+}
+
+float ComputeHistoryWeight(float frameMulti)
+{
+    float numFrames = 7 * frameMulti;
+    float frameWeight = 1 / numFrames;
+    float historyWeight = 1 - frameWeight;
+    return historyWeight;
+}
+
+[numthreads(8,8,1)]
+void CombinedShader(uint3 id : SV_DispatchThreadID)
+{
+    // Get dimensions
+    float3 whd;
+    IntegratedResult.GetDimensions(whd.x, whd.y, whd.z);
+
+    float invDepthNum = 1.0 / whd.z;
+
+    // Initialize accumulators
+    float4 accumScatteringTransmittance = float4(0, 0, 0, 1);
+    float previousDepth = 0.0;
+
+    float2 centerCoord = id.xy + float2(0.5, 0.5);
+
+    // Compute ray direction
+    float3 rayDirWS = normalize(mul(-float4(centerCoord , 1, 1), _VBufferCoordToViewDirWS)).xyz;
+    float rcpLenRayDir = rsqrt(dot(rayDirWS, rayDirWS));
+
+    float3 F = GetViewForwardDir();
+    float3 U = GetViewUpDir();
+
+    float3 rightDirWS = cross(rayDirWS, U);
+    float rcpLenRightDir = rsqrt(dot(rightDirWS, rightDirWS));
+
+    float3 centerDirWS = rayDirWS;
+
+    float FdotD = dot(F, centerDirWS);
+    float unitDistFaceSize = _VBufferUnitDepthTexelSpacing * FdotD * rcpLenRayDir;
+
+    float3 xDirDerivWS = rightDirWS * (rcpLenRightDir * unitDistFaceSize);
+    float3 yDirDerivWS = cross(xDirDerivWS, centerDirWS);
+    float3 jitterDirWS = normalize(centerDirWS);
+
+    // Loop over depth slices
+    for (uint depth = 0; depth < (uint)whd.z; depth++)
+    {
+        // Update UVW and depth calculations
+        float3 id_xyz = float3(id.x, id.y, depth);
+        float4 UVW = float4(id_xyz / whd, 1);
+        float e1 = (depth + 1) / whd.z;
+
+        // Per-pixel randomization
+        float perPixelRandomOffset = GenerateHashedRandomFloat(uint3(id.x, id.y, depth));
+        float rndVal = frac(perPixelRandomOffset + SeqOffset.z);
+
+        float t = DecodeLogarithmicDepthGeneralized((e1 - (rndVal * invDepthNum)), _VBufferDistanceDecodingParams);
+        float pt = DecodeLogarithmicDepthGeneralized((e1 - (.5 * invDepthNum)), _VBufferDistanceDecodingParams);
+
+        float3 centerWS = CameraPosition + (t * jitterDirWS);
+        float3 centWSNJIT = CameraPosition + pt * centerDirWS;
+
+        // Compute per-voxel scattering
+        float4 accumLighting = float4(0,0,0,0);
+
+        // Baked light volumes
+        float3 ClipmapUVW = (centerWS - (_ClipmapPosition - (_ClipmapScale * 0.5))) / _ClipmapScale;
+        float3 LargeClipmapUVW = (centerWS - (_ClipmapPosition - (_ClipmapScale2 * 0.5))) / _ClipmapScale2;
+
+        float Clipped = step(ClipmapUVW.x, 1) * step(0, ClipmapUVW.x) *
+                        step(ClipmapUVW.y, 1) * step(0, ClipmapUVW.y) *
+                        step(ClipmapUVW.z, 1) * step(0, ClipmapUVW.z);
+        Clipped = saturate(Clipped);
+
+        accumLighting += _VolumetricClipmapTexture.SampleLevel(Custom_trilinear_clamp_sampler, ClipmapUVW, 0) * Clipped;
+        accumLighting += _VolumetricClipmapTexture2.SampleLevel(Custom_trilinear_clamp_sampler, LargeClipmapUVW, 0) * (1 - Clipped);
+        accumLighting.rgb *= _StaticLightMultiplier;
+        accumLighting.rgb += GetFogColor(centerDirWS, t) * t;
+
+        // Fog Density
+        float HeightRemap = (centerWS.y - _FogBaseHeight) / (_FogMaxHeight - _FogBaseHeight);
+        float heightDensity = lerp(_GlobalExtinction, 0.001, sqrt(saturate(HeightRemap)));
+        accumLighting.a += heightDensity;
+        accumLighting.rgb *= accumLighting.a;
+
+        // Temporal Reprojection
+        float3 prevPos = CameraPosition - CameraMotionVector;
+        float3 ws_repro = centWSNJIT;
+
+        float2 positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, _PrevViewProjMatrix);
+        float vdistance = distance(ws_repro, prevPos);
+        float W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+
+        float3 reprojection = float3(positionNDC, W);
+        float4 previousScattering = PreviousScattering.SampleLevel(s_linear_clamp_sampler, reprojection, 0);
+
+        float historyWeight = ComputeHistoryWeight((1 / (depth * depth + 0.4) + 1));
+        accumLighting = lerp(accumLighting, previousScattering, historyWeight);
+
+        // Store per-voxel scattering for next frame
+        ScatteringResult[id_xyz] = accumLighting;
+
+        // Integration step
+        float extinction = accumLighting.a;
+        float travelDis = (t - previousDepth);
+        float transmittance = exp(-extinction * travelDis);
+
+        // Update accumulators
+        accumScatteringTransmittance.rgb += accumLighting.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / max(extinction, 1e-6)) * _GlobalScattering;
+        accumScatteringTransmittance.a *= transmittance;
+
+        // Write the integrated result
+        IntegratedResult[id_xyz] = accumScatteringTransmittance;
+
+        // Update previousDepth
+        previousDepth = t;
+    }
+}

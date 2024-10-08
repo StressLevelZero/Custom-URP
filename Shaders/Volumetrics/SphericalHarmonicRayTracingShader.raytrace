@@ -1,0 +1,234 @@
+// SphericalHarmonicRayTracingShader.hlsl
+
+#pragma shader_feature _RAYTRACING
+
+// Include Unity's common shader functions
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+// Acceleration structure
+RaytracingAccelerationStructure g_SceneAccelStruct;
+
+// Output buffer for SH coefficients
+RWStructuredBuffer<float> g_SHCoefficients : register(u0);
+
+// Constant buffers
+//cbuffer CameraData : register(b0)
+//{
+    float3 _OriginPoint; // The point from which rays are cast
+//    float _Padding0;
+//}
+
+cbuffer SamplingData : register(b1)
+{
+    uint _NumSamples;           // Number of primary rays
+    uint _NumRaySegments;       // Number of segments along each ray
+    uint _NumSecondarySamples;  // Number of secondary sphere samples at each segment point
+}
+
+// Payload structure
+struct Payload
+{
+    float visibility;
+};
+
+// Function to compute SH basis functions
+void ComputeSHBasis(float3 dir, out float shBasis[9])
+{
+    float x = dir.x;
+    float y = dir.y;
+    float z = dir.z;
+
+    // L = 0
+    shBasis[0] = 0.282095f; // Y_0^0
+
+    // L = 1
+    shBasis[1] = -0.488603f * y; // Y_1^{-1}
+    shBasis[2] = 0.488603f * z; // Y_1^0
+    shBasis[3] = -0.488603f * x; // Y_1^{1}
+
+    // L = 2
+    shBasis[4] = 1.092548f * x * y;              // Y_2^{-2}
+    shBasis[5] = -1.092548f * y * z;              // Y_2^{-1}
+    shBasis[6] = 0.315392f * (3.0f * z * z - 1); // Y_2^0
+    shBasis[7] = -1.092548f * x * z;              // Y_2^{1}
+    shBasis[8] = 0.546274f * (x * x - y * y);    // Y_2^{2}
+}
+
+// Pseudo-random number generator
+float rand(uint seed)
+{
+    seed ^= 123456789u;
+    seed *= 362436069u;
+    seed ^= (seed << 13);
+    seed ^= (seed >> 17);
+    seed ^= (seed << 5);
+    return frac(seed * 2.3283064365386963e-10f); // 1 / 2^32
+}
+
+float3 SampleSphereDirection(uint seed)
+{
+    // Generate two random numbers
+    float u1 = rand(seed);
+    float u2 = rand(seed + 1u);
+
+    float theta = acos(1.0f - 2.0f * u1);
+    float phi = 2.0f * 3.14159265f * u2;
+
+    float sinTheta = sin(theta);
+    float x = sinTheta * cos(phi);
+    float y = sinTheta * sin(phi);
+    float z = cos(theta);
+
+    return float3(x, y, z);
+}
+
+// Ray Generation Shader
+[shader("raygeneration")]
+void RayGen()
+{
+    float3 origin = _OriginPoint;
+
+    // Initialize SH coefficients
+    float shCoefficients[9] = {0,0,0,0,0,0,0,0,0};
+
+    for (uint i = 0; i < _NumSamples; ++i)
+    {
+        // Generate a unique seed for each primary ray
+        uint primarySeed = i * 1664525u + 1013904223u + origin.x + origin.y + origin.z;
+
+        // Sample a direction for the primary ray using Monte Carlo sampling
+        float3 dir = SampleSphereDirection(primarySeed);
+
+        // Define the primary ray
+        RayDesc ray;
+        ray.Origin = origin;
+        ray.Direction = dir;
+        ray.TMin = 0.001f;
+        ray.TMax = 1e38f; // Infinite length
+
+        // Number of segments along the ray
+        uint numSegments = _NumRaySegments;
+        float segmentLength = (ray.TMax - ray.TMin) / numSegments;
+
+        // Accumulate visibility along the ray
+        float totalVisibility = 0.0f;
+
+        for (uint s = 0; s < numSegments; ++s)
+        {
+            // Compute the sample point along the ray
+            float t = ray.TMin + segmentLength * (s + 0.5f); // Midpoint of the segment
+            float3 samplePoint = ray.Origin + ray.Direction * t;
+
+            // Check if the sample point is inside geometry
+            // We'll cast a shadow ray towards the sample point to see if it is occluded
+
+            RayDesc shadowRay;
+            shadowRay.Origin = ray.Origin;
+            shadowRay.Direction = normalize(samplePoint - ray.Origin);
+            shadowRay.TMin = 0.001f;
+            shadowRay.TMax = t - 0.001f; // Up to the sample point
+
+            Payload shadowPayload = (Payload)0;
+            shadowPayload.visibility = 0.0f;
+
+            TraceRay(
+                g_SceneAccelStruct,
+                RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                0xFF,
+                0, 1, 0,
+                shadowRay,
+                shadowPayload
+            );
+
+            // If the shadow ray hits something, the sample point is inside geometry
+            if (shadowPayload.visibility == 0.0f)
+            {
+                // Sample point is inside geometry; we consider visibility as 0
+                //totalVisibility += 0.0f;
+            }
+            else
+            {
+            totalVisibility = 1.0;
+            /*
+                // Sample point is in free space; perform spherical sampling at this point
+                float visibilitySum = 0.0f;
+
+                for (uint j = 0; j < _NumSecondarySamples; ++j)
+                {
+                    // Generate a unique seed for each secondary ray
+                    uint secondarySeed = i * 1664525u + s * 1013904223u + j * 1103515245u;
+
+                    // Monte Carlo sampling for secondary rays
+                    float3 secondaryDir = SampleSphereDirection(secondarySeed);
+
+                    RayDesc secondaryRay;
+                    secondaryRay.Origin = samplePoint + secondaryDir * 0.001f;
+                    secondaryRay.Direction = secondaryDir;
+                    secondaryRay.TMin = 0.001f;
+                    secondaryRay.TMax = 1e38f;
+
+                    Payload secondaryPayload = (Payload)0;
+                    secondaryPayload.visibility = 1.0f;
+
+                    TraceRay(g_SceneAccelStruct, RAY_FLAG_NONE, 0xFF, 0, 1, 0, secondaryRay, secondaryPayload);
+
+                    visibilitySum += secondaryPayload.visibility;
+                }
+
+                // Compute average visibility at this sample point
+                float averageVisibility = visibilitySum / _NumSecondarySamples;
+
+                // Accumulate visibility
+                totalVisibility += averageVisibility;
+                */
+            }
+        }
+
+        // Compute the average visibility along the ray
+        float rayVisibility = totalVisibility / numSegments;
+
+        // Compute SH basis for the primary ray direction
+        float shBasis[9];
+        ComputeSHBasis(dir, shBasis);
+
+        // Accumulate SH coefficients
+        for (int j = 0; j < 9; ++j)
+        {
+            shCoefficients[j] += shBasis[j] * rayVisibility;
+        }
+    }
+
+    // Normalize the coefficients
+    for (int j = 0; j < 9; ++j)
+    {
+        shCoefficients[j] /= _NumSamples;
+    }
+    
+    ComputeSHBasis(normalize(float3(0,1,0)), shCoefficients);
+
+    // Output the SH coefficients
+    for (int j = 0; j < 9; ++j)
+    {
+        g_SHCoefficients[j] = shCoefficients[j];
+    }
+
+
+}
+
+/*
+// Closest Hit Shader
+[shader("closesthit")]
+void ClosestHit(inout Payload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+    // Indicate that the ray is occluded
+    payload.visibility = 0.0f;
+}
+*/
+
+// Miss Shader
+[shader("miss")]
+void Miss(inout Payload payload)
+{
+    // Ray did not hit anything; visibility remains as is (1.0)
+    payload.visibility = 1.0f;
+}

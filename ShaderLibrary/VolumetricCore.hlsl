@@ -9,6 +9,12 @@ TEXTURECUBE(_SkyTexture);
 SAMPLER(sampler_SkyTexture);
 int _SkyMipCount;
 
+// SH Used for sky occlusion
+// // Monochromatic Spherical Harmonics Coefficients
+CBUFFER_START(MonoSHBuffer)
+    float _SHMonoCoefficients[9];
+CBUFFER_END
+
 CBUFFER_START(VolumetricsCB)
 float4x4 TransposedCameraProjectionMatrix;
 float4x4 CameraProjectionMatrix;
@@ -128,6 +134,23 @@ half4 VolumetricsSurf(half4 color, float3 positionWS, int surfaceType) {
 
 float4 _MipFogParameters = float4(0,5,0.5,0);
 
+float EvaluateMonochromaticSHL2(float3 normal)
+{
+    // Monochromatic SH evaluation using the coefficients array
+    float shValue = _SHMonoCoefficients[0] +                             // L0 term (constant)
+                    normal.y * _SHMonoCoefficients[1] +                  // L1 Y term (gradient)
+                    normal.z * _SHMonoCoefficients[2] +                  // L1 Z term
+                    normal.x * _SHMonoCoefficients[3] +                  // L1 X term
+                    normal.x * normal.y * _SHMonoCoefficients[4] +       // L2 XY term
+                    normal.y * normal.z * _SHMonoCoefficients[5] +       // L2 YZ term
+                    (3.0 * normal.z * normal.z - 1.0) * _SHMonoCoefficients[6] +  // L2 Z² term
+                    normal.x * normal.z * _SHMonoCoefficients[7] +       // L2 XZ term
+                    (normal.x * normal.x - normal.y * normal.y) * _SHMonoCoefficients[8];  // L2 X² - Y² term
+
+    return shValue;
+}
+
+
 //Cloning function for now
 real3 DecodeHDREnvironmentMip(real4 encodedIrradiance, real4 decodeInstructions)
 {
@@ -154,7 +177,7 @@ half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
 //#if defined(REFLECTIONFOG)
   //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
   //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(_SkyTexture, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
-    return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_TrilinearClamp, viewDirectionWS, mipLevel)).rgb;
+    return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_TrilinearClamp, viewDirectionWS, mipLevel)).rgb * saturate(EvaluateMonochromaticSHL2(viewDirectionWS));
 
 
 

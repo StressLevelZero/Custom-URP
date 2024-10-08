@@ -167,6 +167,11 @@ public class VolumetricBaking : EditorWindow
             }
 
         };
+        
+        if (GUILayout.Button("Bake Sky Occlusion"))
+        {
+            SkyOcclusionRenderer.RenderSkyOcclusion();
+        }
 
         EditorGUILayout.LabelField(BakingStatus);
         WarningGUI();
