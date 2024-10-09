@@ -53,11 +53,11 @@ public static class SkyManager
     }
     static SkyManager()
     {
+        if (IsBuildingPlayer()) return;
         LoadComputeShader();
         SetSkyMips(new Vector4(0, 1, 1, 0));
 #if UNITY_EDITOR
         GenerateSkyTexture();
-
         EditorApplication.delayCall += DelayedCheckSky; //Delaying first call when loaded
         EditorSceneManager.sceneOpened -= SceneOpenedCallback;
         EditorSceneManager.sceneOpened += SceneOpenedCallback;
@@ -66,6 +66,15 @@ public static class SkyManager
         SceneManager.sceneLoaded -= OnSceneLoaded; 
         SceneManager.sceneLoaded += OnSceneLoaded;
         InitializeSkyOcclusion();
+    }
+    
+    static bool IsBuildingPlayer()
+    {
+#if UNITY_EDITOR
+        return BuildPipeline.isBuildingPlayer;
+#else
+    return false;
+#endif
     }
 
     public static void InitializeSkyOcclusion()
