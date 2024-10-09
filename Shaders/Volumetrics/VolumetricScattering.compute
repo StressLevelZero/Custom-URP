@@ -134,7 +134,7 @@
         		// For the atmospheric scattering, we use the GGX convoluted version of the cubemap. That matches the of the idnex 0
         		//color *= SampleSkyTexture(-V, mipLevel, 0).rgb; // '_FogColor' is the tint
         	    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb; // '_FogColor' is the tint	
-				color *= EvaluateMonochromaticSHL2(V); //Sky occlusion
+				color *= saturate(EvaluateMonochromaticSHL2(V)); //Sky occlusion
         
         
         	return color;
