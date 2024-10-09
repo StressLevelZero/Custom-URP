@@ -51,27 +51,27 @@ public static class SkyManager
             }
         }
     }
-    static SkyManager()
-    {
-        if (IsBuildingPlayer()) return;
-        LoadComputeShader();
-        SetSkyMips(new Vector4(0, 1, 1, 0));
-#if UNITY_EDITOR
-        GenerateSkyTexture();
-        EditorApplication.delayCall += DelayedCheckSky; //Delaying first call when loaded
-        EditorSceneManager.sceneOpened -= SceneOpenedCallback;
-        EditorSceneManager.sceneOpened += SceneOpenedCallback;
-#endif
-        //Double checking that this doesn't exist. We purposely don't unregister it because we need it constantly called whenever there's a change.
-        SceneManager.sceneLoaded -= OnSceneLoaded; 
-        SceneManager.sceneLoaded += OnSceneLoaded;
-        InitializeSkyOcclusion();
-    }
+//     static SkyManager()
+//     {
+//         if (IsBuildingPlayer()) return;
+//         LoadComputeShader();
+//         SetSkyMips(new Vector4(0, 1, 1, 0));
+// #if UNITY_EDITOR
+//         GenerateSkyTexture();
+//         EditorApplication.delayCall += DelayedCheckSky; //Delaying first call when loaded
+//         EditorSceneManager.sceneOpened -= SceneOpenedCallback;
+//         EditorSceneManager.sceneOpened += SceneOpenedCallback;
+// #endif
+//         //Double checking that this doesn't exist. We purposely don't unregister it because we need it constantly called whenever there's a change.
+//         SceneManager.sceneLoaded -= OnSceneLoaded; 
+//         SceneManager.sceneLoaded += OnSceneLoaded;
+//         InitializeSkyOcclusion();
+//     }
     
     static bool IsBuildingPlayer()
     {
 #if UNITY_EDITOR
-        return BuildPipeline.isBuildingPlayer;
+        return BuildPipeline.isBuildingPlayer || Application.isBatchMode;
 #else
     return false;
 #endif
