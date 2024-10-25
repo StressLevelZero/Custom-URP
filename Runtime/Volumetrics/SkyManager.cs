@@ -64,8 +64,9 @@ public static class SkyManager
         EditorSceneManager.sceneOpened += SceneOpenedCallback;
 #endif
         //Double checking that this doesn't exist. We purposely don't unregister it because we need it constantly called whenever there's a change.
-        SceneManager.sceneLoaded -= OnSceneLoaded; 
-        SceneManager.sceneLoaded += OnSceneLoaded;
+        // SceneManager.sceneLoaded -= OnSceneLoaded; 
+        // SceneManager.sceneLoaded += OnSceneLoaded;
+        SceneManager.activeSceneChanged += OnActiveSceneChanged;
         InitializeSkyOcclusion();
     }
     
@@ -140,14 +141,20 @@ public static class SkyManager
         }
     }
     
-    
+    // Callback method that gets called when the active scene changes
+    private static void OnActiveSceneChanged(Scene previousScene, Scene newScene)
+    {
+        GenerateSkyTexture();
+    }
+
 #if UNITY_EDITOR
     static void SceneOpenedCallback(Scene scene, OpenSceneMode mode)
     {
         Debug.Log(mode + " : " +scene);
         if (!EditorApplication.isUpdating && !EditorApplication.isPlayingOrWillChangePlaymode)
         {
-            RegenerateSkyTexture();
+            GenerateSkyTexture();
+          //  RegenerateSkyTexture();
         }
         else
         {
