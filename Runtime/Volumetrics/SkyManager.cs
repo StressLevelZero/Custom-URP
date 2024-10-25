@@ -62,6 +62,8 @@ public static class SkyManager
         EditorApplication.delayCall += DelayedCheckSky; //Delaying first call when loaded
         EditorSceneManager.sceneOpened -= SceneOpenedCallback;
         EditorSceneManager.sceneOpened += SceneOpenedCallback;
+        EditorSceneManager.activeSceneChangedInEditMode += OnActiveSceneChangedInEditMode;
+
 #endif
         //Double checking that this doesn't exist. We purposely don't unregister it because we need it constantly called whenever there's a change.
         // SceneManager.sceneLoaded -= OnSceneLoaded; 
@@ -104,14 +106,23 @@ public static class SkyManager
        // if (!_kdtreevalid)KDStart();
         
         Vector3 worldpos;
+
+        try
+        {
 #if UNITY_EDITOR
-        if (!Application.isPlaying)
-            worldpos = SceneView.GetAllSceneCameras()[0].transform.position;
-        else
-            worldpos = Camera.main.transform.position; //todo: Not this! :(
+            if (!Application.isPlaying)
+                worldpos = SceneView.GetAllSceneCameras()[0].transform.position;
+            else
+                worldpos = Camera.main.transform.position; //todo: Not this! :(
 #else
         worldpos = Camera.main.transform.position;
 #endif
+        }
+        catch
+        {
+            return;
+        }
+
         MonoSH occlusionResult;
         Profiler.BeginSample("TetrahedronUpdate");
         occlusionResult = TetrahedronUpdate(worldpos);
@@ -161,7 +172,20 @@ public static class SkyManager
             EditorApplication.delayCall += DelayedCheckSky;
         }
     }
-    
+
+    private static void OnActiveSceneChangedInEditMode(Scene previousScene, Scene newScene)
+    {
+        if (!EditorApplication.isUpdating && !EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            GenerateSkyTexture();
+            //  RegenerateSkyTexture();
+        }
+        else
+        {
+            EditorApplication.delayCall += DelayedCheckSky;
+        }
+    }
+
     static void DelayedCheckSky()
     {
         RegenerateSkyTexture();
