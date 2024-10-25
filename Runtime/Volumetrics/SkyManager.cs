@@ -29,11 +29,12 @@ public static class SkyManager
     private static int _kernelIndex;
     private static readonly int ID_SHMonoCoefficients = Shader.PropertyToID("_SHMonoCoefficients");
     
-    //Todo: Change to a tetrahedralize look-up
     public static KdTree<MonoSH> tree; 
     private static bool _kdtreevalid = false;
     private static SkyOcclusionData _skyOcclusionData;
     private static float[] _skyMonoSHCoefficients = new float[9];
+    
+
 
     private static int _skyOccCount = 0;
     private static bool _skyChanged;
@@ -51,22 +52,22 @@ public static class SkyManager
             }
         }
     }
-//     static SkyManager()
-//     {
-//         if (IsBuildingPlayer()) return;
-//         LoadComputeShader();
-//         SetSkyMips(new Vector4(0, 1, 1, 0));
-// #if UNITY_EDITOR
-//         GenerateSkyTexture();
-//         EditorApplication.delayCall += DelayedCheckSky; //Delaying first call when loaded
-//         EditorSceneManager.sceneOpened -= SceneOpenedCallback;
-//         EditorSceneManager.sceneOpened += SceneOpenedCallback;
-// #endif
-//         //Double checking that this doesn't exist. We purposely don't unregister it because we need it constantly called whenever there's a change.
-//         SceneManager.sceneLoaded -= OnSceneLoaded; 
-//         SceneManager.sceneLoaded += OnSceneLoaded;
-//         InitializeSkyOcclusion();
-//     }
+    static SkyManager()
+    {
+        if (IsBuildingPlayer()) return;
+        LoadComputeShader();
+        SetSkyMips(new Vector4(0, 1, 1, 0));
+#if UNITY_EDITOR
+        GenerateSkyTexture();
+        EditorApplication.delayCall += DelayedCheckSky; //Delaying first call when loaded
+        EditorSceneManager.sceneOpened -= SceneOpenedCallback;
+        EditorSceneManager.sceneOpened += SceneOpenedCallback;
+#endif
+        //Double checking that this doesn't exist. We purposely don't unregister it because we need it constantly called whenever there's a change.
+        SceneManager.sceneLoaded -= OnSceneLoaded; 
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        InitializeSkyOcclusion();
+    }
     
     static bool IsBuildingPlayer()
     {
@@ -82,14 +83,16 @@ public static class SkyManager
 
         if (_skyOccCount == 0 || VolumetricRegisters.SkyOcclusionDataAssets.Count == 0) return;
 
-        SkyOcclusionData[] skyoccdatas = new SkyOcclusionData[VolumetricRegisters.SkyOcclusionDataAssets.Count];
+        //SkyOcclusionData[] skyoccdatas = new SkyOcclusionData[VolumetricRegisters.SkyOcclusionDataAssets.Count];
 
         //Combine data
-        for (int i = 0; i < VolumetricRegisters.SkyOcclusionDataAssets.Count; i++)
-        {
-            skyoccdatas[i] = (SkyOcclusionData.CombineSkyOcclusionData(VolumetricRegisters.SkyOcclusionDataAssets[i].skyOcclusionData) );
-        }
-        _skyOcclusionData = SkyOcclusionData.CombineSkyOcclusionData(skyoccdatas);
+        // for (int i = 0; i < VolumetricRegisters.SkyOcclusionDataAssets.Count; i++)
+        // {
+        //     skyoccdatas[i] = (SkyOcclusionData.CombineSkyOcclusionData(VolumetricRegisters.SkyOcclusionDataAssets[i].skyOcclusionData) );
+        // }
+        // _skyOcclusionData = SkyOcclusionData.CombineSkyOcclusionData(skyoccdatas);
+        //TODO: Account for more data. Either we will retetrahedralize or jocky between multiple
+        _skyOcclusionData = VolumetricRegisters.SkyOcclusionDataAssets[0].skyOcclusionData; //Assume there's one for now.
 
         //add function to rendering 
         Application.onBeforeRender -= SkyUpdate;
@@ -97,31 +100,34 @@ public static class SkyManager
     }
     public static void SkyUpdate()
     {
-        if (!_kdtreevalid)KDStart();
+       // if (!_kdtreevalid)KDStart();
         
         Vector3 worldpos;
 #if UNITY_EDITOR
         if (!Application.isPlaying)
             worldpos = SceneView.GetAllSceneCameras()[0].transform.position;
         else
-            worldpos = Camera.main.transform.position;
+            worldpos = Camera.main.transform.position; //todo: Not this! :(
 #else
         worldpos = Camera.main.transform.position;
 #endif
         MonoSH occlusionResult;
-
-        try
-        {
-            Profiler.BeginSample("KDUpdate");
-            occlusionResult = KDUpdate(worldpos);
-            Profiler.EndSample();
-
-        }
-        catch
-        {
-            _kdtreevalid = false;
-            return;
-        }
+        Profiler.BeginSample("TetrahedronUpdate");
+        occlusionResult = TetrahedronUpdate(worldpos);
+        Profiler.EndSample();
+        // try
+        // {
+        //     Profiler.BeginSample("KDUpdate");
+        //     occlusionResult = KDUpdate(worldpos);
+        //     Profiler.EndSample();
+        //
+        // }
+        // catch
+        // {
+        //     _kdtreevalid = false;
+        //     return;
+        // }
+//        Debug.Log(occlusionResult);
         SetSkyOcclusion(occlusionResult);
 
     }
@@ -345,69 +351,114 @@ public static class SkyManager
         Shader.SetGlobalFloatArray(ID_SHMonoCoefficients, MonoSH.White().ToArray());
     }
 
-    static void KDStart()
-    {
-        try
-        {
-            if (_skyOcclusionData.skyOccPos.ToList().Count != _skyOcclusionData.SkySH.ToList().Count) _kdtreevalid = false;
-
-            tree = new KdTree<MonoSH>(_skyOcclusionData.skyOccPos.ToList(), _skyOcclusionData.SkySH.ToList());
-        
-            _kdtreevalid = true;
-            Debug.Log("KDTree has been successfully initialized.");
-        }
-        catch (Exception ex)
-        {
-            _kdtreevalid = false;
-            Debug.LogError("KDTree initialization failed: " + ex.Message);
-        }
-    }
-    
-    // Declare the list 
     private static List<(Vector3 point, MonoSH data)> _nearestPointsData = new List<(Vector3 point, MonoSH data)>(4);
     private static MonoSH _interpolatedSH = MonoSH.White();
-
-    static MonoSH KDUpdate(Vector3 targetPosition)
+    private static int _previousTetIndex = -1;
+    static MonoSH TetrahedronUpdate(Vector3 targetPosition)
     {
-        
-        // Declare or reuse the pre-allocated list
-        // Ensure it's declared outside the method if you plan to reuse it to avoid allocations
-        if (_nearestPointsData == null)
-            _nearestPointsData = new List<(Vector3 point, MonoSH data)>(4);
+        // Create an instance of TetrahedralMesh and populate it
+
+        // Populate tetMesh.Vertices and tetMesh.Tetrahedra
+        // Ensure that for each Tetrahedron, you set up the correct neighbor indices
+
+        // Precompute the Barycentric matrices
+        //_skyOcclusionData.PrecomputeBarycentricMatrices();
+
+        // Optionally, if we have a previous tetrahedron index
+        //int previousTetIndex = -1;
+        //List<int> visitedTetsint;
+        // Find the containing tetrahedron
+        Profiler.BeginSample("FindContainingTetrahedron");
+        int containingTetIndex = _skyOcclusionData.FindContainingTetrahedron(targetPosition, _previousTetIndex/*, out visitedTetsint*/);
+        _previousTetIndex = containingTetIndex;
+        Profiler.EndSample();
+//        Debug.Log(containingTetIndex);
+        if (containingTetIndex != -1)
+        {
+            // Point is inside the mesh, and containingTetIndex is the index of the containing tetrahedron
+            Tetrahedron containingTet = _skyOcclusionData.tetrahedrons[containingTetIndex];
+            // Compute barycentric coordinates
+            Vector4 barycentricCoords = _skyOcclusionData.ComputeBarycentricCoordinates(targetPosition, containingTet);
+            // use baryCoords to interpolate values
+            if (barycentricCoords == Vector4.zero)
+            {
+                //Debug.LogError("Failed to compute barycentric coordinates.");
+                return MonoSH.White();
+            }
+
+            // Interpolate data
+            return MonoSH.Interpolate(
+                _skyOcclusionData.SkySH[containingTet.Vert0],
+                _skyOcclusionData.SkySH[containingTet.Vert1],
+                _skyOcclusionData.SkySH[containingTet.Vert2],
+                _skyOcclusionData.SkySH[containingTet.Vert3], barycentricCoords, _interpolatedSH);
+        }
         else
-            _nearestPointsData.Clear();
-
-        // Call the updated method
-        tree.KNearestNeighbors(targetPosition, 4, _nearestPointsData);
-
-        if (_nearestPointsData.Count < 4)
         {
-           // Debug.LogError("Not enough points found.");
+            // Point is outside the mesh
             return MonoSH.White();
         }
-
-        // Extract points and data
-        Vector3 a = _nearestPointsData[0].point;
-        Vector3 b = _nearestPointsData[1].point;
-        Vector3 c = _nearestPointsData[2].point;
-        Vector3 d = _nearestPointsData[3].point;
-
-        MonoSH dataA = _nearestPointsData[0].data;
-        MonoSH dataB = _nearestPointsData[1].data;
-        MonoSH dataC = _nearestPointsData[2].data;
-        MonoSH dataD = _nearestPointsData[3].data;
-
-        Vector4 barycentricCoords = SkyOcclusion.ComputeBarycentricCoordinates(targetPosition, a, b, c, d);
-
-        if (barycentricCoords == Vector4.zero)
-        {
-            //Debug.LogError("Failed to compute barycentric coordinates.");
-            return MonoSH.White();
-        }
-
-        // Interpolate data
-        return MonoSH.Interpolate(dataA, dataB, dataC, dataD, barycentricCoords, _interpolatedSH);
     }
+    // static void KDStart()
+    // {
+    //
+    //     try
+    //     {
+    //         if (_skyOcclusionData.skyOccPos.ToList().Count != _skyOcclusionData.SkySH.ToList().Count) _kdtreevalid = false;
+    //
+    //         tree = new KdTree<MonoSH>(_skyOcclusionData.skyOccPos.ToList(), _skyOcclusionData.SkySH.ToList());
+    //     
+    //         _kdtreevalid = true;
+    //         Debug.Log("KDTree has been successfully initialized.");
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         _kdtreevalid = false;
+    //         Debug.LogError("KDTree initialization failed: " + ex.Message);
+    //     }
+    // }
+    
+    // static MonoSH KDUpdate(Vector3 targetPosition)
+    // {
+    //     
+    //     // Declare or reuse the pre-allocated list
+    //     // Ensure it's declared outside the method if you plan to reuse it to avoid allocations
+    //     if (_nearestPointsData == null)
+    //         _nearestPointsData = new List<(Vector3 point, MonoSH data)>(4);
+    //     else
+    //         _nearestPointsData.Clear();
+    //
+    //     // Call the updated method
+    //     tree.KNearestNeighbors(targetPosition, 4, _nearestPointsData);
+    //
+    //     if (_nearestPointsData.Count < 4)
+    //     {
+    //        // Debug.LogError("Not enough points found.");
+    //         return MonoSH.White();
+    //     }
+    //
+    //     // Extract points and data
+    //     Vector3 a = _nearestPointsData[0].point;
+    //     Vector3 b = _nearestPointsData[1].point;
+    //     Vector3 c = _nearestPointsData[2].point;
+    //     Vector3 d = _nearestPointsData[3].point;
+    //
+    //     MonoSH dataA = _nearestPointsData[0].data;
+    //     MonoSH dataB = _nearestPointsData[1].data;
+    //     MonoSH dataC = _nearestPointsData[2].data;
+    //     MonoSH dataD = _nearestPointsData[3].data;
+    //
+    //     Vector4 barycentricCoords = SkyOcclusion.ComputeBarycentricCoordinates(targetPosition, a, b, c, d);
+    //
+    //     if (barycentricCoords == Vector4.zero)
+    //     {
+    //         //Debug.LogError("Failed to compute barycentric coordinates.");
+    //         return MonoSH.White();
+    //     }
+    //
+    //     // Interpolate data
+    //     return MonoSH.Interpolate(dataA, dataB, dataC, dataD, barycentricCoords, _interpolatedSH);
+    // }
     public static (float t, int index1, int index2) GetInterpolationFactor(Vector3 providedPos)
     {
         // Step 1: Find the two closest positions and their indices

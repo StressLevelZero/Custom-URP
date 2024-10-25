@@ -90,8 +90,8 @@ public class VolumetricRegisters
         
         foreach (SkyOcclusionProbes SOProbe in skyOcclusionProbes)
         {
-            if (!SkyOcclusionDataAssets.Contains(SOProbe.SkyOcclusionDataAsset)) 
-                SkyOcclusionDataAssets.Add(SOProbe.SkyOcclusionDataAsset);
+            if (!SkyOcclusionDataAssets.Contains(SOProbe.skyOcclusionDataAsset)) 
+                SkyOcclusionDataAssets.Add(SOProbe.skyOcclusionDataAsset);
         }
 
         SkyManager.InitializeSkyOcclusion();
