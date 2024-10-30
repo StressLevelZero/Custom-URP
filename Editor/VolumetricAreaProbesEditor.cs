@@ -23,9 +23,11 @@ public class VolumetricAreaProbesEditor : Editor
             // Calculate the normalized scale
             Vector3 normalizedScale = Vector3.Scale(area.transform.localScale, area.BoxScale);
 
+            Vector3 areaPosition = area.transform.position;
+            
             // Determine the bounds of the area using the position and normalized scale
-            Vector3 minBound = area.transform.position - normalizedScale * 0.5f;
-            Vector3 maxBound = area.transform.position + normalizedScale * 0.5f;
+            Vector3 minBound = areaPosition - normalizedScale * 0.5f;
+            Vector3 maxBound = areaPosition + normalizedScale * 0.5f;
 
             // Define the distance between probes in the grid (adjust as needed)
             float probeSpacing = 5.0f;
@@ -41,7 +43,7 @@ public class VolumetricAreaProbesEditor : Editor
                     for (float z = minBound.z; z <= maxBound.z; z += probeSpacing)
                     {
                         Vector3 probePosition = new Vector3(x, y, z);
-                        probePositions.Add(probePosition);
+                        probePositions.Add(probePosition - areaPosition);
                     }
                 }
             }
