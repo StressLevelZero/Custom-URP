@@ -311,9 +311,14 @@ public static class SkyOcclusionRenderer
         List<Vector3> combinedPositions = new List<Vector3>();
         foreach (var group in skyProbeGroups)
         {
-            var positions = group.probePositions;
+            Vector3[] positions = new Vector3[group.probePositions.Length];
             if (positions != null && positions.Length > 0)
             {
+                for (int i = 0; i < positions.Length; i++)
+                {
+                    positions[i] = group.probePositions[i] + group.gameObject.transform.position;
+                }
+                
                 combinedPositions.AddRange(positions);
             }
         }
@@ -340,6 +345,7 @@ public static class SkyOcclusionRenderer
         tempCamera.backgroundColor = Color.white;
         tempCamera.cullingMask = ~0; // Render everything
         tempCamera.transform.position = position;
+        tempCamera.nearClipPlane = .0001f;
 
         int cubemapSize = 16;
 

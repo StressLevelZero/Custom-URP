@@ -8,22 +8,34 @@ using UnityEngine;
 /// </summary>
 public class SkyOcclusionProbes : MonoBehaviour
 {
+    //Not needed at runtime
+#if UNITY_EDITOR
     //Positions that will be baked out
-    public Vector3[] probePositions;
-
+    public Vector3[] probePositions = 
+        new []{Vector3.zero,  Vector3.one, Vector3.up, Vector3.right, Vector3.forward, 
+            Vector3.forward+Vector3.right,Vector3.forward+Vector3.up, Vector3.up+Vector3.right   };
+#endif
     [SerializeField] public SkyOcclusionDataAsset skyOcclusionDataAsset;
     [SerializeField, HideInInspector] public int dataIndex;
 
     //public int DEBUGINDEX;
     //public Vector3 DEBUGTRANSFORM;
 
-
+#if UNITY_EDITOR
     private void OnDrawGizmosSelected()
     {
+        if (probePositions == null || probePositions.Length < 1)  return;
+        Bounds probebounds = new Bounds();
+        //Need to set a starting bounds because Encapsulate is additive which then includes the initialized zero position 
+        probebounds.SetMinMax(transform.position+probePositions[0],transform.position+probePositions[0]);
         for (int i = 0; i < probePositions.Length; i++)
         {
-            Gizmos.DrawSphere( probePositions[i], 0.1f);
+            Gizmos.DrawSphere( transform.position+probePositions[i], 0.1f);
+            probebounds.Encapsulate(transform.position+probePositions[i]);
         }
+        
+        Gizmos.DrawWireCube(probebounds.center, probebounds.size);
+        
         
         // if (skyOcclusionDataAsset != null)
         // {
@@ -89,6 +101,8 @@ public class SkyOcclusionProbes : MonoBehaviour
     //     GUI.Label(new Rect(screenPos.x - (size.x / 2), -screenPos.y + view.position.height + 4, size.x, size.y), text);
     //     UnityEditor.Handles.EndGUI();
     // }
+
+#endif
     private void Awake()
     {
        if (skyOcclusionDataAsset!=null) VolumetricRegisters.RegisterSkyOcclusionProbes(this);

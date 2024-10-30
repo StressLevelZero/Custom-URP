@@ -134,7 +134,7 @@ public class SkyOcclusionProbesEditor : Editor
             // Draw the probes and handle selection clicks
             for (int i = 0; i < probeScript.probePositions.Length; i++)
             {
-                Vector3 probePos = probeScript.probePositions[i];
+                Vector3 probePos = probeScript.probePositions[i] + probeScript.gameObject.transform.position;
 
                 Color unselected = selectionMode ? new Color(0.6f, 0.6f, 0.5f, 0.25f) : Color.white;
 
@@ -188,7 +188,7 @@ public class SkyOcclusionProbesEditor : Editor
                 }
 
                 center /= selectedProbeIndices.Count;
-
+                center += probeScript.gameObject.transform.position;
                 // Begin checking for changes
                 EditorGUI.BeginChangeCheck();
                 isMovingSelection = true;
@@ -240,7 +240,7 @@ public class SkyOcclusionProbesEditor : Editor
 
         for (int i = 0; i < probeScript.probePositions.Length; i++)
         {
-            Vector3 probePos = probeScript.probePositions[i];
+            Vector3 probePos = probeScript.probePositions[i] + probeScript.gameObject.transform.position;
 
             Vector2 screenPos = HandleUtility.WorldToGUIPoint(probePos);
 
@@ -338,7 +338,7 @@ public class SkyOcclusionProbesEditor : Editor
 
         for (int i = 0; i < probeScript.probePositions.Length; i++)
         {
-            Vector3 probePos = probeScript.probePositions[i];
+            Vector3 probePos = probeScript.probePositions[i] + probeScript.gameObject.transform.position;
 
             // Check for overlapping colliders at the probe position, including terrain
             Collider[] colliders = Physics.OverlapSphere(probePos, radius, layerMask);
@@ -374,5 +374,24 @@ public class SkyOcclusionProbesEditor : Editor
             Debug.Log("No colliding probes found.");
         }
     }
+    
+        
+
+    [MenuItem("GameObject/Light/Sky Occlusion Probes", false, 10)]
+    private static void CreateSkyOcclusionProbes()
+    {
+        // Create a new GameObject
+        GameObject newGameObject = new GameObject("Sky Occlusion Probe Group");
+    
+        // Attach the SkyOcclusionProbes component
+        newGameObject.AddComponent<SkyOcclusionProbes>();
+
+        // Register the creation in the undo system to make it undoable in the editor
+        Undo.RegisterCreatedObjectUndo(newGameObject, "Create Sky Occlusion Probes");
+
+        // Select the newly created object in the editor
+        Selection.activeGameObject = newGameObject;
+    }
+    
 
 }
