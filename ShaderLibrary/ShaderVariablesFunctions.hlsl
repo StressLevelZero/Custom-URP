@@ -289,16 +289,19 @@ half3 AlphaPremultiply(half3 albedo, half alpha)
 // Normalization used to depend on SHADER_QUALITY
 // Currently we always normalize to avoid lighting issues
 // and platform inconsistencies.
+#if REAL_IS_HALF
 half3 NormalizeNormalPerVertex(half3 normalWS)
 {
     return normalize(normalWS);
 }
+#endif
 
 float3 NormalizeNormalPerVertex(float3 normalWS)
 {
     return normalize(normalWS);
 }
 
+#if REAL_IS_HALF
 half3 NormalizeNormalPerPixel(half3 normalWS)
 {
 // With XYZ normal map encoding we sporadically sample normals with near-zero-length causing Inf/NaN
@@ -308,6 +311,7 @@ half3 NormalizeNormalPerPixel(half3 normalWS)
     return normalize(normalWS);
 #endif
 }
+#endif
 
 float3 NormalizeNormalPerPixel(float3 normalWS)
 {
@@ -340,7 +344,7 @@ real ComputeFogFactor(float zPositionCS)
     float clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(zPositionCS);
     return ComputeFogFactorZ0ToFar(clipZ_0Far);
 }
-
+#if REAL_IS_HALF
 half ComputeFogIntensity(half fogFactor)
 {
     half fogIntensity = half(0.0);
@@ -359,7 +363,7 @@ half ComputeFogIntensity(half fogFactor)
     #endif
     return fogIntensity;
 }
-
+#endif
 // SLZ MODIFIED
 real3 DecodeHDREnvironment2(real4 encodedIrradiance, real4 decodeInstructions)
 {
@@ -372,6 +376,7 @@ real3 DecodeHDREnvironment2(real4 encodedIrradiance, real4 decodeInstructions)
 
 // Force enable fog fragment shader evaluation
 #define _FOG_FRAGMENT 1
+
 real InitializeInputDataFog(float4 positionWS, real vertFogFactor)
 {
     real fogFactor = 0.0;
@@ -388,6 +393,7 @@ real InitializeInputDataFog(float4 positionWS, real vertFogFactor)
 #endif
     return fogFactor;
 }
+
 
 float ComputeFogIntensity(float fogFactor)
 {
@@ -408,6 +414,7 @@ float ComputeFogIntensity(float fogFactor)
     return fogIntensity;
 }
 
+#if REAL_IS_HALF
 half3 MixFogColor(half3 fragColor, half3 fogColor, half fogFactor)
 {
     #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
@@ -417,6 +424,7 @@ half3 MixFogColor(half3 fragColor, half3 fogColor, half fogFactor)
     #endif
     return fragColor;
 }
+#endif
 
 float3 MixFogColor(float3 fragColor, float3 fogColor, float fogFactor)
 {
@@ -467,18 +475,19 @@ half4 MixFogSurf(real4 fragColor, float3 viewDirectionWS, float fogFactor, int s
 }
 
 // END SLZ MODIFIED
-
+#if REAL_IS_HALF
 half3 MixFog(half3 fragColor, half fogFactor)
 {
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
 }
-
+#endif
 float3 MixFog(float3 fragColor, float fogFactor)
 {
     return MixFogColor(fragColor, unity_FogColor.rgb, fogFactor);
 }
 
 
+#if REAL_IS_HALF
 // Linear depth buffer value between [0, 1] or [1, 0] to eye depth value between [near, far]
 half LinearDepthToEyeDepth(half rawDepth)
 {
@@ -488,6 +497,7 @@ half LinearDepthToEyeDepth(half rawDepth)
         return half(_ProjectionParams.y + (_ProjectionParams.z - _ProjectionParams.y) * rawDepth);
     #endif
 }
+#endif
 
 float LinearDepthToEyeDepth(float rawDepth)
 {

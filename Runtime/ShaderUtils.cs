@@ -80,7 +80,7 @@ namespace UnityEngine.Rendering.Universal
     {
         static readonly string[] s_ShaderPaths =
         {
-            "Universal Render Pipeline/Lit",
+            "Universal Render Pipeline/Lit (PBR Workflow)",
             "Universal Render Pipeline/Simple Lit",
             "Universal Render Pipeline/Unlit",
             "Universal Render Pipeline/Terrain/Lit",

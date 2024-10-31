@@ -73,7 +73,7 @@ namespace UnityEditor.Rendering.Universal
             HashSet<string> shaderNamesToIgnore = new HashSet<string>();
             GetShaderNamesToIgnore(ref shaderNamesToIgnore);
 
-            MaterialUpgrader.UpgradeSelection(upgraders, shaderNamesToIgnore, "Upgrade to URP Materials", MaterialUpgrader.UpgradeFlags.LogMessageWhenNoUpgraderFound);
+            MaterialUpgrader.UpgradeSelection(upgraders, shaderNamesToIgnore, "Upgrade to URP Materials", MaterialUpgrader.UpgradeFlags.LogMessageWhenNoUpgraderFound | MaterialUpgrader.UpgradeFlags.LogErrorOnNonExistingProperty);
             if (UpgradeAnimationClips)
             {
                 // TODO: return upgrade paths and pass to AnimationClipUpgrader
@@ -84,7 +84,7 @@ namespace UnityEditor.Rendering.Universal
         private static void GetShaderNamesToIgnore(ref HashSet<string> shadersToIgnore)
         {
             shadersToIgnore.Add("Universal Render Pipeline/Baked Lit");
-            shadersToIgnore.Add("Universal Render Pipeline/Lit");
+            shadersToIgnore.Add("Universal Render Pipeline/Lit (PBR Workflow)");
             shadersToIgnore.Add("Universal Render Pipeline/Particles/Lit");
             shadersToIgnore.Add("Universal Render Pipeline/Particles/Simple Lit");
             shadersToIgnore.Add("Universal Render Pipeline/Particles/Unlit");

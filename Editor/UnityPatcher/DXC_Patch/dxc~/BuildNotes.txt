@@ -4,7 +4,9 @@ This DXC was modified to force certain compile arguments. The shader model is al
 The SPIRV-Tools dependency was modified to undo some optimizations introduced since the DXC version Unity is currently using. These removed unused inputs from the shader, changing the interface in a way unity does not account for resulting in misalignment of the vertex data. Additionally, SPV_KHR_fragment_shading_rate was added to the whitelist for the aggressive dead code optimization pass to stop it from failing if that extension was enabled. Changes made are in the SPIRV-Tools-unityfix.patch patch file.
 
 
-If rebuilding this from source, apply DXC-unityfix.patch to the repo root and SPIRV-Tools-unityfix.patch to the SPIRV-Tools folder (from git terminal or bash: patch -p1 < DXC-unityfix.patch). If using visual studio, select the x64-clang-cl-Release config, disable the LLVM_ENABLE_WARNINGS and SPIRV_WERRROR cmake variables, and add this to the command line arguments:
+If rebuilding this from source, apply DXC-unityfix.patch to the repo root and SPIRV-Tools-unityfix.patch to the SPIRV-Tools folder (from git terminal or bash: patch -p1 < DXC-unityfix.patch).If using visual studio, select the x64-clang-cl-Release config, disable the LLVM_ENABLE_WARNINGS and SPIRV_WERRROR cmake variables, and add this to the command line arguments:
 -DCMAKE_CXX_FLAGS="/D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1 -Wno-unsafe-buffer-usage -Wno-c++98-compat" 
 
 Changes in VS 2022 17.10 to make mutex constructors constexpr causes a crash in this dll on our build machines. Force old behavior with _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR  (https://github.com/microsoft/STL/wiki/Changelog#vs-2022-1710)
+
+2024-10-4 Discovered crash on an assert in SPIRV-Tools when compiling with 16 bit types. Visual Studio cmake configs seem to be bugged where it undefines NDEBUG for LLVM, which propagates into SPIRV-Tools and makes it throw assertions in release builds. Using cmake directly to build the project seems to fix the issue
