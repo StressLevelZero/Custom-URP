@@ -12,9 +12,8 @@ Shader "SLZ/Skybox/SLZ Cubemap"
     SubShader
     {
         Tags {"Queue"="Background" "RenderType"="Background" "PreviewType"="Skybox"}
-        Blend One Zero
-        ZWrite Off
-        ZClip Off
+        //Blend One Zero
+        //ZWrite Off
         Cull Off
 
 

@@ -37,7 +37,10 @@ namespace UnityEngine.Rendering.Universal.SLZVolumetrics
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            renderer.EnqueuePass(pass);
+            if (renderingData.postProcessingEnabled)
+            {
+                renderer.EnqueuePass(pass);
+            }
         }
 
         public class VolumetricsRenderPass : ScriptableRenderPass
@@ -89,6 +92,8 @@ namespace UnityEngine.Rendering.Universal.SLZVolumetrics
 
             public override void Execute(ScriptableRenderContext ctx, ref RenderingData renderingData)
             {
+                var camPersistentData = CameraExtDataPool.Instance.GetCameraDataSet(renderingData.cameraData.camera);
+                CamExtVolumetricData camData = camPersistentData.GetOrCreateExtension<CamExtVolumetricData>();
 
             }
             private static void ExecutePass(ScriptableRenderContext context, PassData data, ref RenderingData renderingData, bool yFlip)

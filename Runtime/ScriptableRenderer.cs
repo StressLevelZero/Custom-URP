@@ -1327,6 +1327,16 @@ namespace UnityEngine.Rendering.Universal
             //if (cameraClearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null && cameraData.postProcessEnabled && cameraData.xr.enabled)
             //    return ClearFlag.All;
 
+            // Adreno seems to benefit from having solid color clear. Unity might be setting the framebuffer to VK_ATTACHMENT_LOAD_OP_LOAD when skybox or nothing is set?
+            // either that, or the driver itself gets some hint from the color clear. Thus, if we have the clear flags set to skybox we should do a color clear. Explicit
+            // DepthOnly and None should still not clear however.
+#if UNITY_ANDROID
+            if (cameraClearFlags == CameraClearFlags.Skybox)
+            {
+                return ClearFlag.All;
+            }
+#endif
+
             // END SLZ MODIFIED
 
             if ((cameraClearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null) ||

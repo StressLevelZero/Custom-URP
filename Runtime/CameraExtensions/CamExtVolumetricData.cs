@@ -40,7 +40,6 @@ namespace UnityEngine.Rendering.Universal
                 reprojectionAmount = volSettings.reprojectionAmount;
                 sliceDistributionUniformity = volSettings.SliceDistributionUniformity;
                 FroxelBlur = volSettings.FroxelBlur;
-
             }
         }
 

@@ -23,6 +23,11 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         public const string k_ShaderTagName = "UniversalPipeline";
 
+        /// <summary>
+        /// Toggles whether or not cameras are allowed to skip opaque sorting on tile-based gpus capable of the low-res Z prepass.
+        /// </summary>
+        public static bool allowSortingSkipOnTiledGpus = true;
+
         internal static class Profiling
         {
             private static Dictionary<int, ProfilingSampler> s_HashSamplerCache = new Dictionary<int, ProfilingSampler>();
@@ -995,7 +1000,7 @@ namespace UnityEngine.Rendering.Universal
                 // Some effects like Vignette computes aspect ratio from width and height. We have to take viewport into consideration if it is not default viewport.
                 baseCameraData.cameraTargetDescriptor.width = baseCameraData.pixelWidth;
                 baseCameraData.cameraTargetDescriptor.height = baseCameraData.pixelHeight;
-				baseCameraData.cameraTargetDescriptor.useDynamicScale = false;
+                baseCameraData.cameraTargetDescriptor.useDynamicScale = false;
             }
         }
 
@@ -1228,7 +1233,7 @@ namespace UnityEngine.Rendering.Universal
 
             var commonOpaqueFlags = SortingCriteria.CommonOpaque;
             var noFrontToBackOpaqueFlags = SortingCriteria.SortingLayer | SortingCriteria.RenderQueue | SortingCriteria.OptimizeStateChanges | SortingCriteria.CanvasOrder;
-            bool hasHSRGPU = false;// SystemInfo.hasHiddenSurfaceRemovalOnGPU;
+            bool hasHSRGPU = SystemInfo.hasHiddenSurfaceRemovalOnGPU && allowSortingSkipOnTiledGpus;
             bool canSkipFrontToBackSorting = (baseCamera.opaqueSortMode == OpaqueSortMode.Default && hasHSRGPU) || baseCamera.opaqueSortMode == OpaqueSortMode.NoDistanceSort;
 
             cameraData.defaultOpaqueSortFlags = canSkipFrontToBackSorting ? noFrontToBackOpaqueFlags : commonOpaqueFlags;
