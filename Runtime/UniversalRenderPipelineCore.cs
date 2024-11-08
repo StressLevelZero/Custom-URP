@@ -672,7 +672,7 @@ namespace UnityEngine.Rendering.Universal
 
             return desc;
         }
-
+        
         private static Lightmapping.RequestLightsDelegate lightsDelegate = (Light[] requests, NativeArray<LightDataGI> lightsOutput) =>
         {
             LightDataGI lightData = new LightDataGI();
@@ -682,8 +682,10 @@ namespace UnityEngine.Rendering.Universal
             {
                 Light light = requests[i];
                 var additionalLightData = light.GetUniversalAdditionalLightData();
-
                 LightmapperUtils.Extract(light, out Cookie cookie);
+                
+                //SLZ note: Range makes no sense on baked lights. It's completely non-physical and causes problems in level design.
+                //We can't remove range entirely from non area lights because of the attenuation issue when it's set too high. This may be fixed in future Unity6+ versions.   
 
                 switch (light.type)
                 {
@@ -723,22 +725,26 @@ namespace UnityEngine.Rendering.Universal
                     case LightType.Area:
                         RectangleLight rectangleLight = new RectangleLight();
                         LightmapperUtils.Extract(light, ref rectangleLight);
+                        rectangleLight.range = 9999999; 
                         rectangleLight.mode = LightMode.Baked;
-                        lightData.Init(ref rectangleLight);
+                        lightData.Init(ref rectangleLight, ref cookie);
                         break;
                     case LightType.Disc:
                         DiscLight discLight = new DiscLight();
                         LightmapperUtils.Extract(light, ref discLight);
+                        discLight.range = 9999999;
                         discLight.mode = LightMode.Baked;
-                        lightData.Init(ref discLight);
+
+                        lightData.Init(ref discLight, ref cookie);
                         break;
                     default:
                         lightData.InitNoBake(light.GetInstanceID());
                         break;
                 }
 
-                lightData.falloff = FalloffType.InverseSquared;
-                lightsOutput[i] = lightData;
+                lightData.falloff = FalloffType.InverseSquaredNoRangeAttenuation;
+                if (!additionalLightData.advancedOptions) lightData.indirectColor = lightData.color; //Checking for advanced options
+                lightsOutput[i] = lightData;                
             }
 #else
             // If Enlighten realtime GI isn't active, we don't extract lights.

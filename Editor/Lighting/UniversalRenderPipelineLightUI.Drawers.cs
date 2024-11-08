@@ -262,12 +262,12 @@ namespace UnityEditor.Rendering.Universal
         static void DrawEmissionContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
             serializedLight.settings.DrawIntensity();
-            serializedLight.settings.DrawBounceIntensity();
+            if (serializedLight.additionalLightData.advancedOptions) serializedLight.settings.DrawBounceIntensity(); //This is now treated as an advanced override
 
             if (!serializedLight.settings.lightType.hasMultipleDifferentValues)
             {
                 var lightType = serializedLight.settings.light.type;
-                if (lightType != LightType.Directional)
+                if (lightType != LightType.Directional && lightType != LightType.Area)
                 {
 #if UNITY_2020_1_OR_NEWER
                     serializedLight.settings.DrawRange();
@@ -280,7 +280,10 @@ namespace UnityEditor.Rendering.Universal
 
         static void DrawUVContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
-            GUIContent UltravioletStyle = new GUIContent("Ultraviolet", "Ultraviolet light intensity. Used by fluorescent materials");
+            var lightType = serializedLight.settings.light.type;
+            var lightbake = serializedLight.settings.light.lightmapBakeType;
+            if (lightbake == LightmapBakeType.Baked || lightType == LightType.Area) return;
+                GUIContent UltravioletStyle = new GUIContent("Ultraviolet", "Ultraviolet light intensity. Used by fluorescent materials");
             var light = (Light)owner.target;
             light.color = new Color(light.color.r, light.color.g, light.color.b ,EditorGUILayout.Slider(UltravioletStyle, light.color.a, 0f, 1f) );
         }
@@ -468,8 +471,13 @@ namespace UnityEditor.Rendering.Universal
                 EditorGUILayout.HelpBox("Cannot multi edit light cookies from different light types.", MessageType.Info);
                 return;
             }
-
-            settings.DrawCookie();
+            // SLZ MODIFIED
+            //settings.DrawCookie();
+            //Cookies work on area lights, but unity's internal DrawCookie function doesn't show it.
+            EditorGUILayout.BeginHorizontal();
+            serializedLight.additionalLightData.light.cookie = (Texture)EditorGUILayout.ObjectField(serializedLight.additionalLightData.light.cookie, typeof(Texture), false, GUILayout.Width(64), GUILayout.Height(64));
+            EditorGUILayout.LabelField("Cookie");
+            EditorGUILayout.EndHorizontal();
 
             // Draw 2D cookie size for directional lights
             bool isDirectionalLight = settings.light.type == LightType.Directional;
@@ -492,15 +500,14 @@ namespace UnityEditor.Rendering.Universal
         {
             var settings = serializedLight.settings;
             var additionData = (settings.light).gameObject.GetComponent<UniversalAdditionalLightData>();
-            //if (additionData.customShadowLayers)
-            //    continue;
+            if (!additionData.advancedOptions)  return;
 
             //settings.DrawCookie();
 
             // Draw 2D cookie size for directional lights
             bool isVolumetricsEnabled = additionData.useVolumetric;
             //Realtime isn't implmented yet
-            if (isVolumetricsEnabled && serializedLight.settings.lightmapping.intValue != (int)LightmapBakeType.Realtime)
+            if (isVolumetricsEnabled && serializedLight.settings.lightmapping.intValue != (int)LightmapBakeType.Realtime )
             {
                 using (new EditorGUI.IndentLevelScope())
                 {

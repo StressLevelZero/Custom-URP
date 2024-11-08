@@ -170,6 +170,11 @@ namespace UnityEngine.Rendering.Universal
                 //    HDLightRenderDatabase.instance.EditLightDataAsRef(lightEntity).volumetricDimmer = m_VolumetricDimmer;
             }
         }
+        public bool advancedOptions;
+
+        [ContextMenu("Toggle advanced options")]
+        void ToggleAdvancedOptions() { advancedOptions = !advancedOptions;}
+
 
     }
 }
