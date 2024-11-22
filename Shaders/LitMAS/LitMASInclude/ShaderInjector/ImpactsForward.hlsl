@@ -347,6 +347,7 @@ half4 frag(VertOut i) : SV_Target
 		emission += SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, uv_main) * _EmissionColor;
 		emission.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emission.a);
 		emission.rgb *= pow(abs(fragData.NoV), _EmissionFalloff);
+		emission += _HitColor > 1 ? max(impactMASI.a * _HitColor * impactMASI.g,0) : 0 ;
 	}
 // End Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 
