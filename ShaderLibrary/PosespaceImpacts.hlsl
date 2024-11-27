@@ -78,23 +78,21 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
         // Compute the distance from the current position to the hit point
         half currentdist = length(localspace);
 
-        // Calculate the radial texture coordinate for the current hit // atan2
+        // Calculate the radial texture coordinate for the current hit //atan2
         half HitRadial = FastAtan2(localspace.x, localspace.y) * INV_PI;
 
-        // Compute the weight based on the distance (using exponential falloff)
-        const half scale = 33.0; // Adjust this value to control the blending range
-        half weight = exp(-currentdist * scale);
-
+        // Compute the weight
+        half weight = saturate( 1.0 - currentdist );
+        weight = pow(weight, TWO_PI);
+        
         // Accumulate the weighted contributions
         totalWeight += weight;
         weightedHitRadial += weight * HitRadial;
         weightedHitDistance += weight * currentdist;
     }
 
-    // Ensure we don't divide by zero
     if (totalWeight > 0)
     {
-        // Normalize the accumulated sums to get the final blended values
         weightedHitRadial /= totalWeight;
         weightedHitDistance /= totalWeight;
     }
@@ -104,7 +102,7 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
         weightedHitRadial = 0;
         weightedHitDistance = 1;
     }
-    
+
     weightedHitDistance = saturate(weightedHitDistance);
     return half2(weightedHitDistance, weightedHitRadial);
 }
