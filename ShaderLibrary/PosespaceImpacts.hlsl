@@ -4,6 +4,8 @@
 #define HitArrayCount 32
 #define HitMatrixRowCount HitArrayCount * 3
 
+#define UNITY_ANDROID SHADER_API_MOBILE
+
 #if defined(PACKED_HITPOS)
     #define HitMatrixCount (HitMatrixRowCount) / 4  // (32 * 3) / 4 = 24
 #else
@@ -35,11 +37,16 @@ SamplerState sampler_hitsettings;
 
 inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitMatrixCount], uint NumberOfHits )
 {
+
+#if UNITY_ANDROID
+    half HitDistance = 1;
+    half3 closestHit = half3(0,0,0);
+#else
     // Initialize accumulators for weighted sums
     half totalWeight = 0;
     half weightedHitRadial = 0;
     half weightedHitDistance = 0;
-
+#endif
     UNITY_LOOP for (uint i = 0; i < NumberOfHits; i++)
     {
         #if defined(PACKED_HITPOS)
@@ -76,35 +83,54 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
         half3 localspace = mul(LocalPosP, (half3x3)EllipsoidPos).xyz;
 
         // Compute the distance from the current position to the hit point
-        half currentdist = length(localspace);
+        half currentdist = saturate( length(localspace) );
 
+#if UNITY_ANDROID
+        
+        closestHit = currentdist < HitDistance ? localspace : closestHit;
+        HitDistance =  min( HitDistance, currentdist );
+    }
+    half HitRadial = FastAtan2(closestHit.x, closestHit.y) * INV_PI;
+    return half2(HitDistance,HitRadial);
+    
+#else
+        
+        ////
         // Calculate the radial texture coordinate for the current hit //atan2
         half HitRadial = FastAtan2(localspace.x, localspace.y) * INV_PI;
 
-        // Compute the weight
-        half weight = saturate( 1.0 - currentdist );
-        weight = pow(weight, TWO_PI);
-        
-        // Accumulate the weighted contributions
-        totalWeight += weight;
-        weightedHitRadial += weight * HitRadial;
-        weightedHitDistance += weight * currentdist;
-    }
+            // // Compute the weight based on the distance (using exponential falloff)
+            // const half scale = 33.0; // Adjust this value to control the blending range
+            // half weight = exp(-currentdist * scale);
+            // Compute the weight
+            half weight = saturate( 1.0 - currentdist );
+            weight = pow(weight, 25);
 
-    if (totalWeight > 0)
-    {
-        weightedHitRadial /= totalWeight;
-        weightedHitDistance /= totalWeight;
-    }
-    else
-    {
-        // Default values if no hits contribute
-        weightedHitRadial = 0;
-        weightedHitDistance = 1;
-    }
+            // Accumulate the weighted contributions
+            totalWeight += weight;
+            weightedHitRadial += weight * HitRadial;
+            weightedHitDistance += weight * currentdist;
+        }
 
-    weightedHitDistance = saturate(weightedHitDistance);
-    return half2(weightedHitDistance, weightedHitRadial);
+        // Ensure we don't divide by zero
+        if (totalWeight > 0)
+        {
+            // Normalize the accumulated sums to get the final blended values
+            weightedHitRadial /= totalWeight;
+            weightedHitDistance /= totalWeight;
+        }
+        else
+        {
+            // Default values if no hits contribute
+            weightedHitRadial = 0;
+            weightedHitDistance = 1;
+        }
+            
+        weightedHitDistance = saturate(weightedHitDistance);
+        return half2(weightedHitDistance, weightedHitRadial);
+
+#endif   
+    
 }
 
 float2 AdjustDerivativeForWrapping(float2 derivative) {
