@@ -40,7 +40,7 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
 
 #if UNITY_ANDROID
     half HitDistance = 1;
-    half3 closestHit = half3(0,0,0);
+    half3 closestHit = half3(1,1,1);
 #else
     // Initialize accumulators for weighted sums
     half totalWeight = 0;
