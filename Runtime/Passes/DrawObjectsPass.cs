@@ -81,9 +81,12 @@ namespace UnityEngine.Rendering.Universal.Internal
         bool m_DrawSkybox;
 
         public bool canDrawSkybox;
+        public bool overrideTargets = false;
 
         public bool vkVRSHackOn = false;
         public RTHandle colorTarget;
+        public RTHandle[] subpassInputs = new RTHandle[1];
+        public bool[] subpassInputsTransient = new bool[1];
         RTHandle[] vrsColorTargets = new RTHandle[2];
         public RTHandle depthTarget;
         UniversalRenderer caller; // Keep a reference to the current running renderer so we can check if VRS is enabled on it during the configuration stage
@@ -183,20 +186,18 @@ namespace UnityEngine.Rendering.Universal.Internal
             base.OnCameraSetup(cmd, ref renderingData);
         }
 
-        //SLZ MODIFIED // Added Configure, used to signal to the vulkan VRS plugin that this passes framebuffer needs a VRS attachment, and to prevent reuse of cached framebuffers without the VRS attachment
+        // SLZ MODIFIED 
         public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
         {
-
-            //if (vkVRSHackOn && caller != null && caller.s_IsUsingVkVRS)
-            //{
-            //    // Duplicate the color target, this is the only way to actually tell from vkCreateFramebuffer that we need a VRS attachment. Also prevents caching and reuse of framebuffers from passes w/o VRS
-            //    vrsColorTargets[0] = vrsColorTargets[1] = colorTarget;
-            //    //vrsColorTargets[2] = dummyRTH;
-            //    ConfigureTarget(vrsColorTargets, depthTarget);
-            //
-            //    //ConfigureColorStoreAction(RenderBufferStoreAction.DontCare, 1);
-            //}
-            //else
+            if (overrideTargets)
+            {
+                ConfigureTarget(colorTarget, depthTarget);
+            }
+            if (subpassInputs != null && subpassInputs[0] != null)
+            {
+                ConfigureInputAttachments(subpassInputs[0], subpassInputsTransient[0]);
+            }
+            
             {
                 enableFoveatedRendering = false;
                 // if VRS was enabled previously, then the target will remain until reset

@@ -77,6 +77,9 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
+float _Cutoff;
+// End Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
 	int _AlphaPreMult;
 CBUFFER_END
 

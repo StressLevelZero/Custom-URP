@@ -213,7 +213,7 @@ namespace UnityEngine.Rendering.Universal
                 cameraWidth = (float)cameraData.cameraTargetDescriptor.width;
                 cameraHeight = (float)cameraData.cameraTargetDescriptor.height;
 
-                useRenderPassEnabled = false;
+                //useRenderPassEnabled = false;
             }
 
             if (camera.allowDynamicResolution)
@@ -566,6 +566,9 @@ namespace UnityEngine.Rendering.Universal
         RTHandleRenderTargetIdentifierCompat m_CameraColorTarget;
         RTHandleRenderTargetIdentifierCompat m_CameraDepthTarget;
         RTHandleRenderTargetIdentifierCompat m_CameraResolveTarget;
+        internal RTHandleRenderTargetIdentifierCompat CameraColorTarget { get => m_CameraColorTarget; }
+        internal RTHandleRenderTargetIdentifierCompat CameraDepthTarget { get => m_CameraDepthTarget; }
+        internal RTHandleRenderTargetIdentifierCompat CameraResolveTarget {  get => m_CameraResolveTarget; }
 
         bool m_FirstTimeCameraColorTargetIsBound = true; // flag used to track when m_CameraColorTarget should be cleared (if necessary), as well as other special actions only performed the first time m_CameraColorTarget is bound as a render target
         bool m_FirstTimeCameraDepthTargetIsBound = true; // flag used to track when m_CameraDepthTarget should be cleared (if necessary), the first time m_CameraDepthTarget is bound as a render target
@@ -1777,6 +1780,7 @@ namespace UnityEngine.Rendering.Universal
                 // Disabling Native RenderPass if not using RTHandles as we will be relying on info inside handles object
                 if (IsRenderPassEnabled(renderPass) && cameraData.isRenderPassSupportedCamera && renderPass.m_UsesRTHandles)
                 {
+                    //ebug.Log($"SetNativeRenderPassAttachmentList for {renderPass.renderPassEvent} with color target {passColorAttachment.handle.name}");
                     SetNativeRenderPassAttachmentList(renderPass, ref cameraData, passColorAttachment.handle, passDepthAttachment.handle, finalClearFlag, finalClearColor);
                 }
                 else

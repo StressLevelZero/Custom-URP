@@ -1,3 +1,5 @@
+//#define VULKAN_SUBPASS
+
 using System;
 using System.Collections.Generic;
 using UnityEngine.Experimental.Rendering;
@@ -111,6 +113,10 @@ namespace UnityEngine.Rendering.Universal
         DeferredPass m_DeferredPass;
         DrawObjectsPass m_RenderOpaqueForwardOnlyPass;
         DrawObjectsPass m_RenderOpaqueForwardPass;
+#if VULKAN_SUBPASS
+        DrawObjectsPassNative m_RenderForwardPassNative;
+        public static bool useFusedRenderpass = true;
+#endif
         DrawObjectsWithRenderingLayersPass m_RenderOpaqueForwardWithRenderingLayersPass;
         DrawSkyboxPass m_DrawSkyboxPass;
         CopyDepthPass m_CopyDepthPass;
@@ -157,6 +163,10 @@ namespace UnityEngine.Rendering.Universal
         RTHandle m_MotionVectorDepth;
 
         // SLZ MODIFIED
+
+        RTHandle m_OpaqueSubpassRT;
+
+
         BufferedRTHandleSystem m_OpaqueBufferSystem;
         RTHandle m_DepthHiZTexture;
         RTPermanentHandle m_PrevHiZ0Texture;
@@ -183,6 +193,7 @@ namespace UnityEngine.Rendering.Universal
         Material m_StencilDeferredMaterial = null;
         Material m_CameraMotionVecMaterial = null;
         Material m_ObjectMotionVecMaterial = null;
+        Material m_CopySubpassInputMaterial = null;
 
         // SLZ MODIFIED
 
@@ -217,7 +228,7 @@ namespace UnityEngine.Rendering.Universal
             m_StencilDeferredMaterial = CoreUtils.CreateEngineMaterial(data.shaders.stencilDeferredPS);
             m_CameraMotionVecMaterial = CoreUtils.CreateEngineMaterial(data.shaders.cameraMotionVector);
             m_ObjectMotionVecMaterial = CoreUtils.CreateEngineMaterial(data.shaders.objectMotionVector);
-
+            m_CopySubpassInputMaterial = CoreUtils.CreateEngineMaterial(data.shaders.CopySubpassInputShader);
             // SLZ MODIFIED
 
             m_CopyDepthToColorMat = CoreUtils.CreateEngineMaterial(data.shaders.copyDepthToColorPS);
@@ -335,13 +346,16 @@ namespace UnityEngine.Rendering.Universal
             }
 
             // SLZ MODIFIED
-            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2);
+            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2, !useRenderPassEnabled); // If using native renderpass stuff, we can't skip the setup
             
             // END SLZ MODIFIED
 
             // Always create this pass even in deferred because we use it for wireframe rendering in the Editor or offscreen depth texture rendering.
             m_RenderOpaqueForwardPass = new DrawObjectsPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
             m_RenderOpaqueForwardWithRenderingLayersPass = new DrawObjectsWithRenderingLayersPass(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.opaque, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference);
+#if VULKAN_SUBPASS
+            m_RenderForwardPassNative = new DrawObjectsPassNative(URPProfileId.DrawOpaqueObjects, true, RenderPassEvent.BeforeRenderingOpaques, RenderQueueRange.all, data.opaqueLayerMask, m_DefaultStencilState, stencilData.stencilReference, m_CopySubpassInputMaterial);
+#endif
 
             bool copyDepthAfterTransparents = m_CopyDepthMode == CopyDepthMode.AfterTransparents;
             RenderPassEvent copyDepthEvent = copyDepthAfterTransparents ? RenderPassEvent.AfterRenderingTransparents : RenderPassEvent.AfterRenderingSkybox;
@@ -443,6 +457,7 @@ namespace UnityEngine.Rendering.Universal
             CoreUtils.Destroy(m_StencilDeferredMaterial);
             CoreUtils.Destroy(m_CameraMotionVecMaterial);
             CoreUtils.Destroy(m_ObjectMotionVecMaterial);
+            CoreUtils.Destroy(m_CopySubpassInputMaterial);
 
             CleanupRenderGraphResources();
 
@@ -471,6 +486,9 @@ namespace UnityEngine.Rendering.Universal
             m_OpaqueColor?.Release();
             m_MotionVectorColor?.Release();
             m_MotionVectorDepth?.Release();
+//#if VULKAN_SUBPASS
+            m_OpaqueSubpassRT?.Release();
+//#endif
             hasReleasedRTs = true;
         }
 
@@ -638,6 +656,9 @@ namespace UnityEngine.Rendering.Universal
             //SLZ - Enable "motion vector data" (prev obj to world matricies) for SSR so we can get prev frame's pixel pos for temporal accumulation
             m_RenderOpaqueForwardPass.useMotionVectorData = renderingData.cameraData.enableSSR;
             m_RenderTransparentForwardPass.canDrawSkybox = true;
+#if VULKAN_SUBPASS
+            m_RenderForwardPassNative.canDrawSkybox = true;
+#endif
             // Bullshit hacks go! Turn on render target duplication to signal to the Vulkan VRS plugin that framebuffer objects created for these passes need VRS attachments
 
 
@@ -648,11 +669,24 @@ namespace UnityEngine.Rendering.Universal
             //TODO: This should probably happen in the SLZGlobals pass, not here
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
             SLZGlobals.instance.UpdateBlueNoiseFrame();
+            bool activeDebugHandler = ((DebugHandler != null) && DebugHandler.AreAnySettingsActive);
+
+            //Debug.Log($"Debug handler state for {cameraData.camera.name}: is null? {DebugHandler == null}, is active for camera? {DebugHandler?.IsActiveForCamera(ref cameraData)}, Any settings active: {DebugHandler.AreAnySettingsActive}");
+            bool cameraUseFusedRenderpass =
+#if VULKAN_SUBPASS && UNITY_ANDROID
+                useFusedRenderpass &&
+                !useRenderPassEnabled &&
+                !activeDebugHandler &&
+                !IsWireframeEnabledForCamera(camera) &&
+                ((camera.cameraType & CameraType.Game) != 0 || ((camera.cameraType & CameraType.SceneView) != 0));
+#else
+                false;
+#endif
 
             // END SLZ MODIFIED
 
             if (cameraData.cameraType != CameraType.Game)
-                useRenderPassEnabled = false;
+                //useRenderPassEnabled = false;
 
             // Because of the shortcutting done by depth only offscreen cameras, useDepthPriming must be computed early
             useDepthPriming = IsDepthPrimingEnabled(ref cameraData);
@@ -910,6 +944,10 @@ namespace UnityEngine.Rendering.Universal
                 m_RenderOpaqueForwardPass.m_IsActiveTargetBackBuffer = !intermediateRenderTexture;
                 m_RenderTransparentForwardPass.m_IsActiveTargetBackBuffer = !intermediateRenderTexture;
                 m_DrawSkyboxPass.m_IsActiveTargetBackBuffer = !intermediateRenderTexture;
+#if VULKAN_SUBPASS
+                m_RenderForwardPassNative.m_IsActiveTargetBackBuffer = !intermediateRenderTexture;
+#endif
+
 #if ENABLE_VR && ENABLE_XR_MODULE
                 m_XROcclusionMeshPass.m_IsActiveTargetBackBuffer = !intermediateRenderTexture;
 #endif
@@ -932,10 +970,51 @@ namespace UnityEngine.Rendering.Universal
             }
             if (rendererFeatures.Count != 0 && !isPreviewCamera)
                 ConfigureCameraColorTarget(m_ColorBufferSystem.PeekBackBuffer());
+
             m_RenderOpaqueForwardPass.depthTarget = m_ActiveCameraDepthAttachment;
+
+#if VULKAN_SUBPASS
+            if (cameraUseFusedRenderpass)
+            {
+                RenderTextureDescriptor memorylessColor = cameraTargetDescriptor;
+                memorylessColor.depthStencilFormat = GraphicsFormat.None;
+                memorylessColor.graphicsFormat = GraphicsFormat.R8G8B8A8_SRGB;
+
+                memorylessColor.memoryless = RenderTextureMemoryless.Color;
+                RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueSubpassRT, memorylessColor, name: "OpaqueSubpassRT");
+                m_RenderForwardPassNative.colorTarget = m_ActiveCameraColorAttachment;
+                m_RenderForwardPassNative.depthTarget = m_ActiveCameraDepthAttachment;
+                m_RenderForwardPassNative.opaqueSubpassTarget = m_OpaqueSubpassRT;
+                m_RenderForwardPassNative.cameraTextureDescriptor = cameraTargetDescriptor;
+            }
+            else if (useRenderPassEnabled)
+            {
+                RenderTextureDescriptor memorylessColor = cameraTargetDescriptor;
+                //Debug.Log($"OpaqueRTTemp: {memorylessColor.width} {memorylessColor.height} {memorylessColor.volumeDepth}");
+                memorylessColor.depthStencilFormat = GraphicsFormat.None;
+                //memorylessColor.graphicsFormat = GraphicsFormat.R8G8B8A8_SRGB;
+                //memorylessColor.memoryless = RenderTextureMemoryless.Color;
+                RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueSubpassRT, memorylessColor, name: "OpaqueSubpassRT");
+                //Debug.Log($"RT size: {m_OpaqueSubpassRT.rt.descriptor.width} x {m_OpaqueSubpassRT.rt.descriptor.height}");
+
+                m_RenderOpaqueForwardPass.useNativeRenderPass = true;
+                
+                //if (m_OpaqueSubpassRT == null) Debug.LogError("Reallocate if needed FAILED!");
+                m_RenderOpaqueForwardPass.overrideTargets = true;
+                m_RenderOpaqueForwardPass.colorTarget = m_OpaqueSubpassRT;
+
+                m_RenderTransparentForwardPass.subpassInputs[0] = m_OpaqueSubpassRT;
+                m_RenderTransparentForwardPass.subpassInputsTransient[0] = true;
+                m_RenderTransparentForwardPass.useNativeRenderPass = true;
+                m_RenderTransparentForwardPass.overrideTargets = true;
+            }
+            //Debug.Log($"Camera target: {m_ActiveCameraColorAttachment.nameID.ToString()}\nOpaque Subpass: {m_OpaqueSubpassRT.nameID.ToString()}");
+#else
             m_RenderOpaqueForwardPass.colorTarget = m_ActiveCameraColorAttachment;
+#endif
             m_RenderTransparentForwardPass.depthTarget = m_ActiveCameraDepthAttachment;
             m_RenderTransparentForwardPass.colorTarget = m_ActiveCameraColorAttachment;
+
 
             bool copyColorPass = renderingData.cameraData.requiresOpaqueTexture || renderPassInputs.requiresColorTexture;
             // Check the createColorTexture logic above: intermediate color texture is not available for preview cameras.
@@ -944,7 +1023,6 @@ namespace UnityEngine.Rendering.Universal
 
             // Assign camera targets (color and depth)
             ConfigureCameraTarget(m_ActiveCameraColorAttachment, m_ActiveCameraDepthAttachment);
-
 
             bool hasPassesAfterPostProcessing = activeRenderPassQueue.Find(x => x.renderPassEvent == RenderPassEvent.AfterRenderingPostProcessing) != null;
 
@@ -1248,15 +1326,24 @@ namespace UnityEngine.Rendering.Universal
                     }
                 }
 
-                DrawObjectsPass renderOpaqueForwardPass = null;
-                if (renderingLayerProvidesRenderObjectPass)
+                ScriptableRenderPass renderOpaqueForwardPass = null;
+#if VULKAN_SUBPASS
+                if (cameraUseFusedRenderpass)
                 {
-                    renderOpaqueForwardPass = m_RenderOpaqueForwardWithRenderingLayersPass;
-                    m_RenderOpaqueForwardWithRenderingLayersPass.Setup(m_ActiveCameraColorAttachment, m_DecalLayersTexture, m_ActiveCameraDepthAttachment);
+                    renderOpaqueForwardPass = m_RenderForwardPassNative;
                 }
                 else
-                    renderOpaqueForwardPass = m_RenderOpaqueForwardPass;
-
+#endif
+                {
+                    //DrawObjectsPass renderOpaqueForwardPass = null;
+                    if (renderingLayerProvidesRenderObjectPass)
+                    {
+                        renderOpaqueForwardPass = m_RenderOpaqueForwardWithRenderingLayersPass;
+                        m_RenderOpaqueForwardWithRenderingLayersPass.Setup(m_ActiveCameraColorAttachment, m_DecalLayersTexture, m_ActiveCameraDepthAttachment);
+                    }
+                    else
+                        renderOpaqueForwardPass = m_RenderOpaqueForwardPass;
+                }
                 renderOpaqueForwardPass.ConfigureColorStoreAction(opaquePassColorStoreAction);
                 renderOpaqueForwardPass.ConfigureDepthStoreAction(opaquePassDepthStoreAction);
 
@@ -1354,8 +1441,12 @@ namespace UnityEngine.Rendering.Universal
                 EnqueuePass(m_MotionVectorPass);
             }
 
+
 #if ADAPTIVE_PERFORMANCE_2_1_0_OR_NEWER
             if (needTransparencyPass)
+#endif
+#if VULKAN_SUBPASS
+            if (!cameraUseFusedRenderpass)
 #endif
             {
                 if (transparentsNeedSettingsPass)
@@ -1381,6 +1472,7 @@ namespace UnityEngine.Rendering.Universal
                 m_RenderTransparentForwardPass.ConfigureDepthStoreAction(transparentPassDepthStoreAction);
                 EnqueuePass(m_RenderTransparentForwardPass);
             }
+
             EnqueuePass(m_OnRenderObjectCallbackPass);
 
             bool shouldRenderUI = cameraData.rendersOverlayUI;
@@ -1841,6 +1933,33 @@ namespace UnityEngine.Rendering.Universal
         public bool IsHandleSwapImage(RTHandle handle)
         {
             return m_ColorBufferSystem.IsFrontOrBackBuffer(handle);
+        }
+
+        bool IsWireframeEnabledForCamera(Camera camera)
+        {
+            bool enabled = false;
+#if UNITY_EDITOR
+            if (camera.cameraType == CameraType.SceneView)
+            {
+                // Determine whether the "Post Processes" checkbox is checked for the current view.
+                for (int i = 0; i < UnityEditor.SceneView.sceneViews.Count; i++)
+                {
+                    var sv = UnityEditor.SceneView.sceneViews[i] as UnityEditor.SceneView;
+
+                    // Post-processing is disabled in scene view if either showImageEffects is disabled or we are
+                    // rendering in wireframe mode.
+                    if (sv.camera == camera)
+                    { 
+                        if ( sv.cameraMode.drawMode == UnityEditor.DrawCameraMode.Wireframe) 
+                        {
+                            enabled = true;
+                        }
+                        break;
+                    }
+                }
+            }
+#endif
+            return enabled;
         }
     }
 }

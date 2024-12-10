@@ -9,6 +9,7 @@ Shader "SLZ/Decal Simple Lit"
         [MainColor] _Color ("Baking Transparency Multiplier (A) (RGB unused)", Color) = (1, 1, 1, 0)
         [HalfRateSlope]_Slope("Z Slope Factor", Float) = -1.0008148
         _Offset("Z Offset", Float) = -1
+        _Bias("Mip Bias", Float) = 0
         //[HideInInspector]_TransparencyLM ("Lightmapping Transmission Texture", 2D) = "white" {}
     }
     SubShader
@@ -81,6 +82,7 @@ Shader "SLZ/Decal Simple Lit"
                 float4 _EmissionColor;
                 float4 _BaseMap_ST;
                 float _BakedMultiplier;
+                float _Bias;
             CBUFFER_END
 
             v2f vert(appdata v)
@@ -110,7 +112,7 @@ Shader "SLZ/Decal Simple Lit"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
-                half4 albedoAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv01.xy);
+                half4 albedoAlpha = SAMPLE_TEXTURE2D_BIAS(_BaseMap, sampler_BaseMap, i.uv01.xy, _Bias);
                 half3 emission = _EmissionColor.rgb * lerp(1, albedoAlpha.rgb, _EmissionColor.a);
                 albedoAlpha *= _BaseColor;
 
@@ -173,6 +175,7 @@ Shader "SLZ/Decal Simple Lit"
                 float4 _EmissionColor;
                 float4 _BaseMap_ST;
                 float _BakedMultiplier;
+                float _Bias;
             CBUFFER_END
 
             v2f vert(appdata v)

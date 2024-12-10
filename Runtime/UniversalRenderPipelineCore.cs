@@ -1467,8 +1467,13 @@ namespace UnityEngine.Rendering.Universal
             if (isHdrEnabled)
             {
                 // TODO: we need a proper format scoring system. Score formats, sort, pick first or pick first supported (if not in score).
+#if UNITY_ANDROID
+                if (!needsAlpha && requestHDRColorBufferPrecision != HDRColorBufferPrecision._64Bits && RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.A2R10G10B10_UNormPack32, FormatUsage.Linear | FormatUsage.Render))
+                    return GraphicsFormat.A2R10G10B10_UNormPack32;
+#else
                 if (!needsAlpha && requestHDRColorBufferPrecision != HDRColorBufferPrecision._64Bits && RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.B10G11R11_UFloatPack32, FormatUsage.Linear | FormatUsage.Render))
                     return GraphicsFormat.B10G11R11_UFloatPack32;
+#endif
                 if (RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.R16G16B16A16_SFloat, FormatUsage.Linear | FormatUsage.Render))
                     return GraphicsFormat.R16G16B16A16_SFloat;
                 return SystemInfo.GetGraphicsFormat(DefaultFormat.HDR); // This might actually be a LDR format on old devices.
@@ -1869,11 +1874,11 @@ namespace UnityEngine.Rendering.Universal
         internal static void Initialize()
         {
             bool isRunningMobile = false;
-            #if ENABLE_VR && ENABLE_VR_MODULE
-                #if PLATFORM_WINRT || PLATFORM_ANDROID
+#if ENABLE_VR && ENABLE_VR_MODULE
+#if PLATFORM_WINRT || PLATFORM_ANDROID
                     isRunningMobile = IsRunningXRMobile();
-                #endif
-            #endif
+#endif
+#endif
 
             isXRMobile = isRunningMobile;
             isShaderAPIMobileDefined = GraphicsSettings.HasShaderDefine(BuiltinShaderDefine.SHADER_API_MOBILE);
@@ -1881,7 +1886,7 @@ namespace UnityEngine.Rendering.Universal
         }
 
 #if ENABLE_VR && ENABLE_VR_MODULE
-    #if PLATFORM_WINRT || PLATFORM_ANDROID
+#if PLATFORM_WINRT || PLATFORM_ANDROID
         // XR mobile platforms are not treated as dedicated mobile platforms in Core. Handle them specially here. (Quest and HL).
         private static List<XR.XRDisplaySubsystem> displaySubsystemList = new List<XR.XRDisplaySubsystem>();
         private static bool IsRunningXRMobile()
@@ -1900,7 +1905,7 @@ namespace UnityEngine.Rendering.Universal
             }
             return false;
         }
-    #endif
+#endif
 #endif
 
         /// <summary>

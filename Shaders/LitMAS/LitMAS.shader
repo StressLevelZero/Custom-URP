@@ -18,6 +18,8 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_NO_SSR)] _SSROff("Disable SSR", Float) = 0
         [Header(This should be 0 for skinned meshes)]
         _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
+        [Toggle(_ALPHATEST_ON)]_Alphatest("Alpha Clipping", float) = 0
+        _Cutoff("Alpha Clip Threshold", Range(0,1)) = 1
         //[Toggle(_SM6_QUAD)] _SM6_Quad("Quad-avg SSR", Float) = 0
 
         _Surface ("Surface Type", float) = 0
@@ -88,7 +90,8 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/DepthOnly.hlsl" 
+            #include "LitMASInclude/ShaderInjector/StandardDepthOnly.hlsl" 
+
             ENDHLSL
         }
 

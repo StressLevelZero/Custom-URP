@@ -253,7 +253,10 @@ namespace UnityEngine.Rendering.Universal
     public class SLZGlobalsSetPass : ScriptableRenderPass
     {
 
-
+        //public bool setColorTarget = false;
+        //public bool setDepthTarget = false;
+        //public RTHandle colorTarget;
+        //public RTHandle depthTarget;
         //static RTHandle[] target = new RTHandle[0];
         private bool enableSSR;
         private bool requireHiZ;
@@ -270,12 +273,14 @@ namespace UnityEngine.Rendering.Universal
         private PrevOpaqueRT prevOpaque;
         private PrevHiZRT prevHiZ;
 
+
         SLZGlobalsData passData;
-        public SLZGlobalsSetPass(RenderPassEvent evt)
+        public SLZGlobalsSetPass(RenderPassEvent evt, bool skipSetup)
         {
             renderPassEvent = evt;
             passData = new SLZGlobalsData();
-			skipRenderPassAttachmentSetup = true;
+			skipRenderPassAttachmentSetup = skipSetup;
+            useNativeRenderPass = false;
             //ConfigureTarget(target);
         }
         public void Setup(CameraData camData, CameraDataExtSet camDataExtSet)

@@ -11,9 +11,9 @@
 #else
 #endif
 
-// Begin Injection UNIVERSAL_DEFINES from Injection_Cutout_DepthNormals_NM.hlsl ----------------------------------------------------------
+// Begin Injection UNIVERSAL_DEFINES from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 #pragma shader_feature_local_fragment _ALPHATEST_ON
-// End Injection UNIVERSAL_DEFINES from Injection_Cutout_DepthNormals_NM.hlsl ----------------------------------------------------------
+// End Injection UNIVERSAL_DEFINES from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
@@ -25,34 +25,26 @@
 struct appdata
 {
 	float4 vertex : POSITION;
-	float3 normal : NORMAL;
-// Begin Injection VERTEX_IN from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	float4 tangent : TANGENT;
+// Begin Injection VERTEX_IN from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 	float2 uv0 : TEXCOORD0;
-// End Injection VERTEX_IN from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
+// End Injection VERTEX_IN from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct v2f
 {
 	float4 vertex : SV_POSITION;
-	float4 normalWS : NORMAL;
-// Begin Injection INTERPOLATORS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	float4 tanXYZ_btSign : TEXCOORD0;
+// Begin Injection INTERPOLATORS from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 	float2 uv0XY : TEXCOORD1;
-// End Injection INTERPOLATORS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
+// End Injection INTERPOLATORS from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 	UNITY_VERTEX_OUTPUT_STEREO
 };
 
-// Begin Injection UNIFORMS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	TEXTURE2D(_BumpMap);
-	SAMPLER(sampler_BumpMap);
-// End Injection UNIFORMS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-// Begin Injection UNIFORMS from Injection_Cutout_DepthNormals_NM.hlsl ----------------------------------------------------------
+// Begin Injection UNIFORMS from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 	TEXTURE2D(_BaseMap);
 	SAMPLER(sampler_BaseMap);
-// End Injection UNIFORMS from Injection_Cutout_DepthNormals_NM.hlsl ----------------------------------------------------------
+// End Injection UNIFORMS from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 
 CBUFFER_START(UnityPerMaterial)
 	float4 _BaseMap_ST;
@@ -89,15 +81,9 @@ v2f vert(appdata v)
 
 	o.vertex = TransformObjectToHClip(v.vertex.xyz);
 
-// Begin Injection VERTEX_NORMAL from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	half3 wNorm = (TransformObjectToWorldNormal(v.normal));
-	half3 wTan = (TransformObjectToWorldDir(v.tangent.xyz));
-	half tanSign = v.tangent.w * GetOddNegativeScale();
-	o.normalWS = float4(wNorm, 1);
-	o.tanXYZ_btSign = float4(wTan, tanSign);
-	o.uv0XY.xy = TRANSFORM_TEX(v.uv0, _BaseMap);
-// End Injection VERTEX_NORMAL from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-
+// Begin Injection VERTEX_END from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
+	o.uv0XY = mad(v.uv0.xy, _BaseMap_ST.xy, _BaseMap_ST.zw);
+// End Injection VERTEX_END from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 	return o;
 }
 
@@ -106,34 +92,13 @@ half4 frag(v2f i) : SV_Target
    UNITY_SETUP_INSTANCE_ID(i);
    UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
-// Begin Injection FRAG_BEGIN from Injection_Cutout_DepthNormals_NM.hlsl ----------------------------------------------------------
+// Begin Injection FRAG_BEGIN from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 #if defined(_ALPHATEST_ON)
 	float alpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv0XY.xy).a;
 	clip((alpha * _BaseColor.a) - _Cutoff);
 #endif
-// End Injection FRAG_BEGIN from Injection_Cutout_DepthNormals_NM.hlsl ----------------------------------------------------------
-
-   half4 normals = half4(0, 0, 0, 1);
-
-// Begin Injection FRAG_NORMALS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
-	half4 normalMap = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, i.uv0XY.xy);
-	half3 normalTS = UnpackNormal(normalMap);
-	normalTS = _Normals ? normalTS : half3(0, 0, 1);
-
-	half3 normalWS = i.normalWS.xyz;
-	half3 tangentWS = i.tanXYZ_btSign.xyz;
-	half3 bitangentWS = cross(normalWS, tangentWS) * i.tanXYZ_btSign.w;
-	half3x3 TStoWS = half3x3(
-		tangentWS.x, bitangentWS.x, normalWS.x,
-		tangentWS.y, bitangentWS.y, normalWS.y,
-		tangentWS.z, bitangentWS.z, normalWS.z
-		);
-	normalWS = mul(TStoWS, normalTS);
-	normalWS = normalize(normalWS);
-
-	normals = half4(EncodeWSNormalForNormalsTex(normalWS),0);
-// End Injection FRAG_NORMALS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
+// End Injection FRAG_BEGIN from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 
 
-	return normals;
+	return half4(0, 0, 0, 0);
 }

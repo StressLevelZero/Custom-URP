@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using Unity.Collections;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal.Internal;
 
 namespace UnityEngine.Rendering.Universal
 {
@@ -51,12 +54,13 @@ namespace UnityEngine.Rendering.Universal
 
         internal struct RenderPassDescriptor
         {
-            internal int w, h, samples, depthID;
+            internal int w, h, d, samples, depthID;
 
-            internal RenderPassDescriptor(int width, int height, int sampleCount, int rtID)
+            internal RenderPassDescriptor(int width, int height, int sampleCount, int rtID, int depth = 1)
             {
                 w = width;
                 h = height;
+                d = depth;
                 samples = sampleCount;
                 depthID = rtID;
             }
@@ -109,6 +113,13 @@ namespace UnityEngine.Rendering.Universal
                     var rpDesc = InitializeRenderPassDescriptor(ref cameraData, renderPass);
 
                     Hash128 hash = CreateRenderPassHash(rpDesc, currentHashIndex);
+                   
+                    //if (renderPass.GetType() == typeof(DrawObjectsPass))
+                    //{
+                    //    DrawObjectsPass objPass = (DrawObjectsPass)renderPass;
+                    //    Debug.Log($"DrawObjects at event {(int)objPass.renderPassEvent}:\n" +
+                    //        $"    desc.w: {rpDesc.w}, desc.h = {rpDesc.h}, desc.depthID = {rpDesc.depthID}, desc.samples = {rpDesc.samples}, Hash Index ({currentHashIndex}), Hash ({hash})");
+                    //}
 
                     m_PassIndexToPassHash[i] = hash;
 
@@ -156,8 +167,12 @@ namespace UnityEngine.Rendering.Universal
                     break;
 
                 ScriptableRenderPass pass = m_ActiveRenderPassQueue[passIdx];
+                //ebug.Log($"About to GetFirstAllocatedRTHandle for pass {passIdx} {pass.GetType().ToString()}");
+                //RTHandle overrideTarget = GetFirstAllocatedRTHandle(pass);
 
-                var samples = pass.overrideCameraTarget ? GetFirstAllocatedRTHandle(pass).rt.descriptor.msaaSamples :
+                //var samples = pass.overrideCameraTarget && overrideTarget.rt != null ? overrideTarget.rt.descriptor.msaaSamples :
+                RenderTexture rt = GetFirstAllocatedRTHandle(pass).rt;
+                var samples = pass.overrideCameraTarget && rt ? GetFirstAllocatedRTHandle(pass).rt.descriptor.msaaSamples :
                     (cameraData.targetTexture != null ? cameraData.targetTexture.descriptor.msaaSamples : cameraData.cameraTargetDescriptor.msaaSamples);
 
                 bool rendererSupportsMSAA = cameraData.renderer != null && cameraData.renderer.supportedRenderingFeatures.msaa;
@@ -282,7 +297,7 @@ namespace UnityEngine.Rendering.Universal
             return false;
         }
 
-        internal void SetNativeRenderPassAttachmentList(ScriptableRenderPass renderPass, ref CameraData cameraData, RTHandle passColorAttachment, RTHandle passDepthAttachment, ClearFlag finalClearFlag, Color finalClearColor)
+        internal void SetNativeRenderPassAttachmentList(ScriptableRenderPass renderPass, ref CameraData cameraData, RTHandle thisPassColorAttachment, RTHandle passDepthAttachment, ClearFlag finalClearFlag, Color finalClearColor)
         {
             using (new ProfilingScope(null, Profiling.setAttachmentList))
             {
@@ -299,12 +314,17 @@ namespace UnityEngine.Rendering.Universal
                 UpdateFinalStoreActions(currentMergeablePasses, ref cameraData);
 
                 int currentAttachmentIdx = 0;
+                int currentMergablePass = -1;
+                //ebug.Log($"Current Pass group: {currentPassHash}, num mergable passes: {currentMergeablePasses.Length}");
                 foreach (var passIdx in currentMergeablePasses)
                 {
                     if (passIdx == -1)
                         break;
-                    ScriptableRenderPass pass = m_ActiveRenderPassQueue[passIdx];
+                    currentMergablePass++;
 
+                    ScriptableRenderPass pass = m_ActiveRenderPassQueue[passIdx];
+                    //ebug.Log($"Begin Mergable Pass {currentMergablePass}: index {passIdx} ({pass.GetType().ToString()})");
+                    //ebug.Log($"Num Attachment Indices: {pass.m_ColorAttachmentIndices.Length}");
                     for (int i = 0; i < pass.m_ColorAttachmentIndices.Length; ++i)
                         pass.m_ColorAttachmentIndices[i] = -1;
 
@@ -314,20 +334,27 @@ namespace UnityEngine.Rendering.Universal
 
                     int samples;
                     RenderTargetIdentifier colorAttachmentTarget;
+                    RTHandle passColorAttachment = pass.overrideCameraTarget ? pass.colorAttachmentHandle : m_CameraColorTarget.handle;
                     // We are not rendering to Backbuffer so we have the RT and the information with it
                     // while also creating a new RenderTargetIdentifier to ignore the current depth slice (which might get bypassed in XR setup eventually)
-                    if (new RenderTargetIdentifier(passColorAttachment.nameID, 0, depthSlice: 0) != BuiltinRenderTextureType.CameraTarget)
+                    if (passColorAttachment.rt != null && new RenderTargetIdentifier(passColorAttachment.nameID, 0, depthSlice: 0) != BuiltinRenderTextureType.CameraTarget)
+                    //if (passColorAttachment.rt && new RenderTargetIdentifier(passColorAttachment.nameID, 0, depthSlice: 0) != BuiltinRenderTextureType.CameraTarget)
                     {
+
+
                         currentAttachmentDescriptor = new AttachmentDescriptor(depthOnly ? passColorAttachment.rt.descriptor.depthStencilFormat : passColorAttachment.rt.descriptor.graphicsFormat);
+
                         samples = passColorAttachment.rt.descriptor.msaaSamples;
                         colorAttachmentTarget = passColorAttachment.nameID;
+                        //ebug.Log($"Pass has non-camera target: {colorAttachmentTarget.ToString()}");
                     }
                     else // In this case we might be rendering the the targetTexture or the Backbuffer, so less information is available
                     {
                         currentAttachmentDescriptor = new AttachmentDescriptor(pass.renderTargetFormat[0] != GraphicsFormat.None ? pass.renderTargetFormat[0] : UniversalRenderPipeline.MakeRenderTextureGraphicsFormat(cameraData.isHdrEnabled, cameraData.hdrColorBufferPrecision, Graphics.preserveFramebufferAlpha));
 
                         samples = cameraData.cameraTargetDescriptor.msaaSamples;
-                        colorAttachmentTarget = usesTargetTexture ? new RenderTargetIdentifier(cameraData.targetTexture) : BuiltinRenderTextureType.CameraTarget;
+                        colorAttachmentTarget = usesTargetTexture ? new RenderTargetIdentifier(cameraData.targetTexture) : passColorAttachment.nameID;
+                        //ebug.Log($"Pass has camera target: {colorAttachmentTarget.ToString()}");
                     }
 
                     currentAttachmentDescriptor.ConfigureTarget(colorAttachmentTarget, ((uint)finalClearFlag & (uint)ClearFlag.Color) == 0, true);
@@ -370,14 +397,17 @@ namespace UnityEngine.Rendering.Universal
 
                     if (existingAttachmentIndex == -1)
                     {
+                        
                         // add a new attachment
                         pass.m_ColorAttachmentIndices[0] = currentAttachmentIdx;
                         m_ActiveColorAttachmentDescriptors[currentAttachmentIdx] = currentAttachmentDescriptor;
                         currentAttachmentIdx++;
                         m_RenderPassesAttachmentCount[currentPassHash]++;
+                        //ebug.Log($"Color attachment {passColorAttachment.name} not in m_ActiveColorAttachmentDescriptors, added at index: {currentAttachmentIdx -1}");
                     }
                     else
                     {
+                        //ebug.Log($"Color attachment {passColorAttachment.name} already in m_ActiveColorAttachmentDescriptors at index: {existingAttachmentIndex}");
                         // attachment was already present
                         pass.m_ColorAttachmentIndices[0] = existingAttachmentIndex;
                     }
@@ -385,6 +415,18 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
+        string printIdx(NativeArray<int> attach)
+        {
+            StringBuilder sb = new StringBuilder();
+            int L = attach.Length;
+            for (int i = 0; i < L; i++)
+            {
+                sb.Append(attach[i].ToString());
+                if (i != L - 1)
+                    sb.Append(", ");
+            }
+            return sb.ToString();   
+        }
         internal void ExecuteNativeRenderPass(ScriptableRenderContext context, ScriptableRenderPass renderPass, ref CameraData cameraData, ref RenderingData renderingData)
         {
             using (new ProfilingScope(null, Profiling.execute))
@@ -394,15 +436,23 @@ namespace UnityEngine.Rendering.Universal
                 int[] currentMergeablePasses = m_MergeableRenderPassesMap[currentPassHash];
 
                 int validColorBuffersCount = m_RenderPassesAttachmentCount[currentPassHash];
-
                 var depthOnly = (renderPass.colorAttachmentHandle.rt != null && IsDepthOnlyRenderTexture(renderPass.colorAttachmentHandle.rt)) || (cameraData.targetTexture != null && IsDepthOnlyRenderTexture(cameraData.targetTexture));
                 bool useDepth = depthOnly || (!renderPass.overrideCameraTarget || (renderPass.overrideCameraTarget && renderPass.depthAttachmentHandle.nameID != BuiltinRenderTextureType.CameraTarget));// &&
 
                 var attachments =
-                    new NativeArray<AttachmentDescriptor>(useDepth && !depthOnly ? validColorBuffersCount + 1 : 1, Allocator.Temp);
-
+                    new NativeArray<AttachmentDescriptor>(validColorBuffersCount + (useDepth && !depthOnly ? 1 : 0) , Allocator.Temp);
+                //ebug.Log($"Current Pass {currentPassHash}\n    validColorBuffersCount: {validColorBuffersCount}\n    attachments: {attachments.Length}");
+                //StringBuilder sb = new StringBuilder("m_ActiveColorAttachmentDescriptors");
                 for (int i = 0; i < validColorBuffersCount; ++i)
+                {
                     attachments[i] = m_ActiveColorAttachmentDescriptors[i];
+                    //sb.AppendLine($"{m_ActiveColorAttachmentDescriptors[i].resolveTarget}");
+                    //if (attachments[i] == RenderingUtils.emptyAttachment)
+                    //{
+                    //    Debug.LogError($"Assigning empty attachment at index {i}");
+                    //}
+                }
+                //ebug.Log(sb.ToString());
 
                 if (useDepth && !depthOnly)
                     attachments[validColorBuffersCount] = m_ActiveDepthAttachmentDescriptor;
@@ -427,12 +477,13 @@ namespace UnityEngine.Rendering.Universal
                     if (PassHasInputAttachments(renderPass))
                         Debug.LogWarning("First pass in a RenderPass should not have input attachments.");
 
-                    context.BeginRenderPass(rpDesc.w, rpDesc.h, Math.Max(rpDesc.samples, 1), attachments,
+                    //Debug.Log($"Begin RenderPass ({rpDesc.w}x{rpDesc.h}x{rpDesc.d}), attachment 0: {attachments[0].loadStoreTarget}");
+                    context.BeginRenderPass(rpDesc.w, rpDesc.h, rpDesc.d, Math.Max(rpDesc.samples, 1), attachments,
                         useDepth ? (!depthOnly ? validColorBuffersCount : 0) : -1);
                     attachments.Dispose();
 
                     context.BeginSubPass(attachmentIndices);
-
+                    //ebug.Log($"0 Beginning subpass for event {renderPass.renderPassEvent},\n color attachments: {printIdx(attachmentIndices)}\n");
                     m_LastBeginSubpassPassIndex = currentPassIndex;
                 }
                 else
@@ -444,9 +495,15 @@ namespace UnityEngine.Rendering.Universal
                     {
                         context.EndSubPass();
                         if (PassHasInputAttachments(m_ActiveRenderPassQueue[currentPassIndex]))
+                        {
                             context.BeginSubPass(attachmentIndices, m_ActiveRenderPassQueue[currentPassIndex].m_InputAttachmentIndices);
+                            //ebug.Log($"1 Beginning subpass for event {renderPass.renderPassEvent},\n Inputs: {printIdx(attachmentIndices)}\n Framebuffer: {attachments.Length}");
+                        }
                         else
+                        {
                             context.BeginSubPass(attachmentIndices);
+                            //ebug.Log($"2 Beginning subpass for event {renderPass.renderPassEvent},\n Inputs: {printIdx(attachmentIndices)}\n Framebuffer: {attachments.Length}");
+                        }
 
                         m_LastBeginSubpassPassIndex = currentPassIndex;
                     }
@@ -454,7 +511,7 @@ namespace UnityEngine.Rendering.Universal
                     {
                         context.EndSubPass();
                         context.BeginSubPass(attachmentIndices, m_ActiveRenderPassQueue[currentPassIndex].m_InputAttachmentIndices);
-
+                        //ebug.Log($"3 Beginning subpass for event {renderPass.renderPassEvent},\n Inputs: {printIdx(m_ActiveRenderPassQueue[currentPassIndex].m_InputAttachmentIndices)}\n Framebuffer: {attachments.Length}");
                         m_LastBeginSubpassPassIndex = currentPassIndex;
                     }
                 }
@@ -495,6 +552,20 @@ namespace UnityEngine.Rendering.Universal
                 if (pass.m_InputAttachmentIndices[i] == -1)
                 {
                     Debug.LogWarning("RenderPass Input attachment not found in the current RenderPass");
+                    //StringBuilder sb = new StringBuilder();
+                    //if (pass.m_InputAttachments[i] == null)
+                    //{
+                    //    Debug.LogError("Attachment was NULL!");
+                    //}
+                    //else
+                    //{
+                    //    sb.AppendLine("Missing RT: " + pass.m_InputAttachments[i].nameID.ToString());
+                    //    foreach (AttachmentDescriptor ach in m_ActiveColorAttachmentDescriptors)
+                    //    {
+                    //        sb.AppendLine(ach.loadStoreTarget.ToString());
+                    //    }
+                    //    Debug.Log(sb.ToString());
+                    //}
                     continue;
                 }
 
@@ -630,7 +701,7 @@ namespace UnityEngine.Rendering.Universal
         {
             for (int i = 0; i < pass.colorAttachmentHandles.Length; ++i)
             {
-                if (pass.colorAttachmentHandles[i].rt != null)
+                if (pass.colorAttachmentHandles[i] != null)
                     return pass.colorAttachmentHandles[i];
             }
             return pass.colorAttachmentHandles[0];
@@ -641,14 +712,14 @@ namespace UnityEngine.Rendering.Universal
             return renderPass.m_InputAttachments.Length != 8 || renderPass.m_InputAttachments[0] != null;
         }
 
-        internal static Hash128 CreateRenderPassHash(int width, int height, int depthID, int sample, uint hashIndex)
+        internal static Hash128 CreateRenderPassHash(int width, int height, int volumeDepth, int depthID, int sample, uint hashIndex)
         {
-            return new Hash128((uint)(width << 4) + (uint)height, (uint)depthID, (uint)sample, hashIndex);
+            return new Hash128((uint)(width << 4) + (uint)height + (uint)(volumeDepth << 16), (uint)depthID, (uint)sample, hashIndex);
         }
 
         internal static Hash128 CreateRenderPassHash(RenderPassDescriptor desc, uint hashIndex)
         {
-            return CreateRenderPassHash(desc.w, desc.h, desc.depthID, desc.samples, hashIndex);
+            return CreateRenderPassHash(desc.w, desc.h, desc.d, desc.depthID, desc.samples, hashIndex);
         }
 
         internal static void GetRenderTextureDescriptor(ref CameraData cameraData, ScriptableRenderPass renderPass, out RenderTextureDescriptor targetRT)
@@ -656,7 +727,9 @@ namespace UnityEngine.Rendering.Universal
             if (!renderPass.overrideCameraTarget || (renderPass.colorAttachmentHandle.rt == null && renderPass.depthAttachmentHandle.rt == null))
             {
                 targetRT = cameraData.cameraTargetDescriptor;
-
+                targetRT.width = renderPass.colorAttachmentHandle.rtHandleProperties.currentRenderTargetSize.x;
+                targetRT.height = renderPass.colorAttachmentHandle.rtHandleProperties.currentRenderTargetSize.y;
+                targetRT.volumeDepth = cameraData.xr.enabled ? 2 : 1;
                 // In this case we want to rely on the pixelWidth/Height as the texture could be scaled from a script later and etc.
                 // and it's new dimensions might not be reflected on the targetTexture. This also applies to camera stacks rendering to a target texture.
                 if (cameraData.targetTexture != null)
@@ -669,6 +742,7 @@ namespace UnityEngine.Rendering.Universal
             {
                 var handle = GetFirstAllocatedRTHandle(renderPass);
                 targetRT = handle.rt != null ? handle.rt.descriptor : renderPass.depthAttachmentHandle.rt.descriptor;
+                Debug.Log($"Failed to get RT, first allocated RT dimensions:{targetRT.width}x{targetRT.height}");
             }
         }
 
@@ -679,7 +753,7 @@ namespace UnityEngine.Rendering.Universal
             var depthTarget = renderPass.overrideCameraTarget ? renderPass.depthAttachmentHandle : cameraDepthTargetHandle;
             var depthID = (targetRT.graphicsFormat == GraphicsFormat.None && targetRT.depthStencilFormat != GraphicsFormat.None) ? renderPass.colorAttachmentHandle.GetHashCode() : depthTarget.GetHashCode();
 
-            return new RenderPassDescriptor(targetRT.width, targetRT.height, targetRT.msaaSamples, depthID);
+            return new RenderPassDescriptor(targetRT.width, targetRT.height, targetRT.msaaSamples, depthID, targetRT.volumeDepth);
         }
     }
 }

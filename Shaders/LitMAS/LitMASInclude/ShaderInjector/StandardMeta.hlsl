@@ -18,6 +18,9 @@
 
 //#pragma shader_feature _ EDITOR_VISUALIZATION
 
+// Begin Injection UNIVERSAL_DEFINES from Injection_Cutout.hlsl ----------------------------------------------------------
+#pragma shader_feature_local_fragment _ALPHATEST_ON
+// End Injection UNIVERSAL_DEFINES from Injection_Cutout.hlsl ----------------------------------------------------------
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
@@ -53,6 +56,9 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
+float _Cutoff;
+// End Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
 	int _Surface;
 CBUFFER_END
 
@@ -115,6 +121,11 @@ half4 frag(v2f i) : SV_Target
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv) * _BaseColor;
 	metaInput.Albedo = albedo.rgb;
 
+// Begin Injection FRAG_POST_READ from Injection_Cutout.hlsl ----------------------------------------------------------
+#if defined(_ALPHATEST_ON)
+	clip((albedo.a * _BaseColor.a) - _Cutoff);
+#endif
+// End Injection FRAG_POST_READ from Injection_Cutout.hlsl ----------------------------------------------------------
 
 	half4 emission = half4(0, 0, 0, 0);
 

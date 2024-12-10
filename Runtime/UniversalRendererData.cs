@@ -142,6 +142,9 @@ namespace UnityEngine.Rendering.Universal
             [Reload("Shaders/Utils/DummyShader.shader")]
             public Shader DummyShader;
 
+            [Reload("Shaders/Utils/CopySubpassInput.shader")]
+            public Shader CopySubpassInputShader;
+
             // END SLZ MODIFIED
 
             /// <summary>

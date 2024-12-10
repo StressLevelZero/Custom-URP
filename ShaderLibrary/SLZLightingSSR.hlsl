@@ -56,11 +56,11 @@ struct SSRExtraData
   * @param         surfData  Struct containing physical properties of the surface (specular color, roughness, etc)
   * @param         indSSAO   Indirect screenspace ambient occlusion, not used if SSAO isn't enabled
   */
-void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 SSRColor, inout real SSRLerp, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, SSRExtraData ssrExtra, half indSSAO)
+void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 SSRColor, inout real SSRLerp, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, SSRExtraData ssrExtra, half indSSAO, int surfaceType = 0)
 {
     half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(diffuse);
     half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(fragData.NoV, surfData.occlusion, surfData.roughness);
-    real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion) * LitSpecularOcclusion;
+    real3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion, fragData.screenUV) * LitSpecularOcclusion;
 
     
    
@@ -78,9 +78,12 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
         surfData.perceptualRoughness,
         RdotV,
         ssrExtra.depthDerivativeSum,
-        ssrExtra.noise);
+        ssrExtra.noise,
+        surfaceType > 0
+    );
 
-    SSRLerp = saturate((surfData.perceptualRoughness - 0.5) / (0.4 - 0.5));
+    SSRLerp = saturate((surfData.perceptualRoughness - 0.7) / (0.5 - 0.7));
+	SSRLerp = sqrt(SSRLerp);
     //Piecewise function to make a sinusoidal falloff curve
 #define SSR_FALLOFF_START 0.6666667
     RdotV = 2 * saturate( (1 / SSR_FALLOFF_START) * RdotV);
@@ -130,7 +133,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-	SLZMonoSpecInfo fuckyou = (SLZMonoSpecInfo) 0;
+    SLZMonoSpecInfo monoSpecInfo = { half4(0, 0, 0, -1), (half3) 0 };
 
 
 #if defined(LIGHTMAP_ON) 
@@ -138,7 +141,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     // Lightmapping diffuse and specular calculations
     //-------------------------------------------------------------------------------------------------
 
-    SLZGetLightmapLighting(diffuse, specular, fuckyou, fragData, surfData);
+    SLZGetLightmapLighting(diffuse, specular, monoSpecInfo, fragData, surfData);
 
 #else 
     //-------------------------------------------------------------------------------------------------
@@ -167,19 +170,26 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     //-------------------------------------------------------------------------------------------------
     // Realtime light calculations
     //-------------------------------------------------------------------------------------------------
-	
+    
     // For dynamic objects, this also does specular for probes if there is no main light, assuming the
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
-	SLZMainLight(diffuse, specular, fuckyou, fragData, surfData, ao.directAmbientOcclusion);
+    SLZMainLight(diffuse, specular, monoSpecInfo, fragData, surfData, ao.directAmbientOcclusion);
 
-    UNITY_BRANCH if (_ADDITIONAL_LIGHTS)
+    [branch]
+    if (BRANCH_ADDITIONAL_LIGHTS)
     {
         uint pixelLightCount = GetAdditionalLightsCount();
-
+        
+#if USE_FORWARD_PLUS
+        ForwardPlusMacroFix inputData = {fragData.screenUV, fragData.position};
+#endif
+        
         LIGHT_LOOP_BEGIN(pixelLightCount)
-            Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
-		SLZAddLight(diffuse, specular, fuckyou, fragData, surfData, light, ao.directAmbientOcclusion);
+
+        Light light = GetAdditionalLight(lightIndex, fragData.position, fragData.shadowMask);
+        SLZAddLight(diffuse, specular, monoSpecInfo, fragData, surfData, light, ao.directAmbientOcclusion);
         LIGHT_LOOP_END
+
     }
 
 
@@ -194,7 +204,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     //float oldVertDepth = ssrExtra.lastClipPos.z / ssrExtra.lastClipPos.w;
     //float ddzOld = GetDepthDerivativeSum(oldVertDepth);
 
-	SLZImageBasedSpecularSSR(diffuse, specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion);
+    SLZImageBasedSpecularSSR(diffuse, specular, SSR, SSRLerp, reflectionDir, fragData, surfData, ssrExtra, ao.indirectAmbientOcclusion, surfaceType);
     real horizOcclusion = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
     specular *= horizOcclusion;
     SSR.rgb *= horizOcclusion;
@@ -248,15 +258,15 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
 //    output = volColor.rgb + output * volColor.a;
 //#endif
     if (surfaceType == 1)
-	{
+    {
         surfData.alpha = lerp(surfData.alpha, 1, surfData.reflectivity);
-		real fresnelTerm = (1.0h - saturate(fragData.NoV));
-		fresnelTerm *= fresnelTerm;
-		fresnelTerm *= fresnelTerm;
-		surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
+        real fresnelTerm = (1.0h - saturate(fragData.NoV));
+        fresnelTerm *= fresnelTerm;
+        fresnelTerm *= fresnelTerm;
+        surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
         surfData.alpha *= horizOcclusion;
-	}
-	float4 finalColor = float4(output, surfData.alpha);
+    }
+    float4 finalColor = float4(output, surfData.alpha);
     finalColor = MixFogSurf(finalColor, -fragData.viewDir, ssrExtra.fogFactor, surfaceType);
     finalColor = VolumetricsSurf(finalColor, fragData.position, surfaceType);
 

@@ -12,27 +12,27 @@
 #define _NORMALMAP 1
 
 #if defined(SHADER_API_MOBILE)
-	#define _ADDITIONAL_LIGHTS_VERTEX
-	#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION 
+	//#define _ADDITIONAL_LIGHTS_VERTEX
+	//#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION 
+
 #else              
-	#pragma multi_compile_fragment  _  _MAIN_LIGHT_SHADOWS_CASCADE
-
-	#define DYNAMIC_SCREEN_SPACE_OCCLUSION
-	#pragma dynamic_branch _SCREEN_SPACE_OCCLUSION
-	
-#define DYNAMIC_ADDITIONAL_LIGHTS
-#pragma dynamic_branch _ADDITIONAL_LIGHTS
-
-
-#define DYNAMIC_ADDITIONAL_LIGHT_SHADOWS
-#pragma dynamic_branch _ADDITIONAL_LIGHT_SHADOWS
-
-	#define _SHADOWS_SOFT 1
-	
-	#define _REFLECTION_PROBE_BLENDING
-	//#pragma shader_feature_fragment _REFLECTION_PROBE_BOX_PROJECTION
-	// We don't need a keyword for this! the w component of the probe position already branches box vs non-box, & so little cost on pc it doesn't matter
-	#define _REFLECTION_PROBE_BOX_PROJECTION 
+	//#pragma multi_compile_fragment  _  _MAIN_LIGHT_SHADOWS_CASCADE
+	//#define DYNAMIC_SCREEN_SPACE_OCCLUSION
+	//#pragma dynamic_branch _SCREEN_SPACE_OCCLUSION
+	//
+	//#define DYNAMIC_ADDITIONAL_LIGHTS
+	//#pragma dynamic_branch _ADDITIONAL_LIGHTS
+	//
+	//
+	//#define DYNAMIC_ADDITIONAL_LIGHT_SHADOWS
+	//#pragma dynamic_branch _ADDITIONAL_LIGHT_SHADOWS
+	//
+	//#define _SHADOWS_SOFT 1
+	//
+	//#define _REFLECTION_PROBE_BLENDING
+	////#pragma shader_feature_fragment _REFLECTION_PROBE_BOX_PROJECTION
+	//// We don't need a keyword for this! the w component of the probe position already branches box vs non-box, & so little cost on pc it doesn't matter
+	//#define _REFLECTION_PROBE_BOX_PROJECTION 
 
 // Begin Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------
 #pragma multi_compile _ _SLZ_SSR_ENABLED
@@ -44,22 +44,26 @@
 
 #endif
 
-#pragma multi_compile_fragment _ _LIGHT_COOKIES
-#pragma multi_compile _ SHADOWS_SHADOWMASK
+//#pragma multi_compile_fragment _ _LIGHT_COOKIES
+//#pragma multi_compile _ SHADOWS_SHADOWMASK
 #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
 #pragma multi_compile_fog
-#pragma skip_variants FOG_LINEAR FOG_EXP
+//#pragma skip_variants FOG_LINEAR FOG_EXP
 //#pragma multi_compile_fragment _ DEBUG_DISPLAY
 #pragma multi_compile_fragment _ _DETAILS_ON
 //#pragma multi_compile_fragment _ _EMISSION_ON
 
-
-#if defined(LITMAS_FEATURE_LIGHTMAPPING)
-	#pragma multi_compile _ LIGHTMAP_ON
-	#pragma multi_compile _ DYNAMICLIGHTMAP_ON
-	#pragma multi_compile _ DIRLIGHTMAP_COMBINED
-	#pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
+#if !defined(LITMAS_FEATURE_LIGHTMAPPING)
+#define _DISABLE_LIGHTMAPS
 #endif
+
+#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
+
+// Begin Injection UNIVERSAL_DEFINES from Injection_Cutout.hlsl ----------------------------------------------------------
+#pragma shader_feature_local_fragment _ALPHATEST_ON
+// End Injection UNIVERSAL_DEFINES from Injection_Cutout.hlsl ----------------------------------------------------------
+
+
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -86,7 +90,6 @@
 struct VertIn
 {
 	float4 vertex   : POSITION;
-	//uint stereoTargetEyeIndexAsBlendIdx0 : SV_ViewID;
 	float3 normal    : NORMAL;
 	float4 tangent   : TANGENT;
 	float4 uv0 : TEXCOORD0;
@@ -155,6 +158,9 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
+float _Cutoff;
+// End Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
 	int _Surface;
 CBUFFER_END
 
@@ -233,12 +239,16 @@ half4 frag(VertOut i) : SV_Target
 	float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
 	float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
-	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 
-
+// Begin Injection FRAG_POST_READ from Injection_Cutout.hlsl ----------------------------------------------------------
+#if defined(_ALPHATEST_ON)
+	clip((albedo.a * _BaseColor.a) - _Cutoff);
+#endif
+// End Injection FRAG_POST_READ from Injection_Cutout.hlsl ----------------------------------------------------------
 
 	albedo *= _BaseColor;
+	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half metallic = mas.r;
 	half ao = mas.g;
 	half smoothness = mas.b;
@@ -357,11 +367,6 @@ half4 frag(VertOut i) : SV_Target
 		
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif
-	
 // End Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
-	//#if !defined(UNITY_COMPILER_DXC)
-	//return color * float4(1.1, 0.2, 1.1, 1);
-	//#else
 	return color;
-	//#endif
 }

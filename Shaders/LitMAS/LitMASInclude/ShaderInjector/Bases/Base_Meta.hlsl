@@ -103,6 +103,7 @@ half4 frag(v2f i) : SV_Target
 	metaInput.Albedo = albedo.rgb;
 
 	//#!INJECT_POINT FRAG_POST_INPUTS
+	//#!INJECT_POINT FRAG_POST_READ
 
 	half4 emission = half4(0, 0, 0, 0);
 

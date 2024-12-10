@@ -334,6 +334,7 @@ ENDHLSL
             ZWrite On
             ColorMask 0
             Cull[_Cull]
+            Offset[_OffsetFactor] ,[_OffsetUnits]
 
             HLSLPROGRAM
             #pragma exclude_renderers gles gles3 glcore
@@ -376,6 +377,7 @@ ENDHLSL
             // Render State Commands
             ZWrite On
             Cull[_Cull]
+            Offset[_OffsetFactor] ,[_OffsetUnits]
 
             HLSLPROGRAM
 

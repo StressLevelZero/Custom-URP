@@ -1,0 +1,3 @@
+//#!INJECT_BEGIN MATERIAL_CBUFFER 0
+float _Cutoff;
+//#!INJECT_END
