@@ -1,0 +1,92 @@
+#pragma kernel CSMain
+
+RWTexture2DArray<float4> ResultTextureArray;  // Texture array representing the cubemap faces
+TextureCube<float4> SourceCubeMap;
+SamplerState LinearClampSampler;
+
+// Blur/Scattering parameters
+float ScatteringFactor;
+uint Resolution;  // Pass the resolution dynamically
+int sampleCount;
+
+// Function to compute UV coordinates for each cubemap face
+float3 ComputeDirectionFromID(uint2 pixelID, uint faceIndex)
+{
+    float2 uv = (float2(pixelID) + 0.5) / float(Resolution) * 2.0 - 1.0;  // Use dynamic resolution
+    float3 dir;
+
+    if (faceIndex == 0) { dir = float3(1.0, -uv.y, -uv.x); }     // +X face
+    else if (faceIndex == 1) { dir = float3(-1.0, -uv.y, uv.x); } // -X face
+    else if (faceIndex == 2) { dir = float3(uv.x, 1.0, uv.y); } // +Y face
+    else if (faceIndex == 3) { dir = float3(uv.x, -1.0, -uv.y); } // -Y face
+    else if (faceIndex == 4) { dir = float3(uv.x, -uv.y, 1.0); }  // +Z face
+    else { dir = float3(-uv.x, -uv.y, -1.0); }                    // -Z face
+
+    return normalize(dir);
+}
+
+// Gaussian weight function
+float GaussianWeight(float dist, float sigma)
+{
+    return exp(-0.5 * (dist * dist) / (sigma * sigma)) / (6.28318530718 * sigma * sigma);
+}
+
+// Random number generator based on texture coordinates
+float rand(float2 co)
+{
+    return frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+// Function to apply scattering and blurring
+float3 ApplyScatteringAndBlur(  float3 dir)
+{
+    // Base color
+    //float3 color = SourceCubeMap.SampleLevel(LinearClampSampler, dir, 0).rgb;
+
+    // Accumulate color and keep track of the number of samples
+    float3 accumulatedColor = 0;
+    int totalSamples = 1;  // Start with 1 for the base color
+
+    // Compute the vector to the world center (assuming world center at origin)
+    float3 worldCenter = float3(0.0, 0.0, 0.0);
+    float3 toCenter = normalize(worldCenter - dir);
+
+    // Compute tangent and bitangent vectors using cross product
+    float3 tangent = normalize(cross(float3(0.0, 1.0, 0.0), dir));
+    float3 bitangent = cross(dir, tangent);
+
+    // Loop through the number of samples
+    for (int i = 0; i < sampleCount; i++)
+    {
+        // Compute offsets based on the scatter value and the sample count
+        float angle = (float(i) / float(sampleCount)) * 6.28318530718;  // Full circle (2*PI)
+        float2 offset = float2(cos(angle), sin(angle)) * ScatteringFactor * rand(dir.xy+i*.47);
+
+        // Rotate the offset using the tangent and bitangent vectors
+        float3 rotatedOffset = (offset.x * tangent + offset.y * bitangent);
+
+        // Sample neighboring texels with rotated circular offsets
+        float3 neighborColor = SourceCubeMap.SampleLevel(LinearClampSampler, dir + rotatedOffset, 0).rgb;
+
+        // Accumulate the sampled color
+        accumulatedColor += neighborColor;
+        totalSamples++;
+    }
+
+    // Average the accumulated color for a blur effect
+    return accumulatedColor / float(totalSamples);
+}
+
+
+[numthreads(8, 8, 6)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    // Get direction for the current pixel and face
+    float3 dir = ComputeDirectionFromID(id.xy, id.z);
+
+    // Apply Kawase blur with the given iterations and offset
+    float3 blurredColor = ApplyScatteringAndBlur(dir);
+
+    // Write the result to the appropriate slice of the texture array
+    ResultTextureArray[id.xyz] = float4(blurredColor, 1.0);
+}
