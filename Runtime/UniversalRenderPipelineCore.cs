@@ -1858,7 +1858,8 @@ namespace UnityEngine.Rendering.Universal
         // SLZ MODIFIED // Our additional passes
         SetSLZGlobals,
         HiZPrepass,
-        StoreHiZ0
+        StoreHiZ0,
+        XROcclusionMesh
         // END SLZ MODIFIED
     }
 

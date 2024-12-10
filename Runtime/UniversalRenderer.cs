@@ -686,7 +686,9 @@ namespace UnityEngine.Rendering.Universal
             // END SLZ MODIFIED
 
             if (cameraData.cameraType != CameraType.Game)
-                //useRenderPassEnabled = false;
+            {
+                useRenderPassEnabled = false;
+            }
 
             // Because of the shortcutting done by depth only offscreen cameras, useDepthPriming must be computed early
             useDepthPriming = IsDepthPrimingEnabled(ref cameraData);
@@ -1201,6 +1203,10 @@ namespace UnityEngine.Rendering.Universal
                 occlusionMeshClearsDepth = true;
                 EnqueuePass(m_XROcclusionMeshPass_BeforeDepth);
             }
+            //else
+            //{
+            //    Debug.LogError($"m_XROcclusionMeshPass_BeforeDepth not enqueued, has valid occlusion mesh: {cameraData.xr.hasValidOcclusionMesh}");
+            //}
 #endif
             // END SLZ MODIFIED
 

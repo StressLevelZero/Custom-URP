@@ -57,13 +57,15 @@ namespace UnityEngine.Rendering.Universal
 		private static void ExecutePass(ScriptableRenderContext context, PassData data)
         {
             var cmd = data.renderingData.commandBuffer;
-
-            if (data.renderingData.cameraData.xr.hasValidOcclusionMesh)
+            using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.XROcclusionMesh)))
             {
-                if (data.isActiveTargetBackBuffer)
-                    cmd.SetViewport(data.renderingData.cameraData.xr.GetViewport());
+                if (data.renderingData.cameraData.xr.hasValidOcclusionMesh)
+                {
+                    if (data.isActiveTargetBackBuffer)
+                        cmd.SetViewport(data.renderingData.cameraData.xr.GetViewport());
 
-                data.renderingData.cameraData.xr.RenderOcclusionMesh(cmd, renderIntoTexture: !data.isActiveTargetBackBuffer);
+                    data.renderingData.cameraData.xr.RenderOcclusionMesh(cmd, renderIntoTexture: !data.isActiveTargetBackBuffer);
+                }
             }
         }
 
