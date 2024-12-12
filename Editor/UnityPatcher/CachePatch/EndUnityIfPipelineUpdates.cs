@@ -11,30 +11,35 @@ public static class EndUnityIfPipelineUpdates
     [InitializeOnLoadMethod]
     static void CheckOrDie()
     {
+
         var urpPkgInfo = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.render-pipelines.universal");
         var corePkgInfo = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.render-pipelines.core");
 
-        string currentUrpHash = urpPkgInfo.version != null ? urpPkgInfo.version : "0";
-        string currentCoreHash = corePkgInfo.version != null ? corePkgInfo.version : "0";
-        Debug.Log($"URP Version: {currentUrpHash}");
-        Debug.Log($"SRP Core Version: {currentCoreHash}");
-        string oldUrpHash = SessionState.GetString("URPHash", string.Empty);
-        string oldCoreHash = SessionState.GetString("SRPCoreHash", string.Empty);
+        string currentUrpVersion = urpPkgInfo.version != null ? urpPkgInfo.version : "0";
+        string currentCoreVersion = corePkgInfo.version != null ? corePkgInfo.version : "0";
 
-        if (string.IsNullOrEmpty(oldUrpHash))
+
+        string oldUrpVersion = SessionState.GetString("URPHash", string.Empty);
+        string oldCoreVersion = SessionState.GetString("SRPCoreHash", string.Empty);
+        bool noOldUrpVersion = string.IsNullOrEmpty(oldUrpVersion);
+        bool noOldCoreVersion = string.IsNullOrEmpty(oldCoreVersion);
+
+        Debug.Log($"URP Version - old: {oldUrpVersion}, current:{currentUrpVersion},\nSRP Core Version - old: {oldCoreVersion}, current: {currentCoreVersion}");
+
+        if (noOldUrpVersion)
         {
-            Debug.Log($"URP Version: {currentUrpHash}"); 
-            SessionState.SetString("URPHash", currentUrpHash);
-            oldUrpHash = currentUrpHash;
+            SessionState.SetString("URPHash", currentUrpVersion);
+            oldUrpVersion = currentUrpVersion;
         }
-        if (string.IsNullOrEmpty(oldCoreHash))
+        if (noOldCoreVersion)
         {
-            Debug.Log($"SRP Core version: {currentCoreHash}");
-            SessionState.SetString("SRPCoreHash", currentCoreHash);
-            oldCoreHash = currentCoreHash;
+            SessionState.SetString("SRPCoreHash", currentCoreVersion);
+            oldCoreVersion = currentCoreVersion;
         }
 
-        if (!string.Equals(oldUrpHash, currentUrpHash) || !string.Equals(oldCoreHash, currentCoreHash))
+           
+
+        if (!string.Equals(oldUrpVersion, currentUrpVersion) || !string.Equals(oldCoreVersion, currentCoreVersion))
         {
             Debug.LogError("PANIC - URP or Core pipelines updated while unity was open! Force closing unity!");
             Instagib();
