@@ -8,7 +8,23 @@ using Debug = UnityEngine.Debug;
 
 public static class EndUnityIfPipelineUpdates
 {
+
     [InitializeOnLoadMethod]
+    static void ThisAssemblyReload()
+    {
+        CheckOrDie();
+        AssetDatabase.importPackageStarted -= OnImportPackageStarted;
+        AssetDatabase.importPackageStarted += OnImportPackageStarted;
+    }
+
+    static void OnImportPackageStarted(string packageName)
+    {
+        if (packageName.Equals("com.unity.render-pipelines.universal") || packageName.Equals("com.unity.render-pipelines.core"))
+        {
+            CheckOrDie();
+        }
+    }
+
     static void CheckOrDie()
     {
 
@@ -24,7 +40,10 @@ public static class EndUnityIfPipelineUpdates
         bool noOldUrpVersion = string.IsNullOrEmpty(oldUrpVersion);
         bool noOldCoreVersion = string.IsNullOrEmpty(oldCoreVersion);
 
-        Debug.Log($"URP Version - old: {oldUrpVersion}, current:{currentUrpVersion},\nSRP Core Version - old: {oldCoreVersion}, current: {currentCoreVersion}");
+        if (noOldUrpVersion || noOldCoreVersion)
+        {
+            Debug.Log($"URP Version - old: {oldUrpVersion}, current: {currentUrpVersion},\nSRP Core Version - old: {oldCoreVersion}, current: {currentCoreVersion}");
+        }
 
         if (noOldUrpVersion)
         {
@@ -35,12 +54,11 @@ public static class EndUnityIfPipelineUpdates
         {
             SessionState.SetString("SRPCoreHash", currentCoreVersion);
             oldCoreVersion = currentCoreVersion;
-        }
-
-           
+        }  
 
         if (!string.Equals(oldUrpVersion, currentUrpVersion) || !string.Equals(oldCoreVersion, currentCoreVersion))
         {
+            Debug.Log($"URP Version - old: {oldUrpVersion}, current: {currentUrpVersion},\nSRP Core Version - old: {oldCoreVersion}, current: {currentCoreVersion}");
             Debug.LogError("PANIC - URP or Core pipelines updated while unity was open! Force closing unity!");
             Instagib();
         }
