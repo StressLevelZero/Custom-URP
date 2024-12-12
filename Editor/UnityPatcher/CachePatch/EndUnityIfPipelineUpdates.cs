@@ -16,8 +16,8 @@ public static class EndUnityIfPipelineUpdates
 
         string currentUrpHash = urpPkgInfo.version != null ? urpPkgInfo.version : "0";
         string currentCoreHash = corePkgInfo.version != null ? corePkgInfo.version : "0";
-        //Debug.Log($"URP Git Hash: {currentUrpHash}");
-        //Debug.Log($"SRP Core Git Hash: {currentCoreHash}");
+        Debug.Log($"URP Version: {currentUrpHash}");
+        Debug.Log($"SRP Core Version: {currentCoreHash}");
         string oldUrpHash = SessionState.GetString("URPHash", string.Empty);
         string oldCoreHash = SessionState.GetString("SRPCoreHash", string.Empty);
 
