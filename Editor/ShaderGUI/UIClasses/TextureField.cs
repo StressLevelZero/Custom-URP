@@ -226,7 +226,7 @@ namespace UnityEditor.SLZMaterialUI
             {
                 
                 currentValue = (Texture) newValue;
-                Debug.Log($"Called SetValueWithoutNotify On {textureProperty.name}, current value is now: {currentValue}");
+                //Debug.Log($"Called SetValueWithoutNotify On {textureProperty.name}, current value is now: {currentValue}");
                 if (currentValue == null && defaultTexture != null)
                 {
                     currentValue = defaultTexture;

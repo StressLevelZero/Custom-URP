@@ -90,11 +90,11 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
     RdotV = RdotV > 1 ? -0.5*(RdotV * RdotV) + (2*RdotV - 1) : 0.5 * RdotV * RdotV;
     SSRLerp *= RdotV;
     real4 SSR = real4(0, 0, 0, 0);
+	bool doSSR = SSRLerp > 0.008;
     #if defined(_SM6_QUAD)
-    if (WaveActiveAnyTrue(SSRLerp > 0.008))
-    #else
-    if (SSRLerp > 0.008)
+    if (WaveActiveAnyTrue(doSSR))
     #endif
+	if (doSSR)
     {
         SSR = getSSRColor(ssrData);
     }

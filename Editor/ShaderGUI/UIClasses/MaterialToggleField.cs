@@ -1,13 +1,16 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UIElements;
+using Object = UnityEngine.Object;
 
 namespace UnityEditor.SLZMaterialUI
 {
     public class MaterialToggleField : Toggle, BaseMaterialField
     {
+        public Action<ChangeEvent<bool>> ExtraOnChangeEvent;
         public float onFloatValue = 1.0f;
         public float offFloatValue = 0.0f;
         public int onIntValue = 1;
@@ -19,13 +22,13 @@ namespace UnityEditor.SLZMaterialUI
         string keyword;
         public delegate void BeforeChangeEvent(ChangeEvent<bool> evt);
         //public BeforeChangeEvent BeforeChange;
-        public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx, string keyword, bool isIntField, bool noStyle = false)
+        public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx, string keyword, bool isIntField = false, bool noStyle = false)
         {
             this.materialProperty = materialProperty;
             this.shaderPropertyIdx = shaderPropertyIdx;
             this.isIntField = isIntField;
             this.keyword = keyword;
-            this.RegisterValueChangedCallback(OnChangedEvent);
+            this.RegisterCallback<ChangeEvent<bool>>(OnChangedEvent);
             bool state = false;
             if (isIntField)
             {
@@ -80,12 +83,14 @@ namespace UnityEditor.SLZMaterialUI
                 Undo.RecordObjects(targets, Undo.GetCurrentGroupName());
             }
             SetKeywordOnTargets(evt.newValue);
+
             if (keyword != null)
             {
                 Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
                 Undo.IncrementCurrentGroup();
             }
             this.showMixedValue = false;
+            ExtraOnChangeEvent?.Invoke(evt);
         }
 
         void SetKeywordOnTargets(bool value) 
@@ -95,12 +100,14 @@ namespace UnityEditor.SLZMaterialUI
             {
                 Object[] materials = materialProperty.targets;
                 int numMaterials = materials.Length;
-                Shader s = (materials[0] as Material).shader;
-                LocalKeyword kw = new LocalKeyword(s, keyword);             
+                Shader s = (materials[0] as Material).shader;            
                 for (int i = 0; i < numMaterials; i++) 
                 {
-                    (materials[0] as Material).SetKeyword(kw, value);
+                    Material mat = materials[i] as Material;
+                    CoreUtils.SetKeyword(mat, keyword, value);
+                    EditorUtility.SetDirty(mat);
                 }
+                
             }
         }
         public void UpdateMaterialProperty(MaterialProperty boundProp)
@@ -118,7 +125,7 @@ namespace UnityEditor.SLZMaterialUI
             //Debug.Log($"Update toggle {boundProp.name}, value: {state}");
             this.SetValueWithoutNotify(state);
             this.showMixedValue = materialProperty.hasMixedValue;
-            this.style.color = Color.red;
+            //this.style.color = Color.red;
 
             //MarkDirtyRepaint();
         }

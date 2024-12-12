@@ -27,7 +27,6 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
 		ZTest LEqual
 		Offset 0 , 0
 		ColorMask RGBA
-        LOD 100
 
         Pass
         {

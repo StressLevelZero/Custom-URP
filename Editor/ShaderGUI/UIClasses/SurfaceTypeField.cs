@@ -19,7 +19,7 @@ namespace UnityEditor.SLZMaterialUI
         public INotifyValueChanged<float> blendDst;
         public INotifyValueChanged<float> zWrite;
         public INotifyValueChanged<int> renderQueue;
-
+        public bool alphaClip = false;
 
         enum SurfaceTypes
         {
@@ -67,44 +67,46 @@ namespace UnityEditor.SLZMaterialUI
             dropdown.AddToClassList("materialGUIRightBox");
             style.justifyContent = Justify.FlexStart;
             style.marginRight = 3;
-
-            RegisterCallback<ChangeEvent<int>>(evt =>
+            if (materialProperty.hasMixedValue)
             {
-                
-                int newVal = evt.newValue;
-                Debug.Log("Trying to set surface to " + newVal);
-                UnityEngine.Object[] targets = MaterialProperty.targets;
-                //MaterialProperty.floatValue = newVal;
-                int numTargets = targets.Length;
-                Undo.IncrementCurrentGroup();
-                Undo.RecordObjects(targets, "Set Surface Type");
-                Shader s = ((Material)targets[0]).shader;
-                int surfIdx = s.FindPropertyIndex("_Surface");
-                int blendSrcIdx = s.FindPropertyIndex("_BlendSrc");
-                int blendDstIdx = s.FindPropertyIndex("_BlendDst");
-                int zWriteIdx = s.FindPropertyIndex("_ZWrite");
-                Debug.Log(string.Format("Num Targets: {4}, _Surface: {0}, _BlendSrc:{1}, _BlendDst:{2}, _ZWrite:{3} ", surfIdx, blendSrcIdx, blendDstIdx, zWriteIdx, numTargets));
-                int queue = SurfaceQueue[newVal];
-                queue = queue == s.renderQueue ? -1 : queue;
-                for (int i = 0; i < numTargets; i++)
-                {
-                    Material mat = (Material)targets[i];
-                    mat.SetFloat("_Surface", newVal);
-                    mat.SetFloat("_BlendSrc", SurfaceBlendSrc[newVal]);
-                    mat.SetFloat("_BlendDst", SurfaceBlendDst[newVal]);
-                    mat.SetFloat("_ZWrite", SurfaceZWrite[newVal]);
-                    mat.renderQueue = queue;
-
-                }
-                queueField.SetValueWithoutNotify(SurfaceQueue[newVal]);
-                Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
-                
+                this.showMixedValue = true;
             }
-            );
+            RegisterCallback<ChangeEvent<int>>(ValueChanged);
             this.SetValueWithoutNotify((int)materialProperty.floatValue);
         }
 
-
+        void ValueChanged(ChangeEvent<int> evt)
+        {
+            int newVal = evt.newValue;
+            //Debug.Log("Trying to set surface to " + newVal);
+            UnityEngine.Object[] targets = MaterialProperty.targets;
+            //MaterialProperty.floatValue = newVal;
+            int numTargets = targets.Length;
+            Undo.IncrementCurrentGroup();
+            Undo.RecordObjects(targets, "Set Surface Type");
+            Shader s = ((Material)targets[0]).shader;
+            int surfIdx = s.FindPropertyIndex("_Surface");
+            int blendSrcIdx = s.FindPropertyIndex("_BlendSrc");
+            int blendDstIdx = s.FindPropertyIndex("_BlendDst");
+            int zWriteIdx = s.FindPropertyIndex("_ZWrite");
+            //Debug.Log(string.Format("Num Targets: {4}, _Surface: {0}, _BlendSrc:{1}, _BlendDst:{2}, _ZWrite:{3} ", surfIdx, blendSrcIdx, blendDstIdx, zWriteIdx, numTargets));
+            int queue = SurfaceQueue[newVal];
+            if (alphaClip && queue < 2400) queue = 2450; 
+            queue = queue == s.renderQueue ? -1 : queue;
+            for (int i = 0; i < numTargets; i++)
+            {
+                Material mat = (Material)targets[i];
+                mat.SetFloat("_Surface", newVal);
+                mat.SetFloat("_BlendSrc", SurfaceBlendSrc[newVal]);
+                mat.SetFloat("_BlendDst", SurfaceBlendDst[newVal]);
+                mat.SetFloat("_ZWrite", SurfaceZWrite[newVal]);
+                mat.renderQueue = queue;
+                EditorUtility.SetDirty(mat);
+            }
+            this.showMixedValue = false;
+            renderQueue.SetValueWithoutNotify(SurfaceQueue[newVal]);
+            Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
+        }
 
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {

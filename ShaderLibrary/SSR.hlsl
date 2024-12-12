@@ -341,7 +341,6 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
                 stepMultiplier = isMinMip ? 0.5 * stepMultiplier : stepMultiplier;
             }
         }
-
         // Move forward a step if the ray is above depth or if it is more than 2 steps behind the depth
         // or if it is at mip level 0. Dont move otherwise to prevent moving backwards towards a false
         // surface created by a high level mip
@@ -521,13 +520,14 @@ float4 getSSRColor(SSRData data)
     //colorY = colorY * (min(maxColorY, maxColor) / maxColorY);
     //colorD = colorD * (min(maxColorD, maxColor) / maxColorD);
     
-    float4 kernelWeights = float4(0.25, 0.25, 0.25, 0.25);//float4(0.5, 0.185, 0.185, 0.13);
+    float4 kernelWeights = float4(0.4, 0.2, 0.2, 0.2);//float4(0.5, 0.185, 0.185, 0.13);
     float4 fadeQuad = float4(reflection.a, colorX.a, colorY.a, colorD.a);
     float4 kernel = (fadeQuad) * kernelWeights;
     float weight = kernel.x + kernel.y + kernel.z + kernel.w;
     float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;
     reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
-    reflection.a = weight;
+
+    reflection.a = max(max(fadeQuad.x,fadeQuad.y),max(fadeQuad.z,fadeQuad.w));
     //reflection = kernelWeights.x * reflection + kernelWeights.y * colorX + kernelWeights.z * colorY + kernelWeights.w * colorD;
     
     reflection.rgb = reflection.rgb * reflection.rgb;

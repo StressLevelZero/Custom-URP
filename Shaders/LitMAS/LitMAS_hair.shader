@@ -1,4 +1,4 @@
-Shader "Hidden/SLZ/LitMAS/LitMAS Hair"
+Shader "WIP/SLZ/LitMAS/LitMAS Hair"
 {
     Properties
     {
@@ -29,7 +29,6 @@ Shader "Hidden/SLZ/LitMAS/LitMAS Hair"
         //ZWrite On
         ZTest LEqual
         Offset 0 , 0
-        ColorMask RGBA
         LOD 100
 
 HLSLINCLUDE
@@ -53,27 +52,26 @@ ENDHLSL
             #define LITMAS_FEATURE_TS_NORMALS
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_SSR
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/hairForward.hlsl"
 
             ENDHLSL
         }
 
-        Pass
+		Pass
         {
             Name "DepthOnly"
             Tags {"Lightmode"="DepthOnly"}
 			ZWrite [_ZWrite]
 			Cull [_Cull]
-
-            //ZTest Off
-            ColorMask 0
+			//ZTest Off
 
             HLSLPROGRAM
             
             #pragma vertex vert
             #pragma fragment frag
-            
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
@@ -93,7 +91,7 @@ ENDHLSL
 
             #pragma vertex vert
             #pragma fragment frag
-
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "LitMASInclude/DepthNormals.hlsl" 
 
             ENDHLSL
@@ -109,15 +107,13 @@ ENDHLSL
 			Cull [_Cull]
             ZWrite On
             ZTest LEqual
-            AlphaToMask Off
-            ColorMask 0
 
             HLSLPROGRAM
             
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
-
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "LitMASInclude/ShadowCaster.hlsl" 
 
             ENDHLSL
@@ -143,6 +139,7 @@ ENDHLSL
             #pragma shader_feature _ EDITOR_VISUALIZATION
 
             #define SHADERPASS SHADERPASS_META
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
             #include "LitMASInclude/MetaPass.hlsl" 
             ENDHLSL
@@ -160,6 +157,8 @@ ENDHLSL
             ENDHLSL
         }
     }
-    CustomEditor "UnityEditor.ShaderGraphLitGUI"
-    Fallback "Hidden/InternalErrorShader"
+    CustomEditor "LitMASGUI"
+
+    //CustomEditor "UnityEditor.ShaderGraphLitGUI"
+    //Fallback "Hidden/InternalErrorShader"
 }

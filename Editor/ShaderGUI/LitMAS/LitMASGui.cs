@@ -14,7 +14,6 @@ using UnityEditor.SLZMaterialUI;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using static UnityEngine.Rendering.DebugUI.MessageBox;
-using UnityEditor.ShaderGraph;
 
 namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 {
@@ -65,6 +64,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             _ZWrite,
             _Cull,
             _HalfShade,
+            _Slope,
+            _Offset,
+            _Alphatest,
+            _Cutoff,
 
             // Triplanar properties
             _Expensive,
@@ -97,6 +100,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "_ZWrite",
             "_Cull",
             "_HalfShade",
+            "_Slope",
+            "_Offset",
+            "_Alphatest",
+            "_Cutoff",
 
              // Triplanar properties
             "_Expensive",
@@ -124,6 +131,14 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             public int texturePropertyCount; 
         }
 
+        HelpBox TransparentWarning;
+        HelpBox AlphaClipWarning;
+        int AlphaClipWarningCount;
+        HelpBox ZOffsetWarning;
+        int ZOffsetWarningCount;
+        SurfaceTypeField surfaceTypeField;
+        RenderQueueDropdown renderQueue;
+        MaterialToggleField alphaClipToggle;
 
         public override VisualElement CreateInspectorGUI()
         {
@@ -151,69 +166,250 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             //int currentFieldIdx = 0;
 
             //----------------------------------------------------------------
+            // Warning Messages ----------------------------------------------
+            //----------------------------------------------------------------
+
+            TransparentWarning = new HelpBox("Transparent materials are expensive on Quest, use sparingly!", HelpBoxMessageType.Warning);
+            TransparentWarning.style.display = DisplayStyle.None;
+            ZOffsetWarning = new HelpBox("Non-zero Z Offset slope/units. This will prevent this material from SRP batching with any other material that does not have precisely the same ZOffset values.", HelpBoxMessageType.Warning);
+            ZOffsetWarning.style.display = DisplayStyle.None;
+            AlphaClipWarning = new HelpBox("Opaque alpha clip materials are very expensive on Quest, prefer transparency if possible!", HelpBoxMessageType.Warning);
+            AlphaClipWarning.style.display = DisplayStyle.None;
+
+            MainWindow.Add(TransparentWarning);
+            MainWindow.Add(AlphaClipWarning);
+            MainWindow.Add(ZOffsetWarning);
+
+            //----------------------------------------------------------------
             // Rendering Properties ------------------------------------------
             //----------------------------------------------------------------
 
             Foldout drawProps = new Foldout();
 
 
-            {
+            //{
                 //drawProps.value = false;
 
-                RenderQueueDropdown renderQueue = new RenderQueueDropdown(serializedObject, shader);
+            renderQueue = new RenderQueueDropdown(serializedObject, shader);
 
-                int surfaceIdx = PropertyIdx(ref propTable, PName._Surface);
-                int blendSrcIdx = PropertyIdx(ref propTable, PName._BlendSrc);
-                int blendDstIdx = PropertyIdx(ref propTable, PName._BlendDst);
-                int zWriteIdx = PropertyIdx(ref propTable, PName._ZWrite);
-                if (surfaceIdx != -1 && blendSrcIdx != -1 && blendDstIdx != -1 && zWriteIdx != -1)
-                {
-                    MaterialDummyField blendSrcField = new MaterialDummyField(props[blendSrcIdx], propIdx[blendSrcIdx]);
-                    MaterialDummyField blendDstField = new MaterialDummyField(props[blendDstIdx], propIdx[blendDstIdx]);
-                    MaterialDummyField zWriteField = new MaterialDummyField(props[zWriteIdx], propIdx[zWriteIdx]);
-                    materialFields.Add(blendSrcField);
-                    materialFields.Add(blendDstField);
-                    materialFields.Add(zWriteField);
+            int surfaceIdx = PropertyIdx(ref propTable, PName._Surface);
+            int blendSrcIdx = PropertyIdx(ref propTable, PName._BlendSrc);
+            int blendDstIdx = PropertyIdx(ref propTable, PName._BlendDst);
+            int zWriteIdx = PropertyIdx(ref propTable, PName._ZWrite);
+            if (surfaceIdx != -1 && blendSrcIdx != -1 && blendDstIdx != -1 && zWriteIdx != -1)
+            {
+                MaterialDummyField blendSrcField = new MaterialDummyField(props[blendSrcIdx], propIdx[blendSrcIdx]);
+                MaterialDummyField blendDstField = new MaterialDummyField(props[blendDstIdx], propIdx[blendDstIdx]);
+                MaterialDummyField zWriteField = new MaterialDummyField(props[zWriteIdx], propIdx[zWriteIdx]);
+                materialFields.Add(blendSrcField);
+                materialFields.Add(blendDstField);
+                materialFields.Add(zWriteField);
 
-                    SurfaceTypeField surfaceTypeField = new SurfaceTypeField();
-                    surfaceTypeField.Initialize(
-                        props[surfaceIdx], 
-                        propIdx[surfaceIdx],
-                        blendSrcField,
-                        blendDstField,
-                        zWriteField,
-                        renderQueue
-                        );
-                    surfaceTypeField.tooltip = LitMASGui_Tooltips.Surface.ToString();
-                    materialFields.Add(surfaceTypeField);
-                    drawProps.contentContainer.Add(surfaceTypeField);
-                }
+                surfaceTypeField = new SurfaceTypeField();
+                surfaceTypeField.Initialize(
+                    props[surfaceIdx], 
+                    propIdx[surfaceIdx],
+                    blendSrcField,
+                    blendDstField,
+                    zWriteField,
+                    renderQueue
+                    );
 
-                int cullIdx = PropertyIdx(ref propTable, PName._Cull);
-                if (cullIdx != -1)
-                {
-                    List<int> cullChoices = new List<int>() { (int)CullMode.Back, (int)CullMode.Front, (int)CullMode.Off};
-                    Dictionary<int, string> cullLabels = new Dictionary<int, string>() { { (int)CullMode.Back, "Front" }, { (int)CullMode.Front, "Back" }, { (int)CullMode.Off, "Both (EXPENSIVE)" } };
+                if (!surfaceTypeField.materialProperty.hasMixedValue && surfaceTypeField.value > 0) TransparentWarning.style.display = DisplayStyle.Flex;
 
-                    MaterialIntPopup cullPopup = new MaterialIntPopup();
-                    cullPopup.label = "Rendered Side";
-                    cullPopup.Initialize(props[cullIdx], propIdx[cullIdx], cullChoices, cullLabels);
-                   
-                    materialFields.Add(cullPopup);
-                    drawProps.contentContainer.Add(cullPopup);
-                }
-                int halfShadeIdx = PropertyIdx(ref propTable, PName._HalfShade);
-                if (halfShadeIdx != -1)
-                {
-                    MaterialToggleField halfShadeToggle = new MaterialToggleField();
-                    halfShadeToggle.Initialize(props[halfShadeIdx], propIdx[halfShadeIdx], string.Empty, false);
-                    halfShadeToggle.onFloatValue = 0.0008148f;
-                    halfShadeToggle.label = "2x2 Shading Rate (Quest Only)";
-                    drawProps.contentContainer.Add(halfShadeToggle);
-                }
-
-                drawProps.contentContainer.Add(renderQueue);
+                surfaceTypeField.RegisterValueChangedCallback((ChangeEvent<int> evt) => {
+                    TransparentWarning.style.display = evt.newValue > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                    AlphaClipWarning.style.display = alphaClipToggle != null && alphaClipToggle.value && surfaceTypeField.value == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                });
+                AlphaClipWarningCount += surfaceTypeField.value > 0 ? -1 : 0;
+                surfaceTypeField.tooltip = LitMASGui_Tooltips.Surface.ToString();
+                materialFields.Add(surfaceTypeField);
+                drawProps.contentContainer.Add(surfaceTypeField);
             }
+
+            int cullIdx = PropertyIdx(ref propTable, PName._Cull);
+            if (cullIdx != -1)
+            {
+                List<int> cullChoices = new List<int>() { (int)CullMode.Back, (int)CullMode.Front, (int)CullMode.Off};
+                Dictionary<int, string> cullLabels = new Dictionary<int, string>() { { (int)CullMode.Back, "Front" }, { (int)CullMode.Front, "Back" }, { (int)CullMode.Off, "Both (EXPENSIVE)" } };
+
+                MaterialIntPopup cullPopup = new MaterialIntPopup();
+                cullPopup.label = "Rendered Side";
+                cullPopup.Initialize(props[cullIdx], propIdx[cullIdx], cullChoices, cullLabels);
+               
+                materialFields.Add(cullPopup);
+                drawProps.contentContainer.Add(cullPopup);
+            }
+
+            int alphaClipIdx = PropertyIdx(ref propTable, PName._Alphatest);
+            int alphaClipThresholdIdx = PropertyIdx(ref propTable, PName._Cutoff);
+            if (alphaClipThresholdIdx != -1 && alphaClipIdx != -1)
+            {
+                VisualElement alphaClipping = new VisualElement();
+                alphaClipping.style.justifyContent = Justify.FlexStart;
+                alphaClipping.style.alignItems = Align.Center;
+                alphaClipping.style.flexDirection = FlexDirection.Row;
+                alphaClipping.style.marginLeft = alphaClipping.style.marginRight = 3;
+
+                Label alphaClipLabel = new Label("Alpha Clip");
+                alphaClipLabel.AddToClassList("materialGUILeftBox");
+                alphaClipLabel.style.overflow = Overflow.Hidden;
+                alphaClipLabel.style.minWidth = 0;
+                alphaClipping.Add(alphaClipLabel);
+
+                VisualElement alphaClipFields = new VisualElement();
+                alphaClipFields.AddToClassList("materialGUIRightBox");
+                alphaClipFields.style.flexGrow = 1;
+                alphaClipping.Add(alphaClipFields);
+
+                MaterialRangeField alphaClipThreshold = new MaterialRangeField();
+                alphaClipThreshold.Initialize(props[alphaClipThresholdIdx], propIdx[alphaClipThresholdIdx], true);
+                alphaClipThreshold.style.flexGrow = 1f;
+                alphaClipThreshold.style.flexShrink = 1f;
+                //alphaClipThreshold.style.flexBasis = 24;
+                alphaClipThreshold.label = null;
+                materialFields.Add(alphaClipThreshold);
+
+
+                alphaClipToggle = new MaterialToggleField();
+                alphaClipToggle.Initialize(props[alphaClipIdx], propIdx[alphaClipIdx], "_ALPHATEST_ON", false);
+                alphaClipToggle.label = null;
+                alphaClipToggle.style.flexGrow = 0f;
+                alphaClipToggle.style.flexShrink = 0f;
+                alphaClipToggle.style.flexBasis = 24;
+                alphaClipToggle.style.minWidth = 24;
+                alphaClipToggle.style.marginLeft = 1;
+                alphaClipToggle.ExtraOnChangeEvent = (ChangeEvent<bool> evt) =>
+                {
+                    surfaceTypeField.alphaClip = evt.newValue;
+                    if (surfaceTypeField == null || surfaceTypeField.materialProperty.hasMixedValue || surfaceTypeField.value == 0)
+                    {
+                        UnityEngine.Object[] targets = alphaClipToggle.materialProperty.targets;
+                        int numTargets = targets.Length;
+
+                        if (evt.newValue == true)
+                        {
+                            alphaClipThreshold.SetEnabled(true);
+                            for (int i = 0; i < numTargets; i++)
+                            {
+                                Material mat = (Material)targets[i];
+                                if (mat.renderQueue < 2400)
+                                {
+                                    mat.renderQueue = 2450;
+                                    EditorUtility.SetDirty(mat);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            alphaClipThreshold.SetEnabled(false);
+                            for (int i = 0; i < numTargets; i++)
+                            {
+                                Material mat = (Material)targets[i];
+                                if (mat.renderQueue == 2450)
+                                {
+                                    mat.renderQueue = -1;
+                                }
+                                EditorUtility.SetDirty(mat);
+                            }
+                        }
+
+                        AlphaClipWarning.style.display = alphaClipToggle.value && (surfaceTypeField == null || surfaceTypeField.value == 0) ? DisplayStyle.Flex : DisplayStyle.None;
+
+                    }
+                };
+                surfaceTypeField.alphaClip = alphaClipToggle.value;
+                AlphaClipWarning.style.display = alphaClipToggle.value && surfaceTypeField.value == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                alphaClipThreshold.SetEnabled(alphaClipToggle.value || alphaClipToggle.materialProperty.hasMixedValue);
+
+                materialFields.Add(alphaClipToggle);
+                alphaClipFields.Add(alphaClipToggle);
+                alphaClipFields.Add(alphaClipThreshold);
+
+                drawProps.Add(alphaClipping);
+            }
+
+            int zSlopeIdx = PropertyIdx(ref propTable, PName._Slope);
+            int zOffsetIdx = PropertyIdx(ref propTable, PName._Offset);
+            int halfShadeIdx = PropertyIdx(ref propTable, PName._HalfShade);
+            MaterialZSlopeFloatField zSlopeFloatField = zSlopeIdx != -1 ? new MaterialZSlopeFloatField() : null;
+            MaterialHalfRateToggleField halfShadeToggle = halfShadeIdx != -1 ? new MaterialHalfRateToggleField() : null;
+
+            // "Advanced properties" ie properties you don't want artists changing at random. Category gets added dead last and starts collapsed.
+            // Set it up here since the Z-Offset and half-rate are intertwined, and we want to hide only the z-offset
+            Foldout advancedProps = new Foldout();
+            bool hasAdvancedProps = false;
+
+
+            if (zSlopeIdx != -1 || zOffsetIdx != -1)
+            {
+                hasAdvancedProps = true;
+                VisualElement zOffset = new VisualElement();
+                zOffset.style.justifyContent = Justify.FlexStart;
+                zOffset.style.alignItems = Align.Center;
+                zOffset.style.flexDirection = FlexDirection.Row;
+                zOffset.style.marginLeft = zOffset.style.marginRight = 3;
+
+                Label zOffsetLabel = new Label("Z Offset");
+                zOffsetLabel.AddToClassList("materialGUILeftBox");
+                zOffsetLabel.style.overflow = Overflow.Hidden;
+                zOffsetLabel.style.minWidth = 0;
+                zOffset.Add(zOffsetLabel);
+
+                VisualElement zOffsetFields = new VisualElement();
+                zOffsetFields.AddToClassList("materialGUIRightBox");
+
+                if (zSlopeIdx != -1)
+                {
+                    zSlopeFloatField.Initialize(props[zSlopeIdx], halfShadeToggle, propIdx[zSlopeIdx], false);
+                    zSlopeFloatField.label = "Slope";
+                    zSlopeFloatField.AddToClassList("materialGUIRightBox");
+                    if (zSlopeFloatField.value != 0) ZOffsetWarningCount += 1;
+                    zSlopeFloatField.RegisterValueChangedCallback(SetZOffsetWarningVisibility<float>);
+                    materialFields.Add(zSlopeFloatField);
+                    zOffsetFields.Add(zSlopeFloatField);
+                }
+
+                if (zOffsetIdx != -1)
+                {
+                    MaterialIntField zOffsetUnits = new MaterialIntField();
+                    zOffsetUnits.Initialize(props[zOffsetIdx], propIdx[zOffsetIdx], true);
+                    zOffsetUnits.label = "Units";
+                    VisualElement zOffsetUnitsLabel = zOffsetUnits.ElementAt(0);
+                    VisualElement zOffsetUnitsField = zOffsetUnits.ElementAt(1);
+                    zOffsetUnits.AddToClassList("materialGUIRightBox");
+                    zOffsetUnitsLabel.style.flexBasis = 36;
+                    zOffsetUnitsLabel.style.minWidth = 36;
+                    zOffsetUnitsLabel.style.flexGrow = 0f;
+                    zOffsetUnitsLabel.style.flexShrink = 0f;
+                    zOffsetUnitsLabel.style.alignSelf = Align.FlexStart;
+                    zOffsetUnitsField.style.flexGrow = 1;
+                    zOffsetUnitsField.style.flexShrink = 1f;
+
+                    if (zOffsetUnits.value != 0) ZOffsetWarningCount += 1;
+                    zOffsetUnits.RegisterValueChangedCallback(SetZOffsetWarningVisibility<int>);
+
+                    materialFields.Add(zOffsetUnits);
+                    zOffsetFields.Add(zOffsetUnits);
+                }
+
+                ZOffsetWarning.style.display = ZOffsetWarningCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+
+                zOffset.Add(zOffsetFields);
+                advancedProps.contentContainer.Add(zOffset);
+            }
+
+            if (halfShadeIdx != -1)
+            {
+                halfShadeToggle.Initialize(props[halfShadeIdx], zSlopeFloatField, propIdx[halfShadeIdx], string.Empty, false);
+                drawProps.contentContainer.Add(halfShadeToggle);
+                materialFields.Add(halfShadeToggle);
+            }
+
+
+
+            drawProps.contentContainer.Add(renderQueue);
+            //}
             MainWindow.Add(drawProps);
 
             //----------------------------------------------------------------
@@ -648,6 +844,14 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 MainWindow.Add(unknownProps);
             }
 
+            if (hasAdvancedProps)
+            {
+                Texture2D advancedIcon = ShaderGUIUtils.GetClosestUnityIconMip("console.warnicon.sml", 16);
+                ShaderGUIUtils.SetHeaderStyle(advancedProps, "Advanced", advancedIcon);
+                advancedProps.value = false;
+                MainWindow.Add(advancedProps);
+            }
+
             return root;
         }
 
@@ -677,7 +881,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             return false;
         }
 
-
+        
 
         private ShaderPropertyTable GetPropertyTable(MaterialProperty[] props)
         {
@@ -728,6 +932,24 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             right.AddToClassList("materialGUIRightBox");
             vi.style.justifyContent = Justify.FlexStart;
             vi.style.marginRight = 3;
+        }
+
+        void SetZOffsetWarningVisibility<T>(ChangeEvent<T> evt) where T : struct, IEquatable<T>
+        {
+            //Debug.Log($"Change Event? {evt.previousValue}, {evt.newValue}, {default(T)}");
+
+            // Unity's .NET isn't new enough to have INumber<T> so abuse the fact that we only need to compare against 0, which is the default value
+            if (!evt.previousValue.Equals(default) && !evt.newValue.Equals(default)) return;
+            if (evt.previousValue.Equals(default) && !evt.newValue.Equals(default))
+            {
+                ZOffsetWarningCount += 1;
+                ZOffsetWarning.style.display = DisplayStyle.Flex;
+            }
+            if (!evt.previousValue.Equals(default) && evt.newValue.Equals(default))
+            {
+                ZOffsetWarningCount -= 1;
+                ZOffsetWarning.style.display = ZOffsetWarningCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            }
         }
 
     }

@@ -11,7 +11,7 @@ namespace UnityEditor.SLZMaterialUI
         public int GetShaderPropIdx() { return shaderPropertyIdx; }
         public MaterialProperty materialProperty;
 
-        public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx)
+        public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx, bool noStyle = false)
         {
             this.materialProperty = materialProperty;
             this.shaderPropertyIdx = shaderPropertyIdx;
@@ -27,7 +27,7 @@ namespace UnityEditor.SLZMaterialUI
                 this.showMixedValue = true;
             }
             label = materialProperty.displayName;
-            SetFullLineStyle();
+            if (!noStyle) SetFullLineStyle();
         }
         public void SetFullLineStyle()
         {
@@ -42,7 +42,7 @@ namespace UnityEditor.SLZMaterialUI
         public void OnChangedEvent(ChangeEvent<float> evt)
         {
             materialProperty.floatValue = evt.newValue;
-            this.showMixedValue = false;
+            this.showMixedValue = materialProperty.hasMixedValue;
         }
         public void UpdateMaterialProperty(MaterialProperty boundProp)
         {

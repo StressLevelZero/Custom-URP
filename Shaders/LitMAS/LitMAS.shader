@@ -19,7 +19,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         [Header(This should be 0 for skinned meshes)]
         _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
         [Toggle(_ALPHATEST_ON)]_Alphatest("Alpha Clipping", float) = 0
-        _Cutoff("Alpha Clip Threshold", Range(0,1)) = 1
+        _Cutoff("Alpha Clip Threshold", Range(0,1)) = 0.5
         //[Toggle(_SM6_QUAD)] _SM6_Quad("Quad-avg SSR", Float) = 0
 
         _Surface ("Surface Type", float) = 0
@@ -28,14 +28,15 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         [ToggleUI] _ZWrite ("ZWrite", float) = 1
         _Cull ("Cull Side", float) = 2
         _HalfShade("Enable Vulkan Per-Draw Shading Rate Hack", float) = 0
+        _Slope("Offset Slope Factor", float) = 0
+        _Offset("Offset Units", float) = 0
     }
     SubShader
     {
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" }
         
         ZTest LEqual
-        Offset [_HalfShade] , 0
-        ColorMask RGBA
+        Offset [_Slope], [_Offset]
         LOD 100
 
         HLSLINCLUDE
