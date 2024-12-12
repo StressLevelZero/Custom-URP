@@ -5,6 +5,8 @@ using UnityEditor;
 using UnityEditorInternal;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
+using UnityEditor.PackageManager;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 public static class EndUnityIfPipelineUpdates
 {
@@ -13,21 +15,50 @@ public static class EndUnityIfPipelineUpdates
     static void ThisAssemblyReload()
     {
         CheckOrDie();
-        AssetDatabase.importPackageStarted -= OnImportPackageStarted;
-        AssetDatabase.importPackageStarted += OnImportPackageStarted;
+        Events.registeringPackages -= RegisteringPackages;
+        Events.registeringPackages += RegisteringPackages;
     }
 
-    static void OnImportPackageStarted(string packageName)
+    static void RegisteringPackages(PackageRegistrationEventArgs args)
     {
-        if (packageName.Equals("com.unity.render-pipelines.universal") || packageName.Equals("com.unity.render-pipelines.core"))
+        Debug.Log("Ran RegisteringPackages");
+        PackageInfo oldCore = null;
+        PackageInfo newCore = null;
+
+        PackageInfo oldURP = null;
+        PackageInfo newURP = null;
+
+        int numChanged = args.changedFrom.Count;
+        Debug.Log("Num Changed: " + numChanged);
+        for (int pkgIdx = 0; pkgIdx < numChanged; pkgIdx++)
         {
-            CheckOrDie();
+            //Debug.Log("Changed: " + args.changedFrom[pkgIdx].packageId);
+            if (oldURP == null && args.changedFrom[pkgIdx].packageId.StartsWith("com.unity.render-pipelines.universal@"))
+            {
+                oldURP = args.changedFrom[pkgIdx];
+                newURP = args.changedTo[pkgIdx];
+            }
+            else if (oldCore == null && args.changedFrom[pkgIdx].packageId.StartsWith("com.unity.render-pipelines.core@"))
+            {
+                oldCore = args.changedFrom[pkgIdx];
+                newCore = args.changedTo[pkgIdx];
+            }
+        }
+        if (oldCore != null || oldURP != null)
+        {
+            bool urpChanged = oldURP != null && !string.Equals(oldURP.version, newURP.version);
+            bool coreChanged = oldCore != null && !string.Equals(oldCore.version, newCore.version);
+            if (coreChanged || urpChanged)
+            {
+                Debug.Log($"URP Version - old: {oldURP?.version}, current: {newURP?.version},\nSRP Core Version - old: {oldCore?.version}, current: {newCore?.version}");
+                Debug.LogError("PANIC - URP or Core pipelines updated while unity was open! Force closing unity!");
+                Instagib();
+            }
         }
     }
 
     static void CheckOrDie()
     {
-
         var urpPkgInfo = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.render-pipelines.universal");
         var corePkgInfo = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.render-pipelines.core");
 
@@ -37,6 +68,7 @@ public static class EndUnityIfPipelineUpdates
 
         string oldUrpVersion = SessionState.GetString("URPHash", string.Empty);
         string oldCoreVersion = SessionState.GetString("SRPCoreHash", string.Empty);
+
         bool noOldUrpVersion = string.IsNullOrEmpty(oldUrpVersion);
         bool noOldCoreVersion = string.IsNullOrEmpty(oldCoreVersion);
 
@@ -56,7 +88,7 @@ public static class EndUnityIfPipelineUpdates
             oldCoreVersion = currentCoreVersion;
         }  
 
-        if (!string.Equals(oldUrpVersion, currentUrpVersion) || !string.Equals(oldCoreVersion, currentCoreVersion))
+        if (!(noOldUrpVersion && noOldCoreVersion) && (!string.Equals(oldUrpVersion, currentUrpVersion) || !string.Equals(oldCoreVersion, currentCoreVersion)))
         {
             Debug.Log($"URP Version - old: {oldUrpVersion}, current: {currentUrpVersion},\nSRP Core Version - old: {oldCoreVersion}, current: {currentCoreVersion}");
             Debug.LogError("PANIC - URP or Core pipelines updated while unity was open! Force closing unity!");
