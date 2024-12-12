@@ -254,11 +254,22 @@ VertOut vert(VertIn v)
 	return o;
 }
 
-half4 frag(VertOut i) : SV_Target
+struct FragOut
+{
+	float4 color : SV_Target;
+};
+
+FragOut frag(VertOut i 
+	, bool frontFace : SV_IsFrontFace
+) : SV_Target
 {
 	UNITY_SETUP_INSTANCE_ID(i);
 	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
+	if (!frontFace)
+	{
+		UNPACK_NORMAL(i) = -UNPACK_NORMAL(i);
+	}
 /*---------------------------------------------------------------------------------------------------------------------------*/
 /*---Read Input Data---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
@@ -267,12 +278,11 @@ half4 frag(VertOut i) : SV_Target
 	float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
 	float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
-	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 
 
-
 	albedo *= _BaseColor;
+	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half metallic = mas.r;
 	half ao = mas.g;
 	half smoothness = mas.b;
@@ -390,5 +400,9 @@ half4 frag(VertOut i) : SV_Target
 
 	color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
 	color = VolumetricsSurf(color, fragData.position, _Surface);
-	return color;
+	
+	FragOut output = (FragOut) 0;
+	output.color = color;
+
+	return output;
 }

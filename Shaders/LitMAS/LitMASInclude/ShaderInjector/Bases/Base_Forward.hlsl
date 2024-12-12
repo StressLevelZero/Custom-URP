@@ -179,11 +179,24 @@ VertOut vert(VertIn v)
 	return o;
 }
 
-half4 frag(VertOut i) : SV_Target
+struct FragOut
+{
+	float4 color : SV_Target;
+	//#!INJECT_POINT FRAG_OUT_STRUCT
+};
+
+FragOut frag(VertOut i 
+	, bool frontFace : SV_IsFrontFace
+	//#!INJECT_POINT FRAG_PARAMETERS
+) : SV_Target
 {
 	UNITY_SETUP_INSTANCE_ID(i);
 	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
+	if (!frontFace)
+	{
+		UNPACK_NORMAL(i) = -UNPACK_NORMAL(i);
+	}
 /*---------------------------------------------------------------------------------------------------------------------------*/
 /*---Read Input Data---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
@@ -284,5 +297,10 @@ half4 frag(VertOut i) : SV_Target
 	color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
 	color = VolumetricsSurf(color, fragData.position, _Surface);
 	//#!INJECT_END
-	return color;
+	
+	FragOut output = (FragOut) 0;
+	output.color = color;
+	//#!INJECT_POINT FRAG_OUT_POPULATE
+
+	return output;
 }

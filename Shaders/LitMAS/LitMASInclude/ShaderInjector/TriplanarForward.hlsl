@@ -228,11 +228,22 @@ VertOut vert(VertIn v)
 	return o;
 }
 
-half4 frag(VertOut i) : SV_Target
+struct FragOut
+{
+	float4 color : SV_Target;
+};
+
+FragOut frag(VertOut i 
+	, bool frontFace : SV_IsFrontFace
+) : SV_Target
 {
 	UNITY_SETUP_INSTANCE_ID(i);
 	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
+	if (!frontFace)
+	{
+		UNPACK_NORMAL(i) = -UNPACK_NORMAL(i);
+	}
 /*---------------------------------------------------------------------------------------------------------------------------*/
 /*---Read Input Data---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
@@ -267,8 +278,8 @@ half4 frag(VertOut i) : SV_Target
 // End Injection FRAG_READ_INPUTS from Injection_Triplanar.hlsl ----------------------------------------------------------
 
 
-
 	albedo *= _BaseColor;
+	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half metallic = mas.r;
 	half ao = mas.g;
 	half smoothness = mas.b;
@@ -394,5 +405,9 @@ half4 frag(VertOut i) : SV_Target
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif
 // End Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
-	return color;
+	
+	FragOut output = (FragOut) 0;
+	output.color = color;
+
+	return output;
 }

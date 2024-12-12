@@ -12,27 +12,27 @@
 #define _NORMALMAP 1
 
 #if defined(SHADER_API_MOBILE)
-	#define _ADDITIONAL_LIGHTS_VERTEX
-	#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION 
+	//#define _ADDITIONAL_LIGHTS_VERTEX
+	//#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION 
+
 #else              
-	#pragma multi_compile_fragment  _  _MAIN_LIGHT_SHADOWS_CASCADE
-
-	#define DYNAMIC_SCREEN_SPACE_OCCLUSION
-	#pragma dynamic_branch _SCREEN_SPACE_OCCLUSION
-	
-#define DYNAMIC_ADDITIONAL_LIGHTS
-#pragma dynamic_branch _ADDITIONAL_LIGHTS
-
-
-#define DYNAMIC_ADDITIONAL_LIGHT_SHADOWS
-#pragma dynamic_branch _ADDITIONAL_LIGHT_SHADOWS
-
-	#define _SHADOWS_SOFT 1
-	
-	#define _REFLECTION_PROBE_BLENDING
-	//#pragma shader_feature_fragment _REFLECTION_PROBE_BOX_PROJECTION
-	// We don't need a keyword for this! the w component of the probe position already branches box vs non-box, & so little cost on pc it doesn't matter
-	#define _REFLECTION_PROBE_BOX_PROJECTION 
+	//#pragma multi_compile_fragment  _  _MAIN_LIGHT_SHADOWS_CASCADE
+	//#define DYNAMIC_SCREEN_SPACE_OCCLUSION
+	//#pragma dynamic_branch _SCREEN_SPACE_OCCLUSION
+	//
+	//#define DYNAMIC_ADDITIONAL_LIGHTS
+	//#pragma dynamic_branch _ADDITIONAL_LIGHTS
+	//
+	//
+	//#define DYNAMIC_ADDITIONAL_LIGHT_SHADOWS
+	//#pragma dynamic_branch _ADDITIONAL_LIGHT_SHADOWS
+	//
+	//#define _SHADOWS_SOFT 1
+	//
+	//#define _REFLECTION_PROBE_BLENDING
+	////#pragma shader_feature_fragment _REFLECTION_PROBE_BOX_PROJECTION
+	//// We don't need a keyword for this! the w component of the probe position already branches box vs non-box, & so little cost on pc it doesn't matter
+	//#define _REFLECTION_PROBE_BOX_PROJECTION 
 
 // Begin Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------
 #pragma multi_compile _ _SLZ_SSR_ENABLED
@@ -44,27 +44,28 @@
 
 #endif
 
-#pragma multi_compile_fragment _ _LIGHT_COOKIES
-#pragma multi_compile _ SHADOWS_SHADOWMASK
+//#pragma multi_compile_fragment _ _LIGHT_COOKIES
+//#pragma multi_compile _ SHADOWS_SHADOWMASK
 #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
 #pragma multi_compile_fog
-#pragma skip_variants FOG_LINEAR FOG_EXP
+//#pragma skip_variants FOG_LINEAR FOG_EXP
 //#pragma multi_compile_fragment _ DEBUG_DISPLAY
 #pragma multi_compile_fragment _ _DETAILS_ON
 //#pragma multi_compile_fragment _ _EMISSION_ON
 
-
-#if defined(LITMAS_FEATURE_LIGHTMAPPING)
-	#pragma multi_compile _ LIGHTMAP_ON
-	#pragma multi_compile _ DYNAMICLIGHTMAP_ON
-	#pragma multi_compile _ DIRLIGHTMAP_COMBINED
-	#pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
+#if !defined(LITMAS_FEATURE_LIGHTMAPPING)
+#define _DISABLE_LIGHTMAPS
 #endif
 
+#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
+
+
+
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
@@ -228,11 +229,22 @@ VertOut vert(VertIn v)
 	return o;
 }
 
-half4 frag(VertOut i) : SV_Target
+struct FragOut
+{
+	float4 color : SV_Target;
+};
+
+FragOut frag(VertOut i 
+	, bool frontFace : SV_IsFrontFace
+) : SV_Target
 {
 	UNITY_SETUP_INSTANCE_ID(i);
 	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
+	if (!frontFace)
+	{
+		UNPACK_NORMAL(i) = -UNPACK_NORMAL(i);
+	}
 /*---------------------------------------------------------------------------------------------------------------------------*/
 /*---Read Input Data---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
@@ -245,7 +257,6 @@ half4 frag(VertOut i) : SV_Target
 	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
 	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 // End Injection FRAG_READ_INPUTS from Injection_VertexColorAO.hlsl ----------------------------------------------------------
-
 
 
 // Begin Injection PBR_VALUES from Injection_VertexColorAO.hlsl ----------------------------------------------------------
@@ -374,5 +385,9 @@ half4 frag(VertOut i) : SV_Target
 		color = VolumetricsSurf(color, fragData.position, _Surface);
 	#endif
 // End Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
-	return color;
+	
+	FragOut output = (FragOut) 0;
+	output.color = color;
+
+	return output;
 }
