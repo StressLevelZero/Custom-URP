@@ -189,7 +189,7 @@ float TanGGXConeAngle(const float roughness)
     /* cheap estimation */
     //return 0.55 * roughness;
     //incorrect, but better looking
-	return 0.7 * roughness;
+	return 0.55 * roughness;
 }
 
 /** @brief Scales SSR step size based on distance and angle such that a step moves the ray by about one pixel in 2D screenspace
@@ -399,7 +399,7 @@ float4 getSSRColor(SSRData data)
             //,smoothstep(0.1, 0.4, data.perceptualRoughness)
         //)
     );
-    float3 rayNoise = 2 * rayTanAngle * (2*data.noise.rgb - 1);
+    float3 rayNoise = 1.5 * rayTanAngle * (2*data.noise.rgb - 1);
     rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
     data.rayDir += 0.5*rayNoise;
     data.rayDir.xyz = normalize(data.rayDir.xyz);
@@ -477,8 +477,8 @@ float4 getSSRColor(SSRData data)
     float roughRadius = rayTanAngle * totalDistance;
     
     // ratio of the cross-sectional radius of the roughness cone vs the height of the screen
-    float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
-    fade *= smoothstep(0.5, 0.25, roughRatio);
+    float roughRatio = 2 * roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPos);
+    fade *= smoothstep(0.33, 0.2, roughRatio);
     //roughRatio = rayHit > 0 ? roughRatio : data.perceptualRoughness * data.perceptualRoughness;
     //uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
     float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
@@ -497,6 +497,8 @@ float4 getSSRColor(SSRData data)
     }
     
     #if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
+    
+    // do averaging in 2.0 gamma space.
     reflection.rgb = sqrt(reflection.rgb);
     reflection.a = fade;
 
@@ -526,11 +528,16 @@ float4 getSSRColor(SSRData data)
     float weight = kernel.x + kernel.y + kernel.z + kernel.w;
     float3 avgSSRColor = kernel.x * reflection.rgb +  kernel.y * colorX.rgb +  kernel.z * colorY.rgb + kernel.w * colorD.rgb;
     reflection.rgb = weight > 0.01 ? float3(avgSSRColor.rgb / weight) : reflection.rgb;
-
-    reflection.a = max(max(fadeQuad.x,fadeQuad.y),max(fadeQuad.z,fadeQuad.w));
+    
+    //reflection.a = max(max(fadeQuad.x,fadeQuad.y),max(fadeQuad.z,fadeQuad.w));
+    //float avgWeight = kernel.x + kernel.y + kernel.z + kernel.w;
+    reflection.a = weight > 0.5 ? max(weight, reflection.a) : reflection.a;
+    
     //reflection = kernelWeights.x * reflection + kernelWeights.y * colorX + kernelWeights.z * colorY + kernelWeights.w * colorD;
     
+    // reverse 2.0 gamma
     reflection.rgb = reflection.rgb * reflection.rgb;
+    
     //float fadeX = QuadReadAcrossX(fade);
     //float fadeY = QuadReadAcrossY(fade);
     //float fadeD = QuadReadAcrossDiagonal(fade);

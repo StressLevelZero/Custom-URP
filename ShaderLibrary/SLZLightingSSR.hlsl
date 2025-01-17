@@ -82,7 +82,7 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
         surfaceType > 0
     );
 
-    SSRLerp = saturate((surfData.perceptualRoughness - 0.7) / (0.5 - 0.7));
+    SSRLerp = saturate((surfData.perceptualRoughness - 0.6) / (0.3 - 0.6));
 	SSRLerp = sqrt(SSRLerp);
     //Piecewise function to make a sinusoidal falloff curve
 #define SSR_FALLOFF_START 0.6666667
@@ -102,7 +102,7 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
 
 
     //reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
-    SSRColor = SSR.rgb;
+	SSRColor = SSR.rgb * AOSpecularOcclusion;
     reflectionProbe *= (1.0 - SSR.a * SSRLerp);
     SSRColor *= SSR.a * SSRLerp;
 #endif
