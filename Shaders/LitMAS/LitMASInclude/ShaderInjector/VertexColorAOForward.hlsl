@@ -260,7 +260,8 @@ FragOut frag(VertOut i
 
 
 // Begin Injection PBR_VALUES from Injection_VertexColorAO.hlsl ----------------------------------------------------------
-	albedo *= lerp(1, _BaseColor, albedo.a);
+	albedo.rgb *= lerp(1, _BaseColor.rgb, albedo.a);
+	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half metallic = mas.r;
 	half ao = mas.g;
 	half smoothness = mas.b;

@@ -50,6 +50,7 @@ namespace UnityEngine.Rendering.Universal
             {
                 ConfigureClear(ClearFlag.None, Color.black);
             }
+            
         }
 
         // END SLZ MODIFIED

@@ -20,7 +20,8 @@ float4 color : COLOR;
 //#!INJECT_END
 
 //#!INJECT_BEGIN PBR_VALUES 0
-	albedo *= lerp(1, _BaseColor, albedo.a);
+	albedo.rgb *= lerp(1, _BaseColor.rgb, albedo.a);
+	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
 	half metallic = mas.r;
 	half ao = mas.g;
 	half smoothness = mas.b;
