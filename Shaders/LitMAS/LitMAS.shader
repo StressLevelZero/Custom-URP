@@ -236,7 +236,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/DepthOnly.hlsl" 
+            #include "LitMASInclude/ShaderInjector/StandardDepthOnly.hlsl" 
             ENDHLSL
         }
 
