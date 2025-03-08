@@ -1,4 +1,4 @@
-Shader "Universal Render Pipeline/Lit (PBR Workflow)"
+Shader "Universal Render Pipeline/Lit"
 {
     Properties
     {

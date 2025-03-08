@@ -5,28 +5,9 @@
 #define _NORMALMAP 1
 
 #if defined(SHADER_API_MOBILE)
-	//#define _ADDITIONAL_LIGHTS_VERTEX
-	//#pragma multi_compile _ _REFLECTION_PROBE_BOX_PROJECTION 
-
 	//#!INJECT_POINT MOBILE_DEFINES
 #else              
-	//#pragma multi_compile_fragment  _  _MAIN_LIGHT_SHADOWS_CASCADE
-	//#define DYNAMIC_SCREEN_SPACE_OCCLUSION
-	//#pragma dynamic_branch _SCREEN_SPACE_OCCLUSION
-	//
-	//#define DYNAMIC_ADDITIONAL_LIGHTS
-	//#pragma dynamic_branch _ADDITIONAL_LIGHTS
-	//
-	//
-	//#define DYNAMIC_ADDITIONAL_LIGHT_SHADOWS
-	//#pragma dynamic_branch _ADDITIONAL_LIGHT_SHADOWS
-	//
-	//#define _SHADOWS_SOFT 1
-	//
-	//#define _REFLECTION_PROBE_BLENDING
-	////#pragma shader_feature_fragment _REFLECTION_PROBE_BOX_PROJECTION
-	//// We don't need a keyword for this! the w component of the probe position already branches box vs non-box, & so little cost on pc it doesn't matter
-	//#define _REFLECTION_PROBE_BOX_PROJECTION 
+	#define SLZ_BICUBIC_LM
 
 	//#!INJECT_POINT STANDALONE_DEFINES
 
@@ -64,6 +45,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
 
 //#!INJECT_POINT INCLUDES
 
@@ -300,6 +282,14 @@ FragOut frag(VertOut i
 	
 	FragOut output = (FragOut) 0;
 	output.color = color;
+	
+	//#!INJECT_POINT MOBILE_ANTIBANDING
+	//#!INJECT_DEFAULT
+	#if defined(SHADER_API_MOBILE)
+		output.color.rgb = ApplyInterleavedAntibanding(output.color.rgb, i.vertex.xy);
+	#endif
+	//#!INJECT_END
+	
 	//#!INJECT_POINT FRAG_OUT_POPULATE
 
 	return output;

@@ -30,8 +30,8 @@
 		// Redefine the POSITION semantic to have ViewIndex semantic appended to it
 		// Abuses the fact that HLSL allows every semantic to be numbered, even ones where only one is allowed. Use POSITION0 instead of POSITION
 		// to prevent recursion in the macro.
-		//#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : VIEWIDX
-		#define POSITION POSITION0; uint stereoTargetEyeIndexAsBlendIdx0 : SV_ViewID
+		#define POSITION POSITION0; [[vk::ext_decorate(/*Builtin*/11, /*ViewIndex*/4440)]] uint stereoTargetEyeIndexAsBlendIdx0 : VIEWIDX
+		//#define POSITION POSITION0; uint stereoTargetEyeIndexAsBlendIdx0 : SV_ViewID
 	#endif
 #endif
 

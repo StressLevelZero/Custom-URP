@@ -14,6 +14,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/GlobalIllumination.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
+#if defined(SLZ_BICUBIC_LM)
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/BicubicFilter.hlsl"
+#endif
+
 #if defined(DYNAMIC_ADDITIONAL_LIGHTS)
     #define BRANCH_ADDITIONAL_LIGHTS _ADDITIONAL_LIGHTS
 #elif defined(_ADDITIONAL_LIGHTS)
@@ -30,7 +34,7 @@
 #endif
 
 #if defined(SHADER_API_MOBILE)
-//#define SLZ_MONO_SPECULAR
+ //#define SLZ_MONO_SPECULAR
 #endif
 
 //#define USE_MOBILE_BRDF 
@@ -129,8 +133,8 @@ struct SLZAnisoSpecLightInfo
 
 struct SLZMonoSpecInfo
 {
-	half4 colorMagnitude;
-	half3 direction;
+    half4 colorMagnitude;
+    half3 direction;
 };
 
 //------------------------------------------------------------------------
@@ -156,8 +160,8 @@ struct SLZMonoSpecInfo
 
 half3 SLZSafeHalf3Normalize(half3 value)
 {
-	float lenSqr = max(dot((float3) value, (float3) value), FLT_MIN);
-	return (float3) value * rsqrt(lenSqr).rrr;
+    float lenSqr = max(dot((float3) value, (float3) value), FLT_MIN);
+    return (float3) value * rsqrt(lenSqr).rrr;
 }
 
 
@@ -214,12 +218,12 @@ float SLZGeometricNormalFiltering(float perceptualSmoothness, float3 geometricNo
 
 void StoreMaxSpecularInfo(inout SLZMonoSpecInfo specInfo, half3 diffuse, half3 direction, half NoH)
 {
-	half magnitude = max(diffuse.r, max(diffuse.g, diffuse.b));
-	if (specInfo.colorMagnitude.a < magnitude)
-	{
-		specInfo.colorMagnitude = half4(diffuse, magnitude);
-		specInfo.direction = direction;
-	}
+    half magnitude = max(diffuse.r, max(diffuse.g, diffuse.b));
+    if (specInfo.colorMagnitude.a < magnitude)
+    {
+        specInfo.colorMagnitude = half4(diffuse, magnitude);
+        specInfo.direction = direction;
+    }
 }
 
 //------------------------------------------------------------------------
@@ -229,8 +233,8 @@ void StoreMaxSpecularInfo(inout SLZMonoSpecInfo specInfo, half3 diffuse, half3 d
 //------------------------------------------------------------------------
 
 SLZFragData
-	SLZGetFragData(
-	float4 positionCS, float3 positionWS, float3 normalWS, float2 lightmapUV, float2 dynLightmapUV, half3 vertexLighting)
+    SLZGetFragData(
+    float4 positionCS, float3 positionWS, float3 normalWS, float2 lightmapUV, float2 dynLightmapUV, half3 vertexLighting)
 {
     SLZFragData data;
     data.position = positionWS;
@@ -454,24 +458,26 @@ half4 SLZSampleBDRFLUTShadow( half NoV, half NoL, half shadowAttenuation)
     half lineartocir = sqrt(shadowAttenuation); //replace with an s curve
     // if t < d / 2 then return outSine(t * 2, b, c / 2, d) end
     // return inSine((t * 2) -d, b + c / 2, c / 2, d)
-   // \sqrt{-\left(x-1\right)^{2}+1}
-    return BDRFLUTSAMPLER(float2(min(NoL2, lineartocir  ), saturate(NoV)));
+    // \sqrt{-\left(x-1\right)^{2}+1}
+    
+    half clampedNoL2 = min(NoL2, lineartocir);
+    return BDRFLUTSAMPLER(float2(clampedNoL2, saturate(NoV)));
 }
 
 /**
- * Diffuse BDRF for halftime lights, right now just does lambert but could be modified to do a more complex diffuse BDRF
+ * Diffuse BDRF for realtime lights, right now just does lambert but could be modified to do a more complex diffuse BDRF
  *
  *
  * @param fragData All relevant data relating to the fragment
  * @param surfData All relevant data relating to the surface properties at the fragment
- * @param lightColor Color of the halftime light
+ * @param lightColor Color of the realtime light
  */
 half3 SLZDiffuseBDRF(const SLZFragData fragData, const SLZSurfData surfData, const Light light)
 {
-    #if defined(_BRDFMAP)
-    return SLZSampleBDRFLUTShadow( fragData.NoV, dot(fragData.normal, light.direction), light.shadowAttenuation) * light.distanceAttenuation*light.color.rgb;
-    #else
     half3 attenuatedLight = light.color.rgb * (light.distanceAttenuation * light.shadowAttenuation);
+    #if defined(_BRDFMAP)
+    return SLZSampleBDRFLUTShadow( fragData.NoV, dot(fragData.normal, light.direction), light.shadowAttenuation) * attenuatedLight;
+    #else
     return SLZLambertDiffuse(attenuatedLight, fragData.normal, light.direction);
     #endif
 }
@@ -490,7 +496,7 @@ half3 SLZDiffuseBDRF(const SLZFragData fragData, const SLZSurfData surfData, con
 half SLZGGXSpecularDMobile(half NoH, half NxH2, half roughness)
 {	
     half a = NoH * roughness;
-	half d = roughness / max(a * a + NxH2, REAL_MIN);
+    half d = roughness / max(a * a + NxH2, REAL_MIN);
     half d2 = (d * d * SLZ_INV_PI_half);
     return d2;
 }
@@ -754,12 +760,14 @@ half3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfDat
 //------------------------------------------------------------------------
 
 /**
- * Multiplier to fade out specular highlights from non-halftime sources when the normal faces away from
- * the light source. The specular BRDF actually produces two highlights, one facing the light and one opposite it.
- * With halftime lights, multiplying by the diffuse light zeros out the unwanted highlight. When doing specular
- * highlights from non-unidirectional sources like lightmaps or spherical harmonics, the light recieved by pixels
- * facing away from the fake light direction is not 0 so the false highlight shows up. To get rid of it, we can
- * multiply by some factor of N dot L. This will unfortunately darken the half highlight, but if we take the square
+ * Multiplier to fade out estimated specular highlights from global illumination when the normal faces away from
+ * the estimated light direction. The specular BRDF actually produces two highlights, one facing the light and one 
+ * opposite it. With punctual lights, multiplying by the lambert diffuse zeros out the unwanted highlight. When doing 
+ * fake punctual specular based on global illuination sources like lightmaps or spherical harmonics, the diffuse light 
+ * recieved by fragments facing away from the fake light direction is not 0 so the negative highlight shows up. To get 
+ * rid of it, we can multiply by some factor of N dot L. Just multiplying by NoL will darken the specular too much in most
+ * situations as the lambert diffuse formula is already baked into the GI's color., but if we 
+ * take the square
  * root of N dot L the darkening will not be significant until very grazing angles. 1 - (1 - N dot L)^2 has a
  * similar shape but avoids the square root.
  * 
@@ -818,6 +826,18 @@ half3 SLZApplyLightmapDirectionalityBRDFLUT(const half3 lightmapColor, const hal
 #define SLZ_LM_D_MIN  0.4
 #define SLZ_LM_D_MAX  0.5
 
+float2 IQTextureNiceUVDistort(float2 uv, float2 textureResolution)
+{
+    uv = uv * textureResolution + 0.5;
+    float2 iuv = floor(uv);
+    float2 fuv = frac(uv);
+    uv = iuv + fuv * fuv * (3.0 - 2.0 * fuv);
+    uv = (uv - 0.5) / textureResolution;
+    return uv;
+}
+
+
+
 /**
  * Reads the lightmap, directional lightmap, and dynamic lightmap, and calculates the total diffuse lighting from them as well
  * as calculating a specular highlight using the directional map if present  
@@ -829,9 +849,14 @@ half3 SLZApplyLightmapDirectionalityBRDFLUT(const half3 lightmapColor, const hal
  */
 void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecInfo monoSpec, const SLZFragData frag, inout SLZSurfData surf)
 {
-
-
-    half3 lmDiffuse = SAMPLE_TEXTURE2D(unity_Lightmap, samplerunity_Lightmap, frag.lightmapUV).rgb;
+    #if defined(SLZ_BICUBIC_LM)
+        float4 res;
+        unity_Lightmap.GetDimensions(res.z, res.w);
+        res.xy = 1.0 / res.zw;
+        half3 lmDiffuse = SampleBSplineRGB_LOD(unity_Lightmap, sampler_LinearClamp, frag.lightmapUV, res);
+    #else
+        half3 lmDiffuse = SAMPLE_TEXTURE2D(unity_Lightmap, samplerunity_Lightmap, frag.lightmapUV).rgb;
+    #endif
     //
     #if defined(DIRLIGHTMAP_COMBINED)
             half4 directionalMap = SAMPLE_TEXTURE2D(unity_LightmapInd, samplerunity_Lightmap, frag.lightmapUV);
@@ -1006,7 +1031,7 @@ half SLZSpecularHorizonOcclusion(half3 normal, half3 reflectionDir)
  * if the object isn't lightmapped then the specular is estimated from the spherical harmonics. Avoids having to do a
  * specular highlight for both the directional light and spherical harmonics, especially considering most of the time
  * scenes are fully baked so always calculating a highlight for the directional light is a waste (quest is incapable
- * of half branching, so we can't conditionally calculate it).
+ * of real branching, so we can't conditionally calculate it).
  *
  * @param[in,out] diffuse   Running total of the diffuse light color
  * @param[in,out] specular  Running total of the specular color
@@ -1028,7 +1053,7 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecIn
     //If the object doesn't have a lightmap, do a specular highlight for EITHER the directional light, if it exists, or the spherical harmonics L1 band
     #if !defined(SLZ_NO_SPECULAR)
         #if !defined(LIGHTMAP_ON) && !defined(SLZ_DISABLE_BAKED_SPEC) 
-            bool isMainLight = max(diffuseBRDF.x, max(diffuseBRDF.y, diffuseBRDF.z)) > REAL_MIN ? true : false;
+            bool isMainLight = any(diffuseBRDF.rgb > REAL_MIN) ? true : false;
             half3 shL1Dir = SLZSHSpecularDirection();
             half3 dominantDir = isMainLight ? mainLight.direction : shL1Dir;
             SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, dominantDir);
@@ -1041,13 +1066,16 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecIn
             #else
                 specular += dominantColor * SLZDirectBRDFSpecular(specInfo, surfData, fragData) * NoLMul;
             #endif
-        #elif !defined(DIRLIGHTMAP_COMBINED) || defined(SLZ_DISABLE_BAKED_SPEC)
-            SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, mainLight.direction);
+        #elif !defined(DIRLIGHTMAP_COMBINED) || !defined(SHADER_API_MOBILE) || defined(SLZ_DISABLE_BAKED_SPEC) 
+            [branch] if (any(_MainLightColor.rgb > REAL_MIN))
+            {
+                SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, mainLight.direction);
             #if defined(SLZ_MONO_SPECULAR)
                 StoreMaxSpecularInfo(maxSpecular, diffuseBRDF, mainLight.direction, specInfo.NoH);
             #else
                 specular += diffuseBRDF * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
             #endif
+            }
         #endif
     #endif
     
@@ -1074,7 +1102,7 @@ void SLZAddLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecInf
     }
     diffuse += diffuseBRDF;
     #if !defined(SLZ_NO_SPECULAR)
-	    SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, addLight.direction);
+        SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, addLight.direction);
         #if defined(SLZ_MONO_SPECULAR)
             StoreMaxSpecularInfo(maxSpecular, diffuseBRDF, addLight.direction, specInfo.NoH);
         #else
@@ -1086,8 +1114,8 @@ void SLZAddLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecInf
 
 struct ForwardPlusMacroFix
 {
-	float2 normalizedScreenSpaceUV;
-	float3 positionWS;
+    float2 normalizedScreenSpaceUV;
+    float3 positionWS;
 };
 
 
@@ -1104,9 +1132,9 @@ struct ForwardPlusMacroFix
 half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType = 0)
 {
     half3 diffuse = half3(0.0h, 0.0h, 0.0h);
-	half3 specular = half3(0.0h, 0.0h, 0.0h);
+    half3 specular = half3(0.0h, 0.0h, 0.0h);
    
-	SLZMonoSpecInfo monoSpecInfo = { half4(0, 0, 0, -1), (half3) 0 };
+    SLZMonoSpecInfo monoSpecInfo = { half4(0, 0, 0, -1), (half3) 0 };
 
     //half2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
        
@@ -1140,7 +1168,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
         #if !defined(SLZ_NO_SPECULAR)
         specular *= ao.indirectAmbientOcclusion;
         #endif
-	}
+    }
     
     //-------------------------------------------------------------------------------------------------
     // realtime light calculations
@@ -1148,17 +1176,19 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     
     // For dynamic objects, this also does specular for probes if there is no main light, assuming the
     // diffuse only contains probe light (it also contains vertex lights, but we'll just ignore that)
-	SLZMainLight(diffuse, specular, monoSpecInfo, fragData, surfData, ao.directAmbientOcclusion);
+    SLZMainLight(diffuse, specular, monoSpecInfo, fragData, surfData, ao.directAmbientOcclusion);
 
     
     #if defined(SHADER_API_MOBILE)
-    uint lightMask = 
-        (1 << (int)(unity_LightIndices[0].x - 1)) | 
-        (1 << (int)(unity_LightIndices[0].y - 1)) |
-        (1 << (int)(unity_LightIndices[0].z - 1));
     
-    if (_ImportantLightIndex != -1 && 
-        ((1 << (int)(_ImportantLightIndex - 1)) & lightMask) != 0)
+    //uint lightMask = 
+    //    (1 << (int)(unity_LightIndices[0].x - 1)) | 
+    //    (1 << (int)(unity_LightIndices[0].y - 1)) |
+    //    (1 << (int)(unity_LightIndices[0].z - 1));
+    
+    if (_ImportantLightIndex != -1 
+    //    && ((1 << (int)(_ImportantLightIndex - 1)) & lightMask) != 0 // light mask not necessary
+    )
     {
             Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), fragData.position);
             #if defined(_LIGHT_COOKIES)
@@ -1207,7 +1237,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     half3 finalDiffuse = surfData.occlusion * (surfData.albedo * diffuse) + surfData.emission;
     if (surfaceType == 1) finalDiffuse *= surfData.alpha;
     #if !defined(SLZ_NO_SPECULAR)
-	half3 finalSpecular = surfData.occlusion * specular;
+    half3 finalSpecular = surfData.occlusion * specular;
     #else
     half3 finalSpecular = 0;
     #endif
@@ -1222,7 +1252,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
         #if !defined(SLZ_NO_SPECULAR)
         surfData.alpha *= occlusionFactor;
         #endif
-	}
+    }
     
     return half4(finalDiffuse + finalSpecular, surfData.alpha);
 }

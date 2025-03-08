@@ -61,6 +61,7 @@ Material:
     - _AlphaClip: 0
     - _AlphaPremultiplyEnabled: 0
     - _AlphaToMask: 0
+    - _Alphatest: 0
     - _BakedMutiplier: 1
     - _Blend: 0
     - _BlendDst: 0
@@ -92,6 +93,7 @@ Material:
     - _Mode: 0
     - _Normals: 1
     - _OcclusionStrength: 1
+    - _Offset: 0
     - _OffsetFactor: 0
     - _OffsetUnits: 0
     - _Parallax: 0.02
@@ -101,6 +103,7 @@ Material:
     - _SSROff: 0
     - _SSRTemporalMul: 1
     - _Shininess: 1
+    - _Slope: 0
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecSource: 0

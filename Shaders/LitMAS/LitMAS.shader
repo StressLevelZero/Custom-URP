@@ -72,7 +72,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define _SM6_QUAD 1
             #endif
             //#define _ADDITIONAL_LIGHTS
-            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardForward.hlsl"
 
             ENDHLSL
         }
@@ -136,7 +136,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
-            #include "LitMASInclude/ShadowCaster.hlsl"
+            #include "LitMASInclude/ShaderInjector/StandardShadowCaster.hlsl"
             ENDHLSL
         }
 
@@ -217,7 +217,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             //#define _SM6_QUAD 1
             //#endif
 
-            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardForward.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardForward.hlsl"
 
             ENDHLSL
         }
@@ -278,7 +278,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShadowCaster.hlsl"
+            #include "LitMASInclude/ShaderInjector/StandardShadowCaster.hlsl"
             ENDHLSL
         }
 
