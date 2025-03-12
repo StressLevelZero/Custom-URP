@@ -1,0 +1,70 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{38DC7CDB-2F12-4CBF-A725-51E87AF1D3C0}|ProjectShaderSymbols.csproj|c:\\projects\\customurp2022\\packages\\com.unity.render-pipelines.universal\\runtime\\urpconfig\\.projectshadersymbolssource\\projectshadersymbols\\projectshadersymbols.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{38DC7CDB-2F12-4CBF-A725-51E87AF1D3C0}|ProjectShaderSymbols.csproj|solutionrelative:projectshadersymbols.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{38DC7CDB-2F12-4CBF-A725-51E87AF1D3C0}|ProjectShaderSymbols.csproj|c:\\projects\\customurp2022\\packages\\com.unity.render-pipelines.universal\\runtime\\urpconfig\\.projectshadersymbolssource\\projectshadersymbols\\projectshadersymbols.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{38DC7CDB-2F12-4CBF-A725-51E87AF1D3C0}|ProjectShaderSymbols.csproj|solutionrelative:projectshadersymbols.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{38DC7CDB-2F12-4CBF-A725-51E87AF1D3C0}|ProjectShaderSymbols.csproj|c:\\projects\\customurp2022\\packages\\com.unity.render-pipelines.universal\\runtime\\urpconfig\\.projectshadersymbolssource\\projectshadersymbols\\projectshadersymbols.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
+      "RelativeMoniker": "D:0:0:{38DC7CDB-2F12-4CBF-A725-51E87AF1D3C0}|ProjectShaderSymbols.csproj|solutionrelative:projectshadersymbols.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ProjectShaderSymbols",
+              "DocumentMoniker": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj",
+              "RelativeDocumentMoniker": "ProjectShaderSymbols.csproj",
+              "ToolTip": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj",
+              "RelativeToolTip": "ProjectShaderSymbols.csproj",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-03-10T23:50:57.008Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ProjectShaderSymbols.csproj",
+              "DocumentMoniker": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj",
+              "RelativeDocumentMoniker": "ProjectShaderSymbols.csproj",
+              "ToolTip": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj",
+              "RelativeToolTip": "ProjectShaderSymbols.csproj",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAMAAAAtAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-03-10T23:25:54.649Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ProjectShaderSymbols.cs",
+              "DocumentMoniker": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.cs",
+              "RelativeDocumentMoniker": "ProjectShaderSymbols.cs",
+              "ToolTip": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.cs",
+              "RelativeToolTip": "ProjectShaderSymbols.cs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAsAAABQAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-03-10T22:44:58.805Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

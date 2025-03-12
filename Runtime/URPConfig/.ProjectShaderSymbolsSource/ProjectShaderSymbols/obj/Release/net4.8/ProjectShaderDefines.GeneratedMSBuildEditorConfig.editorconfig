@@ -1,0 +1,5 @@
+is_global = true
+build_property.RootNamespace = ProjectShaderDefines
+build_property.ProjectDir = C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderDefinesSource\ProjectShaderDefines\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 

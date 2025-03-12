@@ -7,7 +7,6 @@
 #if defined(SHADER_API_MOBILE)
 	//#!INJECT_POINT MOBILE_DEFINES
 #else              
-	#define SLZ_BICUBIC_LM
 
 	//#!INJECT_POINT STANDALONE_DEFINES
 

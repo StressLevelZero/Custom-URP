@@ -11,84 +11,141 @@
 
 float4 BSplineWeights(float v)
 {
-	float4 n = float4(1.0, 2.0, 3.0, 4.0) - v;
-	float4 s = n * n * n;
-	float x = s.x;
-	float y = s.y - 4.0 * s.x;
-	float z = s.z - 4.0 * s.y + 6.0 * s.x;
-	float w = 6.0 - x - y - z;
-	return float4(x, y, z, w) * (1.0 / 6.0);
+    float4 n = float4(1.0, 2.0, 3.0, 4.0) - v;
+    float4 s = n * n * n;
+    float x = s.x;
+    float y = s.y - 4.0 * s.x;
+    float z = s.z - 4.0 * s.y + 6.0 * s.x;
+    float w = 6.0 - x - y - z;
+    return float4(x, y, z, w) * (1.0 / 6.0);
 }
 
 float3 SampleBSplineRGB_LOD (Texture2D tex, SamplerState ss, float2 uv, float4 mip_TexelSize, int mipLevel = 0)
 {
-	float2 texSize = mip_TexelSize.zw;
-	float2 invTexSize = mip_TexelSize.xy;
+    float2 texSize = mip_TexelSize.zw;
+    float2 invTexSize = mip_TexelSize.xy;
    
-	uv = uv * texSize - 0.5;
+    uv = uv * texSize - 0.5;
 
-	float2 fracUV = frac(uv);
-	float2 floorUV = floor(uv);
+    float2 fracUV = frac(uv);
+    float2 floorUV = floor(uv);
 
-	float4 xcubic = BSplineWeights(fracUV.x);
-	float4 ycubic = BSplineWeights(fracUV.y);
+    float4 xcubic = BSplineWeights(fracUV.x);
+    float4 ycubic = BSplineWeights(fracUV.y);
 
-	float4 c = floorUV.xxyy + float2(-0.5, +1.5).xyxy;
+    float4 c = floorUV.xxyy + float2(-0.5, +1.5).xyxy;
     
-	float4 s = float4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
-	float4 offset = c + float4(xcubic.yw, ycubic.yw) / s;
+    float4 s = float4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
+    float4 offset = c + float4(xcubic.yw, ycubic.yw) / s;
     
-	offset *= invTexSize.xxyy;
+    offset *= invTexSize.xxyy;
     
-	float3 sample0 = tex.SampleLevel(ss, offset.xz, mipLevel).rgb;
-	float3 sample1 = tex.SampleLevel(ss, offset.yz, mipLevel).rgb;
-	float3 sample2 = tex.SampleLevel(ss, offset.xw, mipLevel).rgb;
-	float3 sample3 = tex.SampleLevel(ss, offset.yw, mipLevel).rgb;
+    float3 sample0 = tex.SampleLevel(ss, offset.xz, mipLevel).rgb;
+    float3 sample1 = tex.SampleLevel(ss, offset.yz, mipLevel).rgb;
+    float3 sample2 = tex.SampleLevel(ss, offset.xw, mipLevel).rgb;
+    float3 sample3 = tex.SampleLevel(ss, offset.yw, mipLevel).rgb;
 
-	float sx = s.x / (s.x + s.y);
-	float sy = s.z / (s.z + s.w);
+    float sx = s.x / (s.x + s.y);
+    float sy = s.z / (s.z + s.w);
 
-	return lerp(lerp(sample3, sample2, sx), lerp(sample1, sample0, sx), sy);
+    return lerp(lerp(sample3, sample2, sx), lerp(sample1, sample0, sx), sy);
 }
 
-float3 SampleBSplineRGB(Texture2D tex, SamplerState ss, float2 uv)
+float3 SampleBSplineRGB_MipNearest(Texture2D tex, SamplerState ss, float2 uv, float mipBias = 0)
 {
-	float2 resolution;
-	float mipLevels;
-	tex.GetDimensions(0u, resolution.x, resolution.y, mipLevels);
-	
-	float2 texcoord = uv * resolution;
-	float2 dx = ddx(texcoord);
+    float2 resolution;
+    float mipLevels;
+    tex.GetDimensions(0u, resolution.x, resolution.y, mipLevels);
+    
+    float2 texcoord = uv * resolution;
+    float2 dx = ddx(texcoord);
     float2 dy = ddy(texcoord);
     float sqLen = 0.5 * (dot(dx, dx) + dot(dy, dy));
-	
-	int mipLevel = clamp(floor(0.5 * log2(sqLen)), 0, mipLevels - 1);
-	
-	float2 texSize = float2(int2(resolution) >> mipLevel);
-	float2 invTexSize = 1.0 / texSize;
+    
+	int mipLevel = clamp(floor(0.5 * log2(sqLen) + mipBias), 0, mipLevels - 1);
+    
+    float2 texSize = float2(int2(resolution) >> mipLevel);
+    float2 invTexSize = 1.0 / texSize;
    
-	uv = uv * texSize - 0.5;
+    uv = uv * texSize - 0.5;
 
-	float2 fracUV = frac(uv);
-	float2 floorUV = floor(uv);
+    float2 fracUV = frac(uv);
+    float2 floorUV = floor(uv);
 
-	float4 xcubic = BSplineWeights(fracUV.x);
-	float4 ycubic = BSplineWeights(fracUV.y);
+    float4 xcubic = BSplineWeights(fracUV.x);
+    float4 ycubic = BSplineWeights(fracUV.y);
 
-	float4 c = floorUV.xxyy + float2(-0.5, +1.5).xyxy;
+    float4 c = floorUV.xxyy + float2(-0.5, +1.5).xyxy;
     
-	float4 s = float4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
-	float4 offset = c + float4(xcubic.yw, ycubic.yw) / s;
+    float4 s = float4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
+    float4 offset = c + float4(xcubic.yw, ycubic.yw) / s;
     
-	offset *= invTexSize.xxyy;
+    offset *= invTexSize.xxyy;
     
-	float3 sample0 = tex.SampleLevel(ss, offset.xz, mipLevel).rgb;
-	float3 sample1 = tex.SampleLevel(ss, offset.yz, mipLevel).rgb;
-	float3 sample2 = tex.SampleLevel(ss, offset.xw, mipLevel).rgb;
-	float3 sample3 = tex.SampleLevel(ss, offset.yw, mipLevel).rgb;
+    float3 sample0 = tex.SampleLevel(ss, offset.xz, mipLevel).rgb;
+    float3 sample1 = tex.SampleLevel(ss, offset.yz, mipLevel).rgb;
+    float3 sample2 = tex.SampleLevel(ss, offset.xw, mipLevel).rgb;
+    float3 sample3 = tex.SampleLevel(ss, offset.yw, mipLevel).rgb;
 
-	float sx = s.x / (s.x + s.y);
-	float sy = s.z / (s.z + s.w);
+    float sx = s.x / (s.x + s.y);
+    float sy = s.z / (s.z + s.w);
 
-	return lerp(lerp(sample3, sample2, sx), lerp(sample1, sample0, sx), sy);
+    return lerp(lerp(sample3, sample2, sx), lerp(sample1, sample0, sx), sy);
+}
+
+float3 SampleBSplineRGB_MipLinear(Texture2D tex, SamplerState ss, float2 uv, float mipBias = 0)
+{
+    float2 resolution;
+    float mipLevels;
+    tex.GetDimensions(0u, resolution.x, resolution.y, mipLevels);
+    
+    float2 texcoord = uv * resolution;
+    float2 dx = ddx(texcoord);
+    float2 dy = ddy(texcoord);
+    float sqLen = 0.5 * (dot(dx, dx) + dot(dy, dy));
+    
+	float mipLevel = clamp(0.5 * log2(sqLen) + mipBias, 0, mipLevels - 1);
+    float mipFrac = frac(mipLevel); 
+    int mipNear = floor(mipLevel);
+    int mipFar = ceil(mipLevel);
+
+    float lerpVal = saturate(3.0 * mipFrac - 1.0);
+    
+    half3 lmNear = 0;
+    half3 lmFar = 0;
+    
+    [branch]
+    if (lerpVal < 1.0)
+    {
+        float2 texSizeNear = float2(int2(resolution) >> mipNear);
+        float2 invTexSizeNear = 1.0 / texSizeNear;
+        float4 mipTexelSizeNear = float4(invTexSizeNear, texSizeNear);
+		lmNear = SampleBSplineRGB_LOD(tex, ss, uv, mipTexelSizeNear, mipNear);
+	}
+    
+    [branch]
+    if (lerpVal > 0.0)
+    {
+        float2 texSizeFar = float2(int2(resolution) >> mipFar);
+        float2 invTexSizeFar = 1.0 / texSizeFar;
+        float4 mipTexelSizeFar = float4(invTexSizeFar, texSizeFar);
+        lmFar = SampleBSplineRGB_LOD(tex, ss, uv, mipTexelSizeFar, mipFar);
+    }
+    
+	return lerp(lmNear, lmFar, lerpVal);
+}
+
+float3 SampleLightmapBSpline(Texture2D tex, SamplerState ss, float2 uv)
+{
+#if defined(SLZ_BICUBIC_LM_MIP_LINEAR)
+    return SampleBSplineRGB_MipLinear(tex, ss, uv, -0.25);
+#elif defined(SLZ_BICUBIC_LM_MIP_NEAREST)
+    return SampleBSplineRGB_MipNearest(tex, ss, uv);
+#else
+    float2 resolution;
+    float mipLevels;
+    tex.GetDimensions(0u, resolution.x, resolution.y, mipLevels);
+    float4 texelSize = float4(1.0 / resolution, resolution);
+    return SampleBSplineRGB_LOD(tex, ss, uv, texelSize, 0);
+#endif
 }

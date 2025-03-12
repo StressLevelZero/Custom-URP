@@ -1,0 +1,52 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj": {}
+  },
+  "projects": {
+    "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj",
+        "projectName": "ProjectShaderSymbols",
+        "projectPath": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\ProjectShaderSymbols.csproj",
+        "packagesPath": "C:\\Users\\Eric\\.nuget\\packages\\",
+        "outputPath": "C:\\Projects\\CustomURP2022\\Packages\\com.unity.render-pipelines.universal\\Runtime\\URPConfig\\.ProjectShaderSymbolsSource\\ProjectShaderSymbols\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Eric\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net4.8"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "targetAlias": "net4.8",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "net4.8",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.300\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

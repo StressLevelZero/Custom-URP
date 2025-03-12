@@ -13,7 +13,6 @@
 
 #if defined(SHADER_API_MOBILE)
 #else              
-	#define SLZ_BICUBIC_LM
 
 // Begin Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------
 #pragma multi_compile _ _SLZ_SSR_ENABLED

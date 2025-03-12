@@ -11,6 +11,8 @@ namespace SLZ.SLZEditorTools
     {
 
         public static readonly string packageName = "com.stresslevelzero.urpconfig";
+        public static readonly string projectSymbolsAssetPath = "Assets/Settings/ProjectShaderSymbols.asset";
+        public static readonly string projectSymbolsInclPath = "Packages/com.stresslevelzero.urpconfig/include/ProjectSymbols.hlsl";
         static string m_pkgPath;
         static bool m_initialized = false;
         public static string packagePath
@@ -52,6 +54,19 @@ namespace SLZ.SLZEditorTools
                     Debug.LogError($"Failed to clone urpconfig package: {ex.Message}");
                 }
             }
+
+            ProjectShaderSymbols sd = AssetDatabase.LoadAssetAtPath<ProjectShaderSymbols>(projectSymbolsAssetPath);
+            if (sd == null)
+            {
+                sd = ScriptableObject.CreateInstance<ProjectShaderSymbols>();
+                if (!Directory.Exists("Assets/Settings"))
+                {
+                    AssetDatabase.CreateFolder("Assets", "Settings");
+                }
+                AssetDatabase.CreateAsset(sd, projectSymbolsAssetPath);
+            }
+            UpdateProjectDefines(sd);
+
             m_initialized = true;
             SessionState.SetBool("URPCfgInit", true);
         }
@@ -72,6 +87,29 @@ namespace SLZ.SLZEditorTools
                 destChild.Create();
                 CopyDirectory(srcChild, destChild);
             }
+        }
+
+        public static void UpdateProjectDefines(ProjectShaderSymbols psd)
+        {
+            string fullPath = Path.GetFullPath(projectSymbolsInclPath);
+            if (File.Exists(fullPath))
+            {
+                string newInclude = psd.GenerateShaderInclude();
+                string oldInclude = File.ReadAllText(fullPath);
+
+                if (!string.Equals(newInclude, oldInclude, StringComparison.Ordinal))
+                {
+                    File.WriteAllText(fullPath, newInclude);
+                    AssetDatabase.ImportAsset(projectSymbolsInclPath);
+                }
+            }
+            else
+            {
+                string newInclude = psd.GenerateShaderInclude();
+                File.WriteAllText(fullPath, newInclude);
+                AssetDatabase.ImportAsset(projectSymbolsInclPath);
+            }
+
         }
     }
 }

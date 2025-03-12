@@ -14,7 +14,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/GlobalIllumination.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZExtentions.hlsl"
 
-#if defined(SLZ_BICUBIC_LM)
+#if defined(SLZ_LM_BICUBIC)
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/BicubicFilter.hlsl"
 #endif
 
@@ -794,9 +794,18 @@ half SLZFakeSpecularFalloff(half NoL)
  * @return Lightmap color, attenuated by the light direction to the strength of the directionality encoded in the directional map
  */
 half3 SLZApplyLightmapDirectionality(half3 lightmapColor, half3 lmDirection, half3 normal, half directionalityFactor)
-{
+{ 
+    #if defined(SLZ_LM_MONOSH) // Bakery monochrome linear spherical harmonic directional lightmaps. TODO: non-linear mode
+    
+    half3 s0 = (2.0 * lmDirection) * normal;
+    return lightmapColor + s0.x * lightmapColor + s0.y * lightmapColor + s0.z * lightmapColor;
+    
+    #else // Default unity half-lambert directional maps (gross)
+    
     half halfLambert = dot(normal, 0.5h * lmDirection) + half(0.5);
     return lightmapColor * halfLambert / max(half(1e-4), directionalityFactor);
+    
+    #endif
 }
 
 /**
@@ -849,11 +858,8 @@ float2 IQTextureNiceUVDistort(float2 uv, float2 textureResolution)
  */
 void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecInfo monoSpec, const SLZFragData frag, inout SLZSurfData surf)
 {
-    #if defined(SLZ_BICUBIC_LM)
-        float4 res;
-        unity_Lightmap.GetDimensions(res.z, res.w);
-        res.xy = 1.0 / res.zw;
-        half3 lmDiffuse = SampleBSplineRGB_LOD(unity_Lightmap, sampler_LinearClamp, frag.lightmapUV, res);
+    #if defined(SLZ_LM_BICUBIC)
+        half3 lmDiffuse = SampleLightmapBSpline(unity_Lightmap, samplerunity_Lightmap, frag.lightmapUV);
     #else
         half3 lmDiffuse = SAMPLE_TEXTURE2D(unity_Lightmap, samplerunity_Lightmap, frag.lightmapUV).rgb;
     #endif
@@ -873,9 +879,15 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, inout SLZ
                 // the length of lmDirection controls the strength of the directionality. 
                 // Baking a lightmap in a white furnace yields a length of 0.66.
                 // Interpolate specular towards 0 as the length approaches this value
-                half directionality = saturate((length(lmDirection) - 0.66h) / (1.0h - 0.66h));
+                #ifdef SLZ_LM_MONOSH 
+                half maxDirectionality = 0.54h;
+                #else
+                half maxDirectionality = 0.66h;
+                #endif
+                half directionality = saturate((length(lmDirection) - maxDirectionality) / (1.0h - maxDirectionality));
                 lmDirection = SLZSafeHalf3Normalize(lmDirection); //length not 1
                 SLZDirectSpecLightInfo lightInfo = SLZGetDirectLightInfo(frag, lmDirection);
+    
                 #ifdef SLZ_MONO_SPECULAR
                     StoreMaxSpecularInfo(monoSpec, lmDiffuse * directionality, lmDirection, lightInfo.NoH);
                 #else

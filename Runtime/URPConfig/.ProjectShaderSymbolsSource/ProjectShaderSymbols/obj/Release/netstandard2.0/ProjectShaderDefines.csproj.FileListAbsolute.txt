@@ -1,0 +1,6 @@
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderDefinesSource\ProjectShaderDefines\obj\Release\netstandard2.0\ProjectShaderDefines.csproj.AssemblyReference.cache
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderDefinesSource\ProjectShaderDefines\obj\Release\netstandard2.0\ProjectShaderDefines.GeneratedMSBuildEditorConfig.editorconfig
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderDefinesSource\ProjectShaderDefines\obj\Release\netstandard2.0\ProjectShaderDefines.AssemblyInfoInputs.cache
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderDefinesSource\ProjectShaderDefines\obj\Release\netstandard2.0\ProjectShaderDefines.AssemblyInfo.cs
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderDefinesSource\ProjectShaderDefines\obj\Release\netstandard2.0\ProjectShaderDefines.csproj.CoreCompileInputs.cache
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderDefinesSource\ProjectShaderDefines\obj\Release\netstandard2.0\ProjectShaderDefines.sourcelink.json

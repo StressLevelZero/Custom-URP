@@ -1,0 +1,6 @@
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderSymbolsSource\ProjectShaderSymbols\obj\Release\net2.0\ProjectShaderSymbols.csproj.AssemblyReference.cache
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderSymbolsSource\ProjectShaderSymbols\obj\Release\net2.0\ProjectShaderSymbols.GeneratedMSBuildEditorConfig.editorconfig
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderSymbolsSource\ProjectShaderSymbols\obj\Release\net2.0\ProjectShaderSymbols.AssemblyInfoInputs.cache
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderSymbolsSource\ProjectShaderSymbols\obj\Release\net2.0\ProjectShaderSymbols.AssemblyInfo.cs
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderSymbolsSource\ProjectShaderSymbols\obj\Release\net2.0\ProjectShaderSymbols.csproj.CoreCompileInputs.cache
+C:\Projects\CustomURP2022\Packages\com.unity.render-pipelines.universal\Runtime\URPConfig\.ProjectShaderSymbolsSource\ProjectShaderSymbols\obj\Release\net2.0\ProjectShaderSymbols.sourcelink.json
