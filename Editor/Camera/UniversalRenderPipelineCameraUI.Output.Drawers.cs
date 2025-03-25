@@ -43,7 +43,11 @@ namespace UnityEditor.Rendering.Universal
                             CED.Group(DrawerOutputMSAA),
                             CED.Group(DrawerOutputAllowDynamicResolution)
                         )
-                    )
+                    ),
+
+                    CED.Group(DrawerOutputOverrideRenderScale),
+                    CED.Group(DrawerOutputRenderScale),
+                    CED.Group(DrawerOutputUpscalingFilter)
                 )
             );
 
@@ -264,6 +268,60 @@ namespace UnityEditor.Rendering.Universal
                                 camera.allowMSAA = allowMSAA;
                                 return true;
                             });
+                        }
+                    }
+                }
+                EditorGUI.EndProperty();
+            }
+
+            static void DrawerOutputOverrideRenderScale(UniversalRenderPipelineSerializedCamera p, Editor owner)
+            {
+                Rect controlRect = EditorGUILayout.GetControlRect(true);
+                EditorGUI.BeginProperty(controlRect, Styles.overrideRenderScale, p.overrideRenderScale);
+                {
+                    using (var checkScope = new EditorGUI.ChangeCheckScope())
+                    {
+                        bool selectedValue = p.overrideRenderScale.boolValue;
+                        bool overrideRenderScale = EditorGUI.Toggle(controlRect, Styles.overrideRenderScale, selectedValue);
+                        if (checkScope.changed)
+                        {
+                            p.overrideRenderScale.boolValue = overrideRenderScale;
+                        }
+                    }
+                }
+                EditorGUI.EndProperty();
+            }
+
+            static void DrawerOutputRenderScale(UniversalRenderPipelineSerializedCamera p, Editor owner)
+            {
+                Rect controlRect = EditorGUILayout.GetControlRect(true);
+                EditorGUI.BeginProperty(controlRect, Styles.renderScale, p.renderScale);
+                {
+                    using (var checkScope = new EditorGUI.ChangeCheckScope())
+                    {
+                        float selectedValue = p.renderScale.floatValue;
+                        float renderScale = EditorGUI.DelayedFloatField(controlRect, Styles.renderScale, selectedValue);
+                        if (checkScope.changed)
+                        {
+                            p.renderScale.floatValue = renderScale;
+                        }
+                    }
+                }
+                EditorGUI.EndProperty();
+            }
+
+            static void DrawerOutputUpscalingFilter(UniversalRenderPipelineSerializedCamera p, Editor owner)
+            {
+                Rect controlRect = EditorGUILayout.GetControlRect(true);
+                EditorGUI.BeginProperty(controlRect, Styles.renderScale, p.renderScale);
+                {
+                    using (var checkScope = new EditorGUI.ChangeCheckScope())
+                    {
+                        UpscalingFilterSelection selectedValue = (UpscalingFilterSelection)p.upscalingFilter.intValue;
+                        UpscalingFilterSelection renderScale = (UpscalingFilterSelection)EditorGUI.EnumPopup(controlRect, Styles.upscalingFilter, selectedValue);
+                        if (checkScope.changed)
+                        {
+                            p.upscalingFilter.intValue = (int)renderScale;
                         }
                     }
                 }

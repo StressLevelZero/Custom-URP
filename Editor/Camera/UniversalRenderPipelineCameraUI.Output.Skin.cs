@@ -43,6 +43,10 @@ namespace UnityEditor.Rendering.Universal
                 public static readonly GUIContent allowHDR = EditorGUIUtility.TrTextContent("HDR Rendering", "High Dynamic Range gives you a wider range of light intensities, so your lighting looks more realistic. With it, you can still see details and experience less saturation even with bright light.", (Texture)null);
                 public static readonly GUIContent allowHDROutput = EditorGUIUtility.TrTextContent("HDR Output", "Whether to support outputting to HDR displays.");
 
+                public static readonly GUIContent overrideRenderScale = EditorGUIUtility.TrTextContent("Override Render Scale", "Override the render scale and filter specified in the pipeline asset");
+                public static readonly GUIContent renderScale = EditorGUIUtility.TrTextContent("Render Scale", "Render Scale of this camera");
+                public static readonly GUIContent upscalingFilter = EditorGUIUtility.TrTextContent("Upscaling Filter", "Filter to use when upscaling a < 1 render scale");
+
                 public static string cameraTargetTextureMSAA = L10n.Tr("Camera target texture requires {0}x MSAA. Universal pipeline {1}.");
                 public static string pipelineMSAACapsSupportSamples = L10n.Tr("is set to support {0}x");
                 public static string pipelineMSAACapsDisabled = L10n.Tr("has MSAA disabled");

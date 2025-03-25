@@ -327,6 +327,9 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] bool m_ClearDepth = true;
         [SerializeField] bool m_AllowXRRendering = true;
         [SerializeField] bool m_AllowHDROutput = true;
+        [SerializeField] bool m_OverrideRenderScale = false;
+        [SerializeField][Range(0.1f,4f)] float m_RenderScale = 1.0f;
+        [SerializeField] UpscalingFilterSelection m_UpscalingFilter;
 
         [SerializeField] bool m_UseScreenCoordOverride;
         [SerializeField] Vector4 m_ScreenSizeOverride;
@@ -768,6 +771,28 @@ namespace UnityEngine.Rendering.Universal
             get => m_AllowHDROutput;
             set => m_AllowHDROutput = value;
         }
+
+        /// SLZ MODIFED ------------------------------------------------------
+
+        public bool overrideRenderScale
+        {
+            get => m_OverrideRenderScale;
+            set => m_OverrideRenderScale = value;
+        }
+
+        public float renderScale
+        {
+            get => m_RenderScale;
+            set => m_RenderScale = Mathf.Clamp(value, 0.1f, 4f);
+        }
+
+        public UpscalingFilterSelection upscalingFilter
+        {
+            get => m_UpscalingFilter;
+            set => m_UpscalingFilter = value;
+        }
+
+        /// END SLZ MODIFIED -------------------------------------------------
 
         /// <inheritdoc/>
         public void OnBeforeSerialize()

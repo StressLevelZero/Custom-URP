@@ -43,6 +43,10 @@ namespace UnityEditor.Rendering.Universal
         public SerializedProperty taaContrastAdaptiveSharpening { get; }
         public SerializedProperty allowHDROutput { get; }
 
+        public SerializedProperty overrideRenderScale { get; }
+        public SerializedProperty renderScale { get; }
+        public SerializedProperty upscalingFilter { get; }
+
         public (Camera camera, UniversalRenderPipelineSerializedCamera serializedCamera) this[int index]
         {
             get
@@ -114,6 +118,9 @@ namespace UnityEditor.Rendering.Universal
             taaContrastAdaptiveSharpening = taaSettings.FindPropertyRelative(nameof(TemporalAA.Settings.m_ContrastAdaptiveSharpening));
 
             allowHDROutput = serializedAdditionalDataObject.FindProperty("m_AllowHDROutput");
+            overrideRenderScale = serializedAdditionalDataObject.FindProperty("m_OverrideRenderScale");
+            renderScale = serializedAdditionalDataObject.FindProperty("m_RenderScale");
+            upscalingFilter = serializedAdditionalDataObject.FindProperty("m_UpscalingFilter");
         }
 
         /// <summary>

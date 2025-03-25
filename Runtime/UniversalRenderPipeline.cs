@@ -1203,11 +1203,14 @@ namespace UnityEngine.Rendering.Universal
             // Discard variations lesser than kRenderScaleThreshold.
             // Scale is only enabled for gameview.
             const float kRenderScaleThreshold = 0.05f;
-            bool disableRenderScale = ((Mathf.Abs(1.0f - settings.renderScale) < kRenderScaleThreshold) || isScenePreviewOrReflectionCamera);
-            cameraData.renderScale = disableRenderScale ? 1.0f : settings.renderScale;
+            bool overrideRenderScale = !isScenePreviewOrReflectionCamera && baseAdditionalCameraData != null && baseAdditionalCameraData.overrideRenderScale;
+            float renderScale = overrideRenderScale ? baseAdditionalCameraData.renderScale : settings.renderScale;
+            bool disableRenderScale = ((Mathf.Abs(1.0f - renderScale) < kRenderScaleThreshold) || isScenePreviewOrReflectionCamera);
+            cameraData.renderScale = disableRenderScale ? 1.0f : renderScale;
 
             // Convert the upscaling filter selection from the pipeline asset into an image upscaling filter
-            cameraData.upscalingFilter = ResolveUpscalingFilterSelection(new Vector2(cameraData.pixelWidth, cameraData.pixelHeight), cameraData.renderScale, settings.upscalingFilter);
+            UpscalingFilterSelection upscalingFilter = overrideRenderScale ? baseAdditionalCameraData.upscalingFilter : settings.upscalingFilter;
+            cameraData.upscalingFilter = ResolveUpscalingFilterSelection(new Vector2(cameraData.pixelWidth, cameraData.pixelHeight), cameraData.renderScale, upscalingFilter);
 
             if (cameraData.renderScale > 1.0f)
             {
@@ -1229,7 +1232,7 @@ namespace UnityEngine.Rendering.Universal
             cameraData.fsrSharpness = settings.fsrSharpness;
 
             cameraData.xr = XRSystem.emptyPass;
-            XRSystem.SetRenderScale(cameraData.renderScale);
+            XRSystem.SetRenderScale(settings.renderScale);
 
             var commonOpaqueFlags = SortingCriteria.CommonOpaque;
             var noFrontToBackOpaqueFlags = SortingCriteria.SortingLayer | SortingCriteria.RenderQueue | SortingCriteria.OptimizeStateChanges | SortingCriteria.CanvasOrder;
