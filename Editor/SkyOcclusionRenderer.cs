@@ -337,8 +337,20 @@ public static class SkyOcclusionRenderer
         // Store the old fog density and sky texture
         float oldFogDensity = RenderSettings.fogDensity;
         RenderSettings.fogDensity = 100;
+        Color oldFogColor = RenderSettings.fogColor; //for normal geo
+        RenderSettings.fogColor = Color.white; //for portals
         var skytex = Shader.GetGlobalTexture("_SkyTexture");
-        SkyManager.SetSkyTexture(GetOrCreateBlackCubemap(1, 1));
+        SkyManager.SetSkyTexture(GetOrCreateBlackCubemap());
+        
+        //Find instances of SkyOcclusionPortals
+        SkyOcclusionPortal[] portals = GameObject.FindObjectsOfType<SkyOcclusionPortal>();
+
+        // Modify the portals as needed before rendering
+        foreach (var portal in portals)
+        {
+            portal.PrepareForRendering();
+        }
+
 
         // Set up the camera
         tempCamera.clearFlags = CameraClearFlags.SolidColor;
@@ -367,7 +379,14 @@ public static class SkyOcclusionRenderer
 
         // Restore the fog density and sky texture
         RenderSettings.fogDensity = oldFogDensity;
+        RenderSettings.fogColor = oldFogColor;
         if (skytex != null) SkyManager.SetSkyTexture(skytex);
+        
+        // Restore the portals to their original state after rendering
+        foreach (var portal in portals)
+        {
+            portal.RestoreAfterRendering();
+        }
 
         // Apply scattering and bake to SH
         SkyManager.ApplyScattering(CurrentTexture, .25f, 4);
