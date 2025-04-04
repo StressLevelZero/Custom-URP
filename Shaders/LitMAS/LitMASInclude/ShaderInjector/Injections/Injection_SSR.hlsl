@@ -25,7 +25,7 @@
 
 //#!INJECT_BEGIN LIGHTING_CALC 0
 	#if defined(_SSR_ENABLED)
-		half4 noiseRGBA = GetScreenNoiseRGBA(fragData.screenUV);
+		half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
 
 		SSRExtraData ssrExtra;
 		ssrExtra.meshNormal = UNPACK_NORMAL(i);

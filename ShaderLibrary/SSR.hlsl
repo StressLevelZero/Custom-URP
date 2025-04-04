@@ -255,6 +255,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
     float largeRadius = max(2 * dynStepSize * stepMultiplier, hitRadius);
 
     float totalDistance = 0.0f;
+	float lastTotalDistance = 0.0f;
     float FdotR4 = FdotR * FdotR;
     FdotR4 *= FdotR4;
     reflectedRay += lerp(0, 0.5*largeRadius, 1 - FdotR4) * rayDir;
@@ -273,7 +274,8 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
         }
 
         int2 uvInt = int2(uvDepth * _HiZDim.xy) >> mipLevel;
-        float rawDepth = LOAD_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, uvInt, mipLevel).r;
+		float rawDepth = LOAD_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, uvInt, mipLevel).r;
+		//float rawDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_LinearClamp, uvDepth, mipLevel).r;
         float linearDepth = Linear01Depth(rawDepth, _ZBufferParams);
         if (linearDepth == 0)
         {
@@ -313,13 +315,14 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
         if (!isRayInFront && storeLastPos && isMinMip)
         {
             finalPos = reflectedRay;
-        }
+			lastTotalDistance = -totalDistance;
+		}
         storeLastPos = isRayInFront ? true : false;
         // If we're within the hit radius, we're done
         UNITY_BRANCH if (inHitRadius && isMinMip)
         {
             finalPos = reflectedRay;
-            totalDistance = -totalDistance;
+			lastTotalDistance = -totalDistance;
             break;
         }
 
@@ -357,7 +360,7 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
         }
     }
     //underPos.w = abs(underPos.w);
-    float4 outp = float4(finalPos.xyz, totalDistance);//finalPos.x == 1.#INF && underPos.w != 1.#INF ? underPos : float4(finalPos.xyz, totalDistance);
+	float4 outp = float4(finalPos.xyz, lastTotalDistance); //finalPos.x == 1.#INF && underPos.w != 1.#INF ? underPos : float4(finalPos.xyz, totalDistance);
     return outp;
 }
 
@@ -399,9 +402,9 @@ float4 getSSRColor(SSRData data)
             //,smoothstep(0.1, 0.4, data.perceptualRoughness)
         //)
     );
-    float3 rayNoise = 1.5 * rayTanAngle * (2*data.noise.rgb - 1);
+    float3 rayNoise = 2.0 * rayTanAngle * (2*data.noise.rgb - 1);
     rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
-    data.rayDir += 0.5*rayNoise;
+    data.rayDir += 0.95*rayNoise;
     data.rayDir.xyz = normalize(data.rayDir.xyz);
 
     float RdotV = saturate(0.95 * dot(data.rayDir, -data.viewDir.xyz) + 0.05);
@@ -413,7 +416,7 @@ float4 getSSRColor(SSRData data)
 
     data.rayDir = mul(UNITY_MATRIX_V, float4(data.rayDir.xyz, 0));
     
-    float3 screenOffset = normalize(mul(UNITY_MATRIX_V, float4(data.faceNormal, 0)));
+    float3 screenOffset = 1.5 * normalize(mul(UNITY_MATRIX_V, float4(data.faceNormal, 0)));
     
     reflectedRay += float(2u << _SSRMinMip) * screenOffset * perspectiveScaledStep(float3(screenOffset), reflectedRay);
     /*
@@ -465,9 +468,9 @@ float4 getSSRColor(SSRData data)
     #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
     float xfade = smoothstep(0, 0.1, unity_StereoEyeIndex == 0 ? uvs.x : 1.0 - uvs.x);
     #else
-    float xfade = smoothstep(0, 0.1, uvs.x)*smoothstep(1, 1- 0.1, uvs.x);//Fade x uvs out towards the edges
+    float xfade = smoothstep(0, 0.2, uvs.x)*smoothstep(1, 1- 0.1, uvs.x);//Fade x uvs out towards the edges
     #endif
-    float yfade = smoothstep(0, 0.1, uvs.y)*smoothstep(1, 1- 0.1, uvs.y);//Same for y
+    float yfade = smoothstep(0, 0.2, uvs.y)*smoothstep(1, 1- 0.1, uvs.y);//Same for y
     xfade *= xfade;
     yfade *= yfade;
     //float lengthFade = smoothstep(1, 0, 2*(totalSteps / data.maxSteps)-1);
@@ -482,7 +485,7 @@ float4 getSSRColor(SSRData data)
     //roughRatio = rayHit > 0 ? roughRatio : data.perceptualRoughness * data.perceptualRoughness;
     //uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
     float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
-    
+	//blur = min(blur, data.perceptualRoughness); // Need to clamp to unity's cubemap roughness to avoid obvious discontinuities
     float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
     
     /*
@@ -496,11 +499,12 @@ float4 getSSRColor(SSRData data)
         reflection = float4(0,0,0,0);
     }
     
-    #if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
+	reflection.a = fade;
+    #if 0// defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
     
     // do averaging in 2.0 gamma space.
     reflection.rgb = sqrt(reflection.rgb);
-    reflection.a = fade;
+   
 
     float4 colorX = QuadReadAcrossX(reflection);
 
@@ -522,7 +526,7 @@ float4 getSSRColor(SSRData data)
     //colorY = colorY * (min(maxColorY, maxColor) / maxColorY);
     //colorD = colorD * (min(maxColorD, maxColor) / maxColorD);
     
-    float4 kernelWeights = float4(0.4, 0.2, 0.2, 0.2);//float4(0.5, 0.185, 0.185, 0.13);
+    float4 kernelWeights = float4(0.5, 0.2, 0.2, 0.1);//float4(0.5, 0.185, 0.185, 0.13);
     float4 fadeQuad = float4(reflection.a, colorX.a, colorY.a, colorD.a);
     float4 kernel = (fadeQuad) * kernelWeights;
     float weight = kernel.x + kernel.y + kernel.z + kernel.w;
@@ -759,7 +763,7 @@ float4 getSSRColorNew(SSRData data)
 
 
     // Random offset to the ray, based on roughness
-    float rayTanAngle = TanPhongConeAngle(data.perceptualRoughness * data.perceptualRoughness); //half the angle because random scatter looks bad, rely on the color pyramid for blur 
+    float rayTanAngle = TanPhongConeAngle(data.perceptualRoughness * data.perceptualRoughness); 
     float3 rayNoise = rayTanAngle * (2 * data.noise.rgb - 1);
     rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
     data.rayDir += rayNoise;
@@ -855,7 +859,7 @@ float4 getSSRColorNew(SSRData data)
     float roughRadius = rayTanAngle2 * totalDistance;
 
     float roughRatio = roughRadius * abs(UNITY_MATRIX_P._m11) / length(finalPosWorld - _WorldSpaceCameraPos);
-    float blur = log2(_CameraOpaqueTexture_Dim.y * roughRatio);
+    float blur = log2(_CameraOpaqueTexture_Dim.y * roughRatio) - 1.0;
     float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
     //reflection *= _ProjectionParams.z;
     //reflection.a *= smoothness*reflStr*fade;

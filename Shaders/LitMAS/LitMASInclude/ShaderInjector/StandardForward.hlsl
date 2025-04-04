@@ -335,7 +335,7 @@ FragOut frag(VertOut i
 
 // Begin Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
 	#if defined(_SSR_ENABLED)
-		half4 noiseRGBA = GetScreenNoiseRGBA(fragData.screenUV);
+		half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
 
 		SSRExtraData ssrExtra;
 		ssrExtra.meshNormal = UNPACK_NORMAL(i);
