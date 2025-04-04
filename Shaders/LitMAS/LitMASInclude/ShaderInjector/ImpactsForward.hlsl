@@ -13,7 +13,6 @@
 
 #if defined(SHADER_API_MOBILE)
 #else              
-	#define SLZ_BICUBIC_LM
 
 // Begin Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------
 #pragma multi_compile _ _SLZ_SSR_ENABLED
@@ -351,7 +350,7 @@ FragOut frag(VertOut i
 
 // Begin Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
 	#if defined(_SSR_ENABLED)
-		half4 noiseRGBA = GetScreenNoiseRGBA(fragData.screenUV);
+		half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
 
 		SSRExtraData ssrExtra;
 		ssrExtra.meshNormal = UNPACK_NORMAL(i);

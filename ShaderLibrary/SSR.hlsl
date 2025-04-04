@@ -185,11 +185,12 @@ float TanGGXConeAngle(const float roughness)
     float theta = acos(mu);
     float tangent = tan(theta);
     return tangent;
+    
+    since tan(acos(x)) = sqrt(1-x*x)/x this can be simplified, and ends up being 
+    tangent = roughness * sqrt( Xi / (1.0 - Xi) ) = roughness * 0.5681120688 for Xi = 0.244
     */
-    /* cheap estimation */
-    //return 0.55 * roughness;
-    //incorrect, but better looking
-	return 0.55 * roughness;
+
+	return 0.5681120688 * roughness;
 }
 
 /** @brief Scales SSR step size based on distance and angle such that a step moves the ray by about one pixel in 2D screenspace

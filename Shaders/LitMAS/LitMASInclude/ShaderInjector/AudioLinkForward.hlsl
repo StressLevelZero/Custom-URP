@@ -13,7 +13,6 @@
 
 #if defined(SHADER_API_MOBILE)
 #else              
-	#define SLZ_BICUBIC_LM
 
 
 #endif
