@@ -13,6 +13,7 @@
 #define _ADDITIONAL_LIGHTS false
 #endif
 
+
 half4 CalcFogFactors(real3 viewDirectionWS, real fogFactor)
 {
     half4 fogFactors = half4(0, 0, 0, 0);
@@ -82,7 +83,7 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
         surfaceType > 0
     );
 
-    SSRLerp = saturate((surfData.perceptualRoughness - 0.6) / (0.3 - 0.6));
+    SSRLerp = saturate((surfData.perceptualRoughness - 0.5) / (0.3 - 0.5));
 	SSRLerp = sqrt(SSRLerp);
     //Piecewise function to make a sinusoidal falloff curve
 #define SSR_FALLOFF_START 0.6666667
@@ -91,7 +92,8 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
     SSRLerp *= RdotV;
     real4 SSR = real4(0, 0, 0, 0);
 	bool doSSR = SSRLerp > 0.008;
-    #if defined(_SM6_QUAD)
+    
+    #if defined(_SM6_WAVE_VOTE)
     if (WaveActiveAnyTrue(doSSR))
     #endif
 	if (doSSR)

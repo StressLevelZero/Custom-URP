@@ -35,7 +35,7 @@ struct v2f
 {
 	float4 vertex : SV_POSITION;
 // Begin Injection INTERPOLATORS from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
-	float2 uv0XY : TEXCOORD1;
+	float2 uv0XY : TEXCOORD0;
 // End Injection INTERPOLATORS from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 	UNITY_VERTEX_OUTPUT_STEREO

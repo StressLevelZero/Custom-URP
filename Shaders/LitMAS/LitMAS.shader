@@ -15,9 +15,10 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         _BakedMutiplier("Emission Baked Mutiplier", Float) = 1
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("Detail Map", 2D) = "gray" {}
-        [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_NO_SSR)] _SSROff("Disable SSR", Float) = 0
-        [Header(This should be 0 for skinned meshes)]
-        _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
+        [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 0
+        // SSR temporal accumulation, no longer used
+        // [Header(This should be 0 for skinned meshes)]
+        [HideInInspector]_SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
         [Toggle(_ALPHATEST_ON)]_Alphatest("Alpha Clipping", float) = 0
         _Cutoff("Alpha Clip Threshold", Range(0,1)) = 0.5
         //[Toggle(_SM6_QUAD)] _SM6_Quad("Quad-avg SSR", Float) = 0
@@ -26,6 +27,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         _BlendSrc ("Blend Source", float) = 1
         _BlendDst ("Blend Destination", float) = 0
         [ToggleUI] _ZWrite ("ZWrite", float) = 1
+
         _Cull ("Cull Side", float) = 2
         _HalfShade("Enable Vulkan Per-Draw Shading Rate Hack", float) = 0
         _Slope("Offset Slope Factor", float) = 0
@@ -65,11 +67,13 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 
             //#pragma use_dxc vulkan
 
-            #if defined(SHADER_API_DESKTOP) && defined(_SLZ_SSR_ENABLED) && !defined(_NO_SSR)
+            #if defined(SHADER_API_DESKTOP) && !defined(_SLZ_SSR_DISABLED)
             #pragma require WaveVote
-            #pragma require QuadShuffle
-            //#pragma shader_feature _SM6_QUAD
-            #define _SM6_QUAD 1
+            #define _SM6_WAVE_VOTE 1
+
+            // Do quad-averaging of the SSR results. 
+            //#pragma require QuadShuffle
+            //#define _SM6_QUAD 1
             #endif
             //#define _ADDITIONAL_LIGHTS
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardForward.hlsl"

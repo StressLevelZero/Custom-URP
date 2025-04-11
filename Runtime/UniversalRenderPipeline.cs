@@ -1383,7 +1383,7 @@ namespace UnityEngine.Rendering.Universal
             //Debug.Log("cameraData.postProcessEnabled: " + cameraData.postProcessEnabled + "\nenableSSR: " + enableSSR);
             cameraData.requiresColorPyramid = asset.supportsCameraOpaqueTexture && enableSSR;
             cameraData.requiresDepthPyramid = asset.supportsCameraDepthTexture && enableSSR;
-            cameraData.requiresMinMaxDepthPyr = false; // False for now, might need this for fancier SSR later
+            cameraData.requiresMinMaxDepthPyr = false;
             cameraData.enableSSR = enableSSR && cameraData.requiresDepthPyramid && cameraData.requiresColorPyramid;
             cameraData.maxSSRSteps = asset.maxSsrSteps;
             cameraData.SSRMinMip = asset.ssrMinMip;

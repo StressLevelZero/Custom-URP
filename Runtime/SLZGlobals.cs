@@ -41,7 +41,19 @@ namespace UnityEngine.Rendering.Universal
 
         public GlobalKeyword HiZEnabledKW { get; private set; }
         public GlobalKeyword HiZMinMaxKW { get; private set; }
-        public GlobalKeyword SSREnabledKW { get; private set; }
+
+        // Previously was SSREnabledKW, had to be inverted to support disabling SSR as a material property without
+        // adding an additional keyword.
+        //
+        // Unity will not allow an enabled global keyword to be disabled by the material's local keyword state.
+        // This meant that in order to disable SSR on a specific material another local keyword was neccessary,
+        // potentially doubling the shader size with an unnecessary duplicates of the programs for the global SSR
+        // off state.
+        //
+        // However, unity will override the local keyword state with the global state if the global is enabled but
+        // the local is not Thus, if we have SSR enabled be the default state and disable it with a global keyword,
+        // then we can also disable it per-material as well.
+        public GlobalKeyword SSRDisabledKW { get; private set; }
 
         //public SLZPerCameraRTStorage PerCameraOpaque;
         //public SLZPerCameraRTStorage PerCameraPrevHiZ;
@@ -73,7 +85,9 @@ namespace UnityEngine.Rendering.Universal
             hasSetBNTextures = false;
             SSRGlobalCB = new ComputeBuffer(8, sizeof(float), ComputeBufferType.Constant);
             HiZDimBuffer = new ComputeBuffer(15, Marshal.SizeOf<Vector4>());
-            SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
+
+            //SSREnabledKW = GlobalKeyword.Create("_SLZ_SSR_ENABLED");
+            SSRDisabledKW = GlobalKeyword.Create("_SLZ_SSR_DISABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
             HiZMinMaxKW = GlobalKeyword.Create("_HIZ_MIN_MAX_ENABLED");
             //PerCameraOpaque = new SLZPerCameraRTStorage();
@@ -95,7 +109,7 @@ namespace UnityEngine.Rendering.Universal
 
         public void SetHiZSSRKeyWords(bool enableSSR, bool requireHiZ, bool requireMinMax)
         {
-            Shader.SetKeyword(SSREnabledKW, enableSSR);
+            Shader.SetKeyword(SSRDisabledKW, !enableSSR);
             Shader.SetKeyword(HiZEnabledKW, requireHiZ);
             Shader.SetKeyword(HiZMinMaxKW, requireMinMax);
         }
@@ -128,7 +142,7 @@ namespace UnityEngine.Rendering.Universal
             //Debug.Log(FRTemporal);
             SSRGlobalArray._SSRTemporalWeight = math.clamp(1.0f - temporalWeight, 0.0078f, 1.0f); //Mathf.Clamp(FRTemporal, 0.0078f, 1.0f); 
             SSRGlobalArray._SSRSteps = maxSteps;
-            float SSRRes = 1024;
+            float SSRRes = 2048;
             int dynamicMinMip = (int)math.round(math.log2(((float)screenHeight) / SSRRes));
             SSRGlobalArray._SSRMinMip = math.max(dynamicMinMip + minMip, 0);
             float halfTan = math.tan(Mathf.Deg2Rad * (fov * 0.5f));
@@ -324,7 +338,7 @@ namespace UnityEngine.Rendering.Universal
             //passData.hiZTex = camData.enableSSR ? prevHiZ.handle : null; // EXPERIMENT: use quad averaging instead of temporal averaging and avoid extra RT + blit + jank previous frame SSR estimation
             passData.opaqueID = SLZGlobals.CameraOpaqueTextureID;
             passData.hiZID = SLZGlobals.PrevHiZ0TextureID;
-            passData.ssrEnabledKW = SLZGlobals.instance.SSREnabledKW;
+            passData.ssrDisabledKW = SLZGlobals.instance.SSRDisabledKW;
             passData.hiZEnabledKW = SLZGlobals.instance.HiZEnabledKW;
             passData.hiZMinMaxKW = SLZGlobals.instance.HiZMinMaxKW;
             passData.ssrMinMip = camData.SSRMinMip;
@@ -357,7 +371,7 @@ namespace UnityEngine.Rendering.Universal
             RTHandle hiZTex = data.hiZTex;
             int opaqueID = data.opaqueID;
             int hiZID = data.hiZID;
-            GlobalKeyword ssrEnabledKW = data.ssrEnabledKW;
+            GlobalKeyword ssrDisabledKW = data.ssrDisabledKW;
             GlobalKeyword hiZEnabledKW = data.hiZEnabledKW;
             GlobalKeyword hiZMinMaxKW = data.hiZMinMaxKW;
            
@@ -371,11 +385,11 @@ namespace UnityEngine.Rendering.Universal
                 }
 
                 SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, data.ssrMaxSteps, data.ssrMinMip, data.ssrHitRadius, data.temporalWeight, data.fov, data.screenHeight);
-                cmd.SetKeyword(ssrEnabledKW, enableSSR);
+                cmd.SetKeyword(ssrDisabledKW, !enableSSR);
                 cmd.SetKeyword(hiZEnabledKW, requireHiZ);
                 cmd.SetKeyword(hiZMinMaxKW, requireMinMax);
                 cmd.SetGlobalVector(SLZGlobals.OpaqueTextureDimID, 
-                    new Vector4(data.screenWidth / data.opaqueTexSizeFrac, data.screenWidth / data.opaqueTexSizeFrac, data.opaqueMipLevels - 1, data.opaqueMipLevels + SLZGlobals.opaqueMipTruncation));
+                    new Vector4(data.screenWidth / data.opaqueTexSizeFrac, data.screenHeight / data.opaqueTexSizeFrac, data.opaqueMipLevels - 1, data.opaqueMipLevels + SLZGlobals.opaqueMipTruncation));
             }
         }
 
@@ -394,7 +408,7 @@ namespace UnityEngine.Rendering.Universal
             public RTHandle hiZTex;
             public int opaqueID;
             public int hiZID;
-            public GlobalKeyword ssrEnabledKW;
+            public GlobalKeyword ssrDisabledKW;
             public GlobalKeyword hiZEnabledKW;
             public GlobalKeyword hiZMinMaxKW;
             public int ssrMinMip;
@@ -435,7 +449,7 @@ namespace UnityEngine.Rendering.Universal
                 passData.hiZTex = hiZHandle;
                 passData.opaqueID = SLZGlobals.instance.opaqueTexID;
                 passData.hiZID = SLZGlobals.instance.prevHiZTexID;
-                passData.ssrEnabledKW = SLZGlobals.instance.SSREnabledKW;
+                passData.ssrDisabledKW = SLZGlobals.instance.SSRDisabledKW;
                 passData.hiZEnabledKW = SLZGlobals.instance.HiZEnabledKW;
                 passData.hiZMinMaxKW = SLZGlobals.instance.HiZMinMaxKW;
                 builder.AllowPassCulling(false);

@@ -20,9 +20,9 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         [HideInInspector]_NumberOfHits("_NumberOfHits", Int) = 0
         [Space(30)][Header(BRDF map)][Space(10)][Toggle(_BRDFMAP)] BRDFMAP("BRDFMAP enabled", Float) = 0
         [NoScaleOffset][SingleLineTexture]g_tBRDFMap("BRDF Ramp", 2D) = "black" {}
-        [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_NO_SSR)] _SSROff("Disable SSR", Float) = 0
-        [Header(This should be 0 for skinned meshes)]
-        _SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
+        [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 0
+        //[Header(This should be 0 for skinned meshes)]
+        [HideInInspector]_SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
 
 		_Surface ("Surface Type", float) = 0
 		_BlendSrc ("Blend Source", float) = 1
@@ -62,11 +62,15 @@ ENDHLSL
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_IMPACTS
             #pragma shader_feature_local_fragment _BRDFMAP
-			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			#pragma require WaveVote
-			#pragma require QuadShuffle
-			#define _SM6_QUAD 1
-			#endif
+
+            #if defined(SHADER_API_DESKTOP) && !defined(_SLZ_SSR_DISABLED)
+            #pragma require WaveVote
+            #define _SM6_WAVE_VOTE 1
+
+            // Do quad-averaging of the SSR results. 
+            //#pragma require QuadShuffle
+            //#define _SM6_QUAD 1
+            #endif
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
 
@@ -182,10 +186,6 @@ ENDHLSL
             #define LITMAS_FEATURE_EMISSION
             #define LITMAS_FEATURE_IMPACTS
             #pragma shader_feature_local_fragment _BRDFMAP
-			#if defined(SHADER_API_DESKTOP) && defined(SHADER_API_VULKAN)
-			#pragma require QuadShuffle
-			#define _SM6_QUAD 1
-			#endif
 
             #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
 

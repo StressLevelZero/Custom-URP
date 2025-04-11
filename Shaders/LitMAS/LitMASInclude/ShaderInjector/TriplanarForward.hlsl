@@ -15,9 +15,23 @@
 #else              
 
 // Begin Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------
-#pragma multi_compile _ _SLZ_SSR_ENABLED
-#pragma shader_feature_local _ _NO_SSR
-#if defined(_SLZ_SSR_ENABLED) && !defined(_NO_SSR) && !defined(SHADER_API_MOBILE)
+
+
+// Previously was _SLZ_SSR_ENABLED, had to be inverted to support disabling SSR as a material property without
+// needing the local _SSR_DISABLED shader feature keyword.
+//
+// Unity will not allow an enabled global keyword to be disabled by the material's local keyword state.
+// This means that in order to disable SSR on a specific material another local keyword is neccessary,
+// potentially doubling the shader size with an unnecessary duplicates of the programs for the global SSR
+// off state.
+//
+// However, unity will override the local keyword state with the global state if the global is enabled but
+// the local is not Thus, if we have SSR enabled be the default state, the material can enable the disabled
+// keyword regardless of the global state
+
+#pragma multi_compile _ _SLZ_SSR_DISABLED
+
+#if !defined(_SLZ_SSR_DISABLED) && !defined(SHADER_API_MOBILE)
 	#define _SSR_ENABLED
 #endif
 // End Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------

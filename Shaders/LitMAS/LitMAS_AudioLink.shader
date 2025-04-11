@@ -55,12 +55,8 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#define LITMAS_FEATURE_LIGHTMAPPING
 			#define LITMAS_FEATURE_TS_NORMALS
 			#define LITMAS_FEATURE_EMISSION
-			#define LITMAS_FEATURE_SSR
-			#if defined(SHADER_API_DESKTOP)
-			#pragma require WaveVote
-			#pragma require QuadShuffle
-			#define _SM6_QUAD 1
-			#endif
+			//#define LITMAS_FEATURE_SSR
+
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 			#define _BRDFMAP
 

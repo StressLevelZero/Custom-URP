@@ -275,7 +275,9 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
         }
 
         int2 uvInt = int2(uvDepth * _HiZDim.xy) >> mipLevel;
-		float rawDepth = LOAD_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, uvInt, mipLevel).r;
+		float2 depthTex = LOAD_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, uvInt, mipLevel).rg;
+		float rawDepth = depthTex.r;
+		//float rawDepthMin = depthTex.g;
 		//float rawDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_LinearClamp, uvDepth, mipLevel).r;
         float linearDepth = Linear01Depth(rawDepth, _ZBufferParams);
         if (linearDepth == 0)
