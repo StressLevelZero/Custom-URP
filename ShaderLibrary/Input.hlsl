@@ -98,8 +98,16 @@ TEXTURECUBE(_GlossyEnvironmentCubeMap);
 SAMPLER(sampler_GlossyEnvironmentCubeMap);
 
 #define _InvCameraViewProj unity_MatrixInvVP
-float4 _ScaledScreenParams;
 
+// _ScaledScreenParams causes unity's light baker to silently die and enter a boot-loop if it is used in the meta pass!
+// unity doesn't have defines for the light mode of the current pass, but the shader graph added its own. If the shader
+// including this file uses those, we can guard against using _ScaledScreenParams in the meta.
+#if defined(SHADERPASS) && defined(SHADERPASS_META) && (SHADERPASS==SHADERPASS_META)
+#define _ScaledScreenParams _ScreenParams
+#define FIXED_META_SCREENPARAMS
+#else
+float4 _ScaledScreenParams;
+#endif
 // x = Mip Bias
 // y = 2.0 ^ [Mip Bias]
 float2 _GlobalMipBias;
