@@ -32,7 +32,7 @@ public class VolumetricBaking : EditorWindow
         //   BuildComboList();
         //   BuildSelectionGrid();
     }
-
+    const int safeTdrDelay = 30; 
     static void SetGPUTimeout()
     {
 #if UNITY_EDITOR_WIN
@@ -41,12 +41,12 @@ public class VolumetricBaking : EditorWindow
         object currentValueBoxed = Registry.GetValue(key, value, null);
         int currentValue = currentValueBoxed != null ? (int)currentValueBoxed : 2;
         //EditorPrefs.SetBool("VolBakeDontShowGPUTimeoutWarning", false);
-        if (!EditorPrefs.GetBool("VolBakeDontShowGPUTimeoutWarning", false) && currentValue < 60)
+        if (!EditorPrefs.GetBool("VolBakeDontShowGPUTimeoutWarning", false) && currentValue < safeTdrDelay)
         {
             int allowKey = EditorUtility.DisplayDialogComplex("Increase GPU timeout",
                 "This tool needs to set a Windows registry key to increase the time the GPU is allowed to take " +
                 "processing graphics jobs in a single frame. Otherwise Windows will consider the GPU to be stalled out and will kill " +
-                "Unity mid-bake.\n\n Key: " + key + "\\" + value + "\n\nIncrease the timeout from the default (2 seconds) to 60s?\n",
+                $"Unity mid-bake.\n\n Key: {key}\\{value}\n\nIncrease the timeout from the default (2 seconds) to {safeTdrDelay}?\n",
                 "Proceed",
                 "Cancel",
                 "Cancel - Don't Show Again"
@@ -66,7 +66,7 @@ public class VolumetricBaking : EditorWindow
             if (allowKey == 2)
             {
                 int choice2 = EditorUtility.DisplayDialogComplex("Don't increase timeout", "Are you sure? If the timeout period isn't increased, unity is almost guaranteed to crash when baking volumetrics." +
-                    "\n\nIncreasing the value of this key should not cause any issues, it only means that Windows will wait 60 seconds before killing applications that have actually experienced a GPU crash. " +
+                    $"\n\nIncreasing the value of this key should not cause any issues, it only means that Windows will wait {safeTdrDelay} seconds before killing applications that have actually experienced a GPU crash. " +
                     "\n\nThis will never ask you again! Only do this if you know what you're doing!",
                     "Don't increase timeout and never ask again",
                     "Don't increase timeout",
@@ -86,7 +86,7 @@ public class VolumetricBaking : EditorWindow
                 System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
                 startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal;
                 startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = string.Format("/C reg add {0} /v {1} /t REG_DWORD /d 60 /f", key, value);
+                startInfo.Arguments = $"/C reg add {key} /v {value} /t REG_DWORD /d {safeTdrDelay} /f";
                 //Debug.Log(startInfo.Arguments);
                 startInfo.Verb = "runas";
                 process.StartInfo = startInfo;
@@ -114,7 +114,7 @@ public class VolumetricBaking : EditorWindow
     public bool SkyboxContribution = false;
     public Cubemap CustomEnvorment;
     public int EnvLightSamples = 2048;
-    public int RayChunkSize = 2048;
+    public int RayChunkSize = 4096;
     public float VolExposure = 0.05f;
 
     bool checkedD3D12 = false;
@@ -132,7 +132,7 @@ public class VolumetricBaking : EditorWindow
         GUI.enabled = true;
         VolExposure = EditorGUILayout.Slider("Debug Exposure", RefreshExposure(VolExposure), 0, 2);
         DXRAcceletration = EditorGUILayout.Toggle("DXR Acceletration", DXRAcceletration);
-        RayChunkSize = EditorGUILayout.IntSlider("DXR Ray Chunk Size", RayChunkSize, 256, 8192);
+        RayChunkSize = Mathf.RoundToInt((float)EditorGUILayout.IntSlider("DXR Ray Chunk Size", RayChunkSize, 512, 16384) / 512.0f) * 512;
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Light Settings", EditorStyles.boldLabel);
