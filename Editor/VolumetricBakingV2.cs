@@ -324,6 +324,10 @@ namespace SLZ.SLZEditorTools
             udata.currentFrame = (udata.currentFrame + 1) % UpdateLoopData.frameSkip;
             if (udata.currentFrame != 0)
             {
+                // Crashing seems to be linked to the scene view not updating. Skipping 5 frames is fine if the view is set to "always refresh",
+                // but if that's disabled it still crashes. Manually force it to update.
+                if (udata.currentFrame == 1) SceneView.RepaintAll();
+
                 return;
             }
 
