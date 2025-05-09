@@ -41,12 +41,12 @@ public class VolumetricBaking : EditorWindow
         object currentValueBoxed = Registry.GetValue(key, value, null);
         int currentValue = currentValueBoxed != null ? (int)currentValueBoxed : 2;
         //EditorPrefs.SetBool("VolBakeDontShowGPUTimeoutWarning", false);
-        if (!EditorPrefs.GetBool("VolBakeDontShowGPUTimeoutWarning", false) && currentValue < 30)
+        if (!EditorPrefs.GetBool("VolBakeDontShowGPUTimeoutWarning", false) && currentValue < 60)
         {
             int allowKey = EditorUtility.DisplayDialogComplex("Increase GPU timeout",
                 "This tool needs to set a Windows registry key to increase the time the GPU is allowed to take " +
                 "processing graphics jobs in a single frame. Otherwise Windows will consider the GPU to be stalled out and will kill " +
-                "Unity mid-bake.\n\n Key: " + key + "\\" + value + "\n\nIncrease the timeout from the default (2 seconds) to 30s?\n",
+                "Unity mid-bake.\n\n Key: " + key + "\\" + value + "\n\nIncrease the timeout from the default (2 seconds) to 60s?\n",
                 "Proceed",
                 "Cancel",
                 "Cancel - Don't Show Again"
@@ -66,7 +66,7 @@ public class VolumetricBaking : EditorWindow
             if (allowKey == 2)
             {
                 int choice2 = EditorUtility.DisplayDialogComplex("Don't increase timeout", "Are you sure? If the timeout period isn't increased, unity is almost guaranteed to crash when baking volumetrics." +
-                    "\n\nIncreasing the value of this key should not cause any issues, it only means that Windows will wait 30 seconds before killing applications that have actually experienced a GPU crash. " +
+                    "\n\nIncreasing the value of this key should not cause any issues, it only means that Windows will wait 60 seconds before killing applications that have actually experienced a GPU crash. " +
                     "\n\nThis will never ask you again! Only do this if you know what you're doing!",
                     "Don't increase timeout and never ask again",
                     "Don't increase timeout",
@@ -86,7 +86,7 @@ public class VolumetricBaking : EditorWindow
                 System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
                 startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal;
                 startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = string.Format("/C reg add {0} /v {1} /t REG_DWORD /d 30 /f", key, value);
+                startInfo.Arguments = string.Format("/C reg add {0} /v {1} /t REG_DWORD /d 60 /f", key, value);
                 //Debug.Log(startInfo.Arguments);
                 startInfo.Verb = "runas";
                 process.StartInfo = startInfo;
@@ -157,7 +157,7 @@ public class VolumetricBaking : EditorWindow
             if (VerifySettings() == false) return; //Check settings and return if something is wrong
             if (DXRAcceletration)
             {
-                BakeDXR();
+                VolumetricBakingV2.BakeDXR(RayChunkSize, EnvLightSamples, AreaLightSamples, SkyboxContribution, CustomEnvorment);
             }
             else
             {
@@ -197,18 +197,20 @@ public class VolumetricBaking : EditorWindow
     {
         //Debug.Log($"New API: {newAPI.ToString()}");
 
-        if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
-        {
-            Process cmd = new Process();
-            string projectPath = Path.GetDirectoryName(Application.dataPath);
-            string unity = EditorApplication.applicationPath;
-            cmd.StartInfo.FileName = "cmd.exe";
-            cmd.StartInfo.Arguments = $"/K timeout /t 7 & {unity} -projectPath \"{projectPath}\" -force-d3d12";
-            cmd.StartInfo.UseShellExecute = true;
-            cmd.Start();
+        GraphicsAPISwitch.SwitchToAPI(GraphicsDeviceType.Direct3D12);
 
-            EditorApplication.Exit(0);
-        }
+        //if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        //{
+        //    Process cmd = new Process();
+        //    string projectPath = Path.GetDirectoryName(Application.dataPath);
+        //    string unity = EditorApplication.applicationPath;
+        //    cmd.StartInfo.FileName = "cmd.exe";
+        //    cmd.StartInfo.Arguments = $"/K timeout /t 7 & {unity} -projectPath \"{projectPath}\" -force-d3d12";
+        //    cmd.StartInfo.UseShellExecute = true;
+        //    cmd.Start();
+        //
+        //    EditorApplication.Exit(0);
+        //}
     }
 
     float RefreshExposure(float Exposure)
