@@ -1095,7 +1095,14 @@ public class VolumetricBaking : EditorWindow
 
         RayTracingAccelerationStructure accelerationStructure = new RayTracingAccelerationStructure(); ;
         Renderer[] renderers = GatherStaticRenderers();
-        for (int i = 0; i < renderers.Length; i++) accelerationStructure.AddInstance(renderers[i]);
+
+        RayTracingSubMeshFlags[] smflags = new RayTracingSubMeshFlags[64];
+        for (int smIdx = 0; smIdx < 64; smIdx++)
+        {
+            smflags[smIdx] = RayTracingSubMeshFlags.Enabled;
+        }
+
+        for (int i = 0; i < renderers.Length; i++) accelerationStructure.AddInstance(renderers[i], smflags);
         accelerationStructure.Build();
         rtshader.SetAccelerationStructure("g_SceneAccelStruct", accelerationStructure);
 
