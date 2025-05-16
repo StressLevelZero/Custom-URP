@@ -416,6 +416,9 @@ namespace UnityEngine.Rendering.Universal
 #endif
     public partial class UniversalRenderPipelineAsset : RenderPipelineAsset, ISerializationCallbackReceiver
     {
+#if UNITY_6000_0_OR_NEWER
+        public override Type pipelineType { get => typeof(UniversalRenderPipeline); }
+#endif
         Shader m_DefaultShader;
         ScriptableRenderer[] m_Renderers = new ScriptableRenderer[1];
 
@@ -1757,10 +1760,10 @@ namespace UnityEngine.Rendering.Universal
         }
 
         /// <inheritdoc/>        
-        public override string renderPipelineShaderTag => UniversalRenderPipeline.k_ShaderTagName;
+
 
 #endif
-
+        public override string renderPipelineShaderTag => UniversalRenderPipeline.k_ShaderTagName;
         /// <summary>Names used for display of rendering layer masks.</summary>
         public override string[] renderingLayerMaskNames => UniversalRenderPipelineGlobalSettings.instance.renderingLayerMaskNames;
 

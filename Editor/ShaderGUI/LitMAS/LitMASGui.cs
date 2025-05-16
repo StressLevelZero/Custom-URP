@@ -22,7 +22,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
     [CanEditMultipleObjects]
     public class LitMASGUI : UIElementsMaterialEditor
     {
-
+        // Temp patch to allow this to work in 2022, 6.0, and 6.1+ simultaneously 
 #if UNITY_6000_1_OR_NEWER
         private MaterialProperty.PropFlags propertyFlags(MaterialProperty prop) => prop.propertyFlags;
 #else
