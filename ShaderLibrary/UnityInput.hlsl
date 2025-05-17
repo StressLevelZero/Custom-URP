@@ -19,6 +19,7 @@
 		
 	    [[vk::ext_capability(/*MultiView*/ 4439)]]
         [[vk::ext_extension("SPV_KHR_multiview")]]
+		void dummy() {}
 		//#error Hacked DXC Enabled?
 		#define SLZ_DXC_MULTIVIEW
 		#ifdef UNITY_INSTANCING_INCLUDED

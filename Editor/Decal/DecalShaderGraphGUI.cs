@@ -1,10 +1,16 @@
 using System;
+using UnityEditor;
 using UnityEditor.ShaderGraph;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.Rendering.Universal.Internal;
 
+#if UNITY_6000_1_OR_NEWER
+using MaterialPropertyFlags = UnityEngine.Rendering.ShaderPropertyFlags;
+#else
+using MaterialPropertyFlags = UnityEditor.MaterialProperty.PropFlags;
+#endif
 namespace UnityEditor.Rendering.Universal
 {
     /// <summary>
@@ -120,7 +126,7 @@ namespace UnityEditor.Rendering.Universal
 #else
                     properties[i].flags
 #endif
-                    & (MaterialProperty.PropFlags.HideInInspector | MaterialProperty.PropFlags.PerRendererData)) != 0)
+                    & (MaterialPropertyFlags.HideInInspector | MaterialPropertyFlags.PerRendererData)) != 0)
                     continue;
 
                 float h = materialEditor.GetPropertyHeight(properties[i], properties[i].displayName);

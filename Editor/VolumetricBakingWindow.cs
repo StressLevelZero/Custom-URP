@@ -1137,7 +1137,11 @@ public class VolumetricBaking : EditorWindow
                     DirectionalLights.Add(Lights[i]);
                     break;
 
+#if UNITY_6000_0_OR_NEWER
+                case LightType.Rectangle:
+#else
                 case LightType.Area:
+#endif
                     AreaLights.Add(Lights[i]);
                     break;
 

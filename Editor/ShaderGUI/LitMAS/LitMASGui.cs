@@ -15,6 +15,12 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using static UnityEngine.Rendering.DebugUI.MessageBox;
 
+#if UNITY_6000_1_OR_NEWER
+using MaterialPropertyFlags = UnityEngine.Rendering.ShaderPropertyFlags;
+#else
+using MaterialPropertyFlags = UnityEditor.MaterialProperty.PropFlags;
+#endif
+
 namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 {
 
@@ -24,9 +30,9 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
     {
         // Temp patch to allow this to work in 2022, 6.0, and 6.1+ simultaneously 
 #if UNITY_6000_1_OR_NEWER
-        private MaterialProperty.PropFlags propertyFlags(MaterialProperty prop) => prop.propertyFlags;
+        private MaterialPropertyFlags propertyFlags(MaterialProperty prop) => prop.propertyFlags;
 #else
-        private MaterialProperty.PropFlags propertyFlags(MaterialProperty prop) => prop.flags;
+        private MaterialPropertyFlags propertyFlags(MaterialProperty prop) => prop.flags;
 
 #endif
         const string keyword_DETAILS_ON = "_DETAILS_ON";
@@ -553,7 +559,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             // Base map tiling offset ----------------------------------------
 
-            if (baseMapIdx != -1 && (propertyFlags(props[baseMapIdx]) & MaterialProperty.PropFlags.NoScaleOffset) == 0)
+            if (baseMapIdx != -1 && (propertyFlags(props[baseMapIdx]) & MaterialPropertyFlags.NoScaleOffset) == 0)
             {
                 MaterialScaleOffsetField baseScaleOffsetField = new MaterialScaleOffsetField(props[baseMapIdx], propIdx[baseMapIdx]);
                 baseProps.Add(baseScaleOffsetField);
@@ -769,19 +775,19 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             {
                 MaterialProperty prop = props[unknownPropIdx[i]];
                 int shaderIdx = propIdx[unknownPropIdx[i]];
-                if ((propertyFlags(prop) & MaterialProperty.PropFlags.HideInInspector) != 0)
+                if ((propertyFlags(prop) & MaterialPropertyFlags.HideInInspector) != 0)
                 {
                     continue;
                 }
                 switch (prop.type) 
                 {
                     case (MaterialProperty.PropType.Texture):
-                        if ((propertyFlags(prop) & MaterialProperty.PropFlags.NonModifiableTextureData) != 0) continue;
-                        TextureField tf = new TextureField(prop, shaderIdx, (prop.flags & MaterialProperty.PropFlags.Normal) != 0, shaderImporter?.GetDefaultTexture(prop.name));
+                        if ((propertyFlags(prop) & MaterialPropertyFlags.NonModifiableTextureData) != 0) continue;
+                        TextureField tf = new TextureField(prop, shaderIdx, (propertyFlags(prop) & MaterialPropertyFlags.Normal) != 0, shaderImporter?.GetDefaultTexture(prop.name));
                         unknownProps.Add(tf);
                         materialFields.Add(tf);
 
-                        if ((prop.flags & MaterialProperty.PropFlags.NoScaleOffset) == 0)
+                        if ((propertyFlags(prop) & MaterialPropertyFlags.NoScaleOffset) == 0)
                         {
                             MaterialScaleOffsetField msof = new MaterialScaleOffsetField(prop, shaderIdx);
                             unknownProps.Add(msof);
@@ -791,7 +797,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                         break;
                     case (MaterialProperty.PropType.Color):
                         MaterialColorField cf = new MaterialColorField();
-                        if ((propertyFlags(prop) & MaterialProperty.PropFlags.HDR) != 0)
+                        if ((propertyFlags(prop) & MaterialPropertyFlags.HDR) != 0)
                         {
                             cf.hdr = true;
                         }

@@ -1589,7 +1589,11 @@ namespace UnityEngine.Rendering.Universal
                         spotLight.angularFalloff = AngularFalloffType.AnalyticAndInnerAngle;
                         lightData.Init(ref spotLight, ref cookie);
                         break;
+#if UNITY_6000_0_OR_NEWER
+                    case LightType.Rectangle:
+#else
                     case LightType.Area:
+#endif
                         RectangleLight rectangleLight = new RectangleLight();
                         LightmapperUtils.Extract(light, ref rectangleLight);
                         rectangleLight.mode = LightMode.Baked;
@@ -1610,8 +1614,8 @@ namespace UnityEngine.Rendering.Universal
                 lightsOutput[i] = lightData;
             }
 #else
-            // If Enlighten realtime GI isn't active, we don't extract lights.
-            if (SupportedRenderingFeatures.active.enlighten == false || ((int)SupportedRenderingFeatures.active.lightmapBakeTypes | (int)LightmapBakeType.Realtime) == 0)
+                        // If Enlighten realtime GI isn't active, we don't extract lights.
+                        if (SupportedRenderingFeatures.active.enlighten == false || ((int)SupportedRenderingFeatures.active.lightmapBakeTypes | (int)LightmapBakeType.Realtime) == 0)
             {
                 for (int i = 0; i < requests.Length; i++)
                 {
@@ -1644,7 +1648,11 @@ namespace UnityEngine.Rendering.Universal
                             spotLight.angularFalloff = AngularFalloffType.AnalyticAndInnerAngle;
                             lightData.Init(ref spotLight);
                             break;
-                        case LightType.Area:
+#if UNITY_6000_0_OR_NEWER
+                    case LightType.Rectangle:
+#else
+                    case LightType.Area:
+#endif
                             // Rect area light is baked only in URP.
                             lightData.InitNoBake(light.GetInstanceID());
                             break;

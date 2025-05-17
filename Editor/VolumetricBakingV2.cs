@@ -445,8 +445,11 @@ namespace SLZ.SLZEditorTools
                         case LightType.Directional:
                             DirectionalLights.Add(light);
                             break;
-
+#if UNITY_6000_0_OR_NEWER
+                        case LightType.Rectangle:
+#else
                         case LightType.Area:
+#endif
                             AreaLights.Add(light);
                             break;
 
