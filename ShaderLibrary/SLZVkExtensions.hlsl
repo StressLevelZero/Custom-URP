@@ -12,18 +12,23 @@
                                         [[vk::ext_capability(/*FragmentDensityEXT*/ 5291)]]
     //Read only, only valid in the fragment stage
     #define SLZ_DECLARE_FRAG_SIZE     , [[vk::ext_decorate(/*Builtin*/ 11, /*FragSizeEXT*/ 5292)]] uint2 FragSizeEXT : FRAGSIZE
-    #define SLZ_FRAG_SIZE FragSizeEXT
+
+    static uint2 SLZ_FragSize = uint2(1,1);
+    #define SLZ_SETUP_FRAG_SIZE SLZ_FragSize = FragSizeEXT;
+    #define SLZ_FRAG_SIZE SLZ_FragSize
     
     // Write only, only valid in vertex and geo stages.
     #define SLZ_OUT_PRIMITIVE_SHADING_RATE , out uint PrimitiveShadingRate : SV_ShadingRate
     #define SLZ_SET_PRIMITIVE_SHADING_RATE(value) PrimitiveShadingRate = value;
     
-    // Combined image sampler - unity can't figure out how to bind this.
+    // Combined image sampler - unity can't figure out how to bind this, don't use.
     #define DECLARE_COMBINED_SAMPLER(_register_) [[vk::combinedImageSampler]][[vk::binding(_register_)]]
+    
 #else
     // Fragment Invocation Density
     #define SLZ_REQUEST_FRAG_SIZE_CAPS
     #define SLZ_DECLARE_FRAG_SIZE
+    #define SLZ_INITIALIZE_FRAG_SIZE
     #define SLZ_FRAG_SIZE uint2(1,1)
     
     // Fragment Shading Rate

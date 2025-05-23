@@ -1469,7 +1469,7 @@ namespace UnityEngine.Rendering.Universal
                 // TODO: we need a proper format scoring system. Score formats, sort, pick first or pick first supported (if not in score).
 #if UNITY_ANDROID
                 if (!needsAlpha && requestHDRColorBufferPrecision != HDRColorBufferPrecision._64Bits && RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.A2R10G10B10_UNormPack32, FormatUsage.Linear | FormatUsage.Render))
-                    return GraphicsFormat.A2R10G10B10_UNormPack32;
+                    return GraphicsFormat.B10G11R11_UFloatPack32;
 #else
                 if (!needsAlpha && requestHDRColorBufferPrecision != HDRColorBufferPrecision._64Bits && RenderingUtils.SupportsGraphicsFormat(GraphicsFormat.B10G11R11_UFloatPack32, FormatUsage.Linear | FormatUsage.Render))
                     return GraphicsFormat.B10G11R11_UFloatPack32;
