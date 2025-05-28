@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Profiling;
+using System.Runtime.InteropServices;
 
 namespace UnityEngine.Rendering.Universal
 {
@@ -1826,7 +1827,44 @@ namespace UnityEngine.Rendering.Universal
 #pragma warning restore 0618
         }
 
-        void BeginXRRendering(CommandBuffer cmd, ScriptableRenderContext context, ref CameraData cameraData)
+        bool m_HasPrintedFovMessage = false;
+        bool m_HasPrintedFovMsgNull = false;
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct FrInfo
+        {
+            public UInt64  validationSize;
+            public UInt32  unknown0;
+            public UInt32  unknown1;    
+            public UInt32  rtWidth;
+            public UInt32  rtHeight;
+            public float   foveationStrength;
+            public Vector2 eyeCenterL;
+            public Vector2 eyeCenterR;
+            public Vector4 unknown3;
+            public Vector4 unknown4;
+            public UInt64  unknown2;
+
+            public override string ToString()
+            {
+                return
+                    "{\n" +
+                    $"validationSize    = {this.validationSize   }\n" +
+                    $"unknown0          = {this.unknown0.ToString("X8")}\n" +
+                    $"unknown1          = {this.unknown1.ToString("X8")}\n" +
+                    $"rtWidth           = {this.rtWidth          }\n" +
+                    $"rtHeight          = {this.rtHeight         }\n" +
+                    $"foveationStrength = {this.foveationStrength}\n" +
+                    $"eyeCenterL        = {this.eyeCenterL       }\n" +
+                    $"eyeCenterR        = {this.eyeCenterR       }\n" +
+                    $"unknown3          = {this.unknown3         }\n" +
+                    $"unknown4          = {this.unknown4         }\n" +
+                    $"unknown2          = {this.unknown2.ToString("X16")}\n" +
+                    "}\n";
+            }
+        }
+
+            void BeginXRRendering(CommandBuffer cmd, ScriptableRenderContext context, ref CameraData cameraData)
         {
 #if ENABLE_VR && ENABLE_XR_MODULE
             if (cameraData.xr.enabled)
@@ -1835,7 +1873,6 @@ namespace UnityEngine.Rendering.Universal
                     cameraData.xrUniversal.canMarkLateLatch = true;
 
                 cameraData.xr.StartSinglePass(cmd);
-
                 if (cameraData.xr.supportsFoveatedRendering)
                 {
                     cmd.ConfigureFoveatedRendering(cameraData.xr.foveatedRenderingInfo);
@@ -1843,6 +1880,38 @@ namespace UnityEngine.Rendering.Universal
                     if (XRSystem.foveatedRenderingCaps.HasFlag(FoveatedRenderingCaps.NonUniformRaster))
                         cmd.EnableShaderKeyword(ShaderKeywordStrings.FoveatedRenderingNonUniformRaster);
                 }
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+                if (cameraData.xr.supportsFoveatedRendering)
+                {
+                    if (!m_HasPrintedFovMessage)
+                    {
+                        
+                        if (cameraData.xr.foveatedRenderingInfo != IntPtr.Zero)
+                        {
+                            Debug.Log($"XR Camera Supports Foveated Rendering, foveatedRenderingInfo = {cameraData.xr.foveatedRenderingInfo}");
+                            UInt64 structSize = Marshal.PtrToStructure<UInt64>(cameraData.xr.foveatedRenderingInfo);
+                            if (structSize >= (UInt64)Marshal.SizeOf<FrInfo>() && structSize < 4096)
+                            {
+                                FrInfo info = Marshal.PtrToStructure<FrInfo>(cameraData.xr.foveatedRenderingInfo);
+                                Debug.Log("XR Camera Foveated Info: " + info.ToString());
+                            }
+                            else
+                            {
+                                Debug.Log($"XR Camera foveatedRenderingInfo was of unexpected size: {structSize}");
+                            }
+                            m_HasPrintedFovMessage = true;
+                        }
+                    }
+                    if (!m_HasPrintedFovMsgNull)
+                    {
+                        if (cameraData.xr.foveatedRenderingInfo == IntPtr.Zero)
+                        {
+                            m_HasPrintedFovMsgNull = true;
+                        }
+                    }
+                }
+
+#endif
 
                 context.ExecuteCommandBuffer(cmd);
                 cmd.Clear();
