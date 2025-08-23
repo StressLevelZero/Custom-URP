@@ -356,7 +356,7 @@ half ComputeFogIntensity(half fogFactor)
         #elif defined(FOG_EXP2)
             // factor = exp(-(density*z)^2)
             // fogFactor = density*z compute at vertex
-            fogIntensity = saturate(exp2(-fogFactor * fogFactor));
+            fogIntensity = fogFactor;//saturate(exp2(-fogFactor * fogFactor));
         #elif defined(FOG_LINEAR)
             fogIntensity = fogFactor;
         #endif
@@ -439,10 +439,10 @@ float3 MixFogColor(float3 fragColor, float3 fogColor, float fogFactor)
 }
 
 // SLZ MODIFIED // Fog that blends with blurred versions of the sky, rather than just a solid color
-half3 MixFogColor(real3 fragColor, real3 fogColor, float3 viewDirectionWS, float fogFactor)
+half3 MixFogColor(half3 fragColor, half3 fogColor, float3 viewDirectionWS, half fogFactor)
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
-    real fogIntensity = ComputeFogIntensity(fogFactor);
+    half fogIntensity = ComputeFogIntensity((half)fogFactor);
     real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7);
     fragColor = lerp(mipFog, fragColor, fogIntensity);
 #endif
@@ -454,12 +454,12 @@ half3 MixFog(real3 fragColor, float3 viewDirectionWS, real fogFactor)
     return  (half4(MixFogColor(fragColor, unity_FogColor.rgb, viewDirectionWS, fogFactor), 1)).rgb;
 }
 
-half4 MixFogColorSurf(real4 fragColor, float3 viewDirectionWS, float fogFactor, int surface)
+half4 MixFogColorSurf(half4 fragColor, half3 viewDirectionWS, half fogFactor, int surface)
 {
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
-    real fogIntensity = ComputeFogIntensity(fogFactor);
+    half fogIntensity = ComputeFogIntensity(fogFactor);
 
-    real3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
+    half3 mipFog = MipFog(viewDirectionWS, fogFactor, 7 );
     if (surface == 1) // 1 = Transparent, which is actually alpha premultiplied.
     {
         mipFog *= fragColor.a;
@@ -469,7 +469,7 @@ half4 MixFogColorSurf(real4 fragColor, float3 viewDirectionWS, float fogFactor, 
     return fragColor;
 }
 
-half4 MixFogSurf(real4 fragColor, float3 viewDirectionWS, float fogFactor, int surface)
+half4 MixFogSurf(half4 fragColor, half3 viewDirectionWS, half fogFactor, int surface)
 {
     return  MixFogColorSurf(fragColor, viewDirectionWS, fogFactor, surface);
 }

@@ -133,8 +133,10 @@ struct SLZAnisoSpecLightInfo
 
 struct SLZMonoSpecInfo
 {
+    #if defined(SLZ_MONO_SPEC)
     half4 colorMagnitude;
     half3 direction;
+#endif
 };
 
 //------------------------------------------------------------------------
@@ -218,12 +220,14 @@ float SLZGeometricNormalFiltering(float perceptualSmoothness, float3 geometricNo
 
 void StoreMaxSpecularInfo(inout SLZMonoSpecInfo specInfo, half3 diffuse, half3 direction, half NoH)
 {
+#if defined(SLZ_MONO_SPEC)
     half magnitude = max(diffuse.r, max(diffuse.g, diffuse.b));
     if (specInfo.colorMagnitude.a < magnitude)
     {
         specInfo.colorMagnitude = half4(diffuse, magnitude);
         specInfo.direction = direction;
     }
+#endif
 }
 
 //------------------------------------------------------------------------
@@ -329,7 +333,7 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
         float3 halfDir = SLZSafeHalf3Normalize(lightDir + frag.viewDir);
 
         half3 NxH = cross(frag.normal, halfDir);
-        data.NoH2 = 1.0 - dot(NxH, NxH);
+        data.NoH2 = half(1.0) - dot(NxH, NxH);
         data.ToH = dot(frag.tangent, halfDir);
         data.BoH = dot(frag.bitangent, halfDir);
 
@@ -338,18 +342,20 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
         data.BoL = dot(frag.bitangent, lightDir);
         data.NoL = saturate(dot(frag.normal, lightDir));
     #elif defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF)
-        float3 halfDir = SLZSafeHalf3Normalize(lightDir + frag.viewDir);
+        // See https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)
+        // Qualcomm Adreno drivers started severely rounding the result of a cross of half-vectors. Components smaller than 2^-7 get rounded down to 0, so when the normal and half vectors are close it rounds to 0. Makes the NDF turn into a sharp square :(. 
+        // Stupid solution: multiply the normalized half-vector by 4. The cross product of the 4x half-vector and the normal vector is also 4x as long, and thus the normal and half vectors can get far closer before the components of the result round to 0 
+        // After dotting the 4x cross vector with itself, we can divide by 16 to get the actual value
+    
+        half3 halfDir = half(4.0h) * SLZSafeHalf3Normalize(lightDir + frag.viewDir);
         data.NoH = saturate(dot(frag.normal, halfDir));
         data.LoH = saturate(dot(lightDir, halfDir));
-        // Qualcomm started rounding <2^7 down to 0 when doing a cross on FP16 operands. Makes the NDF look like minecraft :(.
-        // Upcast to float, which completely defeats the point of using Lagrange's identity to replace NoH^2. 
-        // See https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)
-        // This is more expensive than just doing the normal GGX NDF calculations at full float, but I'm too lazy to switch everything over at the moment
-        float3 NxH = cross((float3)frag.normal, (float3)halfDir);
-        data.NxH2 = saturate(dot(NxH, NxH));
+
+        half3 NxH = cross(frag.normal, halfDir);
+        data.NxH2 = saturate(dot(NxH, NxH)) * half(0.0625h);
         data.NoL = saturate(dot(frag.normal, lightDir));
     #else
-        data.NoV = abs(frag.NoV) + 1e-5;
+        data.NoV = abs(frag.NoV) + half(1e-5);
         data.NoL = dot(frag.normal, lightDir); // Visibility function needs abs, specular falloff needs saturate
         half3 halfDir = SLZSafeHalf3Normalize(lightDir + frag.viewDir);
         data.NoH = saturate(dot(frag.normal, halfDir));
@@ -417,7 +423,7 @@ half4 BDRFLUTSAMPLER(half2 UV){
  */
 half4 SLZSampleBDRFLUT(half NoV, half NoL)
 {
-    NoL = saturate((NoL + 1) * 0.5);
+	NoL = saturate((NoL + half(1)) * half(0.5));
     NoV = saturate(NoV);
     return BDRFLUTSAMPLER(half2(NoL, NoV));
 }
@@ -776,8 +782,8 @@ half3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfDat
  */
 half SLZFakeSpecularFalloff(half NoL)
 {
-    half NoLMul = 1.0 - saturate(NoL); // On PC, the smith visibility function needs abs(NoL), so NoL is stored raw and needs to be saturated here 
-    NoLMul = -NoLMul * NoLMul + 1.0;
+	half NoLMul = half(1.0) - saturate(NoL); // On PC, the smith visibility function needs abs(NoL), so NoL is stored raw and needs to be saturated here 
+	NoLMul = -NoLMul * NoLMul + half(1.0);
     return NoLMul;
 }
 
@@ -863,7 +869,9 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, inout SLZ
     #else
         half3 lmDiffuse = SAMPLE_TEXTURE2D(unity_Lightmap, samplerunity_Lightmap, frag.lightmapUV).rgb;
     #endif
-    //
+    
+	specular *= BakedLightingToSpecularOcclusionGray(lmDiffuse);
+    
     #if defined(DIRLIGHTMAP_COMBINED)
             half4 directionalMap = SAMPLE_TEXTURE2D(unity_LightmapInd, samplerunity_Lightmap, frag.lightmapUV);
             half3 lmDirection = half(2.0) * directionalMap.xyz - half(1.0);
@@ -995,15 +1003,15 @@ half3 SLZProbeReflectionDir(SLZFragData fragData, SLZSurfData surfData)
  */
 void SLZImageBasedSpecular(half3 diffuse, inout half3 specular, half3 reflectionDir, const SLZFragData fragData, const SLZSurfData surfData, half indSSAO)
 {
-    half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(diffuse);
+   // half3 LitSpecularOcclusion = BakedLightingToSpecularOcclusion(diffuse);
     half AOSpecularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(fragData.NoV, surfData.occlusion, surfData.roughness);
-    half3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion, fragData.screenUV) * LitSpecularOcclusion;
+	half3 reflectionProbe = GlossyEnvironmentReflection(reflectionDir, fragData.position, surfData.perceptualRoughness, AOSpecularOcclusion, fragData.screenUV);// * LitSpecularOcclusion;
 #if defined(SLZ_SSR)
 
 #endif
-    half surfaceReduction = 1.0h / (surfData.roughness * surfData.roughness + 1.0h);
-    half3 grazingTerm = saturate((1.0h - surfData.perceptualRoughness) + surfData.reflectivity);
-    half fresnelTerm = (1.0h - saturate(fragData.NoV));
+	half surfaceReduction = half(1.0h) / (surfData.roughness * surfData.roughness + half(1.0h));
+	half3 grazingTerm = saturate((half(1.0h) - surfData.perceptualRoughness) + surfData.reflectivity);
+	half fresnelTerm = (half(1.0h) - saturate(fragData.NoV));
     fresnelTerm *= fresnelTerm;
     fresnelTerm *= fresnelTerm; // fresnelTerm ^ 4
     half3 IBSpec = half3(surfaceReduction * lerp(surfData.specular, grazingTerm, fresnelTerm));
@@ -1031,7 +1039,7 @@ void SLZImageBasedSpecular(half3 diffuse, inout half3 specular, half3 reflection
  */
 half SLZSpecularHorizonOcclusion(half3 normal, half3 reflectionDir)
 {
-    half horizonOcclusion = min(1.0h + dot(reflectionDir, normal), 1.0h);
+	half horizonOcclusion = min(half(1.0h) + dot(reflectionDir, normal), half(1.0h));
     return horizonOcclusion * horizonOcclusion;
 }
 
@@ -1061,7 +1069,7 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecIn
         diffuseBRDF *= directSSAO;
     }
     
-    
+	
     //If the object doesn't have a lightmap, do a specular highlight for EITHER the directional light, if it exists, or the spherical harmonics L1 band
     #if !defined(SLZ_NO_SPECULAR)
         #if !defined(LIGHTMAP_ON) && !defined(SLZ_DISABLE_BAKED_SPEC) 
@@ -1071,7 +1079,7 @@ void SLZMainLight(inout half3 diffuse, inout half3 specular, inout SLZMonoSpecIn
             SLZDirectSpecLightInfo specInfo = SLZGetDirectLightInfo(fragData, dominantDir);
             half3 dominantColor = isMainLight ? diffuseBRDF : max(half(0.0), diffuse);
             half NoLMul = SLZFakeSpecularFalloff(specInfo.NoL);
-            NoLMul = isMainLight ? 1.0 : NoLMul;
+            NoLMul = isMainLight ? half(1.0h) : NoLMul;
             dominantColor *= NoLMul;
             #if defined(SLZ_MONO_SPECULAR)
                 StoreMaxSpecularInfo(maxSpecular, dominantColor, dominantDir, specInfo.NoH);
@@ -1146,7 +1154,29 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     half3 diffuse = half3(0.0h, 0.0h, 0.0h);
     half3 specular = half3(0.0h, 0.0h, 0.0h);
    
-    SLZMonoSpecInfo monoSpecInfo = { half4(0, 0, 0, -1), (half3) 0 };
+	SLZMonoSpecInfo monoSpecInfo = (SLZMonoSpecInfo) 0;
+    
+        //-------------------------------------------------------------------------------------------------
+    // Image-based specular
+    //-------------------------------------------------------------------------------------------------
+#if !defined(SLZ_NO_SPECULAR)
+	half3 reflectionDir = SLZProbeReflectionDir(fragData, surfData);
+	SLZImageBasedSpecular(diffuse, specular, reflectionDir, fragData, surfData, 1.0);// ao.indirectAmbientOcclusion);
+	half occlusionFactor = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
+	specular *= occlusionFactor;
+    #endif
+    
+	if (surfaceType == 1)
+	{
+		surfData.alpha = lerp(surfData.alpha, half(1.0h), surfData.reflectivity);
+		half fresnelTerm = (half(1.0h) - saturate(fragData.NoV));
+		fresnelTerm *= fresnelTerm;
+		fresnelTerm *= fresnelTerm;
+		surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
+#if !defined(SLZ_NO_SPECULAR)
+		surfData.alpha *= occlusionFactor;
+#endif
+	}
 
     //half2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
        
@@ -1163,7 +1193,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     //-------------------------------------------------------------------------------------------------
         
         SLZSHDiffuse(diffuse, fragData.normal);
-        
+	    specular *= BakedLightingToSpecularOcclusionGray(diffuse);
     #endif
     
     diffuse += fragData.vertexLighting; //contains both vertex lights and L2 coefficient of SH on mobile
@@ -1175,7 +1205,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     {
         ao = CreateAmbientOcclusionFactor(fragData.screenUV, surfData.occlusion);
         if (surfaceType > 0) ao.indirectAmbientOcclusion = 1; 
-        surfData.occlusion = 1.0h; // we are already multiplying by the AO here, don't do it at the end like normal
+		surfData.occlusion = half(1.0h); // we are already multiplying by the AO here, don't do it at the end like normal
         diffuse *= ao.indirectAmbientOcclusion;
         #if !defined(SLZ_NO_SPECULAR)
         specular *= ao.indirectAmbientOcclusion;
@@ -1233,15 +1263,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     specular += monoSpecInfo.colorMagnitude.rgb * SLZDirectBRDFSpecular(specInfo, surfData, fragData);
 #endif
     
-    //-------------------------------------------------------------------------------------------------
-    // Image-based specular
-    //-------------------------------------------------------------------------------------------------
-#if !defined(SLZ_NO_SPECULAR)
-    half3 reflectionDir = SLZProbeReflectionDir(fragData, surfData);
-    SLZImageBasedSpecular(diffuse,specular, reflectionDir, fragData, surfData, ao.indirectAmbientOcclusion);
-    half occlusionFactor = SLZSpecularHorizonOcclusion(fragData.normal, reflectionDir);
-    specular *= occlusionFactor;
-    #endif
+
 
     //-------------------------------------------------------------------------------------------------
     // Combine the final lighting information
@@ -1254,17 +1276,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     half3 finalSpecular = 0;
     #endif
     
-    if (surfaceType == 1) 
-    {
-        surfData.alpha = lerp(surfData.alpha, 1, surfData.reflectivity);
-        half fresnelTerm = (1.0h - saturate(fragData.NoV));
-        fresnelTerm *= fresnelTerm;
-        fresnelTerm *= fresnelTerm;
-        surfData.alpha = lerp(surfData.alpha, 1, fresnelTerm);
-        #if !defined(SLZ_NO_SPECULAR)
-        surfData.alpha *= occlusionFactor;
-        #endif
-    }
+
     
     return half4(finalDiffuse + finalSpecular, surfData.alpha);
 }

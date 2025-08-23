@@ -7,13 +7,19 @@
     #define SLZ_VK_EXT_ENABLED
 
     // Fragment Invocation Density - combines qualcomm's per-tile fragment density and KHR fragment shading rate. Also works with NV shading rate 
-    // Only valid for the fragment program
+    // Only valid for the fragment program. Note that attaching this to the fragment does not work with the default Unity 6 version of DXC, use RequestFragmentDensityEXT() instead
     #define SLZ_REQUEST_FRAG_SIZE_CAPS  [[vk::ext_extension("SPV_EXT_fragment_invocation_density")]] \
                                         [[vk::ext_capability(/*FragmentDensityEXT*/ 5291)]]
-    //Read only, only valid in the fragment stage
+
+    // Read only, only valid in the fragment stage. This cannot go into the interpolator struct output by the vert function.
+    // This should be added as an extra parameter to the frag program as the last parameter. Note the leading comma!
+    // HLSL doesn't allow trailing commas in parameter lists, so if SLZ_DECLARE_FRAG_SIZE is defined to be empty the comma separating it needs to disappear too
     #define SLZ_DECLARE_FRAG_SIZE     , [[vk::ext_decorate(/*Builtin*/ 11, /*FragSizeEXT*/ 5292)]] uint2 FragSizeEXT : FRAGSIZE
 
+    // static global for the fragment size that can be read from anywhere, similar to unity_StereoEyeIndex
     static uint2 SLZ_FragSize = uint2(1,1);
+
+    // call this at the beginning of the fragment
     #define SLZ_SETUP_FRAG_SIZE SLZ_FragSize = FragSizeEXT;
     #define SLZ_FRAG_SIZE SLZ_FragSize
     
@@ -43,5 +49,14 @@
 [[vk::ext_instruction(/*OpConstantTrue*/ 41)]]
 #endif
 bool InlineSPIRVEnabled() { return false; }
+
+// Unlike DXC 1.8, DXC 1.7 (used by Unity 6) only allows extension/capability attributes to be attached to special functions. This does not allow directly adding them to the vert or frag programs with the default compiler.
+// However, functions overridden with a SPIR-V opcode are allowed to have these attributes, and there happens to be an opcode (OpNop) which by definition does nothing and is expected to be optimized out.
+// Simply calling this function from anywhere within a shader program will instruct DXC to add the capability and extension to the program.
+#if defined(SLZ_VK_EXT_ENABLED)
+SLZ_REQUEST_FRAG_SIZE_CAPS
+[[vk::ext_instruction(/*OpNop*/ 0)]]
+#endif
+void RequestFragmentDensityEXT() { }
 
 #endif // SLZ_VK_EXTENSIONS

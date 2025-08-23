@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00e8c327044ba5d4994f3dccb035dea4, type: 3}
   m_Name: VRSRenderFeature
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   VisualizeShadingRegions: 0
   radii:
     RDMInnerRadius: 0.25

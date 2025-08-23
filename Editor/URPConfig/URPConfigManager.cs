@@ -35,7 +35,7 @@ namespace SLZ.SLZEditorTools
                 //Debug.Log("Early Exit from URP Config Manager Init");
                 return;
             }
-            Debug.Log("Running URP Config Manager Init");
+            //Debug.Log("Running URP Config Manager Init");
 
             if (!Directory.Exists(packagePath))
             {

@@ -21,7 +21,7 @@ public static class EndUnityIfPipelineUpdates
 
     static void RegisteringPackages(PackageRegistrationEventArgs args)
     {
-        Debug.Log("Ran RegisteringPackages");
+       // Debug.Log("Ran RegisteringPackages");
         PackageInfo oldCore = null;
         PackageInfo newCore = null;
 
@@ -29,7 +29,7 @@ public static class EndUnityIfPipelineUpdates
         PackageInfo newURP = null;
 
         int numChanged = args.changedFrom.Count;
-        Debug.Log("Num Changed: " + numChanged);
+        //Debug.Log("Num Changed: " + numChanged);
         for (int pkgIdx = 0; pkgIdx < numChanged; pkgIdx++)
         {
             //Debug.Log("Changed: " + args.changedFrom[pkgIdx].packageId);
@@ -74,7 +74,7 @@ public static class EndUnityIfPipelineUpdates
 
         if (noOldUrpVersion || noOldCoreVersion)
         {
-            Debug.Log($"URP Version - old: {oldUrpVersion}, current: {currentUrpVersion},\nSRP Core Version - old: {oldCoreVersion}, current: {currentCoreVersion}");
+            //Debug.Log($"URP Version - old: {oldUrpVersion}, current: {currentUrpVersion},\nSRP Core Version - old: {oldCoreVersion}, current: {currentCoreVersion}");
         }
 
         if (noOldUrpVersion)

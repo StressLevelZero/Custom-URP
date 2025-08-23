@@ -405,7 +405,8 @@ FragOut frag(VertOut i
 	output.color = color;
 	
 	#if defined(SHADER_API_MOBILE)
-		output.color.rgb = ApplyInterleavedAntibanding(output.color.rgb, i.vertex.xy);
+		// Don't do this for now, holding on to fragData.screenUV or i.vertex.xy occupies a full-precision register for the entire shader 
+		//output.color.rgb = ApplyInterleavedAntibanding(output.color.rgb, i.vertex.xy);
 	#endif
 	
 

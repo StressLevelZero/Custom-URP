@@ -133,7 +133,13 @@ namespace UnityEditor.Rendering.Universal
         private bool RendererIsDeferred()
         {
             ScreenSpaceAmbientOcclusion ssaoFeature = (ScreenSpaceAmbientOcclusion)this.target;
-            UniversalRenderPipelineAsset pipelineAsset = (UniversalRenderPipelineAsset)GraphicsSettings.renderPipelineAsset;
+            UniversalRenderPipelineAsset pipelineAsset = (UniversalRenderPipelineAsset)
+#if UNITY_6000_0_OR_NEWER
+                GraphicsSettings.defaultRenderPipeline
+#else
+                GraphicsSettings.renderPipelineAsset
+#endif
+                ;
 
             if (ssaoFeature == null || pipelineAsset == null)
                 return false;

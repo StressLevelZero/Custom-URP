@@ -475,7 +475,13 @@ namespace UnityEditor.Rendering.Universal
                     }
                     else
                     {
-                        if (GraphicsSettings.renderPipelineAsset is UniversalRenderPipelineAsset urpAsset)
+                        if (
+#if UNITY_6000_0_OR_NEWER
+                            GraphicsSettings.defaultRenderPipeline
+#else
+                            GraphicsSettings.renderPipelineAsset
+#endif
+                            is UniversalRenderPipelineAsset urpAsset)
                             EditorGUILayout.LabelField($"{urpAsset.GetAdditionalLightsShadowResolution(shadowResolutionTier)} ({urpAsset.name})", GUILayout.ExpandWidth(false));
                     }
                     if (checkScope.changed)

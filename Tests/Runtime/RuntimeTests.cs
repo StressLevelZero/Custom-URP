@@ -18,14 +18,25 @@ class RuntimeTests
     {
         go = new GameObject();
         camera = go.AddComponent<Camera>();
-        currentAssetGraphics = GraphicsSettings.renderPipelineAsset;
+        currentAssetGraphics =
+#if UNITY_6000_0_OR_NEWER
+        GraphicsSettings.defaultRenderPipeline
+#else
+        GraphicsSettings.renderPipelineAsset
+#endif
+            ;
         currentAssetQuality = QualitySettings.renderPipeline;
     }
 
     [TearDown]
     public void Cleanup()
     {
-        GraphicsSettings.renderPipelineAsset = currentAssetGraphics;
+#if UNITY_6000_0_OR_NEWER
+        GraphicsSettings.defaultRenderPipeline
+#else
+        GraphicsSettings.renderPipelineAsset
+#endif
+            = currentAssetGraphics;
         QualitySettings.renderPipeline = currentAssetQuality;
         Object.DestroyImmediate(go);
     }
@@ -56,7 +67,12 @@ class RuntimeTests
 
         Assert.AreEqual("UniversalPipeline", Shader.globalRenderPipeline, "Wrong render pipeline shader tag.");
 
-        GraphicsSettings.renderPipelineAsset = null;
+#if UNITY_6000_0_OR_NEWER
+        GraphicsSettings.defaultRenderPipeline
+#else
+        GraphicsSettings.renderPipelineAsset
+#endif
+         = null;
         QualitySettings.renderPipeline = null;
         camera.Render();
         yield return null;

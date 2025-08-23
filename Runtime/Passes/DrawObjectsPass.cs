@@ -252,6 +252,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                 if (data.m_RenderingData.cameraData.xr.enabled && data.m_IsActiveTargetBackBuffer)
                 {
                     cmd.SetViewport(data.m_RenderingData.cameraData.xr.GetViewport());
+                    if (data.m_RenderingData.cameraData.xr.supportsFoveatedRendering)
+                    {
+                        cmd.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
+                    }
                 }
 #endif
 
@@ -349,6 +353,16 @@ namespace UnityEngine.Rendering.Universal.Internal
 #else
                 drawSettings.overrideMaterial = defaultMat;
                 context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filterSettings);
+#endif
+
+#if ENABLE_VR && ENABLE_XR_MODULE
+                if (data.m_RenderingData.cameraData.xr.enabled && data.m_IsActiveTargetBackBuffer)
+                {
+                    if (data.m_RenderingData.cameraData.xr.supportsFoveatedRendering)
+                    {
+                        cmd.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
+                    }
+                }
 #endif
                 // Clean up
                 CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);

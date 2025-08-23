@@ -161,7 +161,7 @@ public static class SkyManager
 #if UNITY_EDITOR
     static void SceneOpenedCallback(Scene scene, OpenSceneMode mode)
     {
-        Debug.Log(mode + " : " +scene);
+        //Debug.Log(mode + " : " +scene);
         if (!EditorApplication.isUpdating && !EditorApplication.isPlayingOrWillChangePlaymode)
         {
             GenerateSkyTexture();
@@ -256,7 +256,7 @@ public static class SkyManager
        cubetex.GenerateMips();
         
         skytexture = cubetex;
-        Debug.Log("Generated sky: " + cubetex.name );
+        //Debug.Log("Generated sky: " + cubetex.name );
         SetSkyTexture(skytexture);
         SetMonoSHToWhite(); //Clear sky occlusion
     }

@@ -16,8 +16,21 @@ class EditorTests
     public void CreatePipelineAssetWithoutErrors()
     {
         // Test without any render pipeline assigned to GraphicsSettings.
-        var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
-        GraphicsSettings.renderPipelineAsset = null;
+        //var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
+        var renderPipelineAsset =
+        #if UNITY_6000_0_OR_NEWER
+                        GraphicsSettings.defaultRenderPipeline
+        #else
+                        GraphicsSettings.renderPipelineAsset
+        #endif
+                    ;
+        
+        #if UNITY_6000_0_OR_NEWER
+                GraphicsSettings.defaultRenderPipeline
+        #else
+                GraphicsSettings.renderPipelineAsset
+        #endif
+        = null;
 
         try
         {
@@ -30,7 +43,13 @@ class EditorTests
         // Makes sure the render pipeline is restored in case of a NullReference exception.
         finally
         {
-            GraphicsSettings.renderPipelineAsset = renderPipelineAsset;
+                    
+        #if UNITY_6000_0_OR_NEWER
+                GraphicsSettings.defaultRenderPipeline
+        #else
+                GraphicsSettings.renderPipelineAsset
+        #endif
+            = renderPipelineAsset;
         }
     }
 
@@ -39,8 +58,19 @@ class EditorTests
     public void CreateUniversalRendererAssetWithoutErrors()
     {
         // Test without any render pipeline assigned to GraphicsSettings.
-        var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
-        GraphicsSettings.renderPipelineAsset = null;
+        var renderPipelineAsset =
+        #if UNITY_6000_0_OR_NEWER
+                        GraphicsSettings.defaultRenderPipeline
+        #else
+                        GraphicsSettings.renderPipelineAsset
+        #endif
+        ;
+        #if UNITY_6000_0_OR_NEWER
+                GraphicsSettings.defaultRenderPipeline
+        #else
+                GraphicsSettings.renderPipelineAsset
+        #endif
+        = null;
 
         try
         {
@@ -54,7 +84,12 @@ class EditorTests
         // Makes sure the render pipeline is restored in case of a NullReference exception.
         finally
         {
-            GraphicsSettings.renderPipelineAsset = renderPipelineAsset;
+        #if UNITY_6000_0_OR_NEWER
+                GraphicsSettings.defaultRenderPipeline
+        #else
+                GraphicsSettings.renderPipelineAsset
+        #endif
+            = renderPipelineAsset;
         }
     }
 
@@ -63,8 +98,19 @@ class EditorTests
     public void CreateRenderer2DAssetWithoutErrors()
     {
         // Test without any render pipeline assigned to GraphicsSettings.
-        var renderPipelineAsset = GraphicsSettings.renderPipelineAsset;
-        GraphicsSettings.renderPipelineAsset = null;
+        var renderPipelineAsset =
+        #if UNITY_6000_0_OR_NEWER
+                        GraphicsSettings.defaultRenderPipeline
+        #else
+                        GraphicsSettings.renderPipelineAsset
+        #endif
+        ;
+        #if UNITY_6000_0_OR_NEWER
+                GraphicsSettings.defaultRenderPipeline
+        #else
+                GraphicsSettings.renderPipelineAsset
+        #endif
+        = null;
 
         try
         {
@@ -78,7 +124,12 @@ class EditorTests
         // Makes sure the render pipeline is restored in case of a NullReference exception.
         finally
         {
-            GraphicsSettings.renderPipelineAsset = renderPipelineAsset;
+        #if UNITY_6000_0_OR_NEWER
+                GraphicsSettings.defaultRenderPipeline
+        #else
+                GraphicsSettings.renderPipelineAsset
+        #endif
+            = renderPipelineAsset;
         }
     }
 

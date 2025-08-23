@@ -24,13 +24,13 @@ half3 ApplyBayerAntibanding(half3 color, float2 positionCS)
 half3 ApplyInterleavedAntibanding(half3 color, float2 positionCS)
 {
 	// Jimenez, Jorge. Next Generation Post Processing in Call of Duty Advanced Warfare
-	float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
+	half3 magic = half3(0.06711056, 0.00583715, 52.9829189);
 	half ditherVal = frac(magic.z * frac(dot(positionCS, magic.xy)));
 	
 	// Convert to (roughly) gamma space so that 1/255 directly 
 	// corresponds to one quantization step
 	color.rgb = sqrt(color.rgb);
-	color.rgb += (1.0 / 255.0) * (ditherVal - 0.5);
+	color.rgb += (1.0h / 255.0h) * (ditherVal - 0.5h);
 	color.rgb *= color.rgb;
 	return color;
 }
