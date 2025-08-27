@@ -93,12 +93,6 @@ Shader "Universal Render Pipeline/Lit"
         }
         LOD 300
 
-
-HLSLINCLUDE
-#if !defined(SHADER_API_MOBILE)
-#pragma use_dxc vulkan
-#endif
-ENDHLSL
         // ------------------------------------------------------------------
         //  Forward pass. Shades all light in a single pass. GI + emission + Fog
         Pass
@@ -176,7 +170,7 @@ ENDHLSL
             #pragma multi_compile_fog
             #pragma skip_variants FOG_LINEAR FOG_EXP
             //#pragma multi_compile_fragment _ DEBUG_DISPLAY
-
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
             //--------------------------------------
@@ -236,6 +230,7 @@ ENDHLSL
 
             // -------------------------------------
             // Includes
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
             ENDHLSL
@@ -359,6 +354,7 @@ ENDHLSL
 
             // -------------------------------------
             // Includes
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
             ENDHLSL
@@ -401,6 +397,7 @@ ENDHLSL
 
             // -------------------------------------
             // Universal Pipeline keywords
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
 
             //--------------------------------------
