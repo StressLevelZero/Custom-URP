@@ -30,7 +30,7 @@ half3 ApplyInterleavedAntibanding(half3 color, float2 positionCS)
 	// Convert to (roughly) gamma space so that 1/255 directly 
 	// corresponds to one quantization step
 	color.rgb = sqrt(color.rgb);
-	color.rgb += (1.0h / 255.0h) * (ditherVal - 0.5h);
+	color.rgb += half(1.0h / 255.0h) * (ditherVal - half(0.5h));
 	color.rgb *= color.rgb;
 	return color;
 }

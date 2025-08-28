@@ -356,7 +356,7 @@ half ComputeFogIntensity(half fogFactor)
         #elif defined(FOG_EXP2)
             // factor = exp(-(density*z)^2)
             // fogFactor = density*z compute at vertex
-            fogIntensity = fogFactor;//saturate(exp2(-fogFactor * fogFactor));
+            fogIntensity = saturate(exp2(-fogFactor * fogFactor));
         #elif defined(FOG_LINEAR)
             fogIntensity = fogFactor;
         #endif
