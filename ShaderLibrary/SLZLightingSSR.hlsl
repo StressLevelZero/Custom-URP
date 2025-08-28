@@ -135,7 +135,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-    SLZMonoSpecInfo monoSpecInfo = { half4(0, 0, 0, -1), (half3) 0 };
+	SLZMonoSpecInfo monoSpecInfo = (SLZMonoSpecInfo) 0; //{ half4(0, 0, 0, -1), (half3) 0 };
 
 
 #if defined(LIGHTMAP_ON) 

@@ -1232,9 +1232,9 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     //    && ((1 << (int)(_ImportantLightIndex - 1)) & lightMask) != 0 // light mask not necessary
     )
     {
-            Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), fragData.position);
+            Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHTS - 1), fragData.position);
             #if defined(_LIGHT_COOKIES)
-                half3 cookieColor = SampleAdditionalLightCookie((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), fragData.position);
+                half3 cookieColor = SampleAdditionalLightCookie((MAX_VISIBLE_LIGHTS - 1), fragData.position);
                 light.color *= cookieColor.rgbb;
             #endif
             //Light light = GetAdditionalLight(_ImportantLightIndex, fragData.position, fragData.shadowMask);
