@@ -1223,6 +1223,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
     
     #if defined(SHADER_API_MOBILE)
     
+    #if !defined(SLZ_NO_MOBILE_IMPORTANT_LIGHT)
     //uint lightMask = 
     //    (1 << (int)(unity_LightIndices[0].x - 1)) | 
     //    (1 << (int)(unity_LightIndices[0].y - 1)) |
@@ -1240,7 +1241,9 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
             //Light light = GetAdditionalLight(_ImportantLightIndex, fragData.position, fragData.shadowMask);
             SLZAddLight(diffuse, specular, monoSpecInfo, fragData, surfData, light, ao.directAmbientOcclusion);
     }
-    #else
+    #endif // !SLZ_NO_MOBILE_IMPORTANT_LIGHT
+    
+    #else // !SHADER_API_MOBILE
     [branch] if (BRANCH_ADDITIONAL_LIGHTS)
     {
         uint pixelLightCount = GetAdditionalLightsCount();
@@ -1254,7 +1257,7 @@ half4 SLZPBRFragment(SLZFragData fragData, SLZSurfData surfData, int surfaceType
             SLZAddLight(diffuse, specular, monoSpecInfo, fragData, surfData, light, ao.directAmbientOcclusion);
         LIGHT_LOOP_END
     }
-    #endif
+    #endif // !SHADER_API_MOBILE
 
 
 
