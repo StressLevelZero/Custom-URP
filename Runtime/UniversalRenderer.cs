@@ -670,15 +670,19 @@ namespace UnityEngine.Rendering.Universal
             PreviousFrameMatricies.instance.SetPrevFrameGlobalsForCamera(camera, cameraData);
             SLZGlobals.instance.UpdateBlueNoiseFrame();
             bool activeDebugHandler = ((DebugHandler != null) && DebugHandler.AreAnySettingsActive);
-
+            //Debug.Log($"Camera Type: {Convert.ToString((int)camera.cameraType, 2)}, Preview: {(camera.cameraType & CameraType.Preview) != 0}");
             //Debug.Log($"Debug handler state for {cameraData.camera.name}: is null? {DebugHandler == null}, is active for camera? {DebugHandler?.IsActiveForCamera(ref cameraData)}, Any settings active: {DebugHandler.AreAnySettingsActive}");
+            bool isPreview = (camera.cameraType & CameraType.Preview) != 0;
             bool cameraUseFusedRenderpass =
 #if VULKAN_SUBPASS && UNITY_ANDROID
-                useFusedRenderpass &&
-                !useRenderPassEnabled &&
-                !activeDebugHandler &&
-                !IsWireframeEnabledForCamera(camera) &&
-                ((camera.cameraType & CameraType.Game) != 0 || ((camera.cameraType & CameraType.SceneView) != 0));
+                
+                useFusedRenderpass 
+                && !useRenderPassEnabled
+                && !activeDebugHandler
+                && !IsWireframeEnabledForCamera(camera) 
+                && !isPreview
+                //&& ((camera.cameraType & CameraType.Game) != 0 || ((camera.cameraType & CameraType.SceneView) != 0))
+                ;
 #else
                 false;
 #endif
@@ -980,12 +984,13 @@ namespace UnityEngine.Rendering.Universal
             {
                 RenderTextureDescriptor memorylessColor = cameraTargetDescriptor;
                 memorylessColor.depthStencilFormat = GraphicsFormat.None;
-                memorylessColor.graphicsFormat = GraphicsFormat.R8G8B8A8_SRGB;
+                memorylessColor.graphicsFormat = GraphicsFormat.B10G11R11_UFloatPack32;
 
                 memorylessColor.memoryless = RenderTextureMemoryless.Color;
                 RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueSubpassRT, memorylessColor, name: "OpaqueSubpassRT");
                 m_RenderForwardPassNative.colorTarget = m_ActiveCameraColorAttachment;
                 m_RenderForwardPassNative.depthTarget = m_ActiveCameraDepthAttachment;
+                m_RenderForwardPassNative.msaaSampleCount = cameraTargetDescriptor.msaaSamples;
                 m_RenderForwardPassNative.opaqueSubpassTarget = m_OpaqueSubpassRT;
                 m_RenderForwardPassNative.cameraTextureDescriptor = cameraTargetDescriptor;
             }
@@ -1879,7 +1884,10 @@ namespace UnityEngine.Rendering.Universal
             if (isOffscreenRender)
                 return requiresBlitForOffscreenCamera;
 
-            return requiresBlitForOffscreenCamera || isSceneViewCamera || isScaledRender || cameraData.isHdrEnabled ||
+            return requiresBlitForOffscreenCamera || isSceneViewCamera || isScaledRender ||
+#if !UNITY_ANDROID
+                cameraData.isHdrEnabled ||
+#endif
                 !isCompatibleBackbufferTextureDimension || isCapturing || cameraData.requireSrgbConversion;
         }
 

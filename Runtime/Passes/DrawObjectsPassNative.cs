@@ -52,6 +52,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         public RTHandle colorTarget;
         public RTHandle opaqueSubpassTarget;
         public RTHandle depthTarget;
+        public int msaaSampleCount = 1;
         public RenderTextureDescriptor cameraTextureDescriptor;
         UniversalRenderer caller; // Keep a reference to the current running renderer so we can check if VRS is enabled on it during the configuration stage
         NativeArray<AttachmentDescriptor> attachmentDescriptors;
@@ -154,11 +155,13 @@ namespace UnityEngine.Rendering.Universal.Internal
         // SLZ MODIFIED 
         public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
         {
-            //this.cameraTextureDescriptor = cameraTextureDescriptor;
+            this.cameraTextureDescriptor = cameraTextureDescriptor;
+
             if (true)
             {
                 ConfigureTarget(colorTarget, depthTarget);
             }
+            
             ConfigureInputAttachments(opaqueSubpassTarget, true);
             {
                 enableFoveatedRendering = false;
@@ -210,14 +213,19 @@ namespace UnityEngine.Rendering.Universal.Internal
             using (new ProfilingScope(cmd, data.m_ProfilingSampler))
             {
 
-                RenderTextureDescriptor desc = renderingData.cameraData.cameraTargetDescriptor;//data.colorTarget.rt == null ? data.cameraTextureDescriptor : data.colorTarget.rt.descriptor;
-                if (desc.width == 256 && desc.height == 256) return;
+
+                RenderTextureDescriptor desc = data.cameraTextureDescriptor;//renderingData.cameraData.cameraTargetDescriptor;//data.colorTarget.rt == null ? data.cameraTextureDescriptor : data.colorTarget.rt.descriptor;
+                if ((desc.width == 32 && desc.height == 32)) return;
                 //Vector2Int resColor = data.colorTarget.rtHandleProperties.currentRenderTargetSize;
                 //Vector2Int resDepth = data.depthTarget.rtHandleProperties.currentRenderTargetSize;
                 //Vector2Int resOpaque = data.opaqueSubpassTarget.rtHandleProperties.currentRenderTargetSize;
                 //Debug.Log($"Color: {resColor.x} x {resColor.y}, Depth: {resDepth.x}, {resDepth.y}, Opaque: {resOpaque.x}, {resOpaque.y}, ");
-                NativeArray<AttachmentDescriptor> subpassAttachments = new NativeArray<AttachmentDescriptor>(3, Allocator.Temp);
-                subpassAttachments[0] = new AttachmentDescriptor()
+                int colorIdx = 0;
+                int inputIdx = 1;
+                int depthIdx = 2;
+
+                NativeArray<AttachmentDescriptor> subpassAttachments = new NativeArray<AttachmentDescriptor>(depthIdx + 1, Allocator.Temp);
+                subpassAttachments[colorIdx] = new AttachmentDescriptor()
                 {
                     loadStoreTarget = new RenderTargetIdentifier(data.colorTarget.nameID, 0, CubemapFace.Unknown, -1),
                     loadAction = RenderBufferLoadAction.Clear,
@@ -225,9 +233,11 @@ namespace UnityEngine.Rendering.Universal.Internal
                     clearColor = renderingData.cameraData.backgroundColor,
                     clearStencil = 0u,
                     clearDepth = 1.0f,
+
                     graphicsFormat = desc.graphicsFormat,
                 };
 
+                /* Original opaque texture attachment
                 subpassAttachments[1] = new AttachmentDescriptor()
                 {
                     loadStoreTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.None, 0, CubemapFace.Unknown, -1),
@@ -238,15 +248,29 @@ namespace UnityEngine.Rendering.Universal.Internal
                     clearDepth = 1.0f,
                     graphicsFormat = desc.graphicsFormat,
                 };
+                */
+                
+                
+                subpassAttachments[inputIdx] = new AttachmentDescriptor()
+                {
+                    loadStoreTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.None, 0, CubemapFace.Unknown, -1),
+                    loadAction = RenderBufferLoadAction.DontCare,
+                    storeAction = RenderBufferStoreAction.DontCare,
+                    clearColor = renderingData.cameraData.backgroundColor,
+                    clearStencil = 0u,
+                    clearDepth = 1.0f,
+                    graphicsFormat = GraphicsFormat.R16_UNorm,
+                };
+                
 
                 RenderTargetIdentifier depthID = data.depthTarget.nameID == new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget) ? 
                     new RenderTargetIdentifier(BuiltinRenderTextureType.Depth,0,CubemapFace.Unknown,-1) : 
                     new RenderTargetIdentifier(data.depthTarget.nameID,0,CubemapFace.Unknown,-1);
 
-                subpassAttachments[2] = new AttachmentDescriptor()
+                subpassAttachments[depthIdx] = new AttachmentDescriptor()
                 {
                     loadStoreTarget = depthID,
-                    loadAction = RenderBufferLoadAction.DontCare,
+                    loadAction = RenderBufferLoadAction.Clear,
                     storeAction = RenderBufferStoreAction.DontCare,
                     clearColor = renderingData.cameraData.backgroundColor,
                     clearStencil = 0u,
@@ -290,10 +314,10 @@ namespace UnityEngine.Rendering.Universal.Internal
                 //Vector2Int res = data.colorTarget.rtHandleProperties.currentRenderTargetSize;
                
                 //Debug.Log($"Renderpass dimensions {desc.width}, {desc.height}, {desc.volumeDepth}");
-                context.BeginRenderPass(desc.width, desc.height, desc.volumeDepth, Math.Max(desc.msaaSamples, 1), subpassAttachments, 2);
+                context.BeginRenderPass(desc.width, desc.height, desc.volumeDepth, Math.Max(desc.msaaSamples, 1), subpassAttachments, depthIdx);
                 subpassAttachments.Dispose();
 
-                colorAttachment[0] = 1;
+                colorAttachment[0] = colorIdx; // originally 1, wrote to a separate attachment that would be copied to the backbuffer at the beginning of the transparent pass
                 {
                     context.BeginSubPass(colorAttachment);
                    // cmd.ClearRenderTarget(true, true, Color.black);
@@ -377,18 +401,31 @@ namespace UnityEngine.Rendering.Universal.Internal
                     context.EndSubPass();
                 }
 
+                
+                // new - copy depth to input attachment 1
+               // colorAttachment[0] = inputIdx;
+               // inputAttachment[0] = colorIdx;
+               // {
+               //     context.BeginSubPass(colorAttachment, inputAttachment, true);
+               //     //cmd.DrawProcedural(Matrix4x4.identity, data.copySubpassInputMat, 0, MeshTopology.Triangles, 3, 1);
+               //     //context.ExecuteCommandBuffer(cmd);
+               //     //cmd.Clear();
+               //     context.EndSubPass();
+               // }
+                
 
-
-                colorAttachment[0] = 0;
-                inputAttachment[0] = 1;
+                colorAttachment[0] = colorIdx;
+                inputAttachment[0] = depthIdx;
 
                 {
-                    context.BeginSubPass(colorAttachment, inputAttachment);
+                    context.BeginSubPass(colorAttachment, inputAttachment, true);
                     colorAttachment.Dispose();
                     inputAttachment.Dispose();
+                    /* original, copy opaque attachment to backbuffer
                     cmd.DrawProcedural(Matrix4x4.identity, data.copySubpassInputMat, 0, MeshTopology.Triangles, 3, 1);
                     context.ExecuteCommandBuffer(cmd);
                     cmd.Clear();
+                    */
 
 #if !DEBUG_NO_SHADERS
                     if (activeDebugHandler != null)
