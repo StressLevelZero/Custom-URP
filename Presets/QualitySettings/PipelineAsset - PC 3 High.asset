@@ -85,7 +85,7 @@ MonoBehaviour:
   m_EnableSSR: 1
   m_MaxSsrSteps: 35
   m_SsrMinMip: 0
-  m_SsrHitRadius: 0.01
+  m_SsrHitRadius: 0.05
   m_SsrTemporalWeight: 0.5
   m_PrefilteringModeMainLightShadows: 1
   m_PrefilteringModeAdditionalLight: 4

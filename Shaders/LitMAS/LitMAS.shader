@@ -72,8 +72,8 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define _SM6_WAVE_VOTE 1
 
             // Do quad-averaging of the SSR results. 
-            //#pragma require QuadShuffle
-            //#define _SM6_QUAD 1
+            #pragma require QuadShuffle
+            #define _SM6_QUAD 1
             #endif
             //#define _ADDITIONAL_LIGHTS
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardForward.hlsl"

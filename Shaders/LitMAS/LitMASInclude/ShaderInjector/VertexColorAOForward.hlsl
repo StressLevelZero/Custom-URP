@@ -32,7 +32,7 @@
 #pragma multi_compile _ _SLZ_SSR_DISABLED
 
 #if !defined(_SLZ_SSR_DISABLED) && !defined(SHADER_API_MOBILE)
-	#define _SSR_ENABLED
+    #define _SSR_ENABLED
 #endif
 // End Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------
 
@@ -171,6 +171,21 @@ half3 OverlayBlendDetail(half source, half3 destination)
 	//            );
 }
 
+// Begin Injection FUNCTIONS from Injection_SSR.hlsl ----------------------------------------------------------
+half4 GetInterleavedGradientNoise4(float2 pixCoord, int frameCount)
+{
+    const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
+    float2 frameMagicScale = float2(2.083f, 4.867f);
+    pixCoord += frameCount * frameMagicScale;
+    return half4(
+        frac(magic.z * frac(dot(pixCoord, magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(3, -3), magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(5, 5), magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(2, 2), magic.xy)))
+    );
+
+}
+// End Injection FUNCTIONS from Injection_SSR.hlsl ----------------------------------------------------------
 
 VertOut vert(VertIn v)
 {
@@ -213,10 +228,10 @@ VertOut vert(VertIn v)
 #endif
 
 // Begin Injection VERTEX_END from Injection_SSR.hlsl ----------------------------------------------------------
-	//#if defined(_SSR_ENABLED)
-	//	float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
-	//	o.lastVertex = mul(prevVP, lastWPos);
-	//#endif
+    //#if defined(_SSR_ENABLED)
+    //	float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
+    //	o.lastVertex = mul(prevVP, lastWPos);
+    //#endif
 // End Injection VERTEX_END from Injection_SSR.hlsl ----------------------------------------------------------
 // Begin Injection VERTEX_END from Injection_VertexColorAO.hlsl ----------------------------------------------------------
 	o.color = v.color;
@@ -231,6 +246,11 @@ struct FragOut
 
 FragOut frag(VertOut i 
 	, bool frontFace : SV_IsFrontFace
+// Begin Injection FRAG_PARAMETERS from Injection_SSR.hlsl ----------------------------------------------------------
+#if defined(SLZ_VK_EXT_ENABLED) && defined(_SSR_ENABLED)
+SLZ_DECLARE_FRAG_SIZE
+#endif
+// End Injection FRAG_PARAMETERS from Injection_SSR.hlsl ----------------------------------------------------------
 ) : SV_Target
 {
 	UNITY_SETUP_INSTANCE_ID(i);
@@ -355,31 +375,38 @@ FragOut frag(VertOut i
 
 
 // Begin Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
-	#if defined(_SSR_ENABLED)
-		half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
+    #if defined(_SSR_ENABLED)
+        float2 noiseScreenCoords = i.vertex.xy;
+        #if defined(SLZ_VK_EXT_ENABLED)
+        RequestFragmentDensityEXT();
+        SLZ_SETUP_FRAG_SIZE
+        noiseScreenCoords = noiseScreenCoords / float2(SLZ_FRAG_SIZE);
+        #endif
+        //half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
+        half4 noiseRGBA = GetInterleavedGradientNoise4(i.vertex.xy, _BlueNoise_Frame);
 
-		SSRExtraData ssrExtra;
-		ssrExtra.meshNormal = UNPACK_NORMAL(i);
-		//ssrExtra.lastClipPos = i.lastVertex;
-		ssrExtra.temporalWeight = _SSRTemporalMul;
-		ssrExtra.depthDerivativeSum = 0;
-		ssrExtra.noise = noiseRGBA;
-		ssrExtra.fogFactor = UNPACK_FOG(i);
+        SSRExtraData ssrExtra;
+        ssrExtra.meshNormal = UNPACK_NORMAL(i);
+        //ssrExtra.lastClipPos = i.lastVertex;
+        ssrExtra.temporalWeight = _SSRTemporalMul;
+        ssrExtra.depthDerivativeSum = 0;
+        ssrExtra.noise = noiseRGBA;
+        ssrExtra.fogFactor = UNPACK_FOG(i);
 
-		color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
-		color.rgb = max(0, color.rgb);
-	#else
-		color = SLZPBRFragment(fragData, surfData, _Surface);
-	#endif
+        color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
+        color.rgb = max(0, color.rgb);
+    #else
+        color = SLZPBRFragment(fragData, surfData, _Surface);
+    #endif
 // End Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
 
 
 // Begin Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
-	#if !defined(_SSR_ENABLED)
-		color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
-		
-		color = VolumetricsSurf(color, fragData.position, _Surface);
-	#endif
+    #if !defined(_SSR_ENABLED)
+        color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
+        
+        color = VolumetricsSurf(color, fragData.position, _Surface);
+    #endif
 // End Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
 	
 	FragOut output = (FragOut) 0;

@@ -241,7 +241,7 @@ float perspectiveScaledStep(const float3 rayDir, float3 rayPos)
  *          it took stored in the w component. If the function ran out of
  *          iterations or the ray went off screen, the xyz will be (0,0,0).
  */
-float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius, 
+float4 reflect_ray(float3 reflectedRay, float initDist, float3 rayDir, float hitRadius, 
     float noise, half FdotR)
 {
     bool movingForwards = true;
@@ -255,8 +255,8 @@ float4 reflect_ray(float3 reflectedRay, float3 rayDir, float hitRadius,
     float dynHitRadius = hitRadius * dynStepSize;
     float largeRadius = max(2 * dynStepSize * stepMultiplier, hitRadius);
 
-    float totalDistance = 0.0f;
-	float lastTotalDistance = 0.0f;
+	float totalDistance = initDist;
+	float lastTotalDistance = initDist;
     float FdotR4 = FdotR * FdotR;
     FdotR4 *= FdotR4;
     reflectedRay += lerp(0, 0.5*largeRadius, 1 - FdotR4) * rayDir;
@@ -419,20 +419,20 @@ float4 getSSRColor(SSRData data)
 
     data.rayDir = mul(UNITY_MATRIX_V, float4(data.rayDir.xyz, 0));
     
-    float3 screenOffset = 1.5 * normalize(mul(UNITY_MATRIX_V, float4(data.faceNormal, 0)));
-    
-    reflectedRay += float(2u << _SSRMinMip) * screenOffset * perspectiveScaledStep(float3(screenOffset), reflectedRay);
+	float3 screenOffset = 1.5 * normalize(mul(UNITY_MATRIX_V, float4(data.faceNormal, 0)));
+	float initialDist = float(2u << _SSRMinMip) * perspectiveScaledStep(float3(screenOffset), reflectedRay);
+	reflectedRay += screenOffset * initialDist;
     /*
      * Do the raymarching against the depth texture. This returns a world-space position where the ray hit the depth texture,
      * along with the number of iterations it took stored as the w component.
      */
     
-    float4 finalPos = reflect_ray(reflectedRay, data.rayDir, _SSRHitRadius,
+	float4 finalPos = reflect_ray(reflectedRay, initialDist, data.rayDir, _SSRHitRadius,
             data.noise.r, FdotR);
     
     
     // get the total number of iterations out of finalPos's w component and replace with 1.
-    float totalDistance = abs(finalPos.w);
+	float totalDistance = max(abs(finalPos.w),0.1);
     
     finalPos.w = 1;
     
@@ -503,10 +503,10 @@ float4 getSSRColor(SSRData data)
     }
     
 	reflection.a = fade;
-    #if 0// defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
+    #if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
     
     // do averaging in 2.0 gamma space.
-    reflection.rgb = sqrt(reflection.rgb);
+    // reflection.rgb = sqrt(reflection.rgb);
    
 
     float4 colorX = QuadReadAcrossX(reflection);
@@ -538,12 +538,12 @@ float4 getSSRColor(SSRData data)
     
     //reflection.a = max(max(fadeQuad.x,fadeQuad.y),max(fadeQuad.z,fadeQuad.w));
     //float avgWeight = kernel.x + kernel.y + kernel.z + kernel.w;
-    reflection.a = weight > 0.5 ? max(weight, reflection.a) : reflection.a;
+    reflection.a = weight;//weight > 0.5 ? max(weight, reflection.a) : reflection.a;
     
     //reflection = kernelWeights.x * reflection + kernelWeights.y * colorX + kernelWeights.z * colorY + kernelWeights.w * colorD;
     
     // reverse 2.0 gamma
-    reflection.rgb = reflection.rgb * reflection.rgb;
+    //reflection.rgb = reflection.rgb * reflection.rgb;
     
     //float fadeX = QuadReadAcrossX(fade);
     //float fadeY = QuadReadAcrossY(fade);

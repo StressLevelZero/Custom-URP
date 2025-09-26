@@ -16,7 +16,7 @@
 #pragma multi_compile _ _SLZ_SSR_DISABLED
 
 #if !defined(_SLZ_SSR_DISABLED) && !defined(SHADER_API_MOBILE)
-	#define _SSR_ENABLED
+    #define _SSR_ENABLED
 #endif
 //#!INJECT_END
 
@@ -27,39 +27,68 @@
 //#!INJECT_END
 
 //#!INJECT_BEGIN INTERPOLATORS 1
-	//#!TEXCOORD float4 lastVertex 1
+    //#!TEXCOORD float4 lastVertex 1
 //#!INJECT_END
 
 //#!INJECT_BEGIN VERTEX_END 0
-	//#if defined(_SSR_ENABLED)
-	//	float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
-	//	o.lastVertex = mul(prevVP, lastWPos);
-	//#endif
+    //#if defined(_SSR_ENABLED)
+    //	float4 lastWPos = mul(GetPrevObjectToWorldMatrix(), v.vertex);
+    //	o.lastVertex = mul(prevVP, lastWPos);
+    //#endif
+//#!INJECT_END
+
+//#!INJECT_BEGIN FUNCTIONS 0
+half4 GetInterleavedGradientNoise4(float2 pixCoord, int frameCount)
+{
+    const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
+    float2 frameMagicScale = float2(2.083f, 4.867f);
+    pixCoord += frameCount * frameMagicScale;
+    return half4(
+        frac(magic.z * frac(dot(pixCoord, magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(3, -3), magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(5, 5), magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(2, 2), magic.xy)))
+    );
+
+}
+//#!INJECT_END
+
+//#!INJECT_BEGIN FRAG_PARAMETERS 0
+#if defined(SLZ_VK_EXT_ENABLED) && defined(_SSR_ENABLED)
+SLZ_DECLARE_FRAG_SIZE
+#endif
 //#!INJECT_END
 
 //#!INJECT_BEGIN LIGHTING_CALC 0
-	#if defined(_SSR_ENABLED)
-		half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
+    #if defined(_SSR_ENABLED)
+        float2 noiseScreenCoords = i.vertex.xy;
+        #if defined(SLZ_VK_EXT_ENABLED)
+        RequestFragmentDensityEXT();
+        SLZ_SETUP_FRAG_SIZE
+        noiseScreenCoords = noiseScreenCoords / float2(SLZ_FRAG_SIZE);
+        #endif
+        //half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
+        half4 noiseRGBA = GetInterleavedGradientNoise4(i.vertex.xy, _BlueNoise_Frame);
 
-		SSRExtraData ssrExtra;
-		ssrExtra.meshNormal = UNPACK_NORMAL(i);
-		//ssrExtra.lastClipPos = i.lastVertex;
-		ssrExtra.temporalWeight = _SSRTemporalMul;
-		ssrExtra.depthDerivativeSum = 0;
-		ssrExtra.noise = noiseRGBA;
-		ssrExtra.fogFactor = UNPACK_FOG(i);
+        SSRExtraData ssrExtra;
+        ssrExtra.meshNormal = UNPACK_NORMAL(i);
+        //ssrExtra.lastClipPos = i.lastVertex;
+        ssrExtra.temporalWeight = _SSRTemporalMul;
+        ssrExtra.depthDerivativeSum = 0;
+        ssrExtra.noise = noiseRGBA;
+        ssrExtra.fogFactor = UNPACK_FOG(i);
 
-		color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
-		color.rgb = max(0, color.rgb);
-	#else
-		color = SLZPBRFragment(fragData, surfData, _Surface);
-	#endif
+        color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
+        color.rgb = max(0, color.rgb);
+    #else
+        color = SLZPBRFragment(fragData, surfData, _Surface);
+    #endif
 //#!INJECT_END
 
 //#!INJECT_BEGIN VOLUMETRIC_FOG 0
-	#if !defined(_SSR_ENABLED)
-		color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
-		
-		color = VolumetricsSurf(color, fragData.position, _Surface);
-	#endif
+    #if !defined(_SSR_ENABLED)
+        color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
+        
+        color = VolumetricsSurf(color, fragData.position, _Surface);
+    #endif
 //#!INJECT_END

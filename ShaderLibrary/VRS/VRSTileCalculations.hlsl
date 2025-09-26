@@ -9,7 +9,7 @@ void GetTileParams(float2 screenUV, out float4 radii, out bool inner, out bool m
 	uint2 gridUnit = floor(screenUV * 0.5);
 	float2 gridUnit2 = 4 * floor(screenUV * 0.25);
 	float2 center = unity_StereoEyeIndex == 0 ? _EyeCenterCoords.xy : _EyeCenterCoords.zw;
-	center *= _ScreenParams.xy;
+	center *= _ScaledScreenParams.xy;
 	radii.x = length(gridUnit2 + float2(0.0, 0.0) - center) / _ScaledScreenParams.y;
 	radii.y = length(gridUnit2 + float2(4.0, 0.0) - center) / _ScaledScreenParams.y;
 	radii.z = length(gridUnit2 + float2(4.0, 4.0) - center) / _ScaledScreenParams.y;
@@ -33,7 +33,7 @@ bool IsTileCovered(float2 screenUV)
 	uint2 gridUnit = floor(screenUV * 0.5);
 	float2 gridUnit2 = 4 * floor(screenUV * 0.25);
 	float2 center = unity_StereoEyeIndex == 0 ? _EyeCenterCoords.xy : _EyeCenterCoords.zw;
-	center *= _ScreenParams.xy;
+	center *= _ScaledScreenParams.xy;
 	float4 radii;
 	radii.x = length(gridUnit2 + float2(0.0, 0.0) - center) / _ScaledScreenParams.y;
 	radii.y = length(gridUnit2 + float2(4.0, 0.0) - center) / _ScaledScreenParams.y;

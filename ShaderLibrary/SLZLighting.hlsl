@@ -347,9 +347,11 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
         // Stupid solution: multiply the normalized half-vector by 4. The cross product of the 4x half-vector and the normal vector is also 4x as long, and thus the normal and half vectors can get far closer before the components of the result round to 0 
         // After dotting the 4x cross vector with itself, we can divide by 16 to get the actual value
     
+        // counter-intuitively, doing the 4x multiply after calculating NoH and LoH results in 1 more register used (with DXC 1.8)
+        // Multiplying NoH and LoH by 0.25 after using the 4x scaled half vector doesn't
         half3 halfDir = half(4.0h) * SLZSafeHalf3Normalize(lightDir + frag.viewDir);
-        data.NoH = saturate(dot(frag.normal, halfDir));
-        data.LoH = saturate(dot(lightDir, halfDir));
+        data.NoH = saturate(dot(frag.normal, halfDir) * half(0.25));
+        data.LoH = saturate(dot(lightDir, halfDir) * half(0.25));
 
         half3 NxH = cross(frag.normal, halfDir);
         data.NxH2 = saturate(dot(NxH, NxH)) * half(0.0625h);
