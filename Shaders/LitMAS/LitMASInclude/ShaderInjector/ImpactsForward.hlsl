@@ -90,18 +90,18 @@
 
 struct VertIn
 {
-	float4 vertex   : POSITION;
-	float3 normal    : NORMAL;
-	float4 tangent   : TANGENT;
+    float4 vertex   : POSITION;
+    float3 normal    : NORMAL;
+    float4 tangent   : TANGENT;
 	float4 uv0 : TEXCOORD0;
 	float4 uv1 : TEXCOORD1;
 	float4 uv2 : TEXCOORD2;
-	UNITY_VERTEX_INPUT_INSTANCE_ID
+    UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct VertOut
 {
-	float4 vertex       : SV_POSITION;
+    float4 vertex       : SV_POSITION;
 	float4 uv0XY_tanXY : TEXCOORD0;
 #if defined(LIGHTMAP_ON) || defined(DYNAMICLIGHTMAP_ON)
 	float4 uv1 : TEXCOORD1;
@@ -120,8 +120,8 @@ struct VertOut
 	float3 unskinnedObjPos : TEXCOORD6;
 // End Injection INTERPOLATORS from Injection_Impacts.hlsl ----------------------------------------------------------
 
-	UNITY_VERTEX_INPUT_INSTANCE_ID
-		UNITY_VERTEX_OUTPUT_STEREO
+    UNITY_VERTEX_INPUT_INSTANCE_ID
+        UNITY_VERTEX_OUTPUT_STEREO
 };
 
 #define UNPACK_UV0(i) i.uv0XY_tanXY.xy
@@ -151,8 +151,8 @@ CBUFFER_START(UnityPerMaterial)
 	int _NumberOfHits;
 	half4 _HitColor;
 // End Injection MATERIAL_CBUFFER_EARLY from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-	float4 _BaseMap_ST;
-	half4 _BaseColor;
+    float4 _BaseMap_ST;
+    half4 _BaseColor;
 // Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
 float4 _DetailMap_ST;
 half  _Details;
@@ -164,59 +164,44 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-	int _Surface;
+    int _Surface;
 CBUFFER_END
 
 half3 OverlayBlendDetail(half source, half3 destination)
 {
-	half3 switch0 = round(destination); // if destination >= 0.5 then 1, else 0 assuming 0-1 input
-	half3 blendGreater = mad(mad(2.0, destination, -2.0), 1.0 - source, 1.0); // (2.0 * destination - 2.0) * ( 1.0 - source) + 1.0
-	half3 blendLesser = (2.0 * source) * destination;
-	return mad(switch0, blendGreater, mad(-switch0, blendLesser, blendLesser)); // switch0 * blendGreater + (1 - switch0) * blendLesser 
-	//return half3(destination.r > 0.5 ? blendGreater.r : blendLesser.r,
-	//             destination.g > 0.5 ? blendGreater.g : blendLesser.g,
-	//             destination.b > 0.5 ? blendGreater.b : blendLesser.b
-	//            );
+    half3 switch0 = round(destination); // if destination >= 0.5 then 1, else 0 assuming 0-1 input
+    half3 blendGreater = mad(mad(2.0, destination, -2.0), 1.0 - source, 1.0); // (2.0 * destination - 2.0) * ( 1.0 - source) + 1.0
+    half3 blendLesser = (2.0 * source) * destination;
+    return mad(switch0, blendGreater, mad(-switch0, blendLesser, blendLesser)); // switch0 * blendGreater + (1 - switch0) * blendLesser 
+    //return half3(destination.r > 0.5 ? blendGreater.r : blendLesser.r,
+    //             destination.g > 0.5 ? blendGreater.g : blendLesser.g,
+    //             destination.b > 0.5 ? blendGreater.b : blendLesser.b
+    //            );
 }
 
-// Begin Injection FUNCTIONS from Injection_SSR.hlsl ----------------------------------------------------------
-half4 GetInterleavedGradientNoise4(float2 pixCoord, int frameCount)
-{
-    const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
-    float2 frameMagicScale = float2(2.083f, 4.867f);
-    pixCoord += frameCount * frameMagicScale;
-    return half4(
-        frac(magic.z * frac(dot(pixCoord, magic.xy))),
-        frac(magic.z * frac(dot(pixCoord + float2(3, -3), magic.xy))),
-        frac(magic.z * frac(dot(pixCoord + float2(5, 5), magic.xy))),
-        frac(magic.z * frac(dot(pixCoord + float2(2, 2), magic.xy)))
-    );
-
-}
-// End Injection FUNCTIONS from Injection_SSR.hlsl ----------------------------------------------------------
 
 VertOut vert(VertIn v)
 {
-	VertOut o = (VertOut)0;
-	UNITY_SETUP_INSTANCE_ID(v);
-	UNITY_TRANSFER_INSTANCE_ID(v, o);
-	UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+    VertOut o = (VertOut)0;
+    UNITY_SETUP_INSTANCE_ID(v);
+    UNITY_TRANSFER_INSTANCE_ID(v, o);
+    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-	o.wPos_fog.xyz = TransformObjectToWorld(v.vertex.xyz);
-	o.vertex = TransformWorldToHClip(o.wPos_fog.xyz);
-	o.uv0XY_tanXY.xy = v.uv0.xy;
+    o.wPos_fog.xyz = TransformObjectToWorld(v.vertex.xyz);
+    o.vertex = TransformWorldToHClip(o.wPos_fog.xyz);
+    o.uv0XY_tanXY.xy = v.uv0.xy;
 
 #if defined(LIGHTMAP_ON) || defined(DIRLIGHTMAP_COMBINED)
-	OUTPUT_LIGHTMAP_UV(v.uv1.xy, unity_LightmapST, o.uv1.xy);
+    OUTPUT_LIGHTMAP_UV(v.uv1.xy, unity_LightmapST, o.uv1.xy);
 #endif
 
 #ifdef DYNAMICLIGHTMAP_ON
-	OUTPUT_LIGHTMAP_UV(v.uv2.xy, unity_DynamicLightmapST, o.uv1.zw);
+    OUTPUT_LIGHTMAP_UV(v.uv2.xy, unity_DynamicLightmapST, o.uv1.zw);
 #endif
 
-	// Exp2 fog
-	half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
-	o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
+    // Exp2 fog
+    half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
+    o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
 
 // Begin Injection VERTEX_NORMALS from Injection_NormalMaps.hlsl ----------------------------------------------------------
 	//VertexNormalInputs ntb = GetVertexNormalInputs(v.normal, v.tangent);
@@ -229,10 +214,10 @@ VertOut vert(VertIn v)
 // End Injection VERTEX_NORMALS from Injection_NormalMaps.hlsl ----------------------------------------------------------
 
 
-	// Calculate vertex lights and L2 probe lighting on quest 
-	o.SHVertLights_btSign.xyz = VertexLighting(UNPACK_WPOS(o), UNPACK_NORMAL(o));
+    // Calculate vertex lights and L2 probe lighting on quest 
+    o.SHVertLights_btSign.xyz = VertexLighting(UNPACK_WPOS(o), UNPACK_NORMAL(o));
 #if !defined(LIGHTMAP_ON) && !defined(DYNAMICLIGHTMAP_ON) && defined(SHADER_API_MOBILE)
-	o.SHVertLights_btSign.xyz += SampleSHVertex(o.normXYZ_tanZ.xyz);
+    o.SHVertLights_btSign.xyz += SampleSHVertex(o.normXYZ_tanZ.xyz);
 #endif
 
 // Begin Injection VERTEX_END from Injection_SSR.hlsl ----------------------------------------------------------
@@ -244,16 +229,16 @@ VertOut vert(VertIn v)
 // Begin Injection VERTEX_END from Injection_Impacts.hlsl ----------------------------------------------------------
 	o.unskinnedObjPos = v.uv1.xyz;
 // End Injection VERTEX_END from Injection_Impacts.hlsl ----------------------------------------------------------
-	return o;
+    return o;
 }
 
 struct FragOut
 {
-	float4 color : SV_Target;
+    float4 color : SV_Target;
 };
 
 FragOut frag(VertOut i 
-	, bool frontFace : SV_IsFrontFace
+    , bool frontFace : SV_IsFrontFace
 // Begin Injection FRAG_PARAMETERS from Injection_SSR.hlsl ----------------------------------------------------------
 #if defined(SLZ_VK_EXT_ENABLED) && defined(_SSR_ENABLED)
 SLZ_DECLARE_FRAG_SIZE
@@ -261,29 +246,29 @@ SLZ_DECLARE_FRAG_SIZE
 // End Injection FRAG_PARAMETERS from Injection_SSR.hlsl ----------------------------------------------------------
 ) : SV_Target
 {
-	UNITY_SETUP_INSTANCE_ID(i);
-	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+    UNITY_SETUP_INSTANCE_ID(i);
+    UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
-	if (!frontFace)
-	{
-		UNPACK_NORMAL(i) = -UNPACK_NORMAL(i);
-	}
+    if (!frontFace)
+    {
+        UNPACK_NORMAL(i) = -UNPACK_NORMAL(i);
+    }
 /*---------------------------------------------------------------------------------------------------------------------------*/
 /*---Read Input Data---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
-	float2 uv0 = UNPACK_UV0(i);
-	float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
-	float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
-	half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
-	half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
+    float2 uv0 = UNPACK_UV0(i);
+    float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
+    float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
+    half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
+    half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 
 
-	albedo *= _BaseColor;
-	albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
-	half metallic = mas.r;
-	half ao = mas.g;
-	half smoothness = mas.b;
+    albedo *= _BaseColor;
+    albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
+    half metallic = mas.r;
+    half ao = mas.g;
+    half smoothness = mas.b;
 
 // Begin Injection FRAG_POST_INPUTS from Injection_Impacts.hlsl ----------------------------------------------------------
 	half2 impactUV = GetClosestImpactUV(i.unskinnedObjPos, EllipsoidPosArray, _NumberOfHits);
@@ -299,9 +284,9 @@ SLZ_DECLARE_FRAG_SIZE
 /*---Sample Normal Map-------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
-	half3 normalTS = half3(0, 0, 1);
-	half  geoSmooth = 1;
-	half4 normalMap = half4(0, 0, 1, 0);
+    half3 normalTS = half3(0, 0, 1);
+    half  geoSmooth = 1;
+    half4 normalMap = half4(0, 0, 1, 0);
 
 // Begin Injection NORMAL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
 	normalMap = SAMPLE_TEXTURE2D(_BumpMap, sampler_BaseMap, uv_main);
@@ -315,18 +300,18 @@ SLZ_DECLARE_FRAG_SIZE
 /*---Read Detail Map---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
-	#if defined(_DETAILS_ON) 
+    #if defined(_DETAILS_ON) 
 
 // Begin Injection DETAIL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
 		half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv_detail);
 		half3 detailTS = UnpackNormalAG(detailMap);
 		normalTS = normalize(BlendNormalRNM(normalTS, detailTS));
 // End Injection DETAIL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
-	   
-		smoothness = saturate(2.0 * detailMap.b * smoothness);
-		albedo.rgb = OverlayBlendDetail(detailMap.r, albedo.rgb);
+       
+        smoothness = saturate(2.0 * detailMap.b * smoothness);
+        albedo.rgb = OverlayBlendDetail(detailMap.r, albedo.rgb);
 
-	#endif
+    #endif
 
 
 /*---------------------------------------------------------------------------------------------------------------------------*/
@@ -351,7 +336,7 @@ SLZ_DECLARE_FRAG_SIZE
 /*---------------------------------------------------------------------------------------------------------------------------*/
 /*---Lighting Calculations---------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
-	
+    
 // Begin Injection SPEC_AA from Injection_NormalMaps.hlsl ----------------------------------------------------------
 	#if !defined(SHADER_API_MOBILE) && !defined(LITMAS_FEATURE_TP) // Specular antialiasing based on normal derivatives. Only on PC to avoid cost of derivatives on Quest
 		//smoothness = min(smoothness, SLZGeometricSpecularAA(normalWS));
@@ -360,13 +345,13 @@ SLZ_DECLARE_FRAG_SIZE
 // End Injection SPEC_AA from Injection_NormalMaps.hlsl ----------------------------------------------------------
 
 
-	#if defined(LIGHTMAP_ON)
-		SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, i.uv1.xy, i.uv1.zw, UNPACK_VERTLIGHTS(i));
-	#else
-		SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, float2(0, 0), float2(0, 0), UNPACK_VERTLIGHTS(i));
-	#endif
+    #if defined(LIGHTMAP_ON)
+        SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, i.uv1.xy, i.uv1.zw, UNPACK_VERTLIGHTS(i));
+    #else
+        SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, float2(0, 0), float2(0, 0), UNPACK_VERTLIGHTS(i));
+    #endif
 
-	half4 emission = half4(0,0,0,0);
+    half4 emission = half4(0,0,0,0);
 
 // Begin Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 	UNITY_BRANCH if (_Emission)
@@ -378,8 +363,8 @@ SLZ_DECLARE_FRAG_SIZE
 // End Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 
 
-	SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb, albedo.a);
-	half4 color = half4(1, 1, 1, 1);
+    SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb, albedo.a);
+    half4 color = half4(1, 1, 1, 1);
 
 
 // Begin Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
@@ -391,7 +376,7 @@ SLZ_DECLARE_FRAG_SIZE
         noiseScreenCoords = noiseScreenCoords / float2(SLZ_FRAG_SIZE);
         #endif
         //half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
-        half4 noiseRGBA = GetInterleavedGradientNoise4(i.vertex.xy, _BlueNoise_Frame);
+        half4 noiseRGBA = SSRGetInterleavedGradientNoise(i.vertex.xy, _BlueNoise_Frame);
 
         SSRExtraData ssrExtra;
         ssrExtra.meshNormal = UNPACK_NORMAL(i);
@@ -416,15 +401,15 @@ SLZ_DECLARE_FRAG_SIZE
         color = VolumetricsSurf(color, fragData.position, _Surface);
     #endif
 // End Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
-	
-	FragOut output = (FragOut) 0;
-	output.color = color;
-	
-	#if defined(SHADER_API_MOBILE)
-		// Don't do this for now, holding on to fragData.screenUV or i.vertex.xy occupies a full-precision register for the entire shader 
-		//output.color.rgb = ApplyInterleavedAntibanding(output.color.rgb, i.vertex.xy);
-	#endif
-	
+    
+    FragOut output = (FragOut) 0;
+    output.color = color;
+    
+    #if defined(SHADER_API_MOBILE)
+        // Don't do this for now, holding on to fragData.screenUV or i.vertex.xy occupies a full-precision register for the entire shader 
+        //output.color.rgb = ApplyInterleavedAntibanding(output.color.rgb, i.vertex.xy);
+    #endif
+    
 
-	return output;
+    return output;
 }

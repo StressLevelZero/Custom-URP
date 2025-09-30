@@ -46,7 +46,18 @@ struct SSRExtraData
     real fogFactor;
 };
 
-
+half4 SSRGetInterleavedGradientNoise(float2 pixCoord, int frameCount)
+{
+    const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
+    float2 frameMagicScale = float2(2.083f, 4.867f);
+    pixCoord += frameCount * frameMagicScale;
+    return half4(
+        frac(magic.z * frac(dot(pixCoord, magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(2, -1), magic.xy))),
+        frac(magic.z * frac(dot(pixCoord.yx + float2(3, 1), magic.xy))),
+        frac(magic.z * frac(dot(pixCoord + float2(-2, 2), magic.xy)))
+    );
+}
 
  /**
   * Specular from reflection probes and SSR split, so we can reverse the non-ssr color later
@@ -73,6 +84,7 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
 
     SSRData ssrData = GetSSRData(
         fragData.position,
+        fragData.screenUV,
         fragData.viewDir,
         reflectionDir,
         ssrExtra.meshNormal,
@@ -84,19 +96,19 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
     );
 
     SSRLerp = saturate((surfData.perceptualRoughness - 0.5) / (0.3 - 0.5));
-	SSRLerp = sqrt(SSRLerp);
+    SSRLerp = sqrt(SSRLerp);
     //Piecewise function to make a sinusoidal falloff curve
 #define SSR_FALLOFF_START 0.6666667
     RdotV = 2 * saturate( (1 / SSR_FALLOFF_START) * RdotV);
     RdotV = RdotV > 1 ? -0.5*(RdotV * RdotV) + (2*RdotV - 1) : 0.5 * RdotV * RdotV;
     SSRLerp *= RdotV;
     real4 SSR = real4(0, 0, 0, 0);
-	bool doSSR = SSRLerp > 0.008;
+    bool doSSR = SSRLerp > 0.008;
     
     #if defined(_SM6_WAVE_VOTE)
     if (WaveActiveAnyTrue(doSSR))
     #endif
-	if (doSSR)
+    if (doSSR)
     {
         SSR = getSSRColor(ssrData);
     }
@@ -104,7 +116,7 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
 
 
     //reflectionProbe = lerp(reflectionProbe, SSRColor.rgb, SSRColor.a * SSRLerp);
-	SSRColor = SSR.rgb * AOSpecularOcclusion;
+    SSRColor = SSR.rgb * AOSpecularOcclusion;
     reflectionProbe *= (1.0 - SSR.a * SSRLerp);
     SSRColor *= SSR.a * SSRLerp;
 #endif
@@ -135,7 +147,7 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     real3 diffuse = real3(0.0h, 0.0h, 0.0h);
     real3 specular = real3(0.0h, 0.0h, 0.0h);
     //real2 dfg = SLZDFG(fragData.NoV, surfData.roughness);
-	SLZMonoSpecInfo monoSpecInfo = (SLZMonoSpecInfo) 0; //{ half4(0, 0, 0, -1), (half3) 0 };
+    SLZMonoSpecInfo monoSpecInfo = (SLZMonoSpecInfo) 0; //{ half4(0, 0, 0, -1), (half3) 0 };
 
 
 #if defined(LIGHTMAP_ON) 

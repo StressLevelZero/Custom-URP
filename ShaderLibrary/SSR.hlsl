@@ -90,6 +90,7 @@ float3 SLZComputeNDCFromClipWithZ(float4 positionCS)
 struct SSRData
 {
     float3	wPos;
+    float2  screenUV;
     float3	viewDir;
     float3	rayDir;
     half3	faceNormal;
@@ -103,6 +104,7 @@ struct SSRData
 
 SSRData GetSSRData(
     float3	wPos,
+    float2  screenUV,
     float3	viewDir,
     half3	rayDir,
     half3	faceNormal,
@@ -114,6 +116,7 @@ SSRData GetSSRData(
 {
     SSRData ssrData;
     ssrData.wPos = wPos;
+    ssrData.screenUV = screenUV;
     ssrData.viewDir = viewDir;
     ssrData.rayDir = normalize(rayDir);
     ssrData.faceNormal = normalize(faceNormal);
@@ -121,7 +124,7 @@ SSRData GetSSRData(
     ssrData.RdotV = RdotV;
     ssrData.zDerivativeSum = zDerivativeSum;
     ssrData.noise = noise;
-	ssrData.isPostOpaqueCopy = isPostOpaqueCopy;
+    ssrData.isPostOpaqueCopy = isPostOpaqueCopy;
     return ssrData;
 }
 
@@ -190,7 +193,7 @@ float TanGGXConeAngle(const float roughness)
     tangent = roughness * sqrt( Xi / (1.0 - Xi) ) = roughness * 0.5681120688 for Xi = 0.244
     */
 
-	return 0.5681120688 * roughness;
+    return 0.5681120688 * roughness;
 }
 
 /** @brief Scales SSR step size based on distance and angle such that a step moves the ray by about one pixel in 2D screenspace
@@ -255,8 +258,8 @@ float4 reflect_ray(float3 reflectedRay, float initDist, float3 rayDir, float hit
     float dynHitRadius = hitRadius * dynStepSize;
     float largeRadius = max(2 * dynStepSize * stepMultiplier, hitRadius);
 
-	float totalDistance = initDist;
-	float lastTotalDistance = initDist;
+    float totalDistance = initDist;
+    float lastTotalDistance = initDist;
     float FdotR4 = FdotR * FdotR;
     FdotR4 *= FdotR4;
     reflectedRay += lerp(0, 0.5*largeRadius, 1 - FdotR4) * rayDir;
@@ -275,10 +278,10 @@ float4 reflect_ray(float3 reflectedRay, float initDist, float3 rayDir, float hit
         }
 
         int2 uvInt = int2(uvDepth * _HiZDim.xy) >> mipLevel;
-		float2 depthTex = LOAD_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, uvInt, mipLevel).rg;
-		float rawDepth = depthTex.r;
-		//float rawDepthMin = depthTex.g;
-		//float rawDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_LinearClamp, uvDepth, mipLevel).r;
+        float2 depthTex = LOAD_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, uvInt, mipLevel).rg;
+        float rawDepth = depthTex.r;
+        //float rawDepthMin = depthTex.g;
+        //float rawDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraHiZDepthTexture, sampler_LinearClamp, uvDepth, mipLevel).r;
         float linearDepth = Linear01Depth(rawDepth, _ZBufferParams);
         if (linearDepth == 0)
         {
@@ -318,14 +321,14 @@ float4 reflect_ray(float3 reflectedRay, float initDist, float3 rayDir, float hit
         if (!isRayInFront && storeLastPos && isMinMip)
         {
             finalPos = reflectedRay;
-			lastTotalDistance = -totalDistance;
-		}
+            lastTotalDistance = -totalDistance;
+        }
         storeLastPos = isRayInFront ? true : false;
         // If we're within the hit radius, we're done
         UNITY_BRANCH if (inHitRadius && isMinMip)
         {
             finalPos = reflectedRay;
-			lastTotalDistance = -totalDistance;
+            lastTotalDistance = -totalDistance;
             break;
         }
 
@@ -363,7 +366,7 @@ float4 reflect_ray(float3 reflectedRay, float initDist, float3 rayDir, float hit
         }
     }
     //underPos.w = abs(underPos.w);
-	float4 outp = float4(finalPos.xyz, lastTotalDistance); //finalPos.x == 1.#INF && underPos.w != 1.#INF ? underPos : float4(finalPos.xyz, totalDistance);
+    float4 outp = float4(finalPos.xyz, lastTotalDistance); //finalPos.x == 1.#INF && underPos.w != 1.#INF ? underPos : float4(finalPos.xyz, totalDistance);
     return outp;
 }
 
@@ -391,8 +394,8 @@ float4 getSSRColor(SSRData data)
 
     float FdotV = (dot(data.faceNormal, data.viewDir.xyz));
 
-    float3 screenUVs = ComputeGrabScreenPos(mul(UNITY_MATRIX_VP, float4(data.wPos,1)).xyw);
-    screenUVs.xy = screenUVs.xy / screenUVs.z;
+    float2 screenUVs = data.screenUV;// ComputeGrabScreenPos(mul(UNITY_MATRIX_VP, float4(data.wPos,1)).xyw);
+    //screenUVs.xy = screenUVs.xy / screenUVs.z;
 
     // Ray's starting position, in camera space
     float3 reflectedRay = mul(UNITY_MATRIX_V, float4(data.wPos.xyz, 1)).xyz;
@@ -405,9 +408,45 @@ float4 getSSRColor(SSRData data)
             //,smoothstep(0.1, 0.4, data.perceptualRoughness)
         //)
     );
-    float3 rayNoise = 2.0 * rayTanAngle * (2*data.noise.rgb - 1);
+    float3 rayNoiseAxisX = normalize(cross(data.rayDir, data.faceNormal));
+    float3 rayNoiseAxisY = normalize(cross(rayNoiseAxisX, data.rayDir));
+    
+    #if 0
+    //bias the directional noise depending on the quad index. That way quad averaging gives better results
+#ifdef UNITY_COMPILER_DXC
+    uint quadLane = WaveGetLaneIndex() % 4;
+#else
+    uint2 quadCoords = int2(screenUVs * _ScaledScreenParams.xy) % 2u;
+    uint quadLane = clamp(quadCoords.x + 2 * quadCoords.y, 0u, 1u);
+#endif
+     
+    float2 tetraOffset = 0;
+    switch (quadLane)
+    {
+        case 0u:
+            tetraOffset = float2(-0.5, 0.866);
+            break;
+        case 1u:
+            tetraOffset = float2(0.866, 0.5);
+            break;
+        case 2u:
+            tetraOffset = float2(0.5, -0.866);
+            break;
+        case 3u:
+            tetraOffset = float2(-0.866, -0.5);
+            break;
+    }
+    tetraOffset *=  2 * rayTanAngle * data.noise.r;
+    float2 noiseOffset = 0;  // (2 * data.noise.gb - 1) * rayTanAngle;
+    float3 offset = (tetraOffset.x + noiseOffset.x) * rayNoiseAxisX + (tetraOffset.y + noiseOffset.y) * rayNoiseAxisY;
+    data.rayDir += offset;
+    data.rayDir = normalize(data.rayDir);
+    #else
+    float2 noiseOffset = 2 * rayTanAngle * (2 * data.noise.rg - 1);
+    float3 rayNoise = rayNoiseAxisX * noiseOffset.x + rayNoiseAxisY * noiseOffset.y;
     rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
     data.rayDir += 0.95*rayNoise;
+    #endif
     data.rayDir.xyz = normalize(data.rayDir.xyz);
 
     float RdotV = saturate(0.95 * dot(data.rayDir, -data.viewDir.xyz) + 0.05);
@@ -419,20 +458,21 @@ float4 getSSRColor(SSRData data)
 
     data.rayDir = mul(UNITY_MATRIX_V, float4(data.rayDir.xyz, 0));
     
-	float3 screenOffset = 1.5 * normalize(mul(UNITY_MATRIX_V, float4(data.faceNormal, 0)));
-	float initialDist = float(2u << _SSRMinMip) * perspectiveScaledStep(float3(screenOffset), reflectedRay);
-	reflectedRay += screenOffset * initialDist;
+
+    float3 screenOffset = 1.5 * normalize(mul(UNITY_MATRIX_V, float4(data.faceNormal, 0)));
+    float initialDist = float(2u << _SSRMinMip) * perspectiveScaledStep(float3(screenOffset), reflectedRay);
+    reflectedRay += screenOffset * initialDist;
     /*
      * Do the raymarching against the depth texture. This returns a world-space position where the ray hit the depth texture,
      * along with the number of iterations it took stored as the w component.
      */
     
-	float4 finalPos = reflect_ray(reflectedRay, initialDist, data.rayDir, _SSRHitRadius,
+    float4 finalPos = reflect_ray(reflectedRay, initialDist, data.rayDir, _SSRHitRadius,
             data.noise.r, FdotR);
     
     
     // get the total number of iterations out of finalPos's w component and replace with 1.
-	float totalDistance = max(abs(finalPos.w),0.1);
+    float totalDistance = max(abs(finalPos.w),0.1);
     
     finalPos.w = 1;
     
@@ -445,18 +485,18 @@ float4 getSSRColor(SSRData data)
      * Get the screen space coordinates of the ray's final position
      */
     float3 uvs;			
-	float3 hitScreenPos;
-	float4 finalPosWorld = float4(mul(transpose((float3x3) UNITY_MATRIX_V), (finalPos.xyz)) + _WorldSpaceCameraPos, 1);
-	[branch] if (data.isPostOpaqueCopy)
-	{
-		hitScreenPos = mul(unity_MatrixVP, finalPosWorld).xyw;
-		//hitScreenPos.xy = 1.0 - hitScreenPos.xy;
-	}
+    float3 hitScreenPos;
+    float4 finalPosWorld = float4(mul(transpose((float3x3) UNITY_MATRIX_V), (finalPos.xyz)) + _WorldSpaceCameraPos, 1);
+    [branch] if (data.isPostOpaqueCopy)
+    {
+        hitScreenPos = mul(unity_MatrixVP, finalPosWorld).xyw;
+        //hitScreenPos.xy = 1.0 - hitScreenPos.xy;
+    }
     else
     {
-		hitScreenPos = mul(prevVP, finalPosWorld).xyw;
+        hitScreenPos = mul(prevVP, finalPosWorld).xyw;
     }
-	uvs = ComputeGrabScreenPos(hitScreenPos);
+    uvs = ComputeGrabScreenPos(hitScreenPos);
 
     uvs.xy = uvs.xy / uvs.z;
                 
@@ -488,7 +528,7 @@ float4 getSSRColor(SSRData data)
     //roughRatio = rayHit > 0 ? roughRatio : data.perceptualRoughness * data.perceptualRoughness;
     //uvs.xy += roughRatio * (2.0*data.noise.rg - 1.0);
     float blur = min(log2(_CameraOpaqueTexture_Dim.y * roughRatio), _CameraOpaqueTexture_Dim.z);
-	//blur = min(blur, data.perceptualRoughness); // Need to clamp to unity's cubemap roughness to avoid obvious discontinuities
+    //blur = min(blur, data.perceptualRoughness); // Need to clamp to unity's cubemap roughness to avoid obvious discontinuities
     float4 reflection = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, uvs.xy, blur);//float4(getBlurredGP(PASS_SCREENSPACE_TEXTURE(GrabTextureSSR), scrnParams, uvs.xy, blurFactor),1);
     
     /*
@@ -502,11 +542,11 @@ float4 getSSRColor(SSRData data)
         reflection = float4(0,0,0,0);
     }
     
-	reflection.a = fade;
+    reflection.a = fade;
     #if defined(UNITY_COMPILER_DXC) && defined(_SM6_QUAD)
     
     // do averaging in 2.0 gamma space.
-    // reflection.rgb = sqrt(reflection.rgb);
+    reflection.rgb = sqrt(reflection.rgb);
    
 
     float4 colorX = QuadReadAcrossX(reflection);
@@ -543,7 +583,7 @@ float4 getSSRColor(SSRData data)
     //reflection = kernelWeights.x * reflection + kernelWeights.y * colorX + kernelWeights.z * colorY + kernelWeights.w * colorD;
     
     // reverse 2.0 gamma
-    //reflection.rgb = reflection.rgb * reflection.rgb;
+    reflection.rgb = reflection.rgb * reflection.rgb;
     
     //float fadeX = QuadReadAcrossX(fade);
     //float fadeY = QuadReadAcrossY(fade);

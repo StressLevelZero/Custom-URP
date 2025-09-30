@@ -37,22 +37,6 @@
     //#endif
 //#!INJECT_END
 
-//#!INJECT_BEGIN FUNCTIONS 0
-half4 GetInterleavedGradientNoise4(float2 pixCoord, int frameCount)
-{
-    const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
-    float2 frameMagicScale = float2(2.083f, 4.867f);
-    pixCoord += frameCount * frameMagicScale;
-    return half4(
-        frac(magic.z * frac(dot(pixCoord, magic.xy))),
-        frac(magic.z * frac(dot(pixCoord + float2(3, -3), magic.xy))),
-        frac(magic.z * frac(dot(pixCoord + float2(5, 5), magic.xy))),
-        frac(magic.z * frac(dot(pixCoord + float2(2, 2), magic.xy)))
-    );
-
-}
-//#!INJECT_END
-
 //#!INJECT_BEGIN FRAG_PARAMETERS 0
 #if defined(SLZ_VK_EXT_ENABLED) && defined(_SSR_ENABLED)
 SLZ_DECLARE_FRAG_SIZE
@@ -68,7 +52,7 @@ SLZ_DECLARE_FRAG_SIZE
         noiseScreenCoords = noiseScreenCoords / float2(SLZ_FRAG_SIZE);
         #endif
         //half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
-        half4 noiseRGBA = GetInterleavedGradientNoise4(i.vertex.xy, _BlueNoise_Frame);
+        half4 noiseRGBA = SSRGetInterleavedGradientNoise(i.vertex.xy, _BlueNoise_Frame);
 
         SSRExtraData ssrExtra;
         ssrExtra.meshNormal = UNPACK_NORMAL(i);
