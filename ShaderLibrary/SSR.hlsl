@@ -409,7 +409,7 @@ float4 getSSRColor(SSRData data)
         //)
     );
     float3 rayNoiseAxisX = normalize(cross(data.rayDir, data.faceNormal));
-    float3 rayNoiseAxisY = normalize(cross(rayNoiseAxisX, data.rayDir));
+	float3 rayNoiseAxisY = cross(data.faceNormal, rayNoiseAxisX);
     
     #if 0
     //bias the directional noise depending on the quad index. That way quad averaging gives better results
@@ -444,7 +444,7 @@ float4 getSSRColor(SSRData data)
     #else
     float2 noiseOffset = 2 * rayTanAngle * (2 * data.noise.rg - 1);
     float3 rayNoise = rayNoiseAxisX * noiseOffset.x + rayNoiseAxisY * noiseOffset.y;
-    rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
+    //rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
     data.rayDir += 0.95*rayNoise;
     #endif
     data.rayDir.xyz = normalize(data.rayDir.xyz);

@@ -39,8 +39,9 @@ namespace UnityEngine.Rendering.Universal.Internal
 		readonly static int s_OpaqueTextureDimID = Shader.PropertyToID("_CameraOpaqueTexture_Dim");
 		readonly static int s_TempBufferID = Shader.PropertyToID("_TempBuffer");
 		static GlobalKeyword _RECONSTRUCT_VRS_TILES;
+		static GlobalKeyword _BLEED_OCCLUSION_MASK;
 
-		ComputeShader m_ColorPyramidCompute;
+        ComputeShader m_ColorPyramidCompute;
 		public bool m_RequiresMips;
 		private int m_MipLevels;
 		private MipSize m_Size;
@@ -94,9 +95,9 @@ namespace UnityEngine.Rendering.Universal.Internal
 				//Debug.Log(m_CopyColorMaterial.shader.name + " 0");
 				_RECONSTRUCT_VRS_TILES = GlobalKeyword.Create("_RECONSTRUCT_VRS_TILES");
 			}
-
-			// END SLZ MODIFIED
-		}
+			_BLEED_OCCLUSION_MASK = GlobalKeyword.Create("_BLEED_OCCLUSION_MASK");
+            // END SLZ MODIFIED
+        }
 
 		/// <summary>
 		/// Get a descriptor and filter mode for the required texture for this pass
@@ -334,6 +335,10 @@ namespace UnityEngine.Rendering.Universal.Internal
 				{
 					cmd.EnableKeyword(_RECONSTRUCT_VRS_TILES);
 				}
+				if (xrEnabled)
+				{
+					cmd.EnableKeyword(_BLEED_OCCLUSION_MASK);
+				}
 				switch (downsamplingMethod)
 				{
 					case Downsampling.None:
@@ -354,11 +359,15 @@ namespace UnityEngine.Rendering.Universal.Internal
 				{
 					cmd.DisableKeyword(_RECONSTRUCT_VRS_TILES);
 				}
+                if (xrEnabled)
+                {
+                    cmd.DisableKeyword(_BLEED_OCCLUSION_MASK);
+                }
 
 
 
 
-				if (requiresMips && mipLevels > 1)
+                if (requiresMips && mipLevels > 1)
 				{
 					int slices = 1;
 #if ENABLE_VR && ENABLE_XR_MODULE
@@ -389,14 +398,14 @@ namespace UnityEngine.Rendering.Universal.Internal
 
 						m_SizeArray[0] = math.max(m_SizeArray[0] >> 1, 1);
 						m_SizeArray[1] = math.max(m_SizeArray[1] >> 1, 1);
-						cmd.DispatchCompute(colorPyramidCompute, downsampleKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.00001f),
-																					 (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.00001f), slices);
+						cmd.DispatchCompute(colorPyramidCompute, downsampleKernelID, (m_SizeArray[0] + 7) / 8,
+																					 (m_SizeArray[1] + 7) / 8, slices);
 
 						cmd.SetComputeIntParams(colorPyramidCompute, s_SizeID, m_SizeArray);
 
 						cmd.SetComputeTextureParam(colorPyramidCompute, gaussianKernelID, s_DestID, destination, i);
-						cmd.DispatchCompute(colorPyramidCompute, gaussianKernelID, (int)math.ceil((float)m_SizeArray[0] / 8.0f + 0.0001f),
-																				   (int)math.ceil((float)m_SizeArray[1] / 8.0f + 0.0001f), slices);
+						cmd.DispatchCompute(colorPyramidCompute, gaussianKernelID, (m_SizeArray[0] + 7 ) / 8,
+																				   (m_SizeArray[1] + 7 ) / 8, slices);
 
 					}
 

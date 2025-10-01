@@ -7,6 +7,10 @@ using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using Unity.Mathematics;
+using UnityEngine.Experimental.Rendering;
+using static UnityEditor.ShaderData;
+
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -33,6 +37,7 @@ namespace UnityEngine.Rendering.Universal
         public static readonly int PrevHiZ0TextureID = Shader.PropertyToID("_PrevHiZ0Texture");
         // float4 containing the camera opaque texture's 
         public static readonly int OpaqueTextureDimID = Shader.PropertyToID("_CameraOpaqueTexture_Dim");
+        public static readonly int VrOccMeshDistanceID = Shader.PropertyToID("_VrOccMeshDistance");
 
         // Mips of the camera opaque texture only go down to 8x8 (2^3) so truncate the number of mips by this amount
         public const int opaqueMipTruncation = 3;
@@ -41,6 +46,10 @@ namespace UnityEngine.Rendering.Universal
 
         public GlobalKeyword HiZEnabledKW { get; private set; }
         public GlobalKeyword HiZMinMaxKW { get; private set; }
+
+        public RenderTexture VrOccDistanceTex;
+        public bool hasGeneratedVrOcDistTex = false;
+        public Material VrOccDistanceMat;
 
         // Previously was SSREnabledKW, had to be inverted to support disabling SSR as a material property without
         // adding an additional keyword.
@@ -90,6 +99,8 @@ namespace UnityEngine.Rendering.Universal
             SSRDisabledKW = GlobalKeyword.Create("_SLZ_SSR_DISABLED");
             HiZEnabledKW = GlobalKeyword.Create("_HIZ_ENABLED");
             HiZMinMaxKW = GlobalKeyword.Create("_HIZ_MIN_MAX_ENABLED");
+            VrOccDistanceTex = new RenderTexture(VrOccMaskDescriptor(4,4));
+            VrOccDistanceTex.hideFlags = HideFlags.DontSaveInBuild | HideFlags.DontSaveInEditor;
             //PerCameraOpaque = new SLZPerCameraRTStorage();
             //PerCameraPrevHiZ = new SLZPerCameraRTStorage();
             //PerCameraSSRGlobals = new SLZPerCameraBufferStorage(8, sizeof(float), ComputeBufferMode.Dynamic, ComputeBufferType.Constant);
@@ -261,6 +272,24 @@ namespace UnityEngine.Rendering.Universal
         {
             return (int)math.floor(math.max(math.log2(width), math.log2(height))) + 1 - opaqueMipTruncation;
         }
+
+        public static RenderTextureDescriptor VrOccMaskDescriptor(int width, int height)
+        {
+            RenderTextureDescriptor output = new RenderTextureDescriptor();
+            {
+                output.width = width;
+                output.height = height;
+                output.volumeDepth = 2;
+                output.depthBufferBits = 0;
+                output.graphicsFormat = Experimental.Rendering.GraphicsFormat.R8_UNorm;
+                output.dimension = TextureDimension.Tex2DArray;
+                output.enableRandomWrite = false;
+                output.useMipMap = false;
+                output.autoGenerateMips = false;
+                output.msaaSamples = 1;
+            }
+            return output;
+        }
     }
 
 
@@ -287,14 +316,18 @@ namespace UnityEngine.Rendering.Universal
         private PrevOpaqueRT prevOpaque;
         private PrevHiZRT prevHiZ;
 
+        private Material vrOccDistMat;
+
 
         SLZGlobalsData passData;
-        public SLZGlobalsSetPass(RenderPassEvent evt, bool skipSetup)
+        public SLZGlobalsSetPass(RenderPassEvent evt, bool skipSetup, Material vrOccDistMat)
         {
             renderPassEvent = evt;
             passData = new SLZGlobalsData();
 			skipRenderPassAttachmentSetup = skipSetup;
             useNativeRenderPass = false;
+            this.vrOccDistMat = vrOccDistMat;
+
             //ConfigureTarget(target);
         }
         public void Setup(CameraData camData, CameraDataExtSet camDataExtSet)
@@ -349,6 +382,37 @@ namespace UnityEngine.Rendering.Universal
             passData.screenWidth = targetDesc.width;
             passData.screenHeight = targetDesc.height;
             passData.opaqueTexSizeFrac = opaqueTexSizeFrac;
+            if (camData.xrRendering && camData.xrUniversal != null &&
+                    (
+                        (SLZGlobals.instance.VrOccDistanceTex.width  != (camData.cameraTargetDescriptor.width  / 4)) ||
+                        (SLZGlobals.instance.VrOccDistanceTex.height != (camData.cameraTargetDescriptor.height / 4))
+                    )
+                )
+            {
+                passData.generateXrOcclusionMeshDistance = true;
+
+                RenderTextureDescriptor maskDesc = SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height);
+                SLZGlobals.instance.VrOccDistanceTex.Release();
+                SLZGlobals.instance.VrOccDistanceTex.width = maskDesc.width / 4;
+                SLZGlobals.instance.VrOccDistanceTex.height = maskDesc.height / 4;
+                SLZGlobals.instance.VrOccDistanceTex.Create();
+
+                
+                
+                passData.xrPass = camData.xrUniversal;
+
+                passData.xrOcclusionMeshTexID = new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
+                cmd.GetTemporaryRT(SLZGlobals.VrOccMeshDistanceID, SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height));
+
+                passData.xrOccDistanceMat = vrOccDistMat;
+            }
+            else
+            {
+                passData.generateXrOcclusionMeshDistance = false;
+            }
+
+            passData.xrOccDistanceTex = RTHandles.Alloc(SLZGlobals.instance.VrOccDistanceTex);
+
             if (camData.requiresColorPyramid)
                 passData.opaqueMipLevels = SLZGlobals.CalculateOpaqueTexMipLevels(targetDesc.width / opaqueTexSizeFrac, targetDesc.height / opaqueTexSizeFrac);
             else
@@ -384,6 +448,17 @@ namespace UnityEngine.Rendering.Universal
                     //cmd.SetGlobalTexture(hiZID, hiZTex); // EXPERIMENT: use quad averaging instead of temporal averaging and avoid extra RT + blit + jank previous frame SSR estimation
                 }
 
+                if (data.generateXrOcclusionMeshDistance)
+                {
+                    cmd.SetRenderTarget(data.xrOcclusionMeshTexID, 0, CubemapFace.Unknown, -1);
+                    cmd.ClearRenderTarget(false, true, Color.red);
+                    data.xrPass.RenderOcclusionMesh(cmd, true);
+                    cmd.SetGlobalTexture("_MaskTex", data.xrOcclusionMeshTexID);
+
+                    cmd.SetRenderTarget(data.xrOccDistanceTex, 0, CubemapFace.Unknown, -1);
+                    data.xrPass.RenderOcclusionMesh(cmd, true, data.xrOccDistanceMat);
+                }
+                cmd.SetGlobalTexture(SLZGlobals.VrOccMeshDistanceID, data.xrOccDistanceTex);
                 SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, data.ssrMaxSteps, data.ssrMinMip, data.ssrHitRadius, data.temporalWeight, data.fov, data.screenHeight);
                 cmd.SetKeyword(ssrDisabledKW, !enableSSR);
                 cmd.SetKeyword(hiZEnabledKW, requireHiZ);
@@ -392,6 +467,36 @@ namespace UnityEngine.Rendering.Universal
                     new Vector4(data.screenWidth / data.opaqueTexSizeFrac, data.screenHeight / data.opaqueTexSizeFrac, data.opaqueMipLevels - 1, data.opaqueMipLevels + SLZGlobals.opaqueMipTruncation));
             }
         }
+
+        TextureDesc tempOcclusionMask(RenderTextureDescriptor main)
+        {
+            TextureDesc output = new TextureDesc(main.width, main.height, false, true);
+            {
+                output.sizeMode = TextureSizeMode.Explicit;
+                output.width = main.width;
+                output.height = main.height;
+                output.slices = 2;
+                output.scale = Vector2.one;
+                output.depthBufferBits = DepthBits.None;
+                output.colorFormat = Experimental.Rendering.GraphicsFormat.R8_UNorm;
+                output.filterMode = FilterMode.Point;
+                output.wrapMode = TextureWrapMode.Clamp;
+                output.dimension = TextureDimension.Tex2DArray;
+                output.enableRandomWrite = false;
+                output.useMipMap = false;
+                output.autoGenerateMips = false;
+                output.isShadowMap = false;
+                output.anisoLevel = 0;
+                output.mipMapBias = 0;
+                output.msaaSamples = MSAASamples.None;
+                output.bindTextureMS = false;
+                output.clearBuffer = true;
+                output.clearColor = Color.white;
+            }
+            return output;
+        }
+
+
 
         /// <summary>
         /// Rendergraph stuff
@@ -420,6 +525,13 @@ namespace UnityEngine.Rendering.Universal
             public int screenHeight;
             public int opaqueMipLevels;
             public int opaqueTexSizeFrac;
+            public bool generateXrOcclusionMeshDistance;
+
+            public XRPassUniversal xrPass;
+            public Material xrOccDistanceMat;
+            public RTHandle xrOccDistanceTex;
+            public TextureHandle xrOcclusionMeshTex;
+            public RenderTargetIdentifier xrOcclusionMeshTexID;
         }
 
         internal void Render(RenderGraph renderGraph, ref RenderingData renderingData)
@@ -452,6 +564,16 @@ namespace UnityEngine.Rendering.Universal
                 passData.ssrDisabledKW = SLZGlobals.instance.SSRDisabledKW;
                 passData.hiZEnabledKW = SLZGlobals.instance.HiZEnabledKW;
                 passData.hiZMinMaxKW = SLZGlobals.instance.HiZMinMaxKW;
+
+                if (camData.xrRendering)
+                {
+                    passData.generateXrOcclusionMeshDistance = true;
+                    passData.xrPass = camData.xrUniversal;
+                    passData.xrOcclusionMeshTex = 
+                        builder.CreateTransientTexture(tempOcclusionMask(camData.cameraTargetDescriptor));
+                    passData.xrOcclusionMeshTexID = ((RTHandle)passData.xrOcclusionMeshTex).nameID;
+                }
+
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc((SLZGlobalsData data, RenderGraphContext context) =>
                 {

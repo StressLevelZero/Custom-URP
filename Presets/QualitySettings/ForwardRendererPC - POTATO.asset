@@ -51,6 +51,8 @@ MonoBehaviour:
     DummyShader: {fileID: 4800000, guid: 1849e767ba948a84aae10d52f75a5a47, type: 3}
     CopySubpassInputShader: {fileID: 4800000, guid: 752a64d9362e27a4d874da44ffe7b2cb,
       type: 3}
+    CreateVROcclusionDistanceField: {fileID: 4800000, guid: 8febd36e62b42364da87468b77f520e5,
+      type: 3}
     dataDrivenLensFlare: {fileID: 4800000, guid: 6cda457ac28612740adb23da5d39ea92,
       type: 3}
   m_AssetVersion: 2

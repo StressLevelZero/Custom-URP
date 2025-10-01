@@ -145,6 +145,9 @@ namespace UnityEngine.Rendering.Universal
             [Reload("Shaders/Utils/CopySubpassInput.shader")]
             public Shader CopySubpassInputShader;
 
+            [Reload("Shaders/XR/XROcclusionMeshSDF.shader")]
+            public Shader CreateVROcclusionDistanceField;
+
             // END SLZ MODIFIED
 
             /// <summary>

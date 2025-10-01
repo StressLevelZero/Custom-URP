@@ -194,6 +194,7 @@ namespace UnityEngine.Rendering.Universal
         Material m_CameraMotionVecMaterial = null;
         Material m_ObjectMotionVecMaterial = null;
         Material m_CopySubpassInputMaterial = null;
+        Material m_CreateVROcclusionDistanceFieldMaterial = null;
 
         // SLZ MODIFIED
 
@@ -229,6 +230,7 @@ namespace UnityEngine.Rendering.Universal
             m_CameraMotionVecMaterial = CoreUtils.CreateEngineMaterial(data.shaders.cameraMotionVector);
             m_ObjectMotionVecMaterial = CoreUtils.CreateEngineMaterial(data.shaders.objectMotionVector);
             m_CopySubpassInputMaterial = CoreUtils.CreateEngineMaterial(data.shaders.CopySubpassInputShader);
+            m_CreateVROcclusionDistanceFieldMaterial = CoreUtils.CreateEngineMaterial(data.shaders.CreateVROcclusionDistanceField);
             // SLZ MODIFIED
 
             m_CopyDepthToColorMat = CoreUtils.CreateEngineMaterial(data.shaders.copyDepthToColorPS);
@@ -346,7 +348,7 @@ namespace UnityEngine.Rendering.Universal
             }
 
             // SLZ MODIFIED
-            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2, !useRenderPassEnabled); // If using native renderpass stuff, we can't skip the setup
+            m_SLZGlobalsSetPass = new SLZGlobalsSetPass(RenderPassEvent.BeforeRenderingOpaques - 2, !useRenderPassEnabled, m_CreateVROcclusionDistanceFieldMaterial); // If using native renderpass stuff, we can't skip the setup
             
             // END SLZ MODIFIED
 
@@ -458,6 +460,7 @@ namespace UnityEngine.Rendering.Universal
             CoreUtils.Destroy(m_CameraMotionVecMaterial);
             CoreUtils.Destroy(m_ObjectMotionVecMaterial);
             CoreUtils.Destroy(m_CopySubpassInputMaterial);
+            CoreUtils.Destroy(m_CreateVROcclusionDistanceFieldMaterial);
 
             CleanupRenderGraphResources();
 
