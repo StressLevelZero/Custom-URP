@@ -53,6 +53,8 @@
         float _ClipmapScale;
         float _ClipmapScale2;
         float3 _ClipmapPosition;
+
+		const float3 _invDimensions; 
         
         CBUFFER_START(PerFrameCB)
         float4x4 _VBufferCoordToViewDirWS; // >_>
@@ -130,7 +132,7 @@
         {
         	float3 color = float3(1,1,1);
         		// Based on Uncharted 4 "Mip Sky Fog" trick: http://advances.realtimerendering.com/other/2016/naughty_dog/NaughtyDog_TechArt_Final.pdf
-        		float mipLevel = (1.0 - _MipFogParameters.z * saturate((fragDist - _MipFogParameters.x) / (_MipFogParameters.y - _MipFogParameters.x))) * (_SkyMipCount - 1);
+        		float mipLevel = (1.0h - _MipFogParameters.z * saturate((fragDist - _MipFogParameters.x) / (_MipFogParameters.y - _MipFogParameters.x))) * (_SkyMipCount - 1);
         		// For the atmospheric scattering, we use the GGX convoluted version of the cubemap. That matches the of the idnex 0
         		//color *= SampleSkyTexture(-V, mipLevel, 0).rgb; // '_FogColor' is the tint
         	    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb; // '_FogColor' is the tint	
@@ -275,45 +277,45 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 {
 
 	///Get current RT resolution and convert it to 0 - 1 UVW space
-	float3 whd;
-	Result.GetDimensions(whd.x, whd.y, whd.z);
+	//float3 whd;
+	//Result.GetDimensions(whd.x, whd.y, whd.z);
 
-	float4 UVW = float4( (id) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
-	float e1 = (id.z + 1) / whd.z; // (slice + 1) / sliceCount //Todo: Bake Rcp 
-
+	//float4 UVW = float4( (id) / whd, 1); //Make uvs and sample from center of froxel //ID TO UVW
+	//float e1 = (id.z + 1) / whd.z; // (slice + 1) / sliceCount //Todo: Bake Rcp 
+     float e1 = (id.z + 1) * _invDimensions.z;
 	//TODO: replace this with the global baked bluenoise texture used elsewhere
 	// Perform per-pixel randomization by adding an offset and then sampling uniformly
-// (in the log space) in a vein similar to Stochastic Universal Sampling:
-// https://en.wikipedia.org/wiki/Stochastic_universal_sampling
-	float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
+	// (in the log space) in a vein similar to Stochastic Universal Sampling:
+	// https://en.wikipedia.org/wiki/Stochastic_universal_sampling
+	//float perPixelRandomOffset = GenerateHashedRandomfloat(id); //posInput.positionSS
 
 	// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
 	// Each of them is the centroid of the interval of length 2/14.
-	float rndVal = frac(perPixelRandomOffset + SeqOffset.z);
+	//float rndVal = frac(perPixelRandomOffset + SeqOffset.z);
 
-	float2 centerCoord = id.xy + float2(0.5, 0.5);
+	float2 centerCoord = id.xy + float2(0.5h, 0.5h);
 
 	// Compute a ray direction s.t. ViewSpace(rayDirWS).z = 1.
 	float3 rayDirWS = normalize(mul(-float4(centerCoord , 1, 1), _VBufferCoordToViewDirWS)).xyz ;
-	float  rcpLenRayDir = rsqrt(dot(rayDirWS, rayDirWS));
+	//float  rcpLenRayDir = rsqrt(dot(rayDirWS, rayDirWS));
 
-	float3 F = GetViewForwardDir();
-	float3 U = GetViewUpDir();
+	//float3 F = GetViewForwardDir();
+	//float3 U = GetViewUpDir();
 
-	float3 rightDirWS = cross(rayDirWS, U);
-	float  rcpLenRightDir = rsqrt(dot(rightDirWS, rightDirWS));
+	//float3 rightDirWS = cross(rayDirWS, U);
+	//float  rcpLenRightDir = rsqrt(dot(rightDirWS, rightDirWS));
 
-	rndVal =  SeqOffset.z ;
-	float  t = DecodeLogarithmicDepthGeneralized(  ( e1 - (rndVal * (1/whd.z))  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
-	float  pt = DecodeLogarithmicDepthGeneralized(  ( e1 - (.5 * (1/whd.z))  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	float rndVal =  SeqOffset.z ;
+	float  t = DecodeLogarithmicDepthGeneralized(  ( e1 - (rndVal * _invDimensions.z)  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	float  pt = DecodeLogarithmicDepthGeneralized(  ( e1 - (.5h * _invDimensions.z)  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
 	
 	float3 centerDirWS = rayDirWS; // //jittered ray
 
-	float FdotD = dot(F, centerDirWS);
-	float unitDistFaceSize = _VBufferUnitDepthTexelSpacing * FdotD * rcpLenRayDir;
+	//float FdotD = dot(F, centerDirWS);
+	//float unitDistFaceSize = _VBufferUnitDepthTexelSpacing * FdotD * rcpLenRayDir;
 
-	float3 xDirDerivWS = rightDirWS * (rcpLenRightDir * unitDistFaceSize); // Normalize & rescale
-	float3 yDirDerivWS = cross(xDirDerivWS, centerDirWS); // Will have the length of 'unitDistFaceSize' by construction
+	//float3 xDirDerivWS = rightDirWS * (rcpLenRightDir * unitDistFaceSize); // Normalize & rescale
+	//float3 yDirDerivWS = cross(xDirDerivWS, centerDirWS); // Will have the length of 'unitDistFaceSize' by construction
 	float3 jitterDirWS = normalize(centerDirWS);
 
 
@@ -344,9 +346,9 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	//Using combined clipmap instead of direct baked maps. Reduces the amount of 3d texture look-ups per frame.
 	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)	
-	float3 ClipmapUVW =  (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale *.5) )  ) / _ClipmapScale.xxx;
+	float3 ClipmapUVW =  (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale *.5h) )  ) / _ClipmapScale.xxx;
 	
-	float3 LargeClipmapUVW = (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale2 *.5) )  ) / (_ClipmapScale2.xxx);
+	float3 LargeClipmapUVW = (WS_coordinate.xyz - (_ClipmapPosition.xyz - (_ClipmapScale2 *.5h) )  ) / (_ClipmapScale2.xxx);
 
 	//For clipping the clipmap. Isn't needed if the view volume is smaller than the clipmap
 	float Clipped =
@@ -382,7 +384,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 	//float heightDensity = lerp(_GlobalExtinction, REAL_EPS,saturate( (WS_coordinate.y / maxheight - baseheight)  ));
 	//float NewValue = (((WS_coordinate.y) * (maxheight - baseheight)) / (1 - 0)) + baseheight;
 	float HeightRemap = (WS_coordinate.y - _FogBaseHeight) / (_FogMaxHeight - _FogBaseHeight);
-	float heightDensity = lerp(_GlobalExtinction, .001,sqrt(saturate( HeightRemap)) ); 
+	float heightDensity = lerp(_GlobalExtinction, .001h,sqrt(saturate( HeightRemap)) ); 
 	//accumLighting.a += _GlobalExtinction;
 //	accumLighting.a +=  RealtimeMediaSpheres(WS_coordinate.xyz); //Simple density spheres
 	accumLighting.a += heightDensity;
@@ -394,7 +396,7 @@ void Scatter(uint3 id : SV_DispatchThreadID)
 
 	//Result[id.xyz] = lerp(accumLighting , previousResult, reprojectionAmount); // Temporal sampling ComputeHistoryWeight()
 	//Doing a simple curve based on depth so nearer slices take longer to converge. This is to get rid of the near flickering. There is likely something else to fix and this is just a bandaid solution.
-	Result[id.xyz] = lerp(accumLighting , previousResult, ComputeHistoryWeight((1 / (id.z * id.z + .4) + 1)) ); // Temporal sampling 
+	Result[id.xyz] = lerp(accumLighting , previousResult, ComputeHistoryWeight((1 / (id.z * id.z + .4h) + 1)) ); // Temporal sampling 
 	
 }
 

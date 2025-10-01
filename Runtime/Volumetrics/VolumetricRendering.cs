@@ -267,7 +267,11 @@ public class VolumetricRendering : MonoBehaviour
     protected int BlurKernelY = 0;
 
     Matrix4x4 matScaleBias;
-    Vector3 ThreadsToDispatch;
+    //Vector3 ThreadsToDispatch;
+    private int gxs, gys, gzs , igx ,igy;
+    private Vector3 invDimensions; //inverse dimensions
+    private Vector3 invDimensionsStereo; //inverse dimensions
+    
 
     //Stored shader variable name IDs
 
@@ -301,6 +305,8 @@ public class VolumetricRendering : MonoBehaviour
     int ID_ClipmapWorldPosition = Shader.PropertyToID("ClipmapWorldPosition");
     int ID_VBufferUnitDepthTexelSpacing = Shader.PropertyToID("_VBufferUnitDepthTexelSpacing");
     int ID_VolZBufferParams = Shader.PropertyToID("_VolZBufferParams");
+    int ID_invDimensions = Shader.PropertyToID("_invDimensions");
+    int ID_FroxelDepthCount = Shader.PropertyToID("_FroxelDepthCount");
     int ID_GlobalExtinction = Shader.PropertyToID("_GlobalExtinction");
     int ID_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
     int ID_GlobalScattering = Shader.PropertyToID("_GlobalScattering");
@@ -667,11 +673,36 @@ public class VolumetricRendering : MonoBehaviour
             VolumetricResult = IntegrationBuffer;
         }
 
-        ThreadsToDispatch = new Vector3(
-             Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f), 1.0f),
-              Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelHeightResolution / 4.0f), 1.0f),
-              Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f), 1.0f)
-            );
+        invDimensions.x = 1.0f / volumetricData.FroxelWidthResolution;
+        invDimensions.y = 1.0f / volumetricData.FroxelHeightResolution;
+        invDimensions.z = 1.0f / volumetricData.FroxelDepthResolution;
+
+
+        invDimensionsStereo.x = invDimensions.x * .5f;
+        invDimensionsStereo.y = invDimensions.y;
+        invDimensionsStereo.z = invDimensions.z ;
+        
+        // ThreadsToDispatch = new Vector3(
+        //      Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelWidthResolution / 4.0f), 1.0f),
+        //       Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelHeightResolution / 4.0f), 1.0f),
+        //       Mathf.Max(Mathf.CeilToInt(volumetricData.FroxelDepthResolution / 4.0f), 1.0f)
+        //     );
+        
+        // Scatter: [numthreads(4,4,4)]
+        uint sx, sy, sz;
+        FroxelFogCompute.GetKernelThreadGroupSizes(ScatteringKernel, out sx, out sy, out sz);
+         gxs = Mathf.CeilToInt((float)volumetricData.FroxelWidthResolution  / sx);
+         gys = Mathf.CeilToInt((float)volumetricData.FroxelHeightResolution / sy);
+         gzs = Mathf.CeilToInt((float)volumetricData.FroxelDepthResolution  / sz);
+         
+         
+    // StepAdd: [numthreads(8,8,1)] — loops Z internally → 2D dispatch, stereo-wide
+         uint isx, isy, isz;
+         FroxelIntegrationCompute.GetKernelThreadGroupSizes(IntegrateKernel, out isx, out isy, out isz);
+         int totalWidth = volumetricData.FroxelWidthResolution * 2;
+         igx = Mathf.CeilToInt((float)totalWidth / isx);
+         igy = Mathf.CeilToInt((float)volumetricData.FroxelHeightResolution / isy);
+         FroxelIntegrationCompute.Dispatch(IntegrateKernel, igx, igy, 1);
 
         //    ComputZPlaneTexelSpacing(1.0f, vFoV, parameters.resolution.y);
 
@@ -702,7 +733,7 @@ public class VolumetricRendering : MonoBehaviour
         UpdateClipmaps();
         SetFroxelFogUniforms(true);
         SetFroxelIntegrationUniforms(true);
-        SetBlurUniforms(true);
+        //SetBlurUniforms(true);
 
         hasInitialized = true;
         VolumetricRegisters.RegisterVolumetricRenderer(this);
@@ -716,9 +747,13 @@ public class VolumetricRendering : MonoBehaviour
             FroxelFogCompute.SetFloat(ID_VBufferUnitDepthTexelSpacing, ZPlaneTexelSpacing);
             FroxelFogCompute.SetFloat(ID_ClipmapScale1, volumetricData.ClipmapScale);
             FroxelFogCompute.SetFloat(ID_ClipmapScale2, volumetricData.ClipmapScale2);
+            FroxelFogCompute.SetVector(ID_invDimensions, invDimensions);
             //FroxelFogCompute.SetFloat(ID_GlobalExtinction, Extinction);
             //FroxelFogCompute.SetFloat(ID_StaticLightMultiplier, StaticLightMultiplier);
             FroxelFogCompute.SetTexture(ScatteringKernel, ID_Result, FroxelBufferA);
+            // FroxelFogCompute.SetFloat("invW", invW);
+            // FroxelFogCompute.SetFloat("invH", invH);
+            // FroxelFogCompute.SetFloat("invD", invD);
             // CheckCookieList();
             // FroxelFogCompute.SetTexture(ScatteringKernel, ID_LightProjectionTextureArray, LightProjectionTextures);
             FroxelFogCompute.SetConstantBuffer(PerFrameConstBufferID, StepAddPerFrameConstantBuffer, 0, StepAddPerFrameCount * sizeof(float));
@@ -754,6 +789,9 @@ public class VolumetricRendering : MonoBehaviour
             FroxelIntegrationCompute.SetMatrix(ID_LeftEyeMatrix, LeftEyeMatrix);
             FroxelIntegrationCompute.SetMatrix(ID_RightEyeMatrix, RightEyeMatrix);
             FroxelIntegrationCompute.SetVector(ID_VolZBufferParams, VolZBufferParams);
+            FroxelIntegrationCompute.SetVector(ID_invDimensions, invDimensionsStereo);
+            FroxelIntegrationCompute.SetInt(ID_FroxelDepthCount, volumetricData.FroxelDepthResolution);
+
             //FroxelIntegrationCompute.SetVector(ID_GlobalScattering, ExtinctionColor);
             FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_Result, IntegrationBuffer);
             FroxelIntegrationCompute.SetTexture(IntegrateKernel, ID_InLightingTexture, FroxelBufferA);
@@ -762,17 +800,17 @@ public class VolumetricRendering : MonoBehaviour
         }
     }
 
-    void SetBlurUniforms(bool forceUpdate = false)
-    {
-        if (FroxelBlur == BlurType.Gaussian && (lastBlur != this || forceUpdate))
-        {
-            BlurCompute.SetTexture(BlurKernelX, ID_InTex, IntegrationBuffer);
-            BlurCompute.SetTexture(BlurKernelX, ID_Result, BlurBuffer);
-            BlurCompute.SetTexture(BlurKernelY, ID_InTex, BlurBuffer);
-            BlurCompute.SetTexture(BlurKernelY, ID_Result, BlurBufferB);
-            lastBlur = this;
-        }
-    }
+    // void SetBlurUniforms(bool forceUpdate = false)
+    // {
+    //     if (FroxelBlur == BlurType.Gaussian && (lastBlur != this || forceUpdate))
+    //     {
+    //         BlurCompute.SetTexture(BlurKernelX, ID_InTex, IntegrationBuffer);
+    //         BlurCompute.SetTexture(BlurKernelX, ID_Result, BlurBuffer);
+    //         BlurCompute.SetTexture(BlurKernelY, ID_InTex, BlurBuffer);
+    //         BlurCompute.SetTexture(BlurKernelY, ID_Result, BlurBufferB);
+    //         lastBlur = this;
+    //     }
+    // }
 
     public void ClearAllBuffers()
     {
@@ -1146,7 +1184,7 @@ public class VolumetricRendering : MonoBehaviour
 
             SetFroxelFogUniforms();
             SetFroxelIntegrationUniforms();
-            SetBlurUniforms();
+            //SetBlurUniforms();
 
             FlopIntegralBuffers();
             //  Matrix4x4 lightMatrix = matScaleBias * Matrix4x4.Perspective(LightPosition.spotAngle, 1, 0.1f, LightPosition.range) * Matrix4x4.Rotate(LightPosition.transform.rotation).inverse;
@@ -1291,17 +1329,19 @@ public class VolumetricRendering : MonoBehaviour
             var gpuProj = GL.GetGPUProjectionMatrix(Matrix4x4.Perspective(activeCam.fieldOfView, CamAspectRatio, activeCam.nearClipPlane, 100000f), true);
             PrevViewProjMatrix = gpuProj * activeCam.worldToCameraMatrix;
             //Debug.Log("Dispatching 3");
-            FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+            //FroxelFogCompute.Dispatch(ScatteringKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+            FroxelFogCompute.Dispatch(ScatteringKernel, gxs, gys, gzs);
             //    FroxelStackingCompute.DispatchIndirect
             //CONVERT TO DISPATCH INDIRECT to avoid CPU callback?
             //Debug.Log("Dispatching 4");
-            FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
-
-            if (FroxelBlur == BlurType.Gaussian)
-            {
-                BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
-                BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
-            }
+            //FroxelIntegrationCompute.Dispatch(IntegrateKernel, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); //x2 for stereo
+            FroxelIntegrationCompute.Dispatch(IntegrateKernel, igx, igy, 1);
+            
+            // if (FroxelBlur == BlurType.Gaussian)
+            // {
+            //     BlurCompute.Dispatch(BlurKernelX, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+            //     BlurCompute.Dispatch(BlurKernelY, (int)ThreadsToDispatch.x * 2, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z); // Final blur
+            // }
             /* Give the shader constant buffer and volumetric render texture to the
              * additional camera data so that on render the camera can set them as
              * globals

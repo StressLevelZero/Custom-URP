@@ -3,45 +3,31 @@
 
 #pragma kernel StepAdd
 #define EPSILON  1e-8;
-
-
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GeometricTools.hlsl"
-//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
-//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
-//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
-//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/EntityLighting.hlsl"
 
 
-
-RWTexture3D<float4> Result;
-Texture3D<float4> InLightingTexture;
-Texture3D<float4> HistoryBuffer;
-SamplerState Custom_trilinear_clamp_sampler;
-
-
-//shared float4 _GlobalExtinctionTint;
+RWTexture3D<half4> Result;
+Texture3D<half4> InLightingTexture;
+//Texture3D<half4> HistoryBuffer;
+SamplerState Custom_linear_clamp_sampler;
 
 
-//#define extinction _GlobalExtinction
-
-
-
-
-float4x4    LeftEyeMatrix;
-float4x4    RightEyeMatrix;
+// float4x4    LeftEyeMatrix;
+// float4x4    RightEyeMatrix;
 
 //shared float4 _VolumePlaneSettings;
 //shared float _GlobalExtinction;
-shared float4 _GlobalScattering;
+shared half4 _GlobalScattering;
 
-float4 _VolZBufferParams;
+const half3 _invDimensions;
+const int _FroxelDepthCount;
+const half4 _VolZBufferParams;	
 
 //shared float4 _VBufferDistanceEncodingParams;
 
 CBUFFER_START(PerFrameCB)
-float4 _VBufferDistanceDecodingParams;
-float3 SeqOffset; //z offseter
+const half4 _VBufferDistanceDecodingParams;
+const half3 SeqOffset; //z offseter
 CBUFFER_END
 
 //float4 StereoOffset() {
@@ -65,61 +51,34 @@ CBUFFER_END
 //
 //}
 
+//inline half fastExpNeg(half x) { return exp2(-x * 1.44269504h); }
 
 [numthreads(8, 8, 1)]	
 void StepAdd(uint3 id : SV_DispatchThreadID)
 {
-	//Use this to figure out distance between layers
-	//float near = _VolumePlaneSettings.x;
-	//float far = _VolumePlaneSettings.y;
-
 	// T (A → B) = 𝑒 ^ -({ S [𝐴 - 𝐵]}	𝛽𝑒(𝑥) 𝑑x	)
 	//float Absorption = 0.01f; //temp Absorption rate
 
-	float perPixelRandomOffset = GenerateHashedRandomFloat(id); //posInput.positionSS
+	half4 accumScatteringTransmittance = float4(0, 0, 0, 1); //used for current slice output
 
-// This is a time-based sequence of 7 equidistant numbers from 1/14 to 13/14.
-// Each of them is the centroid of the interval of length 2/14.
-	float3 rndVal =  frac(perPixelRandomOffset + 1-SeqOffset);
+	//Make SBS for stereoscopic.
+	half3 Stereo_UVWs =  (id + 0.5h) * _invDimensions; //half4( id / whd ,1)
 
-	float3 whd ; //make floating to avoid interger calulations later
-	Result.GetDimensions(whd.x, whd.y, whd.z); //TODO: Send this in scrpit instead of getting it here
+	//int EyeID = floor(Stereo_UVWs.x * 2); //Assume left and right eyes
+	const uint eye = (uint)floor(Stereo_UVWs.x * 2.0);
+	const half sign = (eye == 0u) ? 1.0h : -1.0h;
 
-	float4 accumScatteringTransmittance = float4(0, 0, 0, 1); //used for current slice output
-
-	//Make stereoscopic.
-	float4 Stereo_UVWs = float4( ((id ))/ whd ,1);
-
-	//Shift space to linear. TODO: link to a shared file and add bias
-	//Stereo_UVWs.z = Stereo_UVWs.z * _VolumePlaneSettings.y / (1 + Stereo_UVWs.z * _VolumePlaneSettings.z); // LinearToVaporDeviceDepth	
-
-	int EyeID = floor(Stereo_UVWs.x * 2); //Assume left and right eyes
-
-	Stereo_UVWs.x = frac(Stereo_UVWs.x * 2); //Make both eyes have proper UV.x
-	
-	///Doesn't support android.
-	//if (id.x < whd.x / 2) 	{
-	//	Stereo_UVWs = mul(LeftEyeMatrix, Stereo_UVWs);
-	//}
-	//else	{
-	//	Stereo_UVWs = mul(RightEyeMatrix, Stereo_UVWs);
-	//}
-
-	//Mask matrix transforms per eye
-//		Stereo_UVWs = (mul(LeftEyeMatrix, Stereo_UVWs) * (1-EyeID)) + (mul(RightEyeMatrix, Stereo_UVWs) * EyeID);
-	//Disabled until it's done correctly for log space
+	Stereo_UVWs.x = frac(Stereo_UVWs.x * 2); //Make both eyes have proper UV.x	
 
 	Stereo_UVWs.z = DecodeLogarithmicDepthGeneralized(Stereo_UVWs.z, _VBufferDistanceDecodingParams);
 
-	float ipd = 0.0001;
+	half ipd = 0.0001;	
 
-	Stereo_UVWs.x = (((Stereo_UVWs.x + (ipd * (1- Stereo_UVWs.z)) )* (1-EyeID)) + (Stereo_UVWs.x - (ipd * (1 - Stereo_UVWs.z)) )*EyeID);
+	Stereo_UVWs.x += sign * ipd * (1.0h - Stereo_UVWs.z);
 
-	float invDepthNum = 1.0 / whd.z; // used to avoid division per slice TODO: move to sccpit
+	half invDepthNum = _invDimensions.z;
 
-	float previousDepth = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
-
-	float4 previousResult = HistoryBuffer[id];
+	half previousDepth = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
 
  //Max unroll. Maybe make this a precompute to optimize further. TODO: Add clamp in scrpit
 //#if defined(SHADER_API_MOBILE)
@@ -127,30 +86,33 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
 //#else
 //	[unroll(128)]
 //#endif 
-	for (float depth = 0.0; depth < whd.z; depth++) {
+	for (uint depth = 0u; depth < _FroxelDepthCount; depth++) {
 
-		float UVSlice = depth * invDepthNum; // slice / slicecount
+		half UVSlice = depth * invDepthNum; 
 
 		//Sampling the input texture here instead of doing an ID lookup because we are offsetting the UVs to get stereo instead of doing it the previous step
-		float4 scatteringExtinction = 
-			InLightingTexture.SampleLevel(Custom_trilinear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0)  ; //Sample current Layer 
-		//float zDepth = GetWDepth(UVSlice);
-		float zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
-		float travelDis = (zDepth - previousDepth)   ; //Distance between layers. Jittering and do temporal blend
-		//* (.5 + rndVal.z *.5)
-		float extinction = scatteringExtinction.a;
-		 float transmittance = exp(-extinction * travelDis );
+		const half4 scatteringExtinction = 
+			InLightingTexture.SampleLevel(Custom_linear_clamp_sampler,float3(Stereo_UVWs.xy, depth * invDepthNum), 0)  ; //Sample current Layer 
+		half zDepth = DecodeLogarithmicDepthGeneralized(UVSlice, _VBufferDistanceDecodingParams);
+		half travelDis = zDepth - previousDepth; 
+		const half extinction = scatteringExtinction.a;
+		const half rcpExtinction = rcp(max(extinction, 1e-6h));
+		const half transmittance = exp2(-extinction * travelDis * 1.44269504h); //fastExpNeg of exp(-extinction * travelDis)
 
-	//	accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * _GlobalScattering; //Non-energy conserve
-		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ((1.0 - transmittance) / extinction) * _GlobalScattering; //Corrected version
+		accumScatteringTransmittance.rgb += scatteringExtinction.rgb * accumScatteringTransmittance.a * ( (1.0 - transmittance) * rcpExtinction) * _GlobalScattering; //Corrected version
 		accumScatteringTransmittance.a *= transmittance ;
-
-
-	//	float4 normalizedVoxelValue = accumScatteringTransmittance * rcp(travelDis);
-
 		Result[int3(id.x, id.y, depth)] = accumScatteringTransmittance;
-
 		previousDepth = zDepth;
+
+		//Early out when transmittance is tiny 
+		if (accumScatteringTransmittance.a <= (half)1e-3)
+		{
+			// fill remaining depths with last value (just UAV writes, no sampling/exp)
+			for (uint d = depth + 1u; d < _FroxelDepthCount; ++d)
+				Result[int3(id.x, id.y, d)] = accumScatteringTransmittance;
+			break;
+		}
+
 	}
 
 }
