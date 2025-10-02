@@ -8,11 +8,10 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using Unity.Mathematics;
 using UnityEngine.Experimental.Rendering;
-using static UnityEditor.ShaderData;
-
 
 #if UNITY_EDITOR
 using UnityEditor;
+//using static UnityEditor.ShaderData;
 #endif
 
 namespace UnityEngine.Rendering.Universal
