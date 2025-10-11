@@ -10,3 +10,22 @@ If rebuilding this from source, apply DXC-unityfix.patch to the repo root and SP
 Changes in VS 2022 17.10 to make mutex constructors constexpr causes a crash in this dll on our build machines. Force old behavior with _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR  (https://github.com/microsoft/STL/wiki/Changelog#vs-2022-1710)
 
 2024-10-4 Discovered crash on an assert in SPIRV-Tools when compiling with 16 bit types. Visual Studio cmake configs seem to be bugged where it undefines NDEBUG for LLVM, which propagates into SPIRV-Tools and makes it throw assertions in release builds. Using cmake directly to build the project seems to fix the issue
+
+2025-10-9 Attempting to build a year later, previous build instructions were insufficient. The project generation is the only part that must be done with command-line cmake. The actual build can be done by opening the generated "LLVM" solution file with VS and building that. If also building with cmake you need to add `-Wno-error` to the CMAKE_CXX_FLAGS. Something is force setting Werror when built by cmake but not when built with VS.
+
+Other requirements for building the solution:
+1) It has to be done from a powershell terminal that has previously run vcvarsall.bat with the x86_64 option. Don't use the powershell from within VS or the "Developer Powershell" shortcut, those seem to either not set the target architecture or set it to the wrong value somehow. 
+2) use Visual Studio 17 2022 as the project generator, not ninja like the VS cmakesettings.json does. It's too hard to get ninja to use clang-cl
+3) use the version of cmake embedded in the visual studio install. The cmake files are too out-of-date and recent versions straight up refuse to set certain legacy policies required by the cmakelists.
+
+This is my current build.bat file for generating the solution:
+
+```
+CALL "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
+SET projectDir=%cd%
+SET BUILD_TYPE=RelWithDebInfo
+SET BUILD_DIR=out5
+CALL "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Visual Studio 17 2022" -T ClangCl -B %BUILD_DIR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -C %projectDir%\cmake\caches\PredefinedParams.cmake -DCLANG_CL=True -DSPIRV_WERROR=False -DLLVM_ENABLE_WARNINGS=False -DSPIRV_BUILD_TESTS=False -DLLVM_ENABLE_ASSERTIONS=Off -DLLVM_ENABLE_WERROR=False -DLLVM_LIT_ARGS="-v" -DCMAKE_CXX_FLAGS="/D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1 /D NDEBUG=1 -Wno-error -Wno-unsafe-buffer-usage -Wno-c++98-compat -Wno-switch -Wno-unused-variable -Wno-cast-function-type-mismatch"
+```
+
+Note that I set DLLVM_ENABLE_ASSERTIONS=Off here. It was previously set to On in my last used build confing in the CMakeSettings.json used by VS gui cmake. I'm unsure if I accidentally copy-pasted this from the debug build config, maybe this is what was causing the issue with building with VS and not just visual studio not setting NDEBUG during project generation? Or maybe there was a legitimate reason that I've forgottent that DLLVM_ENABLE_ASSERTIONS needs to be on? Building with it off seems to work fine...
