@@ -9,26 +9,53 @@ using System.Diagnostics;
 using System.IO;
 using UnityEditor.SceneManagement;
 using Debug = UnityEngine.Debug;
+using System.Web;
+using System;
 
 namespace SLZ.SLZEditorTools
 {
     public class GraphicsAPISwitch : EditorWindow
     {
-        [MenuItem("Stress Level Zero/Switch Graphics API",priority = 1)]
+        [MenuItem("Stress Level Zero/Switch Graphics API",priority = 100)]
         public static void ShowWindow()
         {
             GraphicsAPISwitch wnd = GetWindow<GraphicsAPISwitch>();
             wnd.titleContent = new GUIContent("Switch Graphics API");
+            
         }
 
         [SerializeField]
         public GraphicsDeviceType newAPI = GraphicsDeviceType.Vulkan;
 
-        static Dictionary<GraphicsDeviceType, string> launchParams = new Dictionary<GraphicsDeviceType, string>()
+        Dictionary<GraphicsDeviceType, string> launchParams = new Dictionary<GraphicsDeviceType, string>()
         {
             {GraphicsDeviceType.Vulkan, "-force-vulkan"},
             {GraphicsDeviceType.Direct3D12, "-force-d3d12"},
             {GraphicsDeviceType.Direct3D11, "-force-d3d11"},
+
+        };
+
+        static HashSet<string> stripLaunchParams = new HashSet<string>()
+        {
+            //"-projectpath",
+            "-force-vulkan",
+            "-force-d3d11",
+            "-force-d3d12",
+            //"-useHub",
+            //"-hubIPC",
+            //"-cloudEnvironment",
+            //"-licensingIpc",
+            //"-hubSessionId",
+            //"-accessToken"
+        };
+
+        static HashSet<string> skipParameter = new HashSet<string>()
+        {
+            "-projectpath",
+            "-cloudEnvironment",
+            "-licensingIpc",
+            "-hubSessionId",
+            "-accessToken",
         };
 
         public void CreateGUI()
@@ -90,35 +117,59 @@ namespace SLZ.SLZEditorTools
             }
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             {
-                Process unity = new Process();
-                string projectPath = Path.GetDirectoryName(Application.dataPath);
-                unity.StartInfo.FileName = EditorApplication.applicationPath;
-                unity.StartInfo.Arguments = $"-projectPath \"{projectPath}\" {launchParams[newAPI]}";
-                unity.Start();
-                EditorApplication.Exit(0);
+                //Process cmd = new Process();
+                //string projectPath = Path.GetDirectoryName(Application.dataPath);
+                //string unity = EditorApplication.applicationPath;
+                //cmd.StartInfo.FileName = "cmd.exe";
+                //cmd.StartInfo.Arguments = $"/K timeout /t 10 & \"{unity}\" -projectPath \"{projectPath}\" {launchParams[newAPI]}";
+                //cmd.StartInfo.UseShellExecute = true;
+                //cmd.Start();
+                string[] args = Environment.GetCommandLineArgs();
+                List<string> newArgs = new List<string>(args.Length + 1) { launchParams[newAPI] };
+                for (int i = 1; i < args.Length; i++)
+                {
+                    if (!stripLaunchParams.Contains(args[i]))
+                    {
+                        newArgs.Add(args[i]);
+                    }
+                    //else if (skipParameter.Contains(args[i]))
+                    //{
+                    //    i += 1;
+                    //}
+                }
+                Debug.Log("Command line args: " + string.Join(" ", newArgs));
+
+                Process cmd = new Process();
+                //string projectPath = Path.GetDirectoryName(Application.dataPath);
+                string unity = EditorApplication.applicationPath;
+                cmd.StartInfo.FileName = unity;
+                cmd.StartInfo.Arguments = string.Join(" ", newArgs);
+                cmd.StartInfo.UseShellExecute = true;
+                cmd.Start();
+                Process.GetCurrentProcess().Kill();
+                //EditorApplication.OpenProject(projectPath, newArgs.ToArray());
             }
         }
 
-        public static void SwitchToAPI(GraphicsDeviceType gfxAPI)
+        //[MenuItem("Tools/TestPrintLaunchArgs")]
+        public static void DebugPrintMessage()
         {
-            if (gfxAPI == SystemInfo.graphicsDeviceType)
-            {
-                return;
-            }
-            if (!launchParams.ContainsKey(gfxAPI))
-            {
-                Debug.LogError($"Chosen graphics API is {gfxAPI.ToString()}, but this script has no launch parameters for this API?");
-                return;
-            }
-            if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
-            {
-                Process unity = new Process();
-                string projectPath = Path.GetDirectoryName(Application.dataPath);
-                unity.StartInfo.FileName = EditorApplication.applicationPath;
-                unity.StartInfo.Arguments = $"-projectPath \"{projectPath}\" {launchParams[gfxAPI]}";
-                unity.Start();
-                EditorApplication.Exit(0);
-            }
+            string[] args = Environment.GetCommandLineArgs();
+            //List<string> newArgs = new List<string>(args.Length + 1) {  };
+            //for (int i = 1; i < args.Length; i++)
+            //{
+            //    if (!stripLaunchParams.Contains(args[i]))
+            //    {
+            //        newArgs.Add(args[i]);
+            //    }
+            //    else if (skipParameter.Contains(args[i]))
+            //    {
+            //        i += 1;
+            //    }
+            //}
+            string[] newArgs = args;
+
+            Debug.Log("Command line args: " + string.Join(" ", newArgs));
         }
     }
 }

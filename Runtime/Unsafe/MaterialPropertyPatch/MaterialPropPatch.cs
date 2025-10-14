@@ -16,7 +16,7 @@ public unsafe static class MaterialPropPatch
 
     public static Material[] materialsDetour(Renderer r)
     {
-        throw new InvalidOperationException("Tried to call Renderer.materials. You probably meant Renderer.sharedMaterials. If you actually want to generate material instances, use the extension method 'Renderer.CreateMaterialInstanceExt' or the built-in renderer.GetMaterials method");
+        throw new InvalidOperationException("Tried to call Renderer.materials. You probably meant Renderer.sharedMaterials. If you actually want to generate material instances, use the extension method 'Renderer.CreateMaterialsInstanceExt' or the built-in renderer.GetMaterials method");
     }
 
     #region apdk_detour
