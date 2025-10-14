@@ -391,7 +391,7 @@ namespace SLZ.SLZEditorTools
 
             for (int rIdx = 0; rIdx < renderers.Count; rIdx++)
             {
-                Material[] mats = renderers[rIdx].materials;
+                Material[] mats = renderers[rIdx].sharedMaterials;
                 int smCount = mats.Length;
                 for (int smIdx = 0; smIdx < smCount; smIdx++)
                 {
