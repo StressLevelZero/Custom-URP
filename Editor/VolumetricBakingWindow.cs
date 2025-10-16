@@ -196,9 +196,10 @@ public class VolumetricBaking : EditorWindow
     public void SwtichToDX12()
     {
         //Debug.Log($"New API: {newAPI.ToString()}");
-
-        GraphicsAPISwitch.SwitchToAPI(GraphicsDeviceType.Direct3D12);
-
+        GraphicsAPISwitch APISwitch = ScriptableObject.CreateInstance<GraphicsAPISwitch>();
+        APISwitch.newAPI = GraphicsDeviceType.Direct3D12;
+        APISwitch.SwtichToNewAPI();
+        DestroyImmediate(APISwitch);
         //if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
         //{
         //    Process cmd = new Process();

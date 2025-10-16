@@ -7,17 +7,119 @@ using UnityEngine;
 
 public unsafe static class MaterialPropPatch 
 {
-    delegate Material GetMaterialDelegate(Renderer r);
-    delegate Material[] GetMaterialArrayDelegate(Renderer r);
+
+    public delegate bool IsPersistentDelegate(Renderer r);
+    static IsPersistentDelegate s_IsPersistent;
+    static IsPersistentDelegate IsPersistent
+    {
+        get
+        {
+            if (s_IsPersistent == null)
+            {
+                MethodInfo IsPersistentMI = typeof(Renderer).GetMethod("IsPersistent", BindingFlags.Instance | BindingFlags.NonPublic);
+                s_IsPersistent = (IsPersistentDelegate)IsPersistentMI.CreateDelegate(typeof(IsPersistentDelegate));
+            }
+            return s_IsPersistent;
+        }
+    }
+
+    public delegate Material GetMaterialDelegate(Renderer r);
+    static GetMaterialDelegate s_GetMaterialDelegate;
+    static GetMaterialDelegate GetMaterial
+    {
+        get
+        {
+            if (s_GetMaterialDelegate == null)
+            {
+                MethodInfo getMaterialMI = typeof(Renderer).GetMethod("GetMaterial", BindingFlags.Instance | BindingFlags.NonPublic);
+                s_GetMaterialDelegate = (GetMaterialDelegate)getMaterialMI.CreateDelegate(typeof(GetMaterialDelegate));
+            }
+            return s_GetMaterialDelegate;
+        }
+    }
+
+    public delegate Material[] GetMaterialArrayDelegate(Renderer r);
+    static GetMaterialArrayDelegate s_GetMaterialArrayDelegate;
+    static GetMaterialArrayDelegate GetMaterialArray
+    {
+        get
+        {
+            if (s_GetMaterialArrayDelegate == null)
+            {
+                MethodInfo getMaterialArrayMI = typeof(Renderer).GetMethod("GetMaterialArray", BindingFlags.Instance | BindingFlags.NonPublic);
+                s_GetMaterialArrayDelegate = (GetMaterialArrayDelegate)getMaterialArrayMI.CreateDelegate(typeof(GetMaterialArrayDelegate));
+            }
+            return s_GetMaterialArrayDelegate;
+        }
+    }
+
+    public static Material GetMaterialInstanceExt(this Renderer renderer)
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            Debug.LogError("Not allowed to access Renderer.GetMaterialInstanceExt in edit mode. Creating material instances in edit mode is wrong.", renderer);
+            return null;
+        }
+        if (IsPersistent.Invoke(renderer))
+        {
+            Debug.LogError("Not allowed to access Renderer.GetMaterialInstanceExt on prefab object. Use Renderer.sharedMaterial instead", renderer);
+            return null;
+        }
+        return GetMaterial.Invoke(renderer);
+#else
+        return renderer.material;
+#endif
+    }
+
+    public static Material[] GetAllMaterialInstancesExt(this Renderer renderer)
+    {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            Debug.LogError("Not allowed to access Renderer.GetAllMaterialInstancesExt in edit mode. Creating material instances in edit mode is wrong.", renderer);
+            return null;
+        }
+        if (IsPersistent.Invoke(renderer))
+        {
+            Debug.LogError("Not allowed to access Renderer.GetAllMaterialInstancesExt on prefab object. Use Renderer.sharedMaterials instead", renderer);
+            return null;
+        }
+        return GetMaterialArray.Invoke(renderer);
+#else
+        return renderer.materials;
+#endif
+    }
+
+    #region detour_methods
     public static Material materialDetour(Renderer r)
     {
-        throw new InvalidOperationException("Tried to call Renderer.material. You probably meant Renderer.sharedMaterial. If you actually want to generate a material instance, use the extension method 'Renderer.CreateMaterialInstanceExt' or the built-in renderer.GetMaterials method");
+#if !STRICT_MATERIAL_CHECK
+        if (Application.isPlaying)
+        {
+#if WARN_MATERIAL_CHECK
+            Debug.LogWarning("Tried to call Renderer.material. You probably meant Renderer.sharedMaterial. If you actually want to generate a material instance, use the extension method 'Renderer.GetMaterialInstanceExt' or the built-in renderer.GetMaterials method");
+#endif
+            return r.GetMaterialInstanceExt();
+        }
+#endif
+            throw new InvalidOperationException("Tried to call Renderer.material. You probably meant Renderer.sharedMaterial. If you actually want to generate a material instance, use the extension method 'Renderer.GetMaterialInstanceExt' or the built-in renderer.GetMaterials method");
     }
 
     public static Material[] materialsDetour(Renderer r)
     {
-        throw new InvalidOperationException("Tried to call Renderer.materials. You probably meant Renderer.sharedMaterials. If you actually want to generate material instances, use the extension method 'Renderer.CreateMaterialsInstanceExt' or the built-in renderer.GetMaterials method");
+#if !STRICT_MATERIAL_CHECK 
+        if (!Application.isPlaying)
+        {
+#if WARN_MATERIAL_CHECK
+            Debug.LogWarning("Tried to call Renderer.materials. You probably meant Renderer.sharedMaterials. If you actually want to generate material instances, use the extension method 'Renderer.GetAllMaterialInstancesExt' or the built-in renderer.GetMaterials method");
+#endif
+            return r.GetAllMaterialInstancesExt();
+        }
+#endif
+        throw new InvalidOperationException("Tried to call Renderer.materials. You probably meant Renderer.sharedMaterials. If you actually want to generate material instances, use the extension method 'Renderer.GetAllMaterialInstancesExt' or the built-in renderer.GetMaterials method");
     }
+    #endregion // detour_methods
 
     #region apdk_detour
     // Copied from apkd's static batching sorting fix: https://github.com/apkd/UnityStaticBatchingSortingPatch
