@@ -109,7 +109,7 @@ public unsafe static class MaterialPropPatch
     public static Material[] materialsDetour(Renderer r)
     {
 #if !STRICT_MATERIAL_CHECK 
-        if (!Application.isPlaying)
+        if (Application.isPlaying)
         {
 #if WARN_MATERIAL_CHECK
             Debug.LogWarning("Tried to call Renderer.materials. You probably meant Renderer.sharedMaterials. If you actually want to generate material instances, use the extension method 'Renderer.GetAllMaterialInstancesExt' or the built-in renderer.GetMaterials method");
