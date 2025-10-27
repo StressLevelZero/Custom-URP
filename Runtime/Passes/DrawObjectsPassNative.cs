@@ -393,32 +393,33 @@ namespace UnityEngine.Rendering.Universal.Internal
                             cmd.EnableKeyword(s_DrawProcedural);
                             cmd.DrawProcedural(Matrix4x4.identity, skybox, 0, MeshTopology.Triangles, 3, 1);
                             cmd.DisableKeyword(s_DrawProcedural);
+                            cmd.EnableKeyword(s_SubpassInput0Kw);
                         }
                     }
-                    cmd.SetKeyword(s_SubpassInput0Kw, true);
+
                     context.ExecuteCommandBuffer(cmd);
                     cmd.Clear();
                     context.EndSubPass();
                 }
 
-                
-                // new - copy depth to input attachment 1
-               // colorAttachment[0] = inputIdx;
-               // inputAttachment[0] = colorIdx;
-               // {
-               //     context.BeginSubPass(colorAttachment, inputAttachment, true);
-               //     //cmd.DrawProcedural(Matrix4x4.identity, data.copySubpassInputMat, 0, MeshTopology.Triangles, 3, 1);
-               //     //context.ExecuteCommandBuffer(cmd);
-               //     //cmd.Clear();
-               //     context.EndSubPass();
-               // }
-                
 
+                // new - copy depth to input attachment 1
+                // colorAttachment[0] = inputIdx;
+                // inputAttachment[0] = colorIdx;
+                // {
+                //     context.BeginSubPass(colorAttachment, inputAttachment, true);
+                //     //cmd.DrawProcedural(Matrix4x4.identity, data.copySubpassInputMat, 0, MeshTopology.Triangles, 3, 1);
+                //     //context.ExecuteCommandBuffer(cmd);
+                //     //cmd.Clear();
+                //     context.EndSubPass();
+                // }
+                var fence = cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
                 colorAttachment[0] = colorIdx;
                 inputAttachment[0] = depthIdx;
 
                 {
                     context.BeginSubPass(colorAttachment, inputAttachment, true);
+                    cmd.EnableKeyword(s_SubpassInput0Kw);
                     colorAttachment.Dispose();
                     inputAttachment.Dispose();
                     /* original, copy opaque attachment to backbuffer
@@ -451,13 +452,13 @@ namespace UnityEngine.Rendering.Universal.Internal
 
                     // Clean up
                     CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);
-                    cmd.SetKeyword(s_SubpassInput0Kw, false);
+                    cmd.DisableKeyword(s_SubpassInput0Kw);
 
                     context.ExecuteCommandBuffer(cmd);
                     cmd.Clear();
                     context.EndSubPass();
                 }
-
+              
                 context.EndRenderPass();
 
 

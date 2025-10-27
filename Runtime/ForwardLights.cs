@@ -565,7 +565,8 @@ namespace UnityEngine.Rendering.Universal.Internal
                                 out var isSubtractive);
 
                             m_AdditionalLightsLayerMasks[lightIter] = math.asfloat(lightLayerMask);
-                            m_AdditionalLightColors[lightIter].w = isSubtractive ? 1f : 0f;
+							/// SLZ MODIFIED - We use alpha as UV, not as subtractive toggle
+                            // m_AdditionalLightColors[lightIter].w = isSubtractive ? 1f : 0f;
                             lightIter++;
                         }
                     }
@@ -586,7 +587,8 @@ namespace UnityEngine.Rendering.Universal.Internal
                                out var isSubtractive);
 
                         m_AdditionalLightsLayerMasks[lastIdx] = math.asfloat(lightLayerMask);
-                        m_AdditionalLightColors[lastIdx].w = isSubtractive ? 1f : 0f;
+						
+                        //m_AdditionalLightColors[lastIdx].w = isSubtractive ? 1f : 0f;
                     }
                     //Debug.Log("Set _ImportantLightIndex");
                     cmd.SetGlobalInt("_ImportantLightIndex", lightData.importantAddLight);

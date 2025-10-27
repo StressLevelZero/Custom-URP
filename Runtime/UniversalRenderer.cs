@@ -1,4 +1,3 @@
-//#define VULKAN_SUBPASS
 
 using System;
 using System.Collections.Generic;

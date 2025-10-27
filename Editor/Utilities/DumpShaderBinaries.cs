@@ -21,13 +21,20 @@ namespace SLZ.SLZEditorTools
     {
         SerializedObject thisSerialized;
         public BuildTarget buildTarget;
-        public ShaderCompilerPlatform graphicsAPI;
+        public ShaderCompilerPlatform graphicsAPI = ShaderCompilerPlatform.Vulkan;
         public Shader shader;
         public int subShaderIndex;
         public string passName;
         public int passIndex;
         public List<string> shaderKeywords;
         public string outputPath;
+        public bool dumpPreprocessed;
+
+        public void OnEnable()
+        {
+            if ((int)buildTarget == 0 || buildTarget == BuildTarget.NoTarget)
+                buildTarget = EditorUserBuildSettings.activeBuildTarget;
+        }
 
         class BuildInfo
         {
@@ -275,6 +282,10 @@ namespace SLZ.SLZEditorTools
             shaderKeywordsField.bindingPath = "shaderKeywords";
             shaderKeywordsField.Bind(thisSerialized);
 
+            Toggle dumpPreprocessedToggle = new Toggle("Dump Preprocessed HLSL Instead");
+            dumpPreprocessedToggle.bindingPath = "dumpPreprocessed";
+            dumpPreprocessedToggle.Bind(thisSerialized);
+
             VisualElement pathHorizontal = new VisualElement();
             pathHorizontal.style.flexDirection = FlexDirection.Row;
             pathHorizontal.style.justifyContent = Justify.SpaceBetween;
@@ -289,6 +300,7 @@ namespace SLZ.SLZEditorTools
             outputPathField.style.textOverflow = TextOverflow.Ellipsis;
             outputPathField.Bind(thisSerialized);
             pathHorizontal.Add(outputPathField);
+
 
             Button fileBrowser = new Button(() =>
             {
@@ -343,6 +355,7 @@ namespace SLZ.SLZEditorTools
             root.Add(FromFrameDbg);
             root.Add(graphicsAPIField);
             root.Add(buildTargetField);
+            root.Add(dumpPreprocessedToggle);
             root.Add(shaderField);
             root.Add(m_SubShaderField);
             root.Add(m_PassField);
@@ -423,52 +436,72 @@ namespace SLZ.SLZEditorTools
             {
                 if (!pass.HasShaderStage(stage)) continue;
 
-                ShaderData.VariantCompileInfo compileInfo = pass.CompileVariant(stage, shaderKeywords.ToArray(), graphicsAPI, buildTarget, true);
-
-                ShaderMessage[] messages = compileInfo.Messages;
-                foreach (var message in messages)
+                if (dumpPreprocessed)
                 {
-                    string logMsg = $"{message.severity}: {message.message}\nfile:{message.file}, line: {message.line}";
-                    switch (message.severity)
+                    ShaderData.PreprocessedVariant processed = pass.PreprocessVariant(stage, shaderKeywords.ToArray(), graphicsAPI, buildTarget, true);
+                    ShaderMessage[] messages = processed.Messages;
+                    foreach (var message in messages)
                     {
-                        case ShaderCompilerMessageSeverity.Error:
-                            Debug.LogError(logMsg);
-                            break;
-                        case ShaderCompilerMessageSeverity.Warning:
-                            Debug.LogWarning(logMsg);
-                            break;
+                        string logMsg = $"{message.severity}: {message.message}\nfile:{message.file}, line: {message.line}";
+                        switch (message.severity)
+                        {
+                            case ShaderCompilerMessageSeverity.Error:
+                                Debug.LogError(logMsg);
+                                break;
+                            case ShaderCompilerMessageSeverity.Warning:
+                                Debug.LogWarning(logMsg);
+                                break;
+                        }
                     }
+                    if (!processed.Success) break;
+                    File.WriteAllText(outputPath + $".{stageExt[stage]}.hlsl", processed.PreprocessedCode);
                 }
-                if (!compileInfo.Success) break;
-                
-                File.WriteAllBytes(outputPath + $".{stageExt[stage]}{apiExt[graphicsAPI]}", compileInfo.ShaderData);
-
-                BindingInfo bindingInfo = new BindingInfo();
-
-                int numVtxAttributes = compileInfo.Attributes.Length;
-                bindingInfo.VertexAttributes = new List<string>(numVtxAttributes);
-                for (int aIdx = 0; aIdx < numVtxAttributes; aIdx++)
+                else
                 {
-                    bindingInfo.VertexAttributes.Add(compileInfo.Attributes[aIdx].ToString());
+                    ShaderData.VariantCompileInfo compileInfo = pass.CompileVariant(stage, shaderKeywords.ToArray(), graphicsAPI, buildTarget, true);
+                    ShaderMessage[] messages = compileInfo.Messages;
+                    foreach (var message in messages)
+                    {
+                        string logMsg = $"{message.severity}: {message.message}\nfile:{message.file}, line: {message.line}";
+                        switch (message.severity)
+                        {
+                            case ShaderCompilerMessageSeverity.Error:
+                                Debug.LogError(logMsg);
+                                break;
+                            case ShaderCompilerMessageSeverity.Warning:
+                                Debug.LogWarning(logMsg);
+                                break;
+                        }
+                    }
+                    if (!compileInfo.Success) break;
+
+                    File.WriteAllBytes(outputPath + $".{stageExt[stage]}{apiExt[graphicsAPI]}", compileInfo.ShaderData);
+
+                    BindingInfo bindingInfo = new BindingInfo();
+
+                    int numVtxAttributes = compileInfo.Attributes.Length;
+                    bindingInfo.VertexAttributes = new List<string>(numVtxAttributes);
+                    for (int aIdx = 0; aIdx < numVtxAttributes; aIdx++)
+                    {
+                        bindingInfo.VertexAttributes.Add(compileInfo.Attributes[aIdx].ToString());
+                    }
+
+                    int numConstBuffers = compileInfo.ConstantBuffers.Length;
+                    bindingInfo.ConstantBuffers = new List<SerializedConstantBufferInfo>(compileInfo.ConstantBuffers.Length);
+                    for (int cbIdx = 0; cbIdx < numConstBuffers; cbIdx++)
+                    {
+                        bindingInfo.ConstantBuffers.Add(new SerializedConstantBufferInfo(compileInfo.ConstantBuffers[cbIdx]));
+                    }
+
+                    int numTexBinds = compileInfo.TextureBindings.Length;
+                    bindingInfo.TextureBindings = new List<SerializedTextureBindingInfo>(numTexBinds);
+                    for (int tIdx = 0; tIdx < numTexBinds; tIdx++)
+                    {
+                        bindingInfo.TextureBindings.Add(new SerializedTextureBindingInfo(compileInfo.TextureBindings[tIdx]));
+                    }
+
+                    File.WriteAllText(outputPath + $".{stageExt[stage]}{apiExt[graphicsAPI]}_bindings.json", JsonUtility.ToJson(bindingInfo, true));
                 }
-
-                int numConstBuffers = compileInfo.ConstantBuffers.Length;
-                bindingInfo.ConstantBuffers = new List<SerializedConstantBufferInfo>(compileInfo.ConstantBuffers.Length);
-                for (int cbIdx = 0; cbIdx < numConstBuffers; cbIdx++)
-                {
-                    bindingInfo.ConstantBuffers.Add(new SerializedConstantBufferInfo(compileInfo.ConstantBuffers[cbIdx]));
-                }
-
-                int numTexBinds = compileInfo.TextureBindings.Length;
-                bindingInfo.TextureBindings = new List<SerializedTextureBindingInfo>(numTexBinds);
-                for (int tIdx = 0; tIdx < numTexBinds; tIdx++)
-                {
-                    bindingInfo.TextureBindings.Add(new SerializedTextureBindingInfo(compileInfo.TextureBindings[tIdx]));
-                }
-
-                File.WriteAllText(outputPath + $".{stageExt[stage]}{apiExt[graphicsAPI]}_bindings.json", JsonUtility.ToJson(bindingInfo, true));
-
-
             }
         }
 
