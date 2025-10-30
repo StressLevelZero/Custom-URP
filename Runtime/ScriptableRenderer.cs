@@ -582,6 +582,9 @@ namespace UnityEngine.Rendering.Universal
         internal bool disableNativeRenderPassInFeatures = false;
 
         internal bool useRenderPassEnabled = false;
+        internal bool useRenderPassEnabledSLZ = false;
+
+
         static RenderTargetIdentifier[] m_ActiveColorAttachments = new RenderTargetIdentifier[] { 0, 0, 0, 0, 0, 0, 0, 0 };
         static RenderTargetIdentifier m_ActiveDepthAttachment;
 
@@ -652,6 +655,7 @@ namespace UnityEngine.Rendering.Universal
 
             ResetNativeRenderPassFrameData();
             useRenderPassEnabled = data.useNativeRenderPass && SystemInfo.graphicsDeviceType != GraphicsDeviceType.OpenGLES2 && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Direct3D12;
+            useRenderPassEnabledSLZ = data.useNativeRenderPassSLZ && SystemInfo.graphicsDeviceType == GraphicsDeviceType.Vulkan;
             Clear(CameraRenderType.Base);
             m_ActiveRenderPassQueue.Clear();
 

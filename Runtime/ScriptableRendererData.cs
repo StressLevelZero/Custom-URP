@@ -51,6 +51,7 @@ namespace UnityEngine.Rendering.Universal
         [SerializeField] internal List<ScriptableRendererFeature> m_RendererFeatures = new List<ScriptableRendererFeature>(10);
         [SerializeField] internal List<long> m_RendererFeatureMap = new List<long>(10);
         [SerializeField] bool m_UseNativeRenderPass = false;
+        [SerializeField] bool m_UseNativeRenderPassSLZ = false;
 
         /// <summary>
         /// List of additional render pass features for this renderer.
@@ -107,6 +108,15 @@ namespace UnityEngine.Rendering.Universal
             {
                 SetDirty();
                 m_UseNativeRenderPass = value;
+            }
+        }
+        public bool useNativeRenderPassSLZ
+        {
+            get => m_UseNativeRenderPassSLZ;
+            set
+            {
+                SetDirty();
+                m_UseNativeRenderPassSLZ = value;
             }
         }
 

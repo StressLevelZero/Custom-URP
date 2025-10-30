@@ -107,7 +107,7 @@ struct SLZDirectSpecLightInfo
     half BoL;
     half ToH;
     half BoH;
-    #elif defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF)
+    #elif defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF) || defined(UNITY_UNIFIED_SHADER_PRECISION_MODEL)
     half NoH;
     half LoH;
     half NxH2;
@@ -118,6 +118,9 @@ struct SLZDirectSpecLightInfo
     half NoH;
     half LoH;
     #endif
+#if defined(UNITY_UNIFIED_SHADER_PRECISION_MODEL)
+    half NoV;
+#endif
 };
 
 struct SLZAnisoSpecLightInfo
@@ -341,7 +344,7 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
         data.ToL = dot(frag.tangent, lightDir);
         data.BoL = dot(frag.bitangent, lightDir);
         data.NoL = saturate(dot(frag.normal, lightDir));
-    #elif defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF)
+    #elif defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF) || defined(UNITY_UNIFIED_SHADER_PRECISION_MODEL)
         // See https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)
         // Qualcomm Adreno drivers started severely rounding the result of a cross of half-vectors. Components smaller than 2^-7 get rounded down to 0, so when the normal and half vectors are close it rounds to 0. Makes the NDF turn into a sharp square :(. 
         // Stupid solution: multiply the normalized half-vector by 4. The cross product of the 4x half-vector and the normal vector is also 4x as long, and thus the normal and half vectors can get far closer before the components of the result round to 0 
@@ -356,6 +359,9 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
         half3 NxH = cross(frag.normal, halfDir);
         data.NxH2 = saturate(dot(NxH, NxH)) * half(0.0625h);
         data.NoL = saturate(dot(frag.normal, lightDir));
+        #if defined(UNITY_UNIFIED_SHADER_PRECISION_MODEL)
+            data.NoV = abs(frag.NoV) + half(1e-5);
+        #endif
     #else
         data.NoV = abs(frag.NoV) + half(1e-5);
         data.NoL = dot(frag.normal, lightDir); // Visibility function needs abs, specular falloff needs saturate
@@ -699,13 +705,26 @@ half SLZDirectBRDFSpecularMobile(half NoH, half LoH, half NxH2, half roughness)
 /**
  * High quality specular BDRF, for use on PC. Uses the same GGX N, D, and F as google filament
  */
-half3 SLZDirectBRDFSpecularHighQ(half NoH, half NoV, half NoL, half LoH, half roughness, half3 specColor)
+float3 SLZDirectBRDFSpecularHighQ(float NoH, float NoV, float NoL, float LoH, float roughness, float3 specColor)
 {
     roughness = 0.999f * roughness + 0.001f; // remap to [0.01,1] to prevent specular aliasing
-    half N = SLZGGXSpecularD(NoH, roughness);
-    half D  = SLZSmithVisibility(NoV, NoL, roughness);
-    half3 F   = SLZSchlickFresnel(LoH, specColor);
+	float N = SLZGGXSpecularD(NoH, roughness);
+	float D = SLZSmithVisibility(NoV, NoL, roughness);
+	float3 F = SLZSchlickFresnel(LoH, specColor);
     return N * D * F;
+}
+
+half3 SLZDirectBRDFSpecularHighQ16(half NoH, half NxH2, half NoV, half NoL, half LoH, half roughness, half3 specColor)
+{
+	roughness = half(0.999) * roughness + half(0.001); // remap to [0.01,1] to prevent specular aliasing
+	half N = SLZGGXSpecularDMobile(NoH, NxH2, roughness);
+	half D = SLZSmithVisibility(NoV, NoL, roughness);
+	half3 F = SLZSchlickFresnel(LoH, specColor);
+    
+	half3 specularTerm = (N * D * F) - HALF_MIN;
+	specularTerm = clamp(specularTerm, 0.0, 100.0);
+    
+	return specularTerm;
 }
 
 half3 SLZAnisoDirectBRDFSpecular(SLZDirectSpecLightInfo lightInfo, SLZSurfData surfData, half NoV, half visLambdaView)
@@ -716,7 +735,7 @@ half3 SLZAnisoDirectBRDFSpecular(SLZDirectSpecLightInfo lightInfo, SLZSurfData s
     half3 F = SLZSchlickFresnel(lightInfo.LoH, surfData.specular);
     half3 specularTerm = N * D * F;
 
-#if defined(SHADER_API_MOBILE)
+#if defined(SHADER_API_MOBILE) || defined(UNITY_UNIFIED_PRECISION_MODEL)
     // On platforms where half actually means something, the denominator has a risk of overflow
     // clamp below was added specifically to "fix" that, but dx compiler (we convert bytecode to metal/gles)
     // sees that specularTerm have only non-negative terms, so it skips max(0,..) in clamp (leaving only min(100,...))
@@ -745,8 +764,10 @@ half3 SLZDirectBRDFSpecular(SLZDirectSpecLightInfo specInfo, SLZSurfData surfDat
     specular = SLZAnisoDirectBRDFSpecular(specInfo, surfData, fragData.NoV, fragData.visLambdaView);
     #elif defined(SHADER_API_MOBILE) || defined(USE_MOBILE_BRDF)
         specular = surfData.specular * SLZDirectBRDFSpecularMobile(specInfo.NoH, specInfo.LoH, specInfo.NxH2, surfData.roughness);
+    #elif defined(UNITY_UNIFIED_SHADER_PRECISION_MODEL)
+        specular = SLZDirectBRDFSpecularHighQ16(specInfo.NoH, specInfo.NxH2, specInfo.NoV, specInfo.NoL, specInfo.LoH, surfData.roughness, surfData.specular);
     #else
-        specular = SLZDirectBRDFSpecularHighQ(specInfo.NoH, specInfo.NoV, specInfo.NoL, specInfo.LoH, surfData.roughness, surfData.specular);
+	    specular = SLZDirectBRDFSpecularHighQ(specInfo.NoH, specInfo.NoV, specInfo.NoL, specInfo.LoH, surfData.roughness, surfData.specular);
     #endif
 
     #if defined(ANIME)

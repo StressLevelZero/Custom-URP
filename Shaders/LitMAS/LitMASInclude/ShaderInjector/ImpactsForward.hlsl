@@ -51,6 +51,8 @@
 #define _DISABLE_LIGHTMAPS
 #endif
 
+#define UNITY_UNIFIED_SHADER_PRECISION_MODEL
+
 #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
 // Begin Injection UNIVERSAL_DEFINES from Injection_SSR_CBuffer_Posespace.hlsl ----------------------------------------------------------
@@ -350,6 +352,9 @@ SLZ_DECLARE_FRAG_SIZE
     #else
         SLZFragData fragData = SLZGetFragData(i.vertex, UNPACK_WPOS(i), normalWS, float2(0, 0), float2(0, 0), UNPACK_VERTLIGHTS(i));
     #endif
+    #if defined(SHADER_API_MOBILE)
+        half antibandingNoise = AntibandingNoise(i.vertex.xy);
+    #endif
 
     half4 emission = half4(0,0,0,0);
 
@@ -407,7 +412,7 @@ SLZ_DECLARE_FRAG_SIZE
     
     #if defined(SHADER_API_MOBILE)
         // Don't do this for now, holding on to fragData.screenUV or i.vertex.xy occupies a full-precision register for the entire shader 
-        //output.color.rgb = ApplyInterleavedAntibanding(output.color.rgb, i.vertex.xy);
+        ApplyInterleavedAntibanding(output.color.rgb, antibandingNoise);
     #endif
     
 

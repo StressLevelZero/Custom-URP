@@ -1,4 +1,4 @@
-
+#define VULKAN_SUBPASS
 using System;
 using System.Collections.Generic;
 using UnityEngine.Experimental.Rendering;
@@ -114,7 +114,6 @@ namespace UnityEngine.Rendering.Universal
         DrawObjectsPass m_RenderOpaqueForwardPass;
 #if VULKAN_SUBPASS
         DrawObjectsPassNative m_RenderForwardPassNative;
-        public static bool useFusedRenderpass = true;
 #endif
         DrawObjectsWithRenderingLayersPass m_RenderOpaqueForwardWithRenderingLayersPass;
         DrawSkyboxPass m_DrawSkyboxPass;
@@ -676,9 +675,9 @@ namespace UnityEngine.Rendering.Universal
             //Debug.Log($"Debug handler state for {cameraData.camera.name}: is null? {DebugHandler == null}, is active for camera? {DebugHandler?.IsActiveForCamera(ref cameraData)}, Any settings active: {DebugHandler.AreAnySettingsActive}");
             bool isPreview = (camera.cameraType & CameraType.Preview) != 0;
             bool cameraUseFusedRenderpass =
-#if VULKAN_SUBPASS && UNITY_ANDROID
-                
-                useFusedRenderpass 
+#if VULKAN_SUBPASS
+
+                useRenderPassEnabledSLZ
                 && !useRenderPassEnabled
                 && !activeDebugHandler
                 && !IsWireframeEnabledForCamera(camera) 

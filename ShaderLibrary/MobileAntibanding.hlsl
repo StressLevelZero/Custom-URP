@@ -21,9 +21,17 @@ half3 ApplyBayerAntibanding(half3 color, float2 positionCS)
 	return color;
 }
 
-half3 ApplyInterleavedAntibanding(half3 color, float2 positionCS)
+half AntibandingNoise(float2 positionCS)
 {
 	// Jimenez, Jorge. Next Generation Post Processing in Call of Duty Advanced Warfare
+	float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
+	half noise = (half) frac(magic.z * frac(dot(positionCS, magic.xy)));
+	return noise;
+}
+
+half3 ApplyInterleavedAntibanding(half3 color, float2 positionCS)
+{
+	
 	half3 magic = half3(0.06711056, 0.00583715, 52.9829189);
 	half ditherVal = frac(magic.z * frac(dot(positionCS, magic.xy)));
 	
@@ -33,6 +41,15 @@ half3 ApplyInterleavedAntibanding(half3 color, float2 positionCS)
 	color.rgb += half(1.0h / 255.0h) * (ditherVal - half(0.5h));
 	color.rgb *= color.rgb;
 	return color;
+}
+
+void ApplyInterleavedAntibanding(inout half3 color, half noise)
+{
+	// Convert to (roughly) gamma space so that 1/255 directly 
+	// corresponds to one quantization step
+	color.rgb = sqrt(color.rgb);
+	color.rgb += half(1.0h / 255.0h) * (noise - half(0.5h));
+	color.rgb *= color.rgb;
 }
 
 #endif

@@ -25,6 +25,7 @@ namespace UnityEditor.Rendering.Universal
             public static readonly GUIContent DepthPrimingModeInfo = EditorGUIUtility.TrTextContent("On Android, iOS, and Apple TV, Unity performs depth priming only in the Forced mode. On tiled GPUs, which are common to those platforms, depth priming might reduce performance when combined with MSAA.");
             public static readonly GUIContent CopyDepthModeLabel = EditorGUIUtility.TrTextContent("Depth Texture Mode", "Controls after which pass URP copies the scene depth. It has a significant impact on mobile devices bandwidth usage. It also allows to force a depth prepass to generate it.");
             public static readonly GUIContent RenderPassLabel = EditorGUIUtility.TrTextContent("Native RenderPass", "Enables URP to use RenderPass API. Has no effect on OpenGLES2");
+            public static readonly GUIContent RenderPassSLZLabel = EditorGUIUtility.TrTextContent("Native RenderPass SLZ", "Enable rendering opaque and transparent passes as subpasses of a single renderpass, with the transparent pass forbidden from writing depth but able to read the depth as an attachment");
 
             public static readonly GUIContent RenderPassSectionLabel = EditorGUIUtility.TrTextContent("RenderPass", "This section contains properties related to render passes.");
             public static readonly GUIContent ShadowsSectionLabel = EditorGUIUtility.TrTextContent("Shadows", "This section contains properties related to rendering shadows.");
@@ -46,6 +47,7 @@ namespace UnityEditor.Rendering.Universal
         SerializedProperty m_CopyDepthMode;
         SerializedProperty m_AccurateGbufferNormals;
         SerializedProperty m_UseNativeRenderPass;
+        SerializedProperty m_UseNativeRenderPassSLZ;
         SerializedProperty m_DefaultStencilState;
         SerializedProperty m_PostProcessData;
         SerializedProperty m_Shaders;
@@ -67,6 +69,7 @@ namespace UnityEditor.Rendering.Universal
             m_CopyDepthMode = serializedObject.FindProperty("m_CopyDepthMode");
             m_AccurateGbufferNormals = serializedObject.FindProperty("m_AccurateGbufferNormals");
             m_UseNativeRenderPass = serializedObject.FindProperty("m_UseNativeRenderPass");
+            m_UseNativeRenderPassSLZ = serializedObject.FindProperty("m_UseNativeRenderPassSLZ");
             m_DefaultStencilState = serializedObject.FindProperty("m_DefaultStencilState");
             m_PostProcessData = serializedObject.FindProperty("postProcessData");
             m_Shaders = serializedObject.FindProperty("shaders");
@@ -122,6 +125,7 @@ namespace UnityEditor.Rendering.Universal
             EditorGUILayout.LabelField(Styles.RenderPassSectionLabel, EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(m_UseNativeRenderPass, Styles.RenderPassLabel);
+            EditorGUILayout.PropertyField(m_UseNativeRenderPassSLZ, Styles.RenderPassSLZLabel);
             EditorGUI.indentLevel--;
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(Styles.ShadowsSectionLabel, EditorStyles.boldLabel);
