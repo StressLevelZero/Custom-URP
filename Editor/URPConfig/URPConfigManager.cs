@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 
 namespace SLZ.SLZEditorTools
@@ -55,8 +56,21 @@ namespace SLZ.SLZEditorTools
                 }
             }
 
+
             ProjectShaderSymbols sd = AssetDatabase.LoadAssetAtPath<ProjectShaderSymbols>(projectSymbolsAssetPath);
-            if (sd == null)
+            if (File.Exists(Path.GetFullPath(projectSymbolsAssetPath)))
+            {
+                if (sd == null)
+                {
+                    sd = (ProjectShaderSymbols)(InternalEditorUtility.LoadSerializedFileAndForget(projectSymbolsAssetPath)[0]);
+                    if (sd == null)
+                    {
+                        throw new FileNotFoundException("CRITICAL ERROR: Failed to open ProjectShaderSymbols with the asset database or InternalEditorUtility.LoadSerializedFileAndForget! Shader symbols will not be regenerated!!!!!");
+                        return;
+                    }
+                }
+            }
+            else
             {
                 sd = ScriptableObject.CreateInstance<ProjectShaderSymbols>();
                 if (!Directory.Exists("Assets/Settings"))

@@ -48,6 +48,7 @@ namespace SLZ.EditorPatcher
             uint build = installDXCVersion != null ? (uint)installDXCVersion.FileBuildPart : 0;
             uint priv =  installDXCVersion != null ? (uint)installDXCVersion.FilePrivatePart : 0;
             bool isUpdated = major >= 1 && minor >= 7;
+            Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, $"DXC Version {major}.{minor}.{build}.{priv}");
             URPConfigManager.Initialize();
             SetDXCIncludeState.Set(isUpdated,major,minor,build,priv);
         }
