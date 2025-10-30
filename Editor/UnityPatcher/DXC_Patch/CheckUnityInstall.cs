@@ -26,16 +26,16 @@ namespace SLZ.EditorPatcher
                 return;
             }
 
-#if ERROR_SPOOKY_DONT_USE
+#if !SKIP_DXC_UPGRADE
             CheckDXCSpooky();
 #else
-            CheckDXCSafe();
+            UpdateDXCIncludeState();
 #endif
             SessionState.SetBool("DXCChecked", true);
         }
 
 
-        static void CheckDXCSafe()
+        static void UpdateDXCIncludeState()
         {
             string unity = EditorApplication.applicationPath;
             string toolsDir = Path.Combine(Path.GetDirectoryName(unity), "Data", "Tools");
@@ -121,6 +121,7 @@ namespace SLZ.EditorPatcher
                 if (!localDXCExists) Debug.LogError("URP: Could not find local DXC compiler dlls! Will not attempt to update DXC!");
                 if (!unityDXCExists) Debug.LogError("URP: Could not find unity's DXC compiler dlls! Will not attempt to update DXC!");
                 bool needsUpdate = !unityDXCExists || (installDXCVersion.FileMajorPart < defaultNewDXCVersionMajor || installDXCVersion.FileMinorPart < defaultNewDXCVersionMinor);
+                /*
                 if (needsUpdate)
                 {
                     Debug.LogError("ABORTING: DXC update failed. To prevent corrupting the cache server, unity will now close");
@@ -136,14 +137,16 @@ namespace SLZ.EditorPatcher
                     }
                     Instagib();
                 }
+                */
                 return;
             }
 
-            bool unityNeedsUpdate = installDXCVersion.FileMajorPart < localDXCVersion.FileMajorPart || installDXCVersion.FileMinorPart < localDXCVersion.FileMinorPart;
-            int choice = -1;
+            bool unityNeedsUpdate = installDXCVersion.FileMajorPart < 1 || installDXCVersion.FileMinorPart < 7;
+
 
             if (unityNeedsUpdate)
             {
+                int choice = -1;
                 if (Application.isBatchMode)
                 {
                     Debug.LogError("\n\nWARNING! The URP is going to attempt to modify the Unity install! The DXC shader compiler needs to be updated " +
@@ -154,8 +157,8 @@ namespace SLZ.EditorPatcher
                         $"{localDxcPath}\n" +
                         $"The old DLLs will be moved to a folder named \"DXC_Backup\" in the unity folder.\n" +
                         "This will almost certainly fail if other editor instances are running! In the event that it does, manually backup unity's dlls and " +
-                        "overwrite them with the new dlls from this package. You may also build the dlls from https://github.com/microsoft/DirectXShaderCompiler/releases . " +
-                        "This is tested working with the June 2024 release (1.8.2407), later releases may be incompatible!\n\n"
+                        "overwrite them with the new dlls from this package."
+                        //"This is tested working with a modified version of June 2024 release (1.8.2407), other releases will be incompatible!\n\n"
                         );
                     choice = 0;
                 }
@@ -165,83 +168,88 @@ namespace SLZ.EditorPatcher
                     choice = EditorUtility.DisplayDialogComplex($"DXC update requested ({installDXCVersion.ProductVersion}->{localDXCVersion.ProductVersion})",
                         "The DirectX Shader Compiler (DXC) needs to be updated to support Quest. Allow Update?\n\n" +
                         "This will replace dxcompiler.dll in your Unity Editor install, affecting all projects on this unity version. " +
-                        "A backup of the original dll can be found in Editor/Data/Tools/DXC_Backup.\n\n" +
+                        $"A backup of the original dll can be found in {toolsDir}\\DXC_Backup.\n\n" +
                         "This is optional. If DXC is not updated Quest will instead use the default shader compiler, which is slower and missing some advanced features.\n\n" +
-                        "Before updating, close all other unity editor applications.",
+                        "Before updating, close all other unity editor applications!",
                         "Update and Quit",
                         "Quit",
                         "Don't Update"
                         );
                 }
-            }
-            if (choice == 0)
-            {
-                try
-                {
 
-                    bool updateSuccess = UpdateDXC(localDxcPath, unityDxcPath, out string message);
-                    if (!updateSuccess)
+                if (choice == 0)
+                {
+                    try
                     {
-                        string errMsg = $"DXC Update Failed:\n{message}\n\n" +
-                                "Close any other instance of the editor, and kill any remaining unity or unityshadercompiler processes from task manager!\n" +
-                                $"You may also try manually moving these files:\n{localDxcPath}\nTo:\n{unityDxcPath}\n\n" +
-                                "Aborting!";
-                        Debug.LogError(message);
-                        if (!Application.isBatchMode)
+
+                        bool updateSuccess = UpdateDXC(localDxcPath, unityDxcPath, out string message);
+                        if (!updateSuccess)
                         {
-                            EditorUtility.DisplayDialog("Failed to update DXC", errMsg, "Abort");
-                            Instagib();
-                            return;
+                            string errMsg = $"DXC Update Failed:\n{message}\n\n" +
+                                    "Close any other instance of the editor, and kill any remaining unity or unityshadercompiler processes from task manager!\n" +
+                                    $"You may also try manually moving these files:\n{localDxcPath}\nTo:\n{unityDxcPath}\n\n" +
+                                    "Aborting!";
+                            Debug.LogError(message);
+                            if (!Application.isBatchMode)
+                            {
+                                EditorUtility.DisplayDialog("Failed to update DXC", errMsg, "Abort");
+                                Instagib();
+                                return;
+                            }
                         }
+                        URPConfigManager.Initialize();
+                        Instagib();
+                        return;
                     }
-                    URPConfigManager.Initialize();
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Failed to Update DXC: {ex.Message}");
+                        Instagib();
+                    }
+                    return;
+                }
+                else if (choice == 1)
+                {
                     Instagib();
                     return;
                 }
-                catch (Exception ex)
+                else if (choice == 2)
                 {
-                    Debug.LogError($"Failed to Update DXC: {ex.Message}");
-                    Instagib();
+                    EditorUtility.DisplayDialog("Skipping DXC Update", "Skipping DXC Update. This message will not show again.\n\n" +
+                        "If you wish to update DXC at a future point, go to the menu bar->Stress Level Zero->Graphics->Enable DXC Check", "Ok");
+                    EditorPrefs.SetBool("SkipDXCUpdate", true);
                 }
-                return;
-            }
-            else if (choice == 1)
-            {
-                Instagib();
-                return;
-            }
-            else if (choice == 2)
-            {
-                EditorUtility.DisplayDialog("Skipping DXC Update", "Skipping DXC Update. This message will not show again.\n\n" +
-                    "If you wish to update DXC at a future point, go to the menu bar->Stress Level Zero->Graphics->Enable DXC Check", "Ok");
-                EditorPrefs.SetBool("SkipDXCUpdate", true);
-            }
 
-            bool success = false;
-            try
-            {
-                Debug.Log($"DXC Version: {localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}");
-                success = SetDXCIncludeState.Set(!unityNeedsUpdate, 
-                    (uint)localDXCVersion.FileMajorPart, 
-                    (uint)localDXCVersion.FileMinorPart, 
-                    (uint)localDXCVersion.FileBuildPart,
-                    (uint)localDXCVersion.FilePrivatePart
-                    );
-            }
-            finally
-            {
-                if (!success)
+                bool success = false;
+                try
                 {
-                    Debug.LogError("ERROR: Updating DXCUpdateState.hlsl failed");
-                    if (!Application.isBatchMode)
-                    {
-                        EditorUtility.DisplayDialog("Missing critical shader include",
-                            "Unable to update critical shader include: Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl" +
-                            "\n\nExiting Unity to prevent shader corruption",
-                            "Abort");
-                    }
-                    Instagib();
+                    Debug.Log($"DXC Version: {localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}");
+                    success = SetDXCIncludeState.Set(!unityNeedsUpdate,
+                        (uint)localDXCVersion.FileMajorPart,
+                        (uint)localDXCVersion.FileMinorPart,
+                        (uint)localDXCVersion.FileBuildPart,
+                        (uint)localDXCVersion.FilePrivatePart
+                        );
                 }
+                finally
+                {
+                    if (!success)
+                    {
+                        Debug.LogError("ERROR: Updating DXCUpdateState.hlsl failed");
+                        if (!Application.isBatchMode)
+                        {
+                            EditorUtility.DisplayDialog("Missing critical shader include",
+                                "Unable to update critical shader include: Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl" +
+                                "\n\nExiting Unity to prevent shader corruption",
+                                "Abort");
+                        }
+                        Instagib();
+                    }
+                }
+            }
+            else
+            {
+                UpdateDXCIncludeState();
             }
             SessionState.SetBool("DXCChecked", true);
         }
