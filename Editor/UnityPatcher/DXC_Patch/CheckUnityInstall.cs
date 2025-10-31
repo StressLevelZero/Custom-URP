@@ -1,4 +1,3 @@
-#define SIMULATE_ADMIN_NECESSARY
 using SLZ.SLZEditorTools;
 using System;
 using System.Collections;
@@ -192,6 +191,7 @@ namespace SLZ.EditorPatcher
                                     $"You may also try manually moving these files:\n{localDxcPath}\nTo:\n{unityDxcPath}\n\n" +
                                     "Aborting!";
                             Debug.LogError(message);
+                            
                             if (!Application.isBatchMode)
                             {
                                 EditorUtility.DisplayDialog("Failed to update DXC", errMsg, "Abort");
@@ -356,11 +356,11 @@ namespace SLZ.EditorPatcher
                 errMsg = "";
                 //return true;
             }
-            catch (IOException)
+            catch (IOException ex)
             {
-                UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, false, true);
-                errMsg = "";
-                return true;
+                //UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, false, true);
+                errMsg = $"Failed to overwrite dxcompiler.dll, IO Exception encountered. Make sure all other unity processes are closed, and kill any lingering UnityShaderCompiler.exe processes:\n {ex.Message}";
+                return false;
             }
             catch (Exception ex)
             {
