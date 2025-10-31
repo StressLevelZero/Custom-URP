@@ -348,7 +348,7 @@ namespace SLZ.EditorPatcher
                 }
                 else
                 {
-
+                    UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
                 }
             }
             catch (UnauthorizedAccessException)
