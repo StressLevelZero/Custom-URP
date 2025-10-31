@@ -190,14 +190,14 @@ namespace SLZ.EditorPatcher
                                     "Close any other instance of the editor, and kill any remaining unity or unityshadercompiler processes from task manager!\n" +
                                     $"You may also try manually moving these files:\n{localDxcPath}\nTo:\n{unityDxcPath}\n\n" +
                                     "Aborting!";
+
                             Debug.LogError(message);
-                            
                             if (!Application.isBatchMode)
                             {
                                 EditorUtility.DisplayDialog("Failed to update DXC", errMsg, "Abort");
-                                Instagib();
-                                return;
                             }
+                            Instagib();
+                            return;
                         }
                         URPConfigManager.Initialize();
                         Instagib();
@@ -206,6 +206,11 @@ namespace SLZ.EditorPatcher
                     catch (Exception ex)
                     {
                         Debug.LogError($"Failed to Update DXC: {ex.Message}");
+                        if (!Application.isBatchMode)
+                        {
+                            EditorUtility.DisplayDialog("Failed to update DXC, encoutered unhandled exception:", ex.Message, "Abort");
+                        }
+                       
                         Instagib();
                     }
                     return;
@@ -291,21 +296,17 @@ namespace SLZ.EditorPatcher
                     else
                     {
                         UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
-                        errMsg = "";
-                        return true;
                     }
                 }
                 catch (UnauthorizedAccessException)
                 {
                     UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
-                    errMsg = "";
-                    //return true;
+                    requiresAdmin = true;
                 }
-                catch (IOException)
+                catch (IOException ex)
                 {
-                    UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, false, true);
-                    errMsg = "";
-                    //return true;
+                    errMsg = $"Failed to backup dxcompiler.dll, IO Exception encountered:\n {ex.Message}";
+                    return false;
                 }
                 catch (Exception ex)
                 {
