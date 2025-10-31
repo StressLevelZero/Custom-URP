@@ -134,6 +134,7 @@ MonoBehaviour:
   - {fileID: -785329834275540189}
   m_RendererFeatureMap: e4a2bcaab59df90d1b30f91e9982d9035c7e2b5ae2fde6f723737d34adf219f5
   m_UseNativeRenderPass: 0
+  m_UseNativeRenderPassSLZ: 0
   textures:
     blueNoiseRGBA: {fileID: 18700000, guid: 1b2caf7a618cad3419945d7ef3a5858b, type: 2}
     blueNoiseR: {fileID: 18700000, guid: 712b2d2a3c1660c429e2748554a1c72c, type: 2}

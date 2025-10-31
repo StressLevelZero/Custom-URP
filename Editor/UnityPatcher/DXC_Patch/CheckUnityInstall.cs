@@ -1,3 +1,4 @@
+#define SIMULATE_ADMIN_NECESSARY
 using SLZ.SLZEditorTools;
 using System;
 using System.Collections;
@@ -259,7 +260,21 @@ namespace SLZ.EditorPatcher
         {
             //StringBuilder errBuilder = new StringBuilder();
             string backupPath = Path.Combine(Path.GetDirectoryName(outDXCPath), "DXC_Backup");
-            Directory.CreateDirectory(backupPath);
+            bool requiresAdmin = false;
+            if (!Directory.Exists(backupPath))
+            {
+#if !SIMULATE_ADMIN_NECESSARY
+                try
+                {
+                    Directory.CreateDirectory(backupPath);
+                }
+                catch (UnauthorizedAccessException)
+#endif
+                {
+                    requiresAdmin = true;
+                    CreateFolderAdmin(backupPath);
+                }
+            }
             string backupDXC = Path.Combine(backupPath, "dxcompiler.dll");
             //string backupDXIL = Path.Combine(backupPath, "dxil.dll");
 
@@ -269,19 +284,28 @@ namespace SLZ.EditorPatcher
                 {
                     Debug.Log($"Backing up {outDXCPath} to {backupDXC}");
                     //throw new UnauthorizedAccessException();
-                    File.Copy(outDXCPath, backupDXC);
+                    if (!requiresAdmin)
+                    {
+                        File.Copy(outDXCPath, backupDXC);
+                    }
+                    else
+                    {
+                        UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
+                        errMsg = "";
+                        return true;
+                    }
                 }
                 catch (UnauthorizedAccessException)
                 {
                     UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
                     errMsg = "";
-                    return true;
+                    //return true;
                 }
                 catch (IOException)
                 {
                     UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, false, true);
                     errMsg = "";
-                    return true;
+                    //return true;
                 }
                 catch (Exception ex)
                 {
@@ -317,13 +341,20 @@ namespace SLZ.EditorPatcher
             {
                 Debug.Log($"Ovewriting {outDXCPath} with {inDXCPath}");
                 //throw new UnauthorizedAccessException();
-                File.Copy(inDXCPath, outDXCPath, true);
+                if (!requiresAdmin)
+                {
+                    File.Copy(inDXCPath, outDXCPath, true);
+                }
+                else
+                {
+
+                }
             }
             catch (UnauthorizedAccessException)
             {
                 UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
                 errMsg = "";
-                return true;
+                //return true;
             }
             catch (IOException)
             {
@@ -383,6 +414,18 @@ namespace SLZ.EditorPatcher
             cmd.StartInfo.UseShellExecute = true;
             if (elevated) cmd.StartInfo.Verb = "RunAs";
             cmd.Start();
+        }
+
+        static void CreateFolderAdmin(string folderName)
+        {
+            string command = $"mkdir \"{folderName}\"";
+            Process cmd = new Process();
+            cmd.StartInfo.FileName = "cmd.exe";
+            cmd.StartInfo.Arguments = $"/C {command}";
+            cmd.StartInfo.UseShellExecute = true;
+            cmd.StartInfo.Verb = "RunAs";
+            cmd.Start();
+            cmd.WaitForExit();
         }
 
         static void Instagib()
