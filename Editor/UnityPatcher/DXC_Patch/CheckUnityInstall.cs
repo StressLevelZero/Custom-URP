@@ -9,7 +9,6 @@ using System.IO;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
-using static PlasticGui.LaunchDiffParameters;
 using Debug = UnityEngine.Debug;
 
 namespace SLZ.EditorPatcher
