@@ -1,3 +1,5 @@
+//#define SIMULATE_ADMIN_NECESSARY
+
 using SLZ.SLZEditorTools;
 using System;
 using System.Collections;
@@ -7,6 +9,7 @@ using System.IO;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using static PlasticGui.LaunchDiffParameters;
 using Debug = UnityEngine.Debug;
 
 namespace SLZ.EditorPatcher
@@ -34,6 +37,17 @@ namespace SLZ.EditorPatcher
             SessionState.SetBool("DXCChecked", true);
         }
 
+        static ulong FileVersionToLong(uint major, uint minor, uint build)
+        {
+            return (((ulong)major) << 48) | (((ulong)minor) << 32) | ((ulong)build);
+        }
+
+        static ulong FileVersionToLong(FileVersionInfo version)
+        {
+            return FileVersionToLong((uint)version.FileMajorPart, (uint)version.FileMinorPart, (uint)version.FileBuildPart);
+        }
+
+        static ulong MinSupportedVersion { get => FileVersionToLong(1, 7, 0); }
 
         static void UpdateDXCIncludeState()
         {
@@ -43,24 +57,30 @@ namespace SLZ.EditorPatcher
             // string unityDxilPath = Path.Combine(toolsDir, "dxil.dll");
             bool unityDXCExists = File.Exists(unityDxcPath) /* && File.Exists(unityDxilPath) */;
             FileVersionInfo installDXCVersion = unityDXCExists ? FileVersionInfo.GetVersionInfo(unityDxcPath) : null;
-            uint major = installDXCVersion != null ? (uint)installDXCVersion.FileMajorPart : 0;
-            uint minor = installDXCVersion != null ? (uint)installDXCVersion.FileMinorPart : 0;
-            uint build = installDXCVersion != null ? (uint)installDXCVersion.FileBuildPart : 0;
-            uint priv =  installDXCVersion != null ? (uint)installDXCVersion.FilePrivatePart : 0;
-            bool isUpdated = major >= 1 && minor >= 7;
-            Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, $"DXC Version {major}.{minor}.{build}.{priv}");
-            URPConfigManager.Initialize();
-            SetDXCIncludeState.Set(isUpdated,major,minor,build,priv);
+            UpdateDXCIncludeState(installDXCVersion);
         }
 
-        [MenuItem("Stress Level Zero/Graphics/Experimental/Upgrade DXC Compiler")]
-        static void ManualCheckDXC()
+        static bool UpdateDXCIncludeState(FileVersionInfo versionInfo)
         {
-            CheckDXCSpooky();
+            uint major = versionInfo != null ? (uint)versionInfo.FileMajorPart : 0;
+            uint minor = versionInfo != null ? (uint)versionInfo.FileMinorPart : 0;
+            uint build = versionInfo != null ? (uint)versionInfo.FileBuildPart : 0;
+            uint priv = versionInfo != null ? (uint)versionInfo.FilePrivatePart : 0;
+            bool isUpdated = FileVersionToLong(major, minor, build) >= MinSupportedVersion;
+            Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, $"DXC Version: {major}.{minor}.{build}.{priv}");
+
+            URPConfigManager.Initialize();
+            return SetDXCIncludeState.Set(isUpdated, major, minor, build, priv);
         }
+
+        //[MenuItem("Stress Level Zero/Graphics/DXC Updater/Upgrade DXC Compiler")]
+        //static void ManualCheckDXC()
+        //{
+        //    CheckDXCSpooky();
+        //}
 
         #region ERROR_SPOOKY_DONT_USE
-        [MenuItem("Stress Level Zero/Graphics/Experimental/Enable DXC Check")]
+        [MenuItem("Stress Level Zero/Graphics/DXC Updater/Enable DXC Check")]
         static void EnableDXCCheck()
         {
             EditorPrefs.SetBool("SkipDXCUpdate", false);
@@ -73,7 +93,8 @@ namespace SLZ.EditorPatcher
             if (EditorPrefs.GetBool("SkipDXCUpdate", false))
             {
                 URPConfigManager.Initialize();
-                if (Application.platform == RuntimePlatform.WindowsEditor) SetDXCIncludeState.Set(false, 0, 0, 0, 0);
+                
+                UpdateDXCIncludeState();
                 return;
             }
 
@@ -142,12 +163,17 @@ namespace SLZ.EditorPatcher
                 return;
             }
 
-            bool unityNeedsUpdate = installDXCVersion.FileMajorPart < 1 || installDXCVersion.FileMinorPart < 7;
+            ulong minSupportedL = MinSupportedVersion;
+            ulong installVersionL = FileVersionToLong(installDXCVersion);
+            ulong localVersionL = FileVersionToLong(localDXCVersion);
 
+            bool unityNeedsUpdate = installVersionL < minSupportedL;
+            bool updateAvailable = installVersionL < localVersionL;
 
-            if (unityNeedsUpdate)
+            if (unityNeedsUpdate || updateAvailable)
             {
                 int choice = -1;
+                
                 if (Application.isBatchMode)
                 {
                     Debug.LogError("\n\nWARNING! The URP is going to attempt to modify the Unity install! The DXC shader compiler needs to be updated " +
@@ -165,17 +191,33 @@ namespace SLZ.EditorPatcher
                 }
                 else
                 {
-
-                    choice = EditorUtility.DisplayDialogComplex($"DXC update requested ({installDXCVersion.ProductVersion}->{localDXCVersion.ProductVersion})",
-                        "The DirectX Shader Compiler (DXC) needs to be updated to support Quest. Allow Update?\n\n" +
-                        "This will replace dxcompiler.dll in your Unity Editor install, affecting all projects on this unity version. " +
-                        $"A backup of the original dll can be found in {toolsDir}\\DXC_Backup.\n\n" +
-                        "This is optional. If DXC is not updated Quest will instead use the default shader compiler, which is slower and missing some advanced features.\n\n" +
-                        "Before updating, close all other unity editor applications!",
-                        "Update and Quit",
-                        "Quit",
-                        "Don't Update"
-                        );
+                    if (unityNeedsUpdate)
+                    {
+                        choice = EditorUtility.DisplayDialogComplex($"DXC update requested ({installDXCVersion.ProductVersion}->{localDXCVersion.ProductVersion})",
+                            "The DirectX Shader Compiler (DXC) needs to be updated to support Quest. Allow Update?\n\n" +
+                            "This will replace dxcompiler.dll in your Unity Editor install, affecting all projects on this unity version. " +
+                            $"A backup of the original dll can be found in {toolsDir}\\DXC_Backup.\n\n" +
+                            "This is optional. If DXC is not updated Quest will instead use the default shader compiler, which is slower and missing some advanced features.\n\n" +
+                            "Before updating, close all other unity editor applications!",
+                            //$"\n{Convert.ToString(unchecked((long)installVersionL), 2)}\n{Convert.ToString(unchecked((long)minSupportedL), 2)}",
+                            "Update and Quit",
+                            "Quit",
+                            "Don't Update"
+                            );
+                    }
+                    else
+                    {
+                        choice = EditorUtility.DisplayDialogComplex($"DXC update available ({installDXCVersion.ProductVersion}->{localDXCVersion.ProductVersion})",
+                           "A newer version of the DirectX Shader Compiler (DXC) is included in this package. Allow Update?\n\n" +
+                           "This will replace dxcompiler.dll in your Unity Editor install, affecting all projects on this unity version. " +
+                           $"A backup of the original dll can be found in {toolsDir}\\DXC_Backup.\n\n" +
+                           "This is optional. The new version may produce more optimal shaders and have access to some newer features.\n\n" +
+                           "Before updating, close all other unity editor applications!",
+                           "Update and Quit",
+                           "Quit",
+                           "Don't Update"
+                           );
+                    }
                 }
 
                 if (choice == 0)
@@ -205,7 +247,7 @@ namespace SLZ.EditorPatcher
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"Failed to Update DXC: {ex.Message}");
+                        Debug.LogError($"Failed to Update DXC, unhandled exception: {ex.Message}");
                         if (!Application.isBatchMode)
                         {
                             EditorUtility.DisplayDialog("Failed to update DXC, encoutered unhandled exception:", ex.Message, "Abort");
@@ -223,20 +265,16 @@ namespace SLZ.EditorPatcher
                 else if (choice == 2)
                 {
                     EditorUtility.DisplayDialog("Skipping DXC Update", "Skipping DXC Update. This message will not show again.\n\n" +
-                        "If you wish to update DXC at a future point, go to the menu bar->Stress Level Zero->Graphics->Enable DXC Check", "Ok");
+                        "If you wish to update DXC at a future point, go to the menu bar->Stress Level Zero->Graphics->DXC Updater->Enable DXC Check", "Ok");
                     EditorPrefs.SetBool("SkipDXCUpdate", true);
+                   
                 }
 
                 bool success = false;
                 try
                 {
                     Debug.Log($"DXC Version: {localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}");
-                    success = SetDXCIncludeState.Set(!unityNeedsUpdate,
-                        (uint)localDXCVersion.FileMajorPart,
-                        (uint)localDXCVersion.FileMinorPart,
-                        (uint)localDXCVersion.FileBuildPart,
-                        (uint)localDXCVersion.FilePrivatePart
-                        );
+                    success = UpdateDXCIncludeState(localDXCVersion);
                 }
                 finally
                 {
@@ -256,6 +294,7 @@ namespace SLZ.EditorPatcher
             }
             else
             {
+                Debug.Log($"DXC Version: {localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}");
                 UpdateDXCIncludeState();
             }
             SessionState.SetBool("DXCChecked", true);
@@ -277,7 +316,6 @@ namespace SLZ.EditorPatcher
 #endif
                 {
                     requiresAdmin = true;
-                    CreateFolderAdmin(backupPath);
                 }
             }
             string backupDXC = Path.Combine(backupPath, "dxcompiler.dll");
@@ -296,12 +334,15 @@ namespace SLZ.EditorPatcher
                     else
                     {
                         UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
+                        errMsg = "No error";
+                        return true;
                     }
                 }
                 catch (UnauthorizedAccessException)
                 {
                     UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
-                    requiresAdmin = true;
+                    errMsg = "No error";
+                    return true;
                 }
                 catch (IOException ex)
                 {
@@ -320,42 +361,16 @@ namespace SLZ.EditorPatcher
                 Debug.Log($"dxcompiler.dll already found at {backupDXC}, skipping backup");
             }
 
-            //if (!File.Exists(backupDXIL))
-            //{
-            //    try
-            //    {
-            //        Debug.Log($"Backing up {outDXILPath} to {backupDXIL}");
-            //        File.Copy(outDXILPath, backupDXIL);
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        errMsg = $"Failed to backup dxil.dll, aborting: {ex.Message}";
-            //        return false;
-            //    }
-            //}
-            //else
-            //{
-            //    Debug.Log($"dxil.dll already found at {backupDXIL}, skipping backup");
-            //}
-
             try
             {
                 Debug.Log($"Ovewriting {outDXCPath} with {inDXCPath}");
-                //throw new UnauthorizedAccessException();
-                if (!requiresAdmin)
-                {
-                    File.Copy(inDXCPath, outDXCPath, true);
-                }
-                else
-                {
-                    UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
-                }
+                File.Copy(inDXCPath, outDXCPath, true);
             }
             catch (UnauthorizedAccessException)
             {
                 UpdateDXCCmd(backupPath, backupDXC, inDXCPath, outDXCPath, true, true);
-                errMsg = "";
-                //return true;
+                errMsg = "No error";
+                return true;
             }
             catch (IOException ex)
             {
@@ -368,34 +383,6 @@ namespace SLZ.EditorPatcher
                 errMsg = $"Failed to overwrite dxcompiler.dll, aborting: {ex.Message}";
                 return false;
             }
-
-            //try
-            //{
-            //    Debug.Log($"Ovewriting {outDXILPath} with {inDXILPath}");
-            //    File.Copy(inDXILPath, outDXILPath, true);
-            //}
-            //catch (Exception ex)
-            //{
-            //    errMsg = $"Failed to overwrite dxil.dll, attempting to restore dxcompiler.dll and aborting: {ex.Message}";
-            //    try
-            //    {
-            //        File.Copy(backupDXC, outDXCPath, true);
-            //    }
-            //    catch (Exception ex2)
-            //    {
-            //        errMsg += $"\nFailed to restore dxcompiler.dll!: {ex2.Message}";
-            //    }
-            //    return false;
-            //}
-
-            // // Update via cmd, less safe but allows us to copy the files after the editor has closed
-            // string pause = Application.isBatchMode ? "" : "& pause";
-            // Process cmd = new Process();
-            // cmd.StartInfo.FileName = "cmd.exe";
-            // cmd.StartInfo.Arguments = $"/c timeout /t 5 & copy /b/v/y \"{inDXCPath}\" \"{outDXCPath}\" & copy /b/v/y \"{inDXILPath}\" \"{outDXILPath}\" {pause}";
-            // cmd.StartInfo.UseShellExecute = true;
-            // cmd.StartInfo.CreateNoWindow = false;
-            // cmd.Start();
             
             errMsg = "No error";
             return true;
@@ -417,6 +404,7 @@ namespace SLZ.EditorPatcher
             cmd.Start();
         }
 
+        /*
         static void CreateFolderAdmin(string folderName)
         {
             string command = $"mkdir \"{folderName}\"";
@@ -428,6 +416,7 @@ namespace SLZ.EditorPatcher
             cmd.Start();
             cmd.WaitForExit();
         }
+        */
 
         static void Instagib()
         {
