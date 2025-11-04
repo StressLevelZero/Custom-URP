@@ -352,15 +352,18 @@ SLZDirectSpecLightInfo SLZGetDirectLightInfo(const SLZFragData frag, const half3
     
         // counter-intuitively, doing the 4x multiply after calculating NoH and LoH results in 1 more register used (with DXC 1.8)
         // Multiplying NoH and LoH by 0.25 after using the 4x scaled half vector doesn't
-        half3 halfDir = half(4.0h) * SLZSafeHalf3Normalize(lightDir + frag.viewDir);
-        data.NoH = saturate(dot(frag.normal, halfDir) * half(0.25));
-        data.LoH = saturate(dot(lightDir, halfDir) * half(0.25));
+        half3 halfDir = SLZSafeHalf3Normalize(lightDir + frag.viewDir);
+        data.NoH = saturate(dot(frag.normal, halfDir));
+        data.LoH = saturate(dot(lightDir, halfDir));
 
-        half3 NxH = cross(frag.normal, halfDir);
-        data.NxH2 = saturate(dot(NxH, NxH)) * half(0.0625h);
+        half3 NxH = cross(frag.normal, half(4.0) * halfDir);
+        data.NxH2 = saturate(dot(NxH, NxH) * half(0.0625h));
         data.NoL = saturate(dot(frag.normal, lightDir));
-        #if defined(UNITY_UNIFIED_SHADER_PRECISION_MODEL)
+        #if defined(UNITY_UNIFIED_SHADER_PRECISION_MODEL) && !defined(USE_MOBILE_BRDF)
             data.NoV = abs(frag.NoV) + half(1e-5);
+            data.NoL = dot(frag.normal, lightDir); // Visibility function needs abs, specular falloff needs saturate
+        #else
+            data.NoL = saturate(dot(frag.normal, lightDir));
         #endif
     #else
         data.NoV = abs(frag.NoV) + half(1e-5);
