@@ -372,7 +372,7 @@ FragOut frag(VertOut i
 	{
 		emission += SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, uv_main) * _EmissionColor;
 		emission.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emission.a);
-		emission.rgb *= saturate(pow(abs(fragData.NoV) + REAL_MIN, _EmissionFalloff));
+		emission.rgb *= saturate(pow(abs(fragData.NoV), _EmissionFalloff));
 	}
 // End Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 
