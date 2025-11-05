@@ -307,7 +307,7 @@ SLZ_DECLARE_FRAG_SIZE
 // Begin Injection DETAIL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
 		half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv_detail);
 		half3 detailTS = UnpackNormalAG(detailMap);
-		normalTS = normalize(BlendNormalRNM(normalTS, detailTS));
+		normalTS = SafeNormalize(BlendNormalRNM(normalTS, detailTS));
 // End Injection DETAIL_MAP from Injection_NormalMaps.hlsl ----------------------------------------------------------
        
         smoothness = saturate(2.0 * detailMap.b * smoothness);
@@ -331,7 +331,7 @@ SLZ_DECLARE_FRAG_SIZE
 		tangentWS.z, bitangentWS.z, normalWS.z
 		);
 	normalWS = mul(TStoWS, normalTS);
-	normalWS = normalize(normalWS);
+	normalWS = SafeNormalize(normalWS);
 // End Injection NORMAL_TRANSFORM from Injection_NormalMaps.hlsl ----------------------------------------------------------
 
 

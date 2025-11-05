@@ -111,7 +111,8 @@ void SLZImageBasedSpecularSSR(half3 diffuse, inout real3 specular, inout real3 S
     if (doSSR)
     {
         SSR = getSSRColor(ssrData);
-    }
+		SSR = clamp(SSR, 0, 100);
+	}
     
 
 

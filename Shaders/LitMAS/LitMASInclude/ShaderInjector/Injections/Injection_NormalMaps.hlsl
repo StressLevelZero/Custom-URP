@@ -24,7 +24,7 @@
 //#!INJECT_BEGIN DETAIL_MAP 0
 		half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv_detail);
 		half3 detailTS = UnpackNormalAG(detailMap);
-		normalTS = normalize(BlendNormalRNM(normalTS, detailTS));
+		normalTS = SafeNormalize(BlendNormalRNM(normalTS, detailTS));
 //#!INJECT_END
 
 //#!INJECT_BEGIN NORMAL_TRANSFORM 0
@@ -38,7 +38,7 @@
 		tangentWS.z, bitangentWS.z, normalWS.z
 		);
 	normalWS = mul(TStoWS, normalTS);
-	normalWS = normalize(normalWS);
+	normalWS = SafeNormalize(normalWS);
 //#!INJECT_END
 
 //#!INJECT_BEGIN SPEC_AA 0
