@@ -355,7 +355,8 @@ SLZ_DECLARE_FRAG_SIZE
 	{
 		emission += SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, uv_main) * _EmissionColor;
 		emission.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emission.a);
-		emission.rgb *= saturate(pow(abs(fragData.NoV), _EmissionFalloff));
+		half emNoV = _EmissionFalloff >= 0 ? abs(fragData.NoV) : 1.0 - abs(fragData.NoV);
+		emission.rgb *= saturate(pow(emNoV, abs(_EmissionFalloff)));
 	}
 // End Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 
