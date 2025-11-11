@@ -43,9 +43,9 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
     half3 closestHit = half3(1,1,1);
 #else
     // Initialize accumulators for weighted sums
-    half totalWeight = 0;
-    half weightedHitRadial = 0;
-    half weightedHitDistance = 0;
+    float totalWeight = 0;
+    float weightedHitRadial = 0;
+    float weightedHitDistance = 0;
 #endif
     UNITY_LOOP for (uint i = 0; i < NumberOfHits; i++)
     {
@@ -83,7 +83,7 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
         half3 localspace = mul(LocalPosP, (half3x3)EllipsoidPos).xyz;
 
         // Compute the distance from the current position to the hit point
-        half currentdist = saturate( length(localspace) );
+		half currentdist = saturate(length(localspace));
 
 #if UNITY_ANDROID
         
@@ -103,7 +103,7 @@ inline half2 GetClosestImpactUV( half3 Posespace, half4x4 EllipsoidPosArray[HitM
             // const half scale = 33.0; // Adjust this value to control the blending range
             // half weight = exp(-currentdist * scale);
             // Compute the weight
-            half weight = saturate( 1.0 - currentdist );
+            float weight = saturate( 1.0 - currentdist );
             weight = pow(weight, 25);
 
             // Accumulate the weighted contributions

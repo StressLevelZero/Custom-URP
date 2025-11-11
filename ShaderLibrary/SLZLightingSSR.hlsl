@@ -48,58 +48,42 @@ struct SSRExtraData
     real fogFactor;
 };
 
-/** @brief Remaps a [0.0, 1.0] float value to a [0, 2^rangeExponent) integer value. 
- *      More accurate than multiplying by the range and rounding for large fixed point values (eg 32 bit fixed point)
- *  @param value            0-1 float value to remap
- *  @paran rangeExponent    number of bits in the fixed point value, such that the set of values are [0, 2^rangeExponent)
- */
-uint FloatToUFixed(float value, int rangeExponent)
-{
-	int exp = int((asuint(value) >> 23) & 0xFFu) - 127;
-	exp += rangeExponent - 24;
-	uint output = ((asuint(value) & (0x7FFFFFu)) + 0x800000u) << exp;
-	return output;
-}
-
-half4 SSRGetInterleavedGradientNoiseMorton2d(float2 pixCoord, int frameCount)
+half2 IGNVectorMorton2D(float2 pixCoord, int frameCount)
 {
 	const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
 	float2 frameMagicScale = float2(2.083f, 4.867f);
-	if (unity_DeltaTime.w > 59.0) pixCoord += (frameCount & 1) * frameMagicScale;
+	pixCoord += frameCount * frameMagicScale;
 	float noise1D = frac(magic.z * frac(dot(pixCoord, magic.xy)));
     
 	uint noiseMortonCode = uint(round(noise1D * float(1u << 32)));
         //FloatToUFixed(noise1D, 32);
 	float2 noise2d = float2(DecodeMorton2D(noiseMortonCode)) / (65535.0);
 
-	return half4(
-        noise2d.x,
-        noise2d.y,
-        noise1D, //noise3d.z,
-        frac(magic.z * frac(dot(pixCoord + float2(-2, 2), magic.xy)))
-    );
+	return half2(noise2d);
 }
 
 
-half4 SSRGetInterleavedGradientNoise(float2 pixCoord, int frameCount)
+half4 IGNVectorOffset(float2 pixCoord, int frameCount)
 {
-	//pixCoord = floor(pixCoord * 0.5);
-	//float2 noiseUvs = fmod(pixCoord.xy, _BlueNoise_Dim.xy);
-	//return _BlueNoiseRGBA.Load(int4(noiseUvs.xy, frameCount, 0));
-    //
-	//return SSRGetInterleavedGradientNoiseMorton2d(pixCoord, frameCount);
-    
     const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
     float2 frameMagicScale = float2(2.083f, 4.867f);
-    //pixCoord += frameCount * frameMagicScale;
-	if (unity_DeltaTime.w > 59.0)
-		pixCoord += (frameCount & 1) * frameMagicScale;
+	pixCoord += frameCount * frameMagicScale;
     return half4(
         frac(magic.z * frac(dot(pixCoord, magic.xy))),
         frac(magic.z * frac(dot(pixCoord + float2(2, -1), magic.xy))),
         frac(magic.z * frac(dot(pixCoord.yx + float2(3, 1), magic.xy))),
         frac(magic.z * frac(dot(pixCoord + float2(-2, 2), magic.xy)))
     );
+}
+
+half4 SSRGetInterleavedGradientNoise(float2 pixCoord, int frameCount)
+{
+	frameCount = unity_DeltaTime.w > half(59.0) ? (frameCount & 1) : 0;
+    #if 1
+	return IGNVectorOffset(pixCoord, frameCount);
+    #else
+    return half4(IGNVectorMorton2D(pixCoord, frameCount),0,0);
+    #endif    
 }
 
  /**
