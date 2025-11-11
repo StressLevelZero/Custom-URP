@@ -8,6 +8,8 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSR.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SSRGlobals.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceFillingCurves.hlsl"
+
 
 #if !defined(DYNAMIC_ADDITIONAL_LIGHTS) && !defined(_ADDITIONAL_LIGHTS)
 #define _ADDITIONAL_LIGHTS false
@@ -39,18 +41,59 @@ half3 invertFogLerp(half fogIntensity, half3 mipFog, half3 finalColor)
 struct SSRExtraData
 {
     real3 meshNormal; 
-    //float4 lastClipPos;
+    float4 lastClipPos;
     float temporalWeight;
     float depthDerivativeSum;
     real4 noise;
     real fogFactor;
 };
 
+/** @brief Remaps a [0.0, 1.0] float value to a [0, 2^rangeExponent) integer value. 
+ *      More accurate than multiplying by the range and rounding for large fixed point values (eg 32 bit fixed point)
+ *  @param value            0-1 float value to remap
+ *  @paran rangeExponent    number of bits in the fixed point value, such that the set of values are [0, 2^rangeExponent)
+ */
+uint FloatToUFixed(float value, int rangeExponent)
+{
+	int exp = int((asuint(value) >> 23) & 0xFFu) - 127;
+	exp += rangeExponent - 24;
+	uint output = ((asuint(value) & (0x7FFFFFu)) + 0x800000u) << exp;
+	return output;
+}
+
+half4 SSRGetInterleavedGradientNoiseMorton2d(float2 pixCoord, int frameCount)
+{
+	const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
+	float2 frameMagicScale = float2(2.083f, 4.867f);
+	if (unity_DeltaTime.w > 59.0) pixCoord += (frameCount & 1) * frameMagicScale;
+	float noise1D = frac(magic.z * frac(dot(pixCoord, magic.xy)));
+    
+	uint noiseMortonCode = uint(round(noise1D * float(1u << 32)));
+        //FloatToUFixed(noise1D, 32);
+	float2 noise2d = float2(DecodeMorton2D(noiseMortonCode)) / (65535.0);
+
+	return half4(
+        noise2d.x,
+        noise2d.y,
+        noise1D, //noise3d.z,
+        frac(magic.z * frac(dot(pixCoord + float2(-2, 2), magic.xy)))
+    );
+}
+
+
 half4 SSRGetInterleavedGradientNoise(float2 pixCoord, int frameCount)
 {
+	//pixCoord = floor(pixCoord * 0.5);
+	//float2 noiseUvs = fmod(pixCoord.xy, _BlueNoise_Dim.xy);
+	//return _BlueNoiseRGBA.Load(int4(noiseUvs.xy, frameCount, 0));
+    //
+	//return SSRGetInterleavedGradientNoiseMorton2d(pixCoord, frameCount);
+    
     const float3 magic = float3(0.06711056f, 0.00583715f, 52.9829189f);
     float2 frameMagicScale = float2(2.083f, 4.867f);
-    pixCoord += frameCount * frameMagicScale;
+    //pixCoord += frameCount * frameMagicScale;
+	if (unity_DeltaTime.w > 59.0)
+		pixCoord += (frameCount & 1) * frameMagicScale;
     return half4(
         frac(magic.z * frac(dot(pixCoord, magic.xy))),
         frac(magic.z * frac(dot(pixCoord + float2(2, -1), magic.xy))),
@@ -234,18 +277,21 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
     float3 output = surfData.occlusion * (surfData.albedo * diffuse) + surfData.emission;
     output = surfaceType == 1 ? output * surfData.alpha : output; //Premultiply diffuse by alpha if surface is transparent
     output += surfData.occlusion * specular;
+    #if 1
     if (true)//ssrExtra.temporalWeight == 0 || !isWithinDepthError || oldScreenUV.x < 0 || oldScreenUV.y < 0 || oldScreenUV.x > 1 || oldScreenUV.y > 1)
     {
         output += surfData.occlusion * SSR.rgb;
     }
-    /* Temporal averaging, replaced by across pixel quad-average
-    else
+
+#else
+    /* Temporal averaging, replaced by across pixel quad-average */
+    //else
     {
 
-        float3 oldColor = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, UnityStereoTransformScreenSpaceTex(oldScreenUV), 0).rgb;
+		float3 oldColor = SAMPLE_TEXTURE2D_X_LOD(_CameraOpaqueTexture, sampler_TrilinearClamp, UnityStereoTransformScreenSpaceTex(fragData.screenUV), 0).rgb;
 
 #if defined(_VOLUMETRICS_ENABLED)
-        oldColor = (oldColor - volColor.rgb) / max(volColor.a, 0.0001);
+        //oldColor = (oldColor - volColor.rgb) / max(volColor.a, 0.0001);
 #endif
 
 #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
@@ -253,16 +299,19 @@ real4 SLZPBRFragmentSSR(SLZFragData fragData, SLZSurfData surfData, SSRExtraData
         oldColor = invertFogLerp(fogFactors.w, fogFactors.rgb, oldColor);
 #endif
         oldColor = max(0, oldColor - output);
-        float frameTemp = ssrExtra.temporalWeight < 0.5 ? 
+		float frameTemp =
+  
+        ssrExtra.temporalWeight < 0.5 ? 
             lerp(1.0, _SSRTemporalWeight, ssrExtra.temporalWeight) :
             lerp(_SSRTemporalWeight, 0.0078, ssrExtra.temporalWeight - 1.0);
+
         SSR = SSR * surfData.occlusion;
         SSR = frameTemp * SSR + (1 - frameTemp) * oldColor;
 
         output += SSR;
         //output = frameTemp.xxx + 0.0001 * output;
     }
-    */
+    #endif
     //-------------------------------------------------------------------------------------------------
     // Combine the final lighting information
     //-------------------------------------------------------------------------------------------------

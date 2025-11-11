@@ -293,7 +293,7 @@ namespace SLZ.EditorPatcher
             }
             else
             {
-                Debug.Log($"DXC Version: {localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}");
+                //Debug.Log($"DXC Version: {localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}");
                 UpdateDXCIncludeState();
             }
             SessionState.SetBool("DXCChecked", true);

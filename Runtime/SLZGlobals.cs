@@ -8,6 +8,8 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using Unity.Mathematics;
 using UnityEngine.Experimental.Rendering;
+using static Unity.Burst.Intrinsics.X86.Avx;
+
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -26,6 +28,7 @@ namespace UnityEngine.Rendering.Universal
         private bool hasSetBNTextures;
 #if UNITY_EDITOR
         private static long framecount = 0;
+        private static int unityFrameCount = 0;
         private static double timeSinceStartup = 0.0;
 #endif
         //private int HiZDimBufferID = Shader.PropertyToID("HiZDimBuffer");
@@ -116,6 +119,17 @@ namespace UnityEngine.Rendering.Universal
             }
 
         }
+        /*
+        private static void IncrementFrameCounter(ScriptableRenderContext ctx, List<Camera> cam)
+        {
+            //if (unityFrameCount == Time.frameCount)
+            //{
+            //    Debug.LogError($"IncrementFrameCounter called multiple times in one frame! {unityFrameCount}, {framecount}");
+            //}
+            //unityFrameCount = Time.frameCount;
+            framecount = Time.frameCount;
+        }
+        */
 
         public void SetHiZSSRKeyWords(bool enableSSR, bool requireHiZ, bool requireMinMax)
         {
@@ -190,12 +204,12 @@ namespace UnityEngine.Rendering.Universal
 #if UNITY_EDITOR
                 if (!EditorApplication.isPlaying)
                 {
-                    if (timeSinceStartup != EditorApplication.timeSinceStartup)
-                    {
-                        timeSinceStartup = EditorApplication.timeSinceStartup;
-                        framecount++;
-                    }
-                    BlueNoiseDim[3] = (int)(framecount % BlueNoiseRGBA.depth);
+                    //if (timeSinceStartup != EditorApplication.timeSinceStartup)
+                    //{
+                    //    timeSinceStartup = EditorApplication.timeSinceStartup;
+                    //    framecount++;
+                    //}
+                    BlueNoiseDim[3] = (int)(Math.Abs(Time.frameCount) % BlueNoiseRGBA.depth);
                     //Debug.Log(BlueNoiseDim[3]);
                 }
                 else
@@ -217,6 +231,8 @@ namespace UnityEngine.Rendering.Universal
             }
         }
 
+
+
         public void UpdateBlueNoiseFrame()
         {
             if (BlueNoiseCB != null)
@@ -225,13 +241,13 @@ namespace UnityEngine.Rendering.Universal
                 if (!EditorApplication.isPlaying)
                 {
                     long depth = (long)BlueNoiseDim[2];
-                    BlueNoiseDim[3] = (int)((Screen.currentResolution.refreshRateRatio.value * EditorApplication.timeSinceStartup) % depth);
+                    BlueNoiseDim[3] = (Math.Abs(Time.frameCount) % depth + depth) % depth;//(int)((Screen.currentResolution.refreshRateRatio.value * EditorApplication.timeSinceStartup) % depth);
                 }
                 else
 #endif
                 {
                     int depth = (int)math.round(BlueNoiseDim[2]);
-                    BlueNoiseDim[3] = (Time.frameCount % depth + depth) % depth;
+                    BlueNoiseDim[3] = (Math.Abs(Time.frameCount) % depth + depth) % depth;
                     //BlueNoiseDim[3] = (int)((Time.timeSinceLevelLoadAsDouble * Screen.currentResolution.refreshRate) % depth);
                 }
                 
@@ -261,6 +277,15 @@ namespace UnityEngine.Rendering.Universal
                 {
                     s_Instance.HiZDimBuffer.Dispose();
                     s_Instance.HiZDimBuffer = null;
+                }
+                if (s_Instance.VrOccDistanceTex != null)
+                {
+                    s_Instance.VrOccDistanceTex.Release();
+                    CoreUtils.Destroy(s_Instance.VrOccDistanceTex);
+                }
+                if (s_Instance.VrOccDistanceMat != null)
+                {
+                    CoreUtils.Destroy(s_Instance.VrOccDistanceMat);
                 }
             }
             s_Instance = null;
@@ -381,7 +406,7 @@ namespace UnityEngine.Rendering.Universal
             passData.screenWidth = targetDesc.width;
             passData.screenHeight = targetDesc.height;
             passData.opaqueTexSizeFrac = opaqueTexSizeFrac;
-            if (camData.xrRendering && camData.xrUniversal != null &&
+            if (camData.xrRendering && camData.xrUniversal != null && camData.xrUniversal.hasValidOcclusionMesh &&
                     (
                         (SLZGlobals.instance.VrOccDistanceTex.width  != (camData.cameraTargetDescriptor.width  / 4)) ||
                         (SLZGlobals.instance.VrOccDistanceTex.height != (camData.cameraTargetDescriptor.height / 4))
@@ -416,11 +441,11 @@ namespace UnityEngine.Rendering.Universal
                 passData.opaqueMipLevels = SLZGlobals.CalculateOpaqueTexMipLevels(targetDesc.width / opaqueTexSizeFrac, targetDesc.height / opaqueTexSizeFrac);
             else
                 passData.opaqueMipLevels = 1;
-            ExecutePass(passData, ref cmd);
+            
         }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-           
+            ExecutePass(passData, ref renderingData.commandBuffer);
         }
 
         internal static void ExecutePass(SLZGlobalsData data, ref CommandBuffer cmd)
@@ -466,6 +491,8 @@ namespace UnityEngine.Rendering.Universal
                     new Vector4(data.screenWidth / data.opaqueTexSizeFrac, data.screenHeight / data.opaqueTexSizeFrac, data.opaqueMipLevels - 1, data.opaqueMipLevels + SLZGlobals.opaqueMipTruncation));
             }
         }
+
+        
 
         TextureDesc tempOcclusionMask(RenderTextureDescriptor main)
         {

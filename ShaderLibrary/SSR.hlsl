@@ -91,13 +91,13 @@ struct SSRData
 {
     float3	wPos;
     float2  screenUV;
-    float3	viewDir;
-    float3	rayDir;
+    half3	viewDir;
+    half3	rayDir;
     half3	faceNormal;
     half	perceptualRoughness;
     half	RdotV;
     float   zDerivativeSum;
-    float4	noise;
+    half4	noise;
     bool	isPostOpaqueCopy;
 };
 
@@ -258,8 +258,8 @@ float4 reflect_ray(float3 reflectedRay, float initDist, float3 rayDir, float hit
     float dynHitRadius = hitRadius * dynStepSize;
     float largeRadius = max(2 * dynStepSize * stepMultiplier, hitRadius);
 
-    float totalDistance = initDist;
-    float lastTotalDistance = initDist;
+    half totalDistance = initDist;
+    half lastTotalDistance = initDist;
     float FdotR4 = FdotR * FdotR;
     FdotR4 *= FdotR4;
     reflectedRay += lerp(0, 0.5*largeRadius, 1 - FdotR4) * rayDir;
@@ -408,13 +408,13 @@ float4 getSSRColor(SSRData data)
             //,smoothstep(0.1, 0.4, data.perceptualRoughness)
         //)
     );
-    float3 rayNoiseAxisX = normalize(cross(data.rayDir, data.faceNormal));
-	float3 rayNoiseAxisY = cross(data.faceNormal, rayNoiseAxisX);
+    half3 rayNoiseAxisX = normalize(cross(data.rayDir, data.faceNormal));
+	half3 rayNoiseAxisY = cross(data.faceNormal, rayNoiseAxisX);
     
     #if 0
     //bias the directional noise depending on the quad index. That way quad averaging gives better results
 #ifdef UNITY_COMPILER_DXC
-    uint quadLane = WaveGetLaneIndex() % 4;
+    uint quadLane = (WaveGetLaneIndex()) % 4;
 #else
     uint2 quadCoords = int2(screenUVs * _ScaledScreenParams.xy) % 2u;
     uint quadLane = clamp(quadCoords.x + 2 * quadCoords.y, 0u, 1u);
@@ -436,20 +436,25 @@ float4 getSSRColor(SSRData data)
             tetraOffset = float2(-0.866, -0.5);
             break;
     }
-    tetraOffset *=  2 * rayTanAngle * data.noise.r;
-    float2 noiseOffset = 0;  // (2 * data.noise.gb - 1) * rayTanAngle;
-    float3 offset = (tetraOffset.x + noiseOffset.x) * rayNoiseAxisX + (tetraOffset.y + noiseOffset.y) * rayNoiseAxisY;
-    data.rayDir += offset;
-    data.rayDir = normalize(data.rayDir);
+    //tetraOffset *=  rayTanAngle * data.noise.b;
+    //float2 noiseOffset = 0;  // (2 * data.noise.gb - 1) * rayTanAngle;
+    //float3 offset = (tetraOffset.x + noiseOffset.x) * rayNoiseAxisX + (tetraOffset.y + noiseOffset.y) * rayNoiseAxisY;
+    //data.rayDir += offset;
+    //data.rayDir = normalize(data.rayDir);
+    
+	half2 noiseOffset = 2 * rayTanAngle * (tetraOffset + (data.noise.rg - half(0.5h)));
+	half3 rayNoise = rayNoiseAxisX * noiseOffset.x + rayNoiseAxisY * noiseOffset.y;
+	data.rayDir += half(0.95h) * rayNoise;
+    
     #else
-    float2 noiseOffset = 2 * rayTanAngle * (2 * data.noise.rg - 1);
-    float3 rayNoise = rayNoiseAxisX * noiseOffset.x + rayNoiseAxisY * noiseOffset.y;
+	half2 noiseOffset = half(2) * rayTanAngle * (half(2) * data.noise.rg - half(1));
+    half3 rayNoise = rayNoiseAxisX * noiseOffset.x + rayNoiseAxisY * noiseOffset.y;
     //rayNoise = rayNoise - dot(rayNoise, data.faceNormal) * data.faceNormal; // Make the offset perpendicular to the face normal so the ray can't be offset into the face
-    data.rayDir += 0.95*rayNoise;
+	data.rayDir += half(0.95h) * rayNoise;
     #endif
     data.rayDir.xyz = normalize(data.rayDir.xyz);
 
-    float RdotV = saturate(0.95 * dot(data.rayDir, -data.viewDir.xyz) + 0.05);
+	half RdotV = saturate(half(0.95) * dot(data.rayDir, -data.viewDir.xyz) + half(0.05));
 
     UNITY_BRANCH if (RdotV <= 0)
     {
