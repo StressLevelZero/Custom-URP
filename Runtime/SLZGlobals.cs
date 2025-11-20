@@ -305,7 +305,7 @@ namespace UnityEngine.Rendering.Universal
                 output.height = height;
                 output.volumeDepth = 2;
                 output.depthBufferBits = 0;
-                output.graphicsFormat = Experimental.Rendering.GraphicsFormat.R8_UNorm;
+                output.graphicsFormat = Experimental.Rendering.GraphicsFormat.R8G8_UNorm;
                 output.dimension = TextureDimension.Tex2DArray;
                 output.enableRandomWrite = false;
                 output.useMipMap = false;
@@ -406,7 +406,8 @@ namespace UnityEngine.Rendering.Universal
             passData.screenWidth = targetDesc.width;
             passData.screenHeight = targetDesc.height;
             passData.opaqueTexSizeFrac = opaqueTexSizeFrac;
-            if (camData.xrRendering && camData.xrUniversal != null && camData.xrUniversal.hasValidOcclusionMesh &&
+
+            if (camData.xrRendering && camData.xrUniversal != null && camData.xrUniversal.hasValidOcclusionMesh && camData.requiresOpaqueTexture &&
                     (
                         (SLZGlobals.instance.VrOccDistanceTex.width  != (camData.cameraTargetDescriptor.width  / 4)) ||
                         (SLZGlobals.instance.VrOccDistanceTex.height != (camData.cameraTargetDescriptor.height / 4))
@@ -425,9 +426,9 @@ namespace UnityEngine.Rendering.Universal
                 
                 passData.xrPass = camData.xrUniversal;
 
-                passData.xrOcclusionMeshTexID = new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
+                passData.xrOcclusionMeshTexID =new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
                 cmd.GetTemporaryRT(SLZGlobals.VrOccMeshDistanceID, SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height));
-
+                passData.xrOcclusionMeshTex = RTHandles.Alloc(passData.xrOcclusionMeshTexID);
                 passData.xrOccDistanceMat = vrOccDistMat;
             }
             else
@@ -480,7 +481,9 @@ namespace UnityEngine.Rendering.Universal
                     cmd.SetGlobalTexture("_MaskTex", data.xrOcclusionMeshTexID);
 
                     cmd.SetRenderTarget(data.xrOccDistanceTex, 0, CubemapFace.Unknown, -1);
-                    data.xrPass.RenderOcclusionMesh(cmd, true, data.xrOccDistanceMat);
+
+                    Blitter.BlitCameraTexture(cmd, data.xrOccDistanceTex, data.xrOccDistanceTex, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, data.xrOccDistanceMat, 0);
+                    //data.xrPass.RenderOcclusionMesh(cmd, true, data.xrOccDistanceMat);
                 }
                 cmd.SetGlobalTexture(SLZGlobals.VrOccMeshDistanceID, data.xrOccDistanceTex);
                 SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, data.ssrMaxSteps, data.ssrMinMip, data.ssrHitRadius, data.temporalWeight, data.fov, data.screenHeight);
@@ -556,7 +559,7 @@ namespace UnityEngine.Rendering.Universal
             public XRPassUniversal xrPass;
             public Material xrOccDistanceMat;
             public RTHandle xrOccDistanceTex;
-            public TextureHandle xrOcclusionMeshTex;
+            public RTHandle xrOcclusionMeshTex;
             public RenderTargetIdentifier xrOcclusionMeshTexID;
         }
 

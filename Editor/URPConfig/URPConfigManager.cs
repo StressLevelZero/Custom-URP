@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace SLZ.SLZEditorTools
 {
-    internal static class URPConfigManager
+    public static class URPConfigManager
     {
 
         public static readonly string packageName = "com.stresslevelzero.urpconfig";

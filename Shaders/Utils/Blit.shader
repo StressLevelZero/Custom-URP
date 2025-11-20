@@ -42,7 +42,7 @@ Shader "Hidden/Universal Render Pipeline/Blit"
                 float2 uv = input.texcoord;
 
                 #ifdef _BLEED_OCCLUSION_MASK
-                    float distance = 2 * SAMPLE_TEXTURE2D_X_LOD(_VrOccMeshDistance, sampler_LinearClamp, uv, 0);
+                    float distance = 2 * SAMPLE_TEXTURE2D_X_LOD(_VrOccMeshDistance, sampler_LinearClamp, uv, 0).r;
                     uv = lerp(uv, float2(0.5,0.5), distance);
                 #endif
     

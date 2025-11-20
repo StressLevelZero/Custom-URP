@@ -49,6 +49,11 @@
             "name": "com.unity.visualeffectgraph",
             "expression": "1.0.0",
             "define": "HAS_VFX_GRAPH"
+        },
+        {
+            "name": "com.stresslevelzero.internal.rendering",
+            "expression": "1.0.0",
+            "define": "SLZ_RP_INTERNAL"
         }
     ],
     "noEngineReferences": false

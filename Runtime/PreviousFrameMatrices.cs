@@ -101,12 +101,13 @@ namespace UnityEngine.Rendering.Universal.Internal
 
 
 #if ENABLE_VR && ENABLE_XR_MODULE
-            if (cameraData.xr.enabled)
+            if (cameraData.xr.enabled && cameraData.xr.singlePassEnabled)
             {
+                int rightEyeIndex = cameraData.xr.singlePassEnabled ? 1 : 0;
                 Matrix4x4 gpuProj0 = GL.GetGPUProjectionMatrix(cameraData.GetProjectionMatrix(0), true);
-                Matrix4x4 gpuProj1 = GL.GetGPUProjectionMatrix(cameraData.GetProjectionMatrix(1), true);
+                Matrix4x4 gpuProj1 = GL.GetGPUProjectionMatrix(cameraData.GetProjectionMatrix(rightEyeIndex), true);
                 Matrix4x4 gpuView0 = cameraData.GetViewMatrix(0);
-                Matrix4x4 gpuView1 = cameraData.GetViewMatrix(1);
+                Matrix4x4 gpuView1 = cameraData.GetViewMatrix(rightEyeIndex);
                 Matrix4x4 gpuVP0 = gpuProj0 * gpuView0;
                 Matrix4x4 gpuVP1 = gpuProj1 * gpuView1;
 

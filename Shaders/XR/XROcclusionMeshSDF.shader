@@ -24,8 +24,11 @@ Shader "Hidden/SLZ/XR/XROcclusionMeshDistance"
                 #pragma fragment Frag
                 #pragma editor_sync_compilation
                 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+                #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+
 
                 #pragma exclude_renderers d3d11_9x gles
+                /*
                 #pragma multi_compile _ XR_OCCLUSION_MESH_COMBINED
 
                 // Not all platforms properly support SV_RenderTargetArrayIndex
@@ -36,6 +39,7 @@ Shader "Hidden/SLZ/XR/XROcclusionMeshDistance"
                         #define USE_XR_OCCLUSION_MESH_COMBINED_RT_ARRAY_INDEX XR_OCCLUSION_MESH_COMBINED
                     #endif
                 #endif
+                
 
                 struct Attributes
                 {
@@ -53,6 +57,7 @@ Shader "Hidden/SLZ/XR/XROcclusionMeshDistance"
                 #endif
                 };
 
+                
                 Varyings Vert(Attributes input)
                 {
                     Varyings output;
@@ -71,43 +76,58 @@ Shader "Hidden/SLZ/XR/XROcclusionMeshDistance"
 
                     return output;
                 }
-
+                */
                 Texture2DArray<float> _MaskTex;
                 float4 _MaskTex_TexelSize;
                 //float _StepCount;
 
-                float Frag(Varyings i) : SV_Target
+                float2 Frag(Varyings i) : SV_Target
                 {
-                    unity_StereoEyeIndex = i.rtArrayIndex;
-                    float2 pixelCoords = i.screenUV * _MaskTex_TexelSize.zw;
-                    float2 centerCoords = _MaskTex_TexelSize.zw * 0.5;
+                    //unity_StereoEyeIndex = i.rtArrayIndex;
+                       UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                    float2 uv = i.texcoord;
+                    float2 pixelCoords = uv;// * _MaskTex_TexelSize.zw;
+                    float2 centerCoords = float2(0.5, 0.5);//_MaskTex_TexelSize.zw * 0.5;
                     float stepSize = 0.5;
                     float lastX = 0;
+                    float2 lastCoords = pixelCoords;
                     float x = 0;
 
-                    bool inside = (_MaskTex.Load(int4(pixelCoords, i.rtArrayIndex, 0)).r) != 0;
-                    
-                    if (inside)
+                    bool startsInside = (_MaskTex.SampleLevel(sampler_LinearClamp, float3(pixelCoords, unity_StereoEyeIndex), 0).r) > 0;
+                    bool inside = startsInside;
+                    if (startsInside)
                     {
-                        return 0;
+                        pixelCoords = 2 * pixelCoords - 1.0;
+                        float maxDim = max(abs(pixelCoords.x), abs(pixelCoords.y));
+                        pixelCoords /= maxDim;
+                        pixelCoords = 0.5 * pixelCoords + 0.5;
+                        inside = (_MaskTex.SampleLevel(sampler_LinearClamp, float3(pixelCoords, unity_StereoEyeIndex), 0).r) > 0;
                     }
-
-                    for (float step = 0.0; step < 8.0; step++)
+                    
+                    for (float step = 0.0; step < 16.0; step++)
                     {
                         x = inside ? x - stepSize : x + stepSize;
-                        stepSize *= 0.5f;
-                        int2 coords = round(lerp(pixelCoords, centerCoords, x));
-                        float maskValue = _MaskTex.Load(int4(coords, i.rtArrayIndex, 0)).r;
-                        inside = (maskValue != 0);
+                        //stepSize *= 0.5f;
+                        float2 coords = (lerp(pixelCoords, centerCoords, x));
+                        float maskValue = _MaskTex.SampleLevel(sampler_LinearClamp, float3(coords, unity_StereoEyeIndex), 0).r;
+                        bool nowInside = (maskValue > 0) && (all(coords > 0) && all(coords < 1));
+                        if (nowInside != inside) stepSize *= 0.5f;
+                        inside = nowInside;
                         if (inside)
                         {
-                            lastX = x; 
+                            lastX = x;
+                        }
+                        else
+                        {
+                            lastCoords = coords;
                         }
                     }
+                    
+                    float distance = 1.0 - saturate(8 * length(lastCoords - uv));
+                    //distance *= distance;
+                    //distance = saturate(2.0 * distance - 1.0);
 
-                    //float distance = length( (centerCoords - float2(lastCoords)) / _MaskTex_TexelSize.zw );
-
-                    return lastX;
+                    return startsInside ? float2(0, distance) : float2(lastX, 1);
                 }
 
             ENDHLSL

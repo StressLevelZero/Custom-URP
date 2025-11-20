@@ -17,6 +17,9 @@ CBUFFER_END
 #define _SSRMinMip asuint(_SSRVariables.w)
 #define _SSRDistScale _SSRVariables2.x
 
+#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+TEXTURE2D_ARRAY(_VrOccMeshDistance);
+#endif
 //SamplerState sampler_trilinear_clamp;
 
 #endif

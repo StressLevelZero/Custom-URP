@@ -1,13 +1,10 @@
 using SLZ.SLZEditorTools;
-using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using UnityEngine;
 
-namespace SLZ.EditorPatcher
+namespace SLZ.DXCUpdater
 {
-    internal static class SetDXCIncludeState
+    public static class SetDXCIncludeState
     {
         static string packageName = "com.stresslevelzero.urpconfig";
         public static bool Set(bool patched, uint major, uint minor, uint patch, uint build)

@@ -906,7 +906,7 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, inout SLZ
             #if defined(_BRDFMAP)
             lmDiffuse = SLZApplyLightmapDirectionalityBRDFLUT(lmDiffuse, lmDirection, frag.normal, directionalMap.w, frag, surf);
             #else
-            lmDiffuse = SLZApplyLightmapDirectionality(lmDiffuse,lmDirection, frag.normal, directionalMap.w);
+            lmDiffuse = max(half(0), SLZApplyLightmapDirectionality(lmDiffuse,lmDirection, frag.normal, directionalMap.w));
             #endif
             
             #if !defined(_SLZ_DISABLE_BAKED_SPEC) && !defined(SLZ_NO_SPECULAR)
@@ -927,7 +927,7 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, inout SLZ
                 #else
                     
                     half3 lmSpecular = SLZDirectBRDFSpecular(lightInfo, surf, frag);
-                    specular += lmDiffuse * lmSpecular * lightInfo.NoL * directionality;
+                    specular += max(half(0), lmDiffuse * lmSpecular * lightInfo.NoL * directionality);
                 #endif
             #endif
     #endif

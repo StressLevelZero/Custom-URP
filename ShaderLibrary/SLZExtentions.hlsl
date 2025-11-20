@@ -100,7 +100,7 @@ half DirectionalLightmapSpecular(float2 lightmapUV, float3 normalWorld, float3 v
 	half perceptualRoughness = 1-smoothness;
 	half roughness = perceptualRoughness * perceptualRoughness;
 	half spec = GGXTerm(normalWorld, halfDir, nh, roughness);
-	return spec;
+	return clamp(spec, 0, 100); // can go NaN or Inf if dominant direction is length 0
  //   return 1;
 }
 //Baked Specular using directional baked maps
@@ -112,7 +112,7 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
     half perceptualRoughness = 1 - smoothness;
     half roughness = perceptualRoughness * perceptualRoughness;
     half spec = GGXTerm(normalWorld, halfDir, nh, roughness);
-    return spec;
+	return clamp(spec, 0, 100); // can go NaN or Inf if dominant direction is length 0
     //   return 1;
 }
 
@@ -155,7 +155,7 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
      //    illuminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgb;
      //}
      real halfLambert = dot(normalWS, direction.xyz - 0.5) + 0.5;
-     real3 IndirectDiffuse = illuminance * halfLambert / max(1e-4, direction.w);
+     real3 IndirectDiffuse = max(real(0), illuminance * halfLambert / max(1e-4, direction.w));
      real IndirectSpecular = DirectionalLightmapSpecular(direction, normalWS, viewDirWS, smoothness) ;
      return real4(IndirectDiffuse.xyz, IndirectSpecular) ;
   //   return 0;

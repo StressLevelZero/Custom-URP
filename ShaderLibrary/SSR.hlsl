@@ -491,19 +491,39 @@ float4 getSSRColor(SSRData data)
      */
     float3 uvs;			
     float3 hitScreenPos;
-    float4 finalPosWorld = float4(mul(transpose((float3x3) UNITY_MATRIX_V), (finalPos.xyz)) + _WorldSpaceCameraPos, 1);
+	float4 finalPosWorld = float4(mul(transpose((float3x3) UNITY_MATRIX_V), (finalPos.xyz)) + _WorldSpaceCameraPos, 1);
+#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+    float3 hitScreenPosOtherEye = 0;
+    int otherEyeIndex = (unity_StereoEyeIndex + 1) & 1;
+#endif
     [branch] if (data.isPostOpaqueCopy)
     {
         hitScreenPos = mul(unity_MatrixVP, finalPosWorld).xyw;
+#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+        hitScreenPosOtherEye = mul(unity_StereoMatrixVP[otherEyeIndex], finalPosWorld).xyw;;
+#endif
         //hitScreenPos.xy = 1.0 - hitScreenPos.xy;
     }
     else
     {
         hitScreenPos = mul(prevVP, finalPosWorld).xyw;
-    }
+#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+        hitScreenPosOtherEye = mul(SLZ_PreviousViewStereo[otherEyeIndex], finalPosWorld).xyw;;
+#endif
+	}
     uvs = ComputeGrabScreenPos(hitScreenPos);
+	uvs.xy = uvs.xy / uvs.z;
+#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+    float3 uvsOtherEye = ComputeGrabScreenPos(hitScreenPosOtherEye);
+    uvsOtherEye.xy /= uvsOtherEye.z;
+    float fade1 = 1.0 - SAMPLE_TEXTURE2D_ARRAY_LOD(_VrOccMeshDistance, sampler_TrilinearClamp, uvs.xy, unity_StereoEyeIndex, 0).g;
+    float fade2 = 1.0 - SAMPLE_TEXTURE2D_ARRAY_LOD(_VrOccMeshDistance, sampler_TrilinearClamp, uvsOtherEye.xy, otherEyeIndex, 0).g;
+    float fade = min(fade1, fade2);
+    //fade = saturate(2 * fade);
+    //fade *= fade;
+    fade *= saturate(2*(RdotV));
+#endif
 
-    uvs.xy = uvs.xy / uvs.z;
                 
 
     /*
@@ -512,18 +532,19 @@ float4 getSSRColor(SSRData data)
      * reflection will begin to fade in different locations in each eye). Thus
      * only fade on the outer edge of each eye
      */
-    
-    #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
-    float xfade = smoothstep(0, 0.1, unity_StereoEyeIndex == 0 ? uvs.x : 1.0 - uvs.x);
-    #else
+#if !defined(UNITY_STEREO_INSTANCING_ENABLED) && !defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+    //#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+    //float xfade = smoothstep(0, 0.1, unity_StereoEyeIndex == 0 ? uvs.x : 1.0 - uvs.x);
+    //#else
     float xfade = smoothstep(0, 0.2, uvs.x)*smoothstep(1, 1- 0.1, uvs.x);//Fade x uvs out towards the edges
-    #endif
+    //#endif
     float yfade = smoothstep(0, 0.2, uvs.y)*smoothstep(1, 1- 0.1, uvs.y);//Same for y
     xfade *= xfade;
     yfade *= yfade;
     //float lengthFade = smoothstep(1, 0, 2*(totalSteps / data.maxSteps)-1);
     
     float fade = saturate(2*(RdotV)) * xfade * yfade;
+    #endif
 
     float roughRadius = rayTanAngle * totalDistance;
     
