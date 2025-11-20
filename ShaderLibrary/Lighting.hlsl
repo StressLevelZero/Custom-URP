@@ -195,8 +195,11 @@ half3 VertexLighting(float3 positionWS, half3 normalWS)
     uint meshRenderingLayers = GetMeshRenderingLayer();
 
     LIGHT_LOOP_BEGIN(lightsCount)
+    /// SLZ MODIFIED - Single important pixel light for mobile
+#if !defined(SLZ_NO_MOBILE_IMPORTANT_LIGHT)
         int objLightIndex = GetPerObjectLightIndex(lightIndex);
         if (objLightIndex != _ImportantLightIndex)
+#endif
         {
             Light light = GetAdditionalPerObjectLight(objLightIndex, positionWS);
 #ifdef _LIGHT_LAYERS
@@ -434,7 +437,8 @@ half4 UniversalFragmentPBR(InputData inputData, SurfaceData surfaceData)
 		LIGHT_LOOP_END
     }
 
-    #if defined(_ADDITIONAL_LIGHTS_VERTEX)
+    #if defined(_ADDITIONAL_LIGHTS_VERTEX) && !defined(SLZ_NO_MOBILE_IMPORTANT_LIGHT)
+    
     if (_ImportantLightIndex != -1)
     {
             Light light = GetAdditionalPerObjectLight((MAX_VISIBLE_LIGHT_COUNT_MOBILE - 1), inputData.positionWS);
