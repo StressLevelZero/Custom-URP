@@ -34,6 +34,7 @@ namespace UnityEditor.Rendering.Universal
             public static GUIContent enableRenderGraphText = EditorGUIUtility.TrTextContent("Use Render Graph", "");
 
             // SLZ MODIFIED
+            public static GUIContent allowSinglePixelLight = EditorGUIUtility.TrTextContent("Allow Single Pixel Light", "When additional lights are set to per-vertex, allow a single light whose rendermode is set to \"Important\" to be calculated per-pixel");
 
             public static GUIContent enableSSR = EditorGUIUtility.TrTextContent("Enable SSR", "If enabled, sets the keyword _SLZ_SSR_ENABLED to switch shaders to an SSR variant");
             public static GUIContent SSRSteps = EditorGUIUtility.TrTextContent("Max SSR Steps", "Sets the maximum number of iterations in the SSR marcher");

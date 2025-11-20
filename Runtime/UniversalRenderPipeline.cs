@@ -1405,12 +1405,17 @@ namespace UnityEngine.Rendering.Universal
             var visibleLights = cullResults.visibleLights;
 // SLZ MODIFIED - Store the index of the first light whose (hidden) render mode is "important" on quest so we can move its data to a static position
             int importantLightIndex = -1;
+            int mainLightIndex = 0;
 #if PLATFORM_ANDROID
-            int mainLightIndex = GetMainAndImportantLightIndex(settings, visibleLights, out importantLightIndex);
-            //Debug.Log($"Important Light Index: {importantLightIndex}");
-#else
-            int mainLightIndex = GetMainLightIndex(settings, visibleLights);
+            if (settings.allowSinglePixelLight && settings.additionalLightsRenderingMode == LightRenderingMode.PerVertex)
+            {
+                mainLightIndex = GetMainAndImportantLightIndex(settings, visibleLights, out importantLightIndex);
+            }
+            else
 #endif
+            {
+                mainLightIndex = GetMainLightIndex(settings, visibleLights);
+            }
             bool mainLightCastShadows = false;
             bool additionalLightsCastShadows = false;
 

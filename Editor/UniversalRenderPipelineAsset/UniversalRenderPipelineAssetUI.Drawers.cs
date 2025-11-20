@@ -261,6 +261,13 @@ namespace UnityEditor.Rendering.Universal
             serialized.additionalLightsPerObjectLimitProp.intValue = EditorGUILayout.IntSlider(Styles.perObjectLimit, serialized.additionalLightsPerObjectLimitProp.intValue, 0, UniversalRenderPipeline.maxPerObjectLights);
             EditorGUI.EndDisabledGroup();
 
+            /// SLZ MODIFIED
+            bool disableGroup2 = disableGroup | serialized.additionalLightsRenderingModeProp.intValue != (int)LightRenderingMode.PerVertex;
+            EditorGUI.BeginDisabledGroup(disableGroup2);
+            EditorGUILayout.PropertyField(serialized.allowSinglePixelLight, Styles.allowSinglePixelLight);
+            EditorGUI.EndDisabledGroup();
+            /// END SLZ MODIFIED
+
             disableGroup |= (serialized.additionalLightsPerObjectLimitProp.intValue == 0 || serialized.additionalLightsRenderingModeProp.intValue != (int)LightRenderingMode.PerPixel);
             EditorGUI.BeginDisabledGroup(disableGroup);
             EditorGUILayout.PropertyField(serialized.additionalLightShadowsSupportedProp, Styles.supportsAdditionalShadowsText);

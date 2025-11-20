@@ -73,6 +73,8 @@ namespace UnityEditor.Rendering.Universal
         public SerializedProperty supportDataDrivenLensFlare { get; }
 
         // SLZ MODIFIED
+
+        public SerializedProperty allowSinglePixelLight { get; }
         public SerializedProperty enableSSR { get; }
         public SerializedProperty maxSSRSteps { get; }
         public SerializedProperty ssrMinMip { get; }
@@ -173,6 +175,7 @@ namespace UnityEditor.Rendering.Universal
             state = new EditorPrefBoolFlags<EditorUtils.Unit>(Key);
 
             // SLZ MODIFIED
+            allowSinglePixelLight = serializedObject.FindProperty("m_AllowSinglePixelLight");
             enableSSR = serializedObject.FindProperty("m_EnableSSR");
             maxSSRSteps = serializedObject.FindProperty("m_MaxSsrSteps");
             ssrMinMip = serializedObject.FindProperty("m_SsrMinMip");

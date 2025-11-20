@@ -569,6 +569,8 @@ namespace UnityEngine.Rendering.Universal
 
         // SLZ MODIFIED
 
+        [SerializeField] bool m_AllowSinglePixelLight = true;
+
         [SerializeField] bool m_EnableSSR = false;
         [SerializeField] int m_MaxSsrSteps = 35;
         [SerializeField] int m_SsrMinMip = 0;
@@ -2020,6 +2022,12 @@ namespace UnityEngine.Rendering.Universal
         }
 
         // SLZ MODIFIED
+        public bool allowSinglePixelLight
+        {
+            get { return m_AllowSinglePixelLight; }
+            set { m_AllowSinglePixelLight = value; }
+        }
+
         public bool enableSSR
         {
             get { return m_EnableSSR; }
