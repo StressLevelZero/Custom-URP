@@ -393,8 +393,19 @@ namespace SLZ.SLZEditorTools
             {
                 Material[] mats = renderers[rIdx].sharedMaterials;
                 int smCount = mats.Length;
+                bool hasShownWarning = false;
                 for (int smIdx = 0; smIdx < smCount; smIdx++)
                 {
+                    if (mats[smIdx] == null)
+                    {
+                        if (!hasShownWarning)
+                        {
+                            Debug.LogWarning($"Volumetric Baking: Renderer with unpopulated material slots, fix this! : {AnimationUtility.CalculateTransformPath(renderers[rIdx].transform, null)}");
+                            hasShownWarning = true;
+                        }
+                        smflags[smIdx] = RayTracingSubMeshFlags.Disabled;
+                        continue;
+                    }
                     if (mats[smIdx].renderQueue < 2450)
                     {
                         smflags[smIdx] = RayTracingSubMeshFlags.Enabled;
