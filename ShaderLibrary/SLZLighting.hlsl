@@ -246,7 +246,7 @@ SLZFragData
     SLZFragData data;
     data.position = positionWS;
     data.normal = normalWS;
-    data.viewDir = SLZSafeHalf3Normalize(half3(_WorldSpaceCameraPos - positionWS));
+    data.viewDir = half3(normalize(_WorldSpaceCameraPos - positionWS));
     data.NoV = dot(data.normal, data.viewDir);
     data.lightmapUV = lightmapUV;
     data.dynLightmapUV = dynLightmapUV;
