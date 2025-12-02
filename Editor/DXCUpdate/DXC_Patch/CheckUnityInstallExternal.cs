@@ -1,10 +1,12 @@
 //#define SIMULATE_ADMIN_NECESSARY
-#if !SLZ_RP_INTERNAL
+#if !SLZ_RP_INTERNAL || SIMULATE_EXTERNAL
 
 using SLZ.SLZEditorTools;
+using System;
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Experimental;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -15,7 +17,11 @@ namespace SLZ.DXCUpdater
     /// </summary>
     internal static class CheckDXCInstallExternal
     {
-        [InitializeOnLoadMethod]
+        static string dxcompilerName = "dxcompiler.dll";
+        public static string UnityDxcPath() { return Path.Combine(Path.GetDirectoryName(EditorApplication.applicationPath), "Data", "Tools", dxcompilerName); }
+        public static string SlzDxcPath() { return Path.GetFullPath(Path.Combine("Packages","com.unity.render-pipelines.universal","Editor","DXCUpdate","DXC_Patch","dxc~", dxcompilerName)); }
+
+        [InitializeOnLoadMethod()]
         static void CheckDXC()
         {
             // avoid running this method every domain reload
@@ -26,7 +32,7 @@ namespace SLZ.DXCUpdater
             }
 
 #if !SKIP_DXC_UPGRADE
-            CheckDXCExternal();
+            EditorApplication.update += CheckDXCExternal;
 #else
             UpdateDXCIncludeState();
 #endif
@@ -69,6 +75,11 @@ namespace SLZ.DXCUpdater
             return SetDXCIncludeState.Set(isUpdated, major, minor, build, priv);
         }
 
+        static string FileVersionToStr(FileVersionInfo vi)
+        {
+            return $"{vi.FileMajorPart}.{vi.FileMinorPart}.{vi.FileBuildPart}.{vi.FilePrivatePart}";
+        }
+
 
         [MenuItem("Stress Level Zero/Graphics/DXC Updater/Enable DXC Check")]
         static void EnableDXCCheck()
@@ -77,8 +88,19 @@ namespace SLZ.DXCUpdater
             EditorUtility.DisplayDialog("DXC Update Check Enabled", "DXC update check enabled, restart editor to update", "Ok");
         }
 
+        internal static void GetDXCVersions(string unityDxcPath, string slzDxcPath, out bool unityDXCExists, out FileVersionInfo unityDXCVersion, out bool slzDXCExists, out FileVersionInfo SlzDXCVersion)
+        {
+            unityDXCExists = File.Exists(unityDxcPath);
+            unityDXCVersion = unityDXCExists ? FileVersionInfo.GetVersionInfo(unityDxcPath) : default(FileVersionInfo);
+
+            slzDXCExists = File.Exists(slzDxcPath);
+            SlzDXCVersion = slzDXCExists ? FileVersionInfo.GetVersionInfo(slzDxcPath) : default(FileVersionInfo);
+        }
+
+        //[MenuItem("TEST/Show DXC Warning")]
         static void CheckDXCExternal()
         {
+            EditorApplication.update -= CheckDXCExternal;
             if (EditorPrefs.GetBool("SkipDXCUpdate", false))
             {
                 URPConfigManager.Initialize();
@@ -86,44 +108,51 @@ namespace SLZ.DXCUpdater
                 UpdateDXCIncludeState();
                 return;
             }
-            string unity = EditorApplication.applicationPath;
-            string toolsDir = Path.Combine(Path.GetDirectoryName(unity), "Data", "Tools");
-            string localPath = Path.GetFullPath("Packages/com.unity.render-pipelines.universal/Editor/DXCUpdate/DXC_Patch/dxc~");
+            string slzDxcPath = SlzDxcPath();
+            string unityDxcPath = UnityDxcPath();
+            GetDXCVersions(unityDxcPath, slzDxcPath, out bool unityDXCExists, out FileVersionInfo installDXCVersion, out bool localDXCExists, out FileVersionInfo localDXCVersion);
 
-            string unityDxcPath = Path.Combine(toolsDir, "dxcompiler.dll");
-            // string unityDxilPath = Path.Combine(toolsDir, "dxil.dll");
-            bool unityDXCExists = File.Exists(unityDxcPath) /* && File.Exists(unityDxilPath) */;
-            FileVersionInfo installDXCVersion = unityDXCExists ? FileVersionInfo.GetVersionInfo(unityDxcPath) : default(FileVersionInfo);
-
-
-            string localDxcPath = Path.Combine(localPath, "dxcompiler.dll");
-            //string localDxilPath = Path.Combine(localPath, "dxil.dll");
-            bool localDXCExists = File.Exists(localDxcPath) /* && File.Exists(localDxilPath) */;
-            FileVersionInfo localDXCVersion = localDXCExists ? FileVersionInfo.GetVersionInfo(localDxcPath) : default(FileVersionInfo);
+            //Debug.LogError($"{unityDxcPath} : {unityDXCExists}\n{slzDxcPath} : {localDXCExists}");
 
             int defaultNewDXCVersionMajor = 1;
             int defaultNewDXCVersionMinor = 7;
             bool needsUpdate = !unityDXCExists || !localDXCExists || (installDXCVersion.FileMajorPart < defaultNewDXCVersionMajor || installDXCVersion.FileMinorPart < defaultNewDXCVersionMinor);
-            
+
+            DXCWarningWindow[] warnWindows = Resources.FindObjectsOfTypeAll<DXCWarningWindow>();
+            foreach (var warnWindow in warnWindows)
+            {
+                warnWindow.Close();
+                EditorWindow.DestroyImmediate(warnWindow);
+            }
+
             // for legal reasons, we can't auto update the compiler on end-user's machines. Auto-updater moved to internal package
             if (needsUpdate)
             {
-                bool warnNonWin = EditorUtility.DisplayDialog($"DXC out of date",
-                      $"The DirectX Shader Compiler (DXC) in the Unity Editor installation is too old to support Quest.\n" +
-                      "Unity uses the DXC library at:\n" +
-                      $"{toolsDir}\\dxcompiler.dll\n\n" +
-                      "A Unity-compatible fork of DXC is included inside this package at:\n" +
-                      $"{localPath}\\dxcompiler.dll\n\n" +
-                      $"The legacy compiler will be used. Advanced shader features will be unavailable and compilation times will be longer.",
-                      "Dismiss",
-                      "Dismiss - Don't warn again for this machine"
-                      );
-                if (!warnNonWin)
+                EditorPrefs.DeleteKey(typeof(DXCWarningWindow).ToString() + "x");
+                EditorPrefs.DeleteKey(typeof(DXCWarningWindow).ToString() + "y");
+                EditorPrefs.SetFloat(typeof(DXCWarningWindow).ToString() + "w", 800);
+                EditorPrefs.SetFloat(typeof(DXCWarningWindow).ToString() + "h", 240);
+                DXCWarningWindow.unityDXCInfo = FileVersionToStr(installDXCVersion);
+                DXCWarningWindow.slzDXCInfo = FileVersionToStr(localDXCVersion);
+                DXCWarningWindow.unityDXCPath = unityDxcPath;
+                DXCWarningWindow.slzDXCPath = slzDxcPath;
+                DXCWarningWindow warnWindow = EditorWindow.GetWindow<DXCWarningWindow>( true, "DXC Shader Compiler Out Of Date", true);
+                DXCWarningWindow.unityDXCInfo  = null;
+                DXCWarningWindow.slzDXCInfo    = null;
+                DXCWarningWindow.unityDXCPath  = null;
+                DXCWarningWindow.slzDXCPath    = null;
+                //warnWindow.position = ContainerWindowBridge.ParentBorderSize(warnWindow, new Rect(new Vector2(0,0), new Vector2(800, 240)));
+                warnWindow.ShowUtility();
+                Debug.Log(warnWindow.position);
+            }
+            else
+            {
+                DXCWarningWindow[] windows = Resources.FindObjectsOfTypeAll<DXCWarningWindow>();
+                foreach (DXCWarningWindow window in windows)
                 {
-                    EditorPrefs.SetBool("SkipDXCUpdate", true);
+                    window.Close();
+                    UnityEngine.Object.DestroyImmediate(window);
                 }
-               
-
             }
             URPConfigManager.Initialize();
             UpdateDXCIncludeState(installDXCVersion);
