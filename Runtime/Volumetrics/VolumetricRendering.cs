@@ -702,7 +702,7 @@ public class VolumetricRendering : MonoBehaviour
          int totalWidth = volumetricData.FroxelWidthResolution * 2;
          igx = Mathf.CeilToInt((float)totalWidth / isx);
          igy = Mathf.CeilToInt((float)volumetricData.FroxelHeightResolution / isy);
-         FroxelIntegrationCompute.Dispatch(IntegrateKernel, igx, igy, 1);
+
 
         //    ComputZPlaneTexelSpacing(1.0f, vFoV, parameters.resolution.y);
 
@@ -729,10 +729,13 @@ public class VolumetricRendering : MonoBehaviour
         Clear3DTexture(IntegrationBuffer);
 
         SetVariables();
+        SetFroxelIntegrationUniforms(true);
+        FroxelIntegrationCompute.Dispatch(IntegrateKernel, igx, igy, 1);
+
         SetupClipmap();
         UpdateClipmaps();
         SetFroxelFogUniforms(true);
-        SetFroxelIntegrationUniforms(true);
+
         //SetBlurUniforms(true);
 
         hasInitialized = true;
