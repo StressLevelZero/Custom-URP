@@ -82,6 +82,14 @@ half3 ApplyTonemap(half3 input)
     return saturate(input);
 }
 
+float3 tony_mc_mapface_space(float3 stimulus) {
+    // Apply a non-linear transform that the LUT is encoded with.
+	//stimulus =  pow(2, stimulus.rgb * (8.0 + 13.0) - 13.0 );
+	//stimulus = pow(stimulus, 0.45454545);
+    const float3 encoded = stimulus / (stimulus + 1.0);
+	return encoded;
+}
+
 half3 ApplyColorGrading(half3 input, float postExposure, TEXTURE2D_PARAM(lutTex, lutSampler), float3 lutParams, TEXTURE2D_PARAM(userLutTex, userLutSampler), float3 userLutParams, float userLutContrib)
 {
     // Artist request to fine tune exposure in post without affecting bloom, dof etc
@@ -92,17 +100,19 @@ half3 ApplyColorGrading(half3 input, float postExposure, TEXTURE2D_PARAM(lutTex,
     //   - (optional) Clamp result & apply user LUT
     #if _HDR_GRADING
     {
+		
         float3 inputLutSpace = saturate(LinearToLogC(input)); // LUT space is in LogC
+		
         input = ApplyLut2D(TEXTURE2D_ARGS(lutTex, lutSampler), inputLutSpace, lutParams);
 
         UNITY_BRANCH
         if (userLutContrib > 0.0)
         {
-            input = saturate(input);
-            input.rgb = GetLinearToSRGB(input.rgb); // In LDR do the lookup in sRGB for the user LUT
-            half3 outLut = ApplyLut2D(TEXTURE2D_ARGS(userLutTex, userLutSampler), input, userLutParams);
+            //input = saturate(input);
+            //input.rgb = GetLinearToSRGB(input.rgb); // In LDR do the lookup in sRGB for the user LUT
+            half3 outLut = ApplyLut2D(TEXTURE2D_ARGS(userLutTex, userLutSampler), inputLutSpace, userLutParams);
             input = lerp(input, outLut, userLutContrib);
-            input.rgb = GetSRGBToLinear(input.rgb);
+            //input.rgb = GetSRGBToLinear(input.rgb);
         }
     }
 
@@ -112,16 +122,21 @@ half3 ApplyColorGrading(half3 input, float postExposure, TEXTURE2D_PARAM(lutTex,
     //   - Apply internal linear LUT
     #else
     {
-        input = ApplyTonemap(input);
+        
 
         UNITY_BRANCH
         if (userLutContrib > 0.0)
         {
-            input.rgb = GetLinearToSRGB(input.rgb); // In LDR do the lookup in sRGB for the user LUT
-            half3 outLut = ApplyLut2D(TEXTURE2D_ARGS(userLutTex, userLutSampler), input, userLutParams);
+            //input.rgb = GetLinearToSRGB(input.rgb); // In LDR do the lookup in sRGB for the user LUT
+			float3 colorLutSpace = saturate(LinearToLogC(input.rgb));
+            half3 outLut = half3(0.5,0.5,0.5);//ApplyLut2D(TEXTURE2D_ARGS(userLutTex, userLutSampler), colorLutSpace, userLutParams);
             input = lerp(input, outLut, userLutContrib);
-            input.rgb = GetSRGBToLinear(input.rgb);
+            //input.rgb = GetSRGBToLinear(input.rgb);
         }
+		else
+		{
+			input = ApplyTonemap(input);
+		}
 
         input = ApplyLut2D(TEXTURE2D_ARGS(lutTex, lutSampler), input, lutParams);
     }

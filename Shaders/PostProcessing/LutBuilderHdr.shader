@@ -1,13 +1,18 @@
 Shader "Hidden/Universal Render Pipeline/LutBuilderHdr"
 {
     HLSLINCLUDE
-        #pragma multi_compile_local _ _TONEMAP_ACES _TONEMAP_NEUTRAL
+        #pragma multi_compile_local _ _TONEMAP_ACES _TONEMAP_NEUTRAL _TONEMAP_KHRONOS _TONEMAP_CUSTOM
         #pragma multi_compile_local_fragment _ HDR_COLORSPACE_CONVERSION
 
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/Shaders/PostProcessing/Common.hlsl"
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ACES.hlsl"
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+
+        /// SLZ MODIFIED - Use Khronos PBR tonemapper
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/KhronosPBRNeutralTonemap.hlsl"
+        /// END SLZ MODIFIED
+
 #if defined(HDR_COLORSPACE_CONVERSION)
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/HDROutput.hlsl"
 #endif
@@ -40,6 +45,10 @@ Shader "Hidden/Universal Render Pipeline/LutBuilderHdr"
         TEXTURE2D(_CurveHueVsSat);
         TEXTURE2D(_CurveSatVsSat);
         TEXTURE2D(_CurveLumVsSat);
+
+        #ifdef _TONEMAP_CUSTOM
+        TEXTURE3D(_TonemapCustom);
+        #endif
 
         #define MinNits                 _HDROutputLuminanceParams.x
         #define MaxNits                 _HDROutputLuminanceParams.y
@@ -189,14 +198,33 @@ Shader "Hidden/Universal Render Pipeline/LutBuilderHdr"
         float3 Tonemap(float3 colorLinear)
         {
             #if _TONEMAP_NEUTRAL
-            {
-                colorLinear = NeutralTonemap(colorLinear);
+            { 
+               colorLinear = NeutralTonemap(colorLinear);
             }
             #elif _TONEMAP_ACES
             {
                 // Note: input is actually ACEScg (AP1 w/ linear encoding)
                 float3 aces = ACEScg_to_ACES(colorLinear);
                 colorLinear = AcesTonemap(aces);
+            }
+            #elif _TONEMAP_KHRONOS
+            {
+                colorLinear = KhronosNeutralToneMapping(colorLinear);
+            }
+            #elif _TONEMAP_CUSTOM
+            {
+                float3 colorLogC = 
+                    //colorLinear / (colorLinear + 1.0);
+                    LinearToLogC(colorLinear);
+                    //float3(
+                    //		LinearToLogC_Precise(colorLinear.x),
+                    //	    LinearToLogC_Precise(colorLinear.y),
+                    //	    LinearToLogC_Precise(colorLinear.z)
+                    //	);
+                float3 dimensions;
+                _TonemapCustom.GetDimensions(dimensions.x,dimensions.y,dimensions.z);
+                float3 coords = colorLogC * ((dimensions - 1.0) / dimensions) + (0.5 / dimensions);
+                colorLinear = saturate(_TonemapCustom.SampleLevel(sampler_LinearClamp, coords, 0));
             }
             #endif
 

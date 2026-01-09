@@ -225,7 +225,16 @@ namespace UnityEngine.Rendering.Universal.Internal
                     switch (tonemapping.mode.value)
                     {
                         case TonemappingMode.Neutral: material.EnableKeyword(ShaderKeywordStrings.TonemapNeutral); break;
+                        case TonemappingMode.KhronosPBRNeutral: material.EnableKeyword(ShaderKeywordStrings.TonemapKhronos); break;
                         case TonemappingMode.ACES: material.EnableKeyword(allowColorGradingACESHDR ? ShaderKeywordStrings.TonemapACES : ShaderKeywordStrings.TonemapNeutral); break;
+                        case TonemappingMode.CustomLut:
+                            {
+                                if (!tonemapping.customLUT.value) break;
+                                material.SetTexture("_TonemapCustom", tonemapping.customLUT.value);
+                                material.EnableKeyword(ShaderKeywordStrings.TonemapCustom); 
+                                break;
+                            }
+
                         default: break; // None
                     }
 

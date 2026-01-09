@@ -5,6 +5,7 @@ using SLZ.SLZEditorTools;
 using System;
 using System.Diagnostics;
 using System.IO;
+
 using UnityEditor;
 using UnityEditor.Experimental;
 using UnityEngine;
@@ -53,10 +54,7 @@ namespace SLZ.DXCUpdater
 
         static void UpdateDXCIncludeState()
         {
-            string unity = EditorApplication.applicationPath;
-            string toolsDir = Path.Combine(Path.GetDirectoryName(unity), "Data", "Tools");
-            string unityDxcPath = Path.Combine(toolsDir, "dxcompiler.dll");
-            // string unityDxilPath = Path.Combine(toolsDir, "dxil.dll");
+            string unityDxcPath = UnityDxcPath();
             bool unityDXCExists = File.Exists(unityDxcPath) /* && File.Exists(unityDxilPath) */;
             FileVersionInfo installDXCVersion = unityDXCExists ? FileVersionInfo.GetVersionInfo(unityDxcPath) : null;
             UpdateDXCIncludeState(installDXCVersion);
@@ -91,13 +89,19 @@ namespace SLZ.DXCUpdater
         internal static void GetDXCVersions(string unityDxcPath, string slzDxcPath, out bool unityDXCExists, out FileVersionInfo unityDXCVersion, out bool slzDXCExists, out FileVersionInfo SlzDXCVersion)
         {
             unityDXCExists = File.Exists(unityDxcPath);
+
             unityDXCVersion = unityDXCExists ? FileVersionInfo.GetVersionInfo(unityDxcPath) : default(FileVersionInfo);
+#if SIMULATE_EXTERNAL && SIMULATE_OLD_DXC
+            unityDXCVersion = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(FileVersionInfo)) as FileVersionInfo;
+#endif
 
             slzDXCExists = File.Exists(slzDxcPath);
             SlzDXCVersion = slzDXCExists ? FileVersionInfo.GetVersionInfo(slzDxcPath) : default(FileVersionInfo);
         }
 
-        //[MenuItem("TEST/Show DXC Warning")]
+#if SIMULATE_EXTERNAL
+        [MenuItem("TEST/Show DXC Warning")]
+#endif
         static void CheckDXCExternal()
         {
             EditorApplication.update -= CheckDXCExternal;

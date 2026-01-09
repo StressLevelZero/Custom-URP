@@ -16,6 +16,7 @@ namespace UnityEditor.Rendering.Universal
         SerializedDataParameter m_HDRMinNits;
         SerializedDataParameter m_HDRMaxNits;
         SerializedDataParameter m_HDRAcesPreset;
+        SerializedDataParameter m_CustomLut;
 
         public override bool hasAdditionalProperties => true;
 
@@ -32,6 +33,7 @@ namespace UnityEditor.Rendering.Universal
             m_HDRMinNits = Unpack(o.Find(x => x.minNits));
             m_HDRMaxNits = Unpack(o.Find(x => x.maxNits));
             m_HDRAcesPreset = Unpack(o.Find(x => x.acesPreset));
+            m_CustomLut = Unpack(o.Find(x => x.customLUT));
         }
 
         public override void OnInspectorGUI()
@@ -44,6 +46,11 @@ namespace UnityEditor.Rendering.Universal
             {
                 EditorGUILayout.HelpBox("Tonemapping should only be used when working with High Dynamic Range (HDR). Please enable HDR through the active Render Pipeline Asset.", MessageType.Warning);
                 return;
+            }
+
+            if (m_Mode.value.intValue == (int)TonemappingMode.CustomLut)
+            {
+                PropertyField(m_CustomLut);
             }
 
             if (PlayerSettings.allowHDRDisplaySupport && m_Mode.value.intValue != (int)TonemappingMode.None)
@@ -85,6 +92,7 @@ namespace UnityEditor.Rendering.Universal
                     }
                     EditorGUI.indentLevel--;
                 }
+
             }
         }
     }

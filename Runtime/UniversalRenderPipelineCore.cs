@@ -1248,6 +1248,12 @@ namespace UnityEngine.Rendering.Universal
         /// <summary> Keyword used for Neutral Tonemapping. </summary>
         public const string TonemapNeutral = "_TONEMAP_NEUTRAL";
 
+        /// <summary> Keyword used for Khronos PBR Tonemapping. </summary>
+        public const string TonemapKhronos = "_TONEMAP_KHRONOS";
+
+        /// <summary> Keyword used for custom tonemapping LUT. </summary>
+        public const string TonemapCustom = "_TONEMAP_CUSTOM";
+
         /// <summary> Keyword used for Film Grain. </summary>
         public const string FilmGrain = "_FILM_GRAIN";
 

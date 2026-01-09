@@ -24,6 +24,10 @@ namespace UnityEngine.Rendering.Universal
         /// Note that if you use this tonemapper all the grading operations will be done in the ACES color spaces for optimal precision and results.
         /// </summary>
         ACES, // ACES Filmic reference tonemapper (custom approximation)
+
+        KhronosPBRNeutral,
+
+        CustomLut
     }
 
     /// <summary>
@@ -123,6 +127,8 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         [Tooltip("The maximum brightness of the screen (in nits). This value is defined by the preset when using ACES Tonemap.")]
         public ClampedFloatParameter maxNits = new ClampedFloatParameter(1000.0f, 0.0f, 5000.0f);
+
+        public Texture3DParameter customLUT = new Texture3DParameter(null,false);
 
         /// <inheritdoc/>
         public bool IsActive() => mode.value != TonemappingMode.None;
