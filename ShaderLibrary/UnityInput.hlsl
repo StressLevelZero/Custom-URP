@@ -126,6 +126,74 @@ float4x4 unity_CameraToWorld;
 #ifndef DOTS_INSTANCING_ON // UnityPerDraw cbuffer doesn't exist with hybrid renderer
 
 // Block Layout should be respected due to SRP Batcher
+#if defined(UNITY_VERSION >= 60000000) // For temporary compatibility with unity 6 while we refactor the renderpipeline. 6 added reflection probe rotations. Not having those misaligns the buffer, which blocks draws from being SRP batched and breaks depth priming
+CBUFFER_START(UnityPerDraw)
+// Space block Feature
+float4x4 unity_ObjectToWorld;
+float4x4 unity_WorldToObject;
+float4 unity_LODFade; // x is the fade value ranging within [0,1]. y is x quantized into 16 levels
+real4 unity_WorldTransformParams; // w is usually 1.0, or -1.0 for odd-negative scale transforms
+
+// Render Layer block feature
+// Only the first channel (x) contains valid data and the float must be reinterpreted using asuint() to extract the original 32 bits values.
+float4 unity_RenderingLayer;
+
+// Light Indices block feature
+// These are set internally by the engine upon request by RendererConfiguration.
+half4 unity_LightData;
+half4 unity_LightIndices[2];
+
+float4 unity_ProbesOcclusion;
+
+// Reflection Probe 0 block feature
+// HDR environment map decode instructions
+real4 unity_SpecCube0_HDR;
+real4 unity_SpecCube1_HDR;
+
+float4 unity_SpecCube0_BoxMax;          // w contains the blend distance
+float4 unity_SpecCube0_BoxMin;          // w contains the lerp value
+float4 unity_SpecCube0_ProbePosition;   // w is set to 1 for box projection
+float4 unity_SpecCube0_Rotation;
+float4 unity_SpecCube1_BoxMax;          // w contains the blend distance
+float4 unity_SpecCube1_BoxMin;          // w contains the sign of (SpecCube0.importance - SpecCube1.importance)
+float4 unity_SpecCube1_ProbePosition;   // w is set to 1 for box projection
+float4 unity_SpecCube1_Rotation;
+
+// Lightmap block feature
+float4 unity_LightmapST;
+float4 unity_DynamicLightmapST;
+
+// SH block feature
+real4 unity_SHAr;
+real4 unity_SHAg;
+real4 unity_SHAb;
+real4 unity_SHBr;
+real4 unity_SHBg;
+real4 unity_SHBb;
+real4 unity_SHC;
+
+// Renderer bounding box.
+float4 unity_RendererBounds_Min;
+float4 unity_RendererBounds_Max;
+
+// Velocity
+float4x4 unity_MatrixPreviousM;
+float4x4 unity_MatrixPreviousMI;
+//X : Use last frame positions (right now skinned meshes are the only objects that use this
+//Y : Force No Motion
+//Z : Z bias value
+//W : Camera only
+float4 unity_MotionVectorsParams;
+
+// Sprite.
+float4 unity_SpriteColor;
+//X : FlipX
+//Y : FlipY
+//Z : Reserved for future use.
+//W : Reserved for future use.
+float4 unity_SpriteProps;
+CBUFFER_END
+#else
 CBUFFER_START(UnityPerDraw)
 // Space block Feature
 float4x4 unity_ObjectToWorld;
@@ -182,7 +250,7 @@ float4x4 unity_MatrixPreviousMI;
 //W : Camera only
 float4 unity_MotionVectorsParams;
 CBUFFER_END
-
+#endif // !(UNITY_VERSION >= 60000000)
 #endif // UNITY_DOTS_INSTANCING_ENABLED
 
 #if defined(USING_STEREO_MATRICES)
