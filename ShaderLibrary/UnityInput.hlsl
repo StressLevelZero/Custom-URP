@@ -126,7 +126,7 @@ float4x4 unity_CameraToWorld;
 #ifndef DOTS_INSTANCING_ON // UnityPerDraw cbuffer doesn't exist with hybrid renderer
 
 // Block Layout should be respected due to SRP Batcher
-#if defined(UNITY_VERSION >= 60000000) // For temporary compatibility with unity 6 while we refactor the renderpipeline. 6 added reflection probe rotations. Not having those misaligns the buffer, which blocks draws from being SRP batched and breaks depth priming
+#if (UNITY_VERSION >= 60000000) // For temporary compatibility with unity 6 while we refactor the renderpipeline. 6 added reflection probe rotations. Not having those misaligns the buffer, which blocks draws from being SRP batched and breaks depth priming
 CBUFFER_START(UnityPerDraw)
 // Space block Feature
 float4x4 unity_ObjectToWorld;
