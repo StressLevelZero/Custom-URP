@@ -72,7 +72,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -92,7 +92,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/DepthNormals.hlsl" 
+            #include_with_pragmas "LitMASInclude/DepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -114,7 +114,7 @@ ENDHLSL
             #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
 
             ENDHLSL
         }   
@@ -141,7 +141,7 @@ ENDHLSL
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
-            #include "LitMASInclude/MetaPass.hlsl" 
+            #include_with_pragmas "LitMASInclude/MetaPass.hlsl" 
             ENDHLSL
         }
 
@@ -152,7 +152,7 @@ ENDHLSL
             Tags{ "LightMode" = "BakedRaytrace" }
             HLSLPROGRAM
 
-            #include "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }

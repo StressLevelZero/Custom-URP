@@ -80,7 +80,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma vertex vert
 			#pragma fragment frag
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/DepthOnly.hlsl" 
+			#include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
 
 			ENDHLSL
 		}
@@ -99,7 +99,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma vertex vert
 			#pragma fragment frag
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/ShaderInjector/AudioLinkDepthNormals.hlsl" 
+			#include_with_pragmas "LitMASInclude/ShaderInjector/AudioLinkDepthNormals.hlsl" 
 
 			ENDHLSL
 		}
@@ -122,7 +122,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/ShadowCaster.hlsl"
+			#include_with_pragmas "LitMASInclude/ShadowCaster.hlsl"
 
 			ENDHLSL
 		}
@@ -146,7 +146,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma fragment frag
 		   
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/ShaderInjector/AudioLinkMeta.hlsl"
+			#include_with_pragmas "LitMASInclude/ShaderInjector/AudioLinkMeta.hlsl"
 			ENDHLSL
 		}
 
@@ -158,7 +158,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			HLSLPROGRAM
 			#pragma only_renderers vulkan
 
-			#include "LitMASInclude/ShaderInjector/AudioLinkBakedRT.hlsl"
+			#include_with_pragmas "LitMASInclude/ShaderInjector/AudioLinkBakedRT.hlsl"
 
 			ENDHLSL
 		}
@@ -217,7 +217,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma vertex vert
 			#pragma fragment frag
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/DepthOnly.hlsl" 
+			#include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
 
 			ENDHLSL
 		}
@@ -236,7 +236,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma vertex vert
 			#pragma fragment frag
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/ShaderInjector/AudioLinkDepthNormals.hlsl" 
+			#include_with_pragmas "LitMASInclude/ShaderInjector/AudioLinkDepthNormals.hlsl" 
 
 			ENDHLSL
 		}
@@ -259,7 +259,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/ShadowCaster.hlsl"
+			#include_with_pragmas "LitMASInclude/ShadowCaster.hlsl"
 
 			ENDHLSL
 		}
@@ -283,7 +283,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			#pragma fragment frag
 		   
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-			#include "LitMASInclude/ShaderInjector/AudioLinkMeta.hlsl"
+			#include_with_pragmas "LitMASInclude/ShaderInjector/AudioLinkMeta.hlsl"
 			ENDHLSL
 		}
 
@@ -294,7 +294,7 @@ Shader "SLZ/LitMAS/LitMAS AudioLink"
 			Tags{ "LightMode" = "BakedRaytrace" }
 			HLSLPROGRAM
 			#pragma exclude_renderers vulkan
-			#include "LitMASInclude/ShaderInjector/AudioLinkBakedRT.hlsl"
+			#include_with_pragmas "LitMASInclude/ShaderInjector/AudioLinkBakedRT.hlsl"
 
 			ENDHLSL
 		}

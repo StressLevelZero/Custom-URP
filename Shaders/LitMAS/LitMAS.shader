@@ -95,7 +95,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/StandardDepthOnly.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardDepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -115,7 +115,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
-            #include "LitMASInclude/ShaderInjector/StandardDepthNormals.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardDepthNormals.hlsl" 
             ENDHLSL
         }
 
@@ -140,7 +140,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
-            #include "LitMASInclude/ShaderInjector/StandardShadowCaster.hlsl"
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardShadowCaster.hlsl"
             ENDHLSL
         }
 
@@ -164,7 +164,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
-            #include "LitMASInclude/ShaderInjector/StandardMeta.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardMeta.hlsl" 
             ENDHLSL
         }
 
@@ -176,7 +176,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             HLSLPROGRAM
             #pragma only_renderers vulkan
             #pragma multi_compile _ _EMISSION_ON
-            #include "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
 
             ENDHLSL
         }
@@ -240,7 +240,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/StandardDepthOnly.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardDepthOnly.hlsl" 
             ENDHLSL
         }
 
@@ -258,7 +258,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/StandardDepthNormals.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardDepthNormals.hlsl" 
             ENDHLSL
         }
 
@@ -282,7 +282,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/StandardShadowCaster.hlsl"
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardShadowCaster.hlsl"
             ENDHLSL
         }
 
@@ -305,7 +305,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
 
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/StandardMeta.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardMeta.hlsl" 
             ENDHLSL
         }
 
@@ -317,7 +317,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             HLSLPROGRAM
             #pragma exclude_renderers vulkan
             #pragma multi_compile _ _EMISSION_ON
-            #include "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
+            #include_with_pragmas "LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
 
             ENDHLSL
         }

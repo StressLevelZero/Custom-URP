@@ -92,7 +92,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             
-            #include "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -112,7 +112,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
 
-            #include "LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -136,7 +136,7 @@ ENDHLSL
 
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
-            #include "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
 
 			ENDHLSL
 		}
@@ -148,7 +148,7 @@ ENDHLSL
             Tags{ "LightMode" = "BakedRaytrace" }
 			HLSLPROGRAM
 #pragma only_renderers vulkan
-            #include "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }
@@ -207,7 +207,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             
-            #include "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -228,7 +228,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
 
-            #include "LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -253,7 +253,7 @@ ENDHLSL
 
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
-            #include "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
 
 			ENDHLSL
 		}
@@ -266,7 +266,7 @@ ENDHLSL
 			HLSLPROGRAM
             #pragma exclude_renderers vulkan
 
-            #include "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }

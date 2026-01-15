@@ -67,7 +67,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
             #pragma fragment frag
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/DepthOnly.hlsl"
+            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl"
             ENDHLSL
         }
 
@@ -87,7 +87,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
             #pragma fragment frag
 
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/WhiteBoardDepthNormals.hlsl"
+            #include_with_pragmas "LitMASInclude/ShaderInjector/WhiteBoardDepthNormals.hlsl"
             ENDHLSL
         }
 
@@ -109,7 +109,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
 			#pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShadowCaster.hlsl"
+            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl"
 
 			ENDHLSL
 		}
@@ -135,7 +135,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
 
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/WhiteBoardMeta.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/WhiteBoardMeta.hlsl" 
             ENDHLSL
         }
 
@@ -146,7 +146,7 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
             Tags{ "LightMode" = "BakedRaytrace" }
             HLSLPROGRAM
 
-            #include "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }

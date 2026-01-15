@@ -88,7 +88,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -107,7 +107,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/TriplanarDepthNormals.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarDepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -131,7 +131,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
 
             ENDHLSL
         }
@@ -157,7 +157,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/TriplanarMeta.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarMeta.hlsl" 
             ENDHLSL
         }
 
@@ -169,7 +169,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             HLSLPROGRAM
             #pragma only_renderers vulkan
 
-            #include "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }
@@ -227,7 +227,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -246,7 +246,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/TriplanarDepthNormals.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarDepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -269,7 +269,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
 
             ENDHLSL
         }
@@ -294,7 +294,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
 
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include "LitMASInclude/ShaderInjector/TriplanarMeta.hlsl" 
+            #include_with_pragmas "LitMASInclude/ShaderInjector/TriplanarMeta.hlsl" 
             ENDHLSL
         }
 
@@ -305,7 +305,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             Tags{ "LightMode" = "BakedRaytrace" }
             HLSLPROGRAM
             #pragma exclude_renderers vulkan
-            #include "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }
