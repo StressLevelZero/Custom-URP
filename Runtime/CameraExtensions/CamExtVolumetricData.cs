@@ -13,7 +13,7 @@ namespace UnityEngine.Rendering.Universal
         public VolumetricData volumetricData;
         public float reprojectionAmount = 0.95f;
         public float sliceDistributionUniformity = 0.5f;
-        public VolumetricRendering.BlurType FroxelBlur = VolumetricRendering.BlurType.None;
+        //public VolumetricRendering.BlurType FroxelBlur = VolumetricRendering.BlurType.None;
 
         // Default values when there's no volume
         public Color albedo = Color.white;
@@ -39,7 +39,7 @@ namespace UnityEngine.Rendering.Universal
                 volumetricData = volSettings.volumetricData;
                 reprojectionAmount = volSettings.reprojectionAmount;
                 sliceDistributionUniformity = volSettings.SliceDistributionUniformity;
-                FroxelBlur = volSettings.FroxelBlur;
+           //     FroxelBlur = volSettings.FroxelBlur;
             }
         }
 
@@ -55,7 +55,7 @@ namespace UnityEngine.Rendering.Universal
                 volumetricData = volSettings.volumetricData;
                 reprojectionAmount = volSettings.reprojectionAmount;
                 sliceDistributionUniformity = volSettings.SliceDistributionUniformity;
-                FroxelBlur = volSettings.FroxelBlur;
+           //     FroxelBlur = volSettings.FroxelBlur;
             }
         }
 

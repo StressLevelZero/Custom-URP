@@ -243,10 +243,10 @@ public class VolumetricDebugTool : EditorTool
                     vR.cam = SceneView.lastActiveSceneView.camera;
                     if (VolumetricScript != null)
                     {
-                        vR.tempOffset = VolumetricScript.tempOffset;
+             //           vR.tempOffset = VolumetricScript.tempOffset;
                         vR.volumetricData = VolumetricScript.volumetricData;
                         vR.reprojectionAmount = VolumetricScript.reprojectionAmount;
-                        vR.FroxelBlur = VolumetricScript.FroxelBlur;
+             //           vR.FroxelBlur = VolumetricScript.FroxelBlur;
                         vR.SliceDistributionUniformity = VolumetricScript.SliceDistributionUniformity;
                         vR.albedo = VolumetricScript.albedo;
                         vR.meanFreePath = VolumetricScript.meanFreePath;

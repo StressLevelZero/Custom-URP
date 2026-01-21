@@ -189,8 +189,10 @@ namespace UnityEditor
                 new LightingExplorerTab("Lights", GetHDLights, GetLightColumns, true),
                 new LightingExplorerTab("Volumes", GetVolumes, GetVolumeColumns, true),
                 new LightingExplorerTab("Baked Volumetrics", GetBakedVolumetrics, GetBakedVolumetricColumns, true),
+                new LightingExplorerTab("Local Volumetrics", GetLocalVolumetrics, GetLocalVolumetricColumns, true),
                 new LightingExplorerTab("Reflection Probes", GetReflectionProbes, GetReflectionProbeColumns, true),
                 new LightingExplorerTab("Light Probes", GetLightProbes, GetLightProbeColumns, true),
+                new LightingExplorerTab("Sky Occlusion Probes", GetSkyOcclusionProbes, GetSkyOcclusionProbesColumns, true),
                 new LightingExplorerTab("Emissive Materials", GetEmissives, GetEmissivesColumns, false)
             };
         }
@@ -246,6 +248,38 @@ namespace UnityEditor
                 new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.Enabled, "m_Enabled", 60), // 0: Enabled
                 new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Name, HDStyles.Name, null, 200), //Name
                 new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float,  EditorGUIUtility.TrTextContent("Texel Density"), "TexelDensity", 60), // 3: Density
+            };
+        }
+        
+        ////////////
+        ///Local VOLUMETRIC areas
+        ///////////////
+        protected virtual UnityEngine.Object[] GetLocalVolumetrics()
+        {
+#if UNITY_2020_1_OR_NEWER
+            var volumes = Resources.FindObjectsOfTypeAll<LocalVolumetricFog>();
+#else
+            var volumes = UnityEngine.Object.FindObjectsOfType<LocalVolumetricFog>();
+#endif
+
+            //foreach (var volume in volumes)
+            //{
+            //    volumeDataPairing[volume] = !volume.HasInstantiatedProfile() && volume.sharedProfile == null
+            //        ? new VolumeData(volume.isGlobal, null)
+            //        : new VolumeData(volume.isGlobal, volume.HasInstantiatedProfile() ? volume.profile : volume.sharedProfile);
+            //}
+            return volumes;
+        }
+
+        protected virtual LightingExplorerTableColumn[] GetLocalVolumetricColumns()
+        {
+            return new[]
+            {
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.Enabled, "m_Enabled", 60), // 0: Enabled
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Name, HDStyles.Name, null, 200), //Name
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float,  EditorGUIUtility.TrTextContent("View Distance"), "ViewDistance", 200), 
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float,  EditorGUIUtility.TrTextContent("Falloff"), "falloffDistance", 200), 
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum,  EditorGUIUtility.TrTextContent("Shape Type"), "shapeType", 60), 
             };
         }
 
@@ -325,6 +359,28 @@ namespace UnityEditor
                     {
                         return EditorUtility.NaturalCompare(((lprop == null || lprop.objectReferenceValue == null) ? "--" : lprop.objectReferenceValue.name), ((rprop == null || rprop.objectReferenceValue == null) ? "--" : rprop.objectReferenceValue.name));
                     }),
+            };
+        }
+        
+        ////////////
+        ///Local VOLUMETRIC areas
+        ///////////////
+        protected virtual UnityEngine.Object[] GetSkyOcclusionProbes()
+        {
+#if UNITY_2020_1_OR_NEWER
+            var probes = Resources.FindObjectsOfTypeAll<SkyOcclusionProbes>();
+#else
+            var probes = UnityEngine.Object.FindObjectsOfType<SkyOcclusionProbes>();
+#endif
+            return probes;
+        }
+
+        protected virtual LightingExplorerTableColumn[] GetSkyOcclusionProbesColumns()
+        {
+            return new[]
+            {
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.Enabled, "m_Enabled", 60), // 0: Enabled
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Name, HDStyles.Name, null, 200), //Name
             };
         }
 

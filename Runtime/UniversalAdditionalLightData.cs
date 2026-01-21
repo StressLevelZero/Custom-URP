@@ -332,6 +332,95 @@ namespace UnityEngine.Rendering.Universal
                 //    HDLightRenderDatabase.instance.EditLightDataAsRef(lightEntity).volumetricDimmer = m_VolumetricDimmer;
             }
         }
+        // === SLZ MODIFIED: Volumetric Light Auto-Registration =======================
+
+        [Tooltip("Override epsilon; <= 0 uses VolumetricRegisters.VolumetricLightEpsilon.")]
+        //[SerializeField] float m_LocalVolumetricEpsilon = -1f;
+
+        bool m_wasEligible;
+        bool m_wasEnabled;
+       // LightmapBakeType m_wasBakeType;
+        float m_wasDimmer;
+
+ 
+
+        bool IsEligibleRuntime()
+        {
+            // NOTE: volumetricDimmer getter returns 0 if useVolumetric == false
+            if (light == null || !light.isActiveAndEnabled) return false;
+            //if (light.lightmapBakeType != LightmapBakeType.Realtime) return false;
+            return volumetricDimmer > VolumetricRegisters.VolumetricLightEpsilon;
+        }
+
+        void CacheCurrentState()
+        {
+            m_wasEnabled  = light != null && light.isActiveAndEnabled;
+           // m_wasBakeType = light != null ? light.lightmapBakeType : LightmapBakeType.Baked;
+            m_wasDimmer   = volumetricDimmer;
+        }
+
+        void EvaluateAndApplyRegistration()
+        {
+        #if UNITY_EDITOR
+            if (!Application.isPlaying) return; // keep editor-time lists stable
+        #endif
+            CacheCurrentState();
+
+            bool eligible = IsEligibleRuntime();
+
+            if (eligible)
+            {
+                // Try add every time; Register method guards duplicates
+                VolumetricRegisters.RegisterVolumetricLight(light);
+            }
+            else if (m_wasEligible)
+            {
+                VolumetricRegisters.UnregisterVolumetricLight(light);
+            }
+
+            m_wasEligible = eligible;
+        }
+
+        // Unity lifecycle hooks
+        void OnEnable()
+        {
+        #if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+        #endif
+            EvaluateAndApplyRegistration();
+        }
+
+      //   void Update() //Don't need to ping every frame
+      //   {
+      //   #if UNITY_EDITOR
+      //       if (!Application.isPlaying) return;
+      //   #endif
+      //       // Detect changes cheaply; re-evaluate only when needed
+      //       bool enabledNow  = light != null && light.isActiveAndEnabled;
+      // //      LightmapBakeType bakeNow = light != null ? light.lightmapBakeType : LightmapBakeType.Baked;
+      //       float dimmerNow = volumetricDimmer;
+      //
+      //       if (enabledNow != m_wasEnabled ||
+      //       //    bakeNow    != m_wasBakeType ||
+      //           !Mathf.Approximately(dimmerNow, m_wasDimmer))
+      //       {
+      //           EvaluateAndApplyRegistration();
+      //       }
+      //   }
+
+        void OnDisable()
+        {
+        #if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+        #endif
+            if (m_wasEligible && light != null)
+            {
+                VolumetricRegisters.UnregisterVolumetricLight(light);
+                m_wasEligible = false;
+            }
+        }
+
+        // === END SLZ MODIFIED =======================================================
 
         // END SLZ MODIFIED
 

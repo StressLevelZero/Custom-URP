@@ -116,6 +116,64 @@ float rand(float3 Pixel)
 	return result;
 }
 
+uint hash(uint x)
+{
+    x ^= x >> 17;
+    x *= 0xed5ad4bbU;
+    x ^= x >> 11;
+    x *= 0xac4c1b51U;
+    x ^= x >> 15;
+    x *= 0x31848babU;
+    x ^= x >> 14;
+    return x;
+}
+
+float rand1(uint x)
+{
+    return (hash(x) & 0x00FFFFFFu) / 16777216.0f;
+}
+
+float2 rand2(uint x)
+{
+    return float2(rand1(x), rand1(x + 0x68bc21ebu));
+}
+
+float3 rand3(uint x)
+{
+    return float3(rand1(x), rand1(x + 0x68bc21ebu), rand1(x + 0x02e5be93u));
+}
+
+uint hash_u32(uint x)
+{
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+float rand01(inout uint state)
+{
+    state = hash_u32(state);
+    // 24 bits of mantissa for a clean 0-1 float
+    return (state & 0x00FFFFFFu) * (1.0f / 16777216.0f);
+}
+
+// Uniform sampling over the full sphere
+float3 sampleUniformSphere(inout uint state)
+{
+    float u1 = rand01(state);
+    float u2 = rand01(state);
+
+    float z  = 1.0f - 2.0f * u1;                    // cos(theta) in [-1,1]
+    float r  = sqrt(saturate(1.0f - z * z));
+    float phi = 2.0f * M_PI * u2;
+
+    return float3(r * cos(phi), r * sin(phi), z);   // unit vector
+}
+
+
 //RTgems 3.11 FIBONACCI SPHERE
 //current index, number of samples
  float3 sphericalFibonacci(float i, float n) 
@@ -308,31 +366,42 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
 }
 
 //Cast Ray from vox to env
-float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx){
 
-    float4 Accumulation = float4(0,0,0,0);
-
-    for (int j = startIdx; j < endIdx; j++) 
-    {
-        uint3 id =  DispatchRaysIndex().xyz;
-        float3 rayDirection = sphericalFibonacci(j, EnvLightSamples) + ( normalize(float3(rand(id.xyz+j),rand(id.xyz+j+33) , rand(id.xyz+j+120)) -.5) * 2 * (4*M_PI / EnvLightSamples) )  ;
-
-        RayDesc ray;
-        ray.Origin    = VoxelWS;
-        ray.Direction = rayDirection;
-        ray.TMin      = 0.0f;
-        ray.TMax      = 100000;
-
-        RayPayload payload;
-        payload.color = float4(0, 0, 0, 0);
-
-        uint missShaderIndex = 1;
-        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
-        
-        Accumulation += payload.color / EnvLightSamples;
-    }
-    return Accumulation;
-}
+float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx)
+ {
+     int sampleCount = endIdx - startIdx;
+     if (sampleCount <= 0)
+         return 0;
+ 
+     // Per-voxel seed based on 3D ray index + sample window
+     uint3 id = DispatchRaysIndex().xyz;
+     uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
+     seed ^= (uint)startIdx * 0x9e3779b9u;
+ 
+     float4 Accumulation = 0;
+ 
+     // Use sampleCount actual samples, ignore the absolute j index
+     for (int s = 0; s < sampleCount; ++s)
+     {
+         float3 rayDirection = sampleUniformSphere(seed);
+ 
+         RayDesc ray;
+         ray.Origin    = VoxelWS;
+         ray.Direction = rayDirection;
+         ray.TMin      = 1e-3f;       // avoid self-hits
+         ray.TMax      = 100000.0f;
+ 
+         RayPayload payload;
+         payload.color = 0;
+ 
+         uint missShaderIndex = 1;
+         TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+ 
+         Accumulation += payload.color;
+     }
+ 
+     return Accumulation / max(1, sampleCount);
+ }
 
 // [shader("closesthit")]
 // void MyClosestHit(inout RayPayload data,

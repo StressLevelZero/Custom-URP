@@ -6,6 +6,7 @@
 #pragma kernel ClipMapGen
 #pragma kernel ClipMapClear
 #pragma kernel ClipMapHeight
+#pragma kernel ClipMapCopy
 
 Texture3D<float4>	PreResult;
 RWTexture3D<float4> Result;
@@ -20,10 +21,13 @@ float3	VolumeWorldPosition;
 
 Texture3D<float4> VolumeMap;
 SamplerState trilinear_clamp_sampler;
-float VolumeDensity;
 
 shared float _GlobalExtinction;
 float4 clearColor;
+
+// Region controls (voxel space)
+int3 _RegionOffset;   // starting voxel (inclusive)
+int3 _RegionSize;     // number of voxels in each axis
 
 [numthreads(4, 4, 4)]
 void ClipMapClear(uint3 id : SV_DispatchThreadID)
@@ -35,46 +39,56 @@ void ClipMapClear(uint3 id : SV_DispatchThreadID)
 [numthreads(4,4,4)]
 void ClipMapGen (uint3 id : SV_DispatchThreadID)
 {
-	//uint count, stride;
+	// Treat id as *local* within the region
+	if (id.x >= (uint)_RegionSize.x ||
+		id.y >= (uint)_RegionSize.y ||
+		id.z >= (uint)_RegionSize.z)
+		return;
 
-	float3 ClipRes = float3(0,0,0);
-	Result.GetDimensions(ClipRes.x, ClipRes.y, ClipRes.z);
-	float4 UVW;
-	UVW.xyz = (id + 0.5) / ClipRes.xyz; //0-1 scaling
-	UVW.w = 1;
+	int3 coord = int3(id) + _RegionOffset;
 
-	float4 WorldCoord = UVW * ClipmapScale + ClipmapWorldPosition.xyzz;
-	float3 MapUVW = (WorldCoord.xyz - VolumeWorldPosition) / VolumeWorldSize;
+	int3 clipRes;
+	Result.GetDimensions(clipRes.x, clipRes.y, clipRes.z);
 
-	//TODO: Make sampling calculations run or not if they are inside or out of the clipped area
-	float ClipUVW  =
-		step(MapUVW.x, 1) * step(0, MapUVW.x) *
-		step(MapUVW.y, 1) * step(0, MapUVW.y) *
-		step(MapUVW.z, 1) * step(0, MapUVW.z);
+	// Safety clamp in case region extends past the texture
+	if (coord.x < 0 || coord.y < 0 || coord.z < 0 ||
+		coord.x >= clipRes.x || coord.y >= clipRes.y || coord.z >= clipRes.z)
+		return;
 
-	//float tempden = distance(WorldCoord.xyz,0) > 3 ? 0:10 ;
-	float3 VolRes = float3(0, 0, 0);
-	VolumeMap.GetDimensions(VolRes.x, VolRes.y, VolRes.z);
-	//float3 VolPixSize = VolumeWorldSize / VolRes;
-	//float3 ClipPixSize = ClipmapScale / ClipRes;
+	float3 fClipRes = (float3)clipRes;
+	float3 UVW      = (float3(coord) + 0.5) / fClipRes; // 0–1
 
-	// Move this math into the C# side, no reason to do this per pixel!
-	float3 VolPixPerClipPix = (ClipmapScale * VolRes) / (VolumeWorldSize * ClipRes); // ClipPixSize / VolPixSize;
-	float maxScale = max(VolPixPerClipPix.x, max(VolPixPerClipPix.y, VolPixPerClipPix.z));
-	float mip = log2(maxScale);
-	
-	//Sample baked volume and clip it off to its area
-	//Doing max of the two results to account for overlaps
+	float3 WorldCoord = UVW * ClipmapScale + ClipmapWorldPosition;
+	float3 MapUVW     = (WorldCoord - VolumeWorldPosition) / VolumeWorldSize;
 
-	float4 colors = max(PreResult[id.xyz], VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, mip) * ClipUVW);
-	colors.a = 0;
-	Result[id.xyz] = colors;
+	bool inBounds = all(MapUVW >= 0.0) && all(MapUVW <= 1.0);
+
+	// Read current accumulated color from the same buffer
+	float4 colors = Result[coord];
+
+	if (inBounds)
+	{
+		float3 volRes;
+		VolumeMap.GetDimensions(volRes.x, volRes.y, volRes.z);
+
+		// Same mip logic as before, just using clipRes instead of per-id math
+		float3 VolPixPerClipPix = (ClipmapScale * volRes) / (VolumeWorldSize * fClipRes);
+		float  maxScale         = max(VolPixPerClipPix.x, max(VolPixPerClipPix.y, VolPixPerClipPix.z));
+		float  mip              = log2(maxScale);
+
+		float3 baked = VolumeMap.SampleLevel(trilinear_clamp_sampler, MapUVW, mip).rgb;
+
+		// Combine with max to handle overlapping baked volumes
+		colors.rgb = max(colors.rgb, baked);
+	}
+
+	Result[coord] = colors;
 }
 
-[numthreads(4, 4, 4)]
-void MediapGen(uint3 id : SV_DispatchThreadID)
+[numthreads(4,4,4)]
+void ClipMapCopy(uint3 id : SV_DispatchThreadID)
 {
-
+	Result[id] = PreResult[id];
 }
 
 [numthreads(4, 4, 4)]

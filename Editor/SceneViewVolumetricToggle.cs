@@ -167,10 +167,10 @@ namespace SLZ.SLZEditorTools
                     }
                     if (mainVol != null)
                     {
-                        vol.tempOffset = mainVol.tempOffset;
+                    //    vol.tempOffset = mainVol.tempOffset;
                         vol.volumetricData = mainVol.volumetricData;
                         vol.reprojectionAmount = mainVol.reprojectionAmount;
-                        vol.FroxelBlur = mainVol.FroxelBlur;
+                    //    vol.FroxelBlur = mainVol.FroxelBlur;
                         vol.SliceDistributionUniformity = mainVol.SliceDistributionUniformity;
                         vol.albedo = mainVol.albedo;
                         vol.meanFreePath = mainVol.meanFreePath;

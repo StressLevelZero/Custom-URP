@@ -17,7 +17,19 @@ MonoBehaviour:
   FroxelWidthResolution: 24
   FroxelHeightResolution: 24
   FroxelDepthResolution: 12
-  ClipMapResolution: 64
-  ClipmapScale: 20
-  ClipmapScale2: 200
-  ClipmapResampleThreshold: 3
+  ClipmapLevel0:
+    ClipMapResolution: 128
+    ClipmapScale: 20
+    ClipmapResampleThresholdDistance: 2
+  ClipmapLevel1:
+    ClipMapResolution: 128
+    ClipmapScale: 60
+    ClipmapResampleThresholdDistance: 6
+  ClipmapLevel2:
+    ClipMapResolution: 128
+    ClipmapScale: 180
+    ClipmapResampleThresholdDistance: 18
+  ClipmapLevel3:
+    ClipMapResolution: 128
+    ClipmapScale: 540
+    ClipmapResampleThresholdDistance: 54
