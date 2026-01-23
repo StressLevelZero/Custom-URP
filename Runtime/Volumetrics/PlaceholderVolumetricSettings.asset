@@ -33,3 +33,5 @@ MonoBehaviour:
     ClipMapResolution: 128
     ClipmapScale: 540
     ClipmapResampleThresholdDistance: 54
+  DefaultTurbulentNoise: {fileID: 11700000, guid: 9ce4767405d3bd745833cebe4fa320ab,
+    type: 2}

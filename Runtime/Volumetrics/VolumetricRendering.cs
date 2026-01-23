@@ -112,7 +112,6 @@ public class VolumetricRendering : MonoBehaviour
     public float _FoveationOuterRadius =  0.4f;
     [HideInInspector] public bool enableEditorPreview = false;
     
-    public Texture3D tex3d;
     public float _bakedTurbulence = 5f;
     
     Vector3 ClipmapTransform; //Have this follow the camera and resample when the camera moves enough 
@@ -714,7 +713,7 @@ public class VolumetricRendering : MonoBehaviour
         // FroxelFogCompute.SetVector("pointpos", VolumetricRegisters.realtimeVolumetricLights[0].transform.position);
         // FroxelFogCompute.SetVector("pointcolorint",VolumetricRegisters.realtimeVolumetricLights[0].color*VolumetricRegisters.realtimeVolumetricLights[0].intensity);
         // FroxelFogCompute.SetFloat("pointrange", VolumetricRegisters.realtimeVolumetricLights[0].range);
-        FroxelFogCompute.SetTexture(ScatteringKernel, "Noise3d", tex3d);
+        FroxelFogCompute.SetTexture(ScatteringKernel, "Noise3d", volumetricData.DefaultTurbulentNoise);
 
       //  FroxelFogCompute.SetVector("_FoveaCenterUV", _FoveaCenterUV);
         FroxelFogCompute.SetBool("_FoveationEnabled", _FoveationEnabled);

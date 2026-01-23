@@ -37,6 +37,8 @@ public class VolumetricData : ScriptableObject
     public ClipmapLevelData ClipmapLevel1;
     public ClipmapLevelData ClipmapLevel2;
     public ClipmapLevelData ClipmapLevel3;
+
+    public Texture3D DefaultTurbulentNoise;
 }
 
 
