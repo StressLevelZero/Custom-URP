@@ -544,7 +544,7 @@ float4 getSSRColor(SSRData data)
     //float lengthFade = smoothstep(1, 0, 2*(totalSteps / data.maxSteps)-1);
     
     float fade = saturate(2*(RdotV)) * xfade * yfade;
-    #endif
+#endif
 
     float roughRadius = rayTanAngle * totalDistance;
     

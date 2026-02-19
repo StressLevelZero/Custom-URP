@@ -147,7 +147,7 @@ half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float _SSRTemporalMul;
+	float4 _SSRSmoothnessRange;
 // End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
 	half  _Emission;
@@ -372,11 +372,11 @@ SLZ_DECLARE_FRAG_SIZE
         SSRExtraData ssrExtra;
         ssrExtra.meshNormal = UNPACK_NORMAL(i);
         //ssrExtra.lastClipPos = i.lastVertex;
-        ssrExtra.temporalWeight = _SSRTemporalMul;
+        //ssrExtra.temporalWeight = _SSRTemporalMul;
         ssrExtra.depthDerivativeSum = 0;
         ssrExtra.noise = noiseRGBA;
         ssrExtra.fogFactor = UNPACK_FOG(i);
-
+        ssrExtra.roughnessRange = half2(1.0 - _SSRSmoothnessRange.y, 1.0 - _SSRSmoothnessRange.x);
         color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
         color.rgb = max(0, color.rgb);
     #else

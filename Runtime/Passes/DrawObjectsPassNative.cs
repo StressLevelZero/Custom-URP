@@ -367,7 +367,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                         RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, camera, filterSettingsOpaque, SortingCriteria.None);
                     }
 #else
-                    drawSettings.overrideMaterial = defaultMat;
+                    drawSettingsOpaque.overrideMaterial = defaultMat;
                     context.DrawRenderers(renderingData.cullResults, ref drawSettingsOpaque, ref filterSettingsOpaque);
 #endif
                     if (data.drawSkybox)
@@ -445,7 +445,7 @@ namespace UnityEngine.Rendering.Universal.Internal
                         RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, camera, filterSettingsTransparent, SortingCriteria.None);
                     }
 #else
-                drawSettings.overrideMaterial = defaultMat;
+                drawSettingsTransparent.overrideMaterial = defaultMat;
                 context.DrawRenderers(renderingData.cullResults, ref drawSettingsTransparent, ref filterSettingsTransparent);
 #endif
 

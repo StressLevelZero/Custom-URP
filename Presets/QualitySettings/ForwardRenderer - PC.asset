@@ -28,89 +28,6 @@ MonoBehaviour:
   FakeVRSReconstructShader: {fileID: 4800000, guid: 8dbb535a5b3bf3340b94dd5ad907fe0b,
     type: 3}
   Blit: {fileID: 4800000, guid: c17132b1f77d20942aa75f8429c0f8bc, type: 3}
---- !u!114 &-583499953080664484
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9b7f813b992430245ad61f09b0473d9f, type: 3}
-  m_Name: MKGlow
-  m_EditorClassIdentifier: 
-  m_Active: 1
-  showEditorMainBehavior: 1
-  showEditorBloomBehavior: 0
-  showEditorLensSurfaceBehavior: 0
-  showEditorLensFlareBehavior: 0
-  showEditorGlareBehavior: 0
-  workmode: 0
-  allowGeometryShaders: 1
-  allowComputeShaders: 1
-  renderPriority: 1
-  debugView: 0
-  quality: 2
-  antiFlickerMode: 0
-  workflow: 0
-  selectiveRenderLayerMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  anamorphicRatio: 0
-  lumaScale: 0.5
-  blooming: 0
-  bloomThreshold:
-    minValue: 1.25
-    maxValue: 10
-  bloomScattering: 7
-  bloomIntensity: 1
-  allowLensSurface: 0
-  lensSurfaceDirtTexture: {fileID: 0}
-  lensSurfaceDirtIntensity: 2.5
-  lensSurfaceDiffractionTexture: {fileID: 0}
-  lensSurfaceDiffractionIntensity: 2
-  allowLensFlare: 0
-  lensFlareStyle: 1
-  lensFlareGhostFade: 10
-  lensFlareGhostIntensity: 1
-  lensFlareThreshold:
-    minValue: 1.3
-    maxValue: 10
-  lensFlareScattering: 5
-  lensFlareColorRamp: {fileID: 0}
-  lensFlareChromaticAberration: 53
-  lensFlareGhostCount: 3
-  lensFlareGhostDispersal: 0.6
-  lensFlareHaloFade: 2
-  lensFlareHaloIntensity: 1
-  lensFlareHaloSize: 0.4
-  allowGlare: 0
-  glareBlend: 0.33
-  glareIntensity: 1
-  glareAngle: 0
-  glareThreshold:
-    minValue: 1.25
-    maxValue: 10
-  glareStreaks: 4
-  glareStyle: 4
-  glareScattering: 2
-  glareSample0Scattering: 5
-  glareSample0Angle: 0
-  glareSample0Intensity: 1
-  glareSample0Offset: 0
-  glareSample1Scattering: 5
-  glareSample1Angle: 45
-  glareSample1Intensity: 1
-  glareSample1Offset: 0
-  glareSample2Scattering: 5
-  glareSample2Angle: 90
-  glareSample2Intensity: 1
-  glareSample2Offset: 0
-  glareSample3Scattering: 5
-  glareSample3Angle: 135
-  glareSample3Intensity: 1
-  glareSample3Offset: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -128,11 +45,8 @@ MonoBehaviour:
       type: 3}
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
   m_RendererFeatures:
-  - {fileID: 1007009395273147108}
-  - {fileID: 277396446221250587}
-  - {fileID: -583499953080664484}
   - {fileID: -785329834275540189}
-  m_RendererFeatureMap: e4a2bcaab59df90d1b30f91e9982d9035c7e2b5ae2fde6f723737d34adf219f5
+  m_RendererFeatureMap: 23737d34adf219f5
   m_UseNativeRenderPass: 0
   m_UseNativeRenderPassSLZ: 0
   textures:
@@ -191,30 +105,3 @@ MonoBehaviour:
   m_CopyDepthMode: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
---- !u!114 &277396446221250587
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 73bb0c28b25f48d4ea2f38b3e2010651, type: 3}
-  m_Name: AutoExposureRenderFeature
-  m_EditorClassIdentifier: 
-  m_Active: 1
---- !u!114 &1007009395273147108
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f7c2c2c3c19808149a4d3454e1019255, type: 3}
-  m_Name: HBAO
-  m_EditorClassIdentifier: 
-  m_Active: 1
-  shader: {fileID: 4800000, guid: bf610497676b34e4dbe0f14fe3fe311c, type: 3}

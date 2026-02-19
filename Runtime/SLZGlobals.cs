@@ -407,29 +407,35 @@ namespace UnityEngine.Rendering.Universal
             passData.screenHeight = targetDesc.height;
             passData.opaqueTexSizeFrac = opaqueTexSizeFrac;
 
-            if (camData.xrRendering && camData.xrUniversal != null && camData.xrUniversal.hasValidOcclusionMesh && camData.requiresOpaqueTexture &&
-                    (
-                        (SLZGlobals.instance.VrOccDistanceTex.width  != (camData.cameraTargetDescriptor.width  / 4)) ||
-                        (SLZGlobals.instance.VrOccDistanceTex.height != (camData.cameraTargetDescriptor.height / 4))
-                    )
-                )
+
+            if (camData.xrRendering && camData.xrUniversal != null && camData.xrUniversal.hasValidOcclusionMesh && camData.requiresOpaqueTexture)   
+                //if (true)
             {
-                passData.generateXrOcclusionMeshDistance = true;
+                bool xrOccMeshIsValid = (SLZGlobals.instance.VrOccDistanceTex.width == (camData.cameraTargetDescriptor.width / 4)) &&
+                                        (SLZGlobals.instance.VrOccDistanceTex.height == (camData.cameraTargetDescriptor.height / 4));
+                if (!xrOccMeshIsValid)
+                {
+                    passData.generateXrOcclusionMeshDistance = true;
 
-                RenderTextureDescriptor maskDesc = SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height);
-                SLZGlobals.instance.VrOccDistanceTex.Release();
-                SLZGlobals.instance.VrOccDistanceTex.width = maskDesc.width / 4;
-                SLZGlobals.instance.VrOccDistanceTex.height = maskDesc.height / 4;
-                SLZGlobals.instance.VrOccDistanceTex.Create();
+                    RenderTextureDescriptor maskDesc = SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height);
+                    SLZGlobals.instance.VrOccDistanceTex.Release();
+                    SLZGlobals.instance.VrOccDistanceTex.width = maskDesc.width / 4;
+                    SLZGlobals.instance.VrOccDistanceTex.height = maskDesc.height / 4;
+                    SLZGlobals.instance.VrOccDistanceTex.Create();
 
-                
-                
-                passData.xrPass = camData.xrUniversal;
 
-                passData.xrOcclusionMeshTexID =new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
-                cmd.GetTemporaryRT(SLZGlobals.VrOccMeshDistanceID, SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height));
-                passData.xrOcclusionMeshTex = RTHandles.Alloc(passData.xrOcclusionMeshTexID);
-                passData.xrOccDistanceMat = vrOccDistMat;
+
+                    passData.xrPass = camData.xrUniversal;
+
+                    passData.xrOcclusionMeshTexID = new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
+                    cmd.GetTemporaryRT(SLZGlobals.VrOccMeshDistanceID, SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height));
+                    passData.xrOcclusionMeshTex = RTHandles.Alloc(passData.xrOcclusionMeshTexID);
+                    passData.xrOccDistanceMat = vrOccDistMat;
+                }
+                else
+                {
+                    passData.generateXrOcclusionMeshDistance = false;
+                }
             }
             else
             {

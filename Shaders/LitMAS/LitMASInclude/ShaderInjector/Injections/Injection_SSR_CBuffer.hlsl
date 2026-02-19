@@ -1,3 +1,3 @@
 //#!INJECT_BEGIN MATERIAL_CBUFFER 0
-	float _SSRTemporalMul;
+	float4 _SSRSmoothnessRange;
 //#!INJECT_END

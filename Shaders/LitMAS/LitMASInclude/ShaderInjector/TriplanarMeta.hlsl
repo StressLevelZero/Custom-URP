@@ -54,7 +54,7 @@ half _UVScaler;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float _SSRTemporalMul;
+	float4 _SSRSmoothnessRange;
 // End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
 	int _Surface;
 CBUFFER_END

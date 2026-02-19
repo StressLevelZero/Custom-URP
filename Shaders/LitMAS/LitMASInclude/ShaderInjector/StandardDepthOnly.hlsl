@@ -55,7 +55,7 @@ half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float _SSRTemporalMul;
+	float4 _SSRSmoothnessRange;
 // End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
 	half  _Emission;

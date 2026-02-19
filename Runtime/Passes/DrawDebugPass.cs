@@ -1,0 +1,301 @@
+using SLZ.SLZEditorTools;
+using System;
+using System.Collections.Generic;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
+using UnityEngine.Profiling;
+
+namespace UnityEngine.Rendering.Universal.Internal
+{
+  
+    public class DrawDebugPass : ScriptableRenderPass
+    {
+        static Material s_MicroTriMat;
+        static Material MicroTriMat
+        {
+            get
+            {
+                if (s_MicroTriMat == null)
+                {
+                    Shader s = Shader.Find("SLZ/Debug/Show Micro Triangles");
+                    s_MicroTriMat = new Material(s);
+                }
+                return s_MicroTriMat;
+            }
+        }
+
+
+        FilteringSettings m_FilteringSettings;
+        RenderStateBlock m_RenderStateBlock;
+        List<ShaderTagId> m_ShaderTagIdList = new List<ShaderTagId>();
+        string m_ProfilerTag;
+        ProfilingSampler m_ProfilingSampler;
+        bool m_IsOpaque;
+        bool m_DrawSkybox;
+
+        public bool canDrawSkybox;
+        public bool overrideTargets = false;
+
+        public RTHandle colorTarget;
+
+        public RTHandle depthTarget;
+        /// <summary>
+        /// Used to indicate if the active target of the pass is the back buffer
+        /// </summary>
+        public bool m_IsActiveTargetBackBuffer; // TODO: Remove this when we remove non-RG path
+
+
+
+        PassData m_PassData;
+
+        static readonly int s_DrawObjectPassDataPropID = Shader.PropertyToID("_DrawObjectPassData");
+
+        public DrawDebugPass(string profilerTag, bool opaque, RenderPassEvent evt)
+        {
+            base.profilingSampler = new ProfilingSampler(nameof(DrawDebugPass));
+            m_ProfilerTag = profilerTag;
+            m_ProfilingSampler = new ProfilingSampler(profilerTag);
+            m_ShaderTagIdList = new List<ShaderTagId>() { new ShaderTagId("SRPDefaultUnlit"), new ShaderTagId("UniversalForward"), new ShaderTagId("UniversalForwardOnly") };
+            renderPassEvent = evt;
+            m_FilteringSettings = new FilteringSettings(RenderQueueRange.all, -1);
+            m_RenderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
+            m_IsOpaque = false;
+            m_IsActiveTargetBackBuffer = false;
+            m_PassData = new PassData();
+        }
+
+
+        /// <summary>
+        /// Creates a new <c>DrawObjectsPass</c> instance.
+        /// </summary>
+        /// <param name="profilerTag"></param>
+        /// <param name="shaderTagIds"></param>
+        /// <param name="opaque"></param>
+        /// <param name="evt">The <c>RenderPassEvent</c> to use.</param>
+        /// <param name="renderQueueRange"></param>
+        /// <param name="layerMask"></param>
+        /// <param name="stencilState"></param>
+        /// <param name="stencilReference"></param>
+        /// <seealso cref="ShaderTagId"/>
+        /// <seealso cref="RenderPassEvent"/>
+        /// <seealso cref="RenderQueueRange"/>
+        /// <seealso cref="LayerMask"/>
+        /// <seealso cref="StencilState"/>
+        public DrawDebugPass(string profilerTag, ShaderTagId[] shaderTagIds, bool opaque, RenderPassEvent evt, RenderQueueRange renderQueueRange, LayerMask layerMask, StencilState stencilState, int stencilReference)
+        {
+            base.profilingSampler = new ProfilingSampler(nameof(DrawDebugPass));
+            m_PassData = new PassData();
+            m_ProfilerTag = profilerTag;
+            m_ProfilingSampler = new ProfilingSampler(profilerTag);
+            foreach (ShaderTagId sid in shaderTagIds)
+                m_ShaderTagIdList.Add(sid);
+            renderPassEvent = evt;
+            m_FilteringSettings = new FilteringSettings(renderQueueRange, layerMask);
+            m_RenderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
+            m_IsOpaque = opaque;
+            m_IsActiveTargetBackBuffer = false;
+
+            if (stencilState.enabled)
+            {
+                m_RenderStateBlock.stencilReference = stencilReference;
+                m_RenderStateBlock.mask = RenderStateMask.Stencil;
+                m_RenderStateBlock.stencilState = stencilState;
+            }
+        }
+
+        /// <summary>
+        /// Creates a new <c>DrawObjectsPass</c> instance.
+        /// </summary>
+        /// <param name="profilerTag"></param>
+        /// <param name="opaque"></param>
+        /// <param name="evt"></param>
+        /// <param name="renderQueueRange"></param>
+        /// <param name="layerMask"></param>
+        /// <param name="stencilState"></param>
+        /// <param name="stencilReference"></param>
+        /// <seealso cref="RenderPassEvent"/>
+        /// <seealso cref="RenderQueueRange"/>
+        /// <seealso cref="LayerMask"/>
+        /// <seealso cref="StencilState"/>
+        public DrawDebugPass(string profilerTag, bool opaque, RenderPassEvent evt, RenderQueueRange renderQueueRange, LayerMask layerMask, StencilState stencilState, int stencilReference)
+            : this(profilerTag,
+            new ShaderTagId[] { new ShaderTagId("SRPDefaultUnlit"), new ShaderTagId("UniversalForward"), new ShaderTagId("UniversalForwardOnly") },
+            opaque, evt, renderQueueRange, layerMask, stencilState, stencilReference)
+        { }
+
+        internal DrawDebugPass(URPProfileId profileId, bool opaque, RenderPassEvent evt, RenderQueueRange renderQueueRange, LayerMask layerMask, StencilState stencilState, int stencilReference)
+            : this(profileId.GetType().Name, opaque, evt, renderQueueRange, layerMask, stencilState, stencilReference)
+        {
+            m_ProfilingSampler = ProfilingSampler.Get(profileId);
+        }
+
+        public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
+        {
+            base.OnCameraSetup(cmd, ref renderingData);
+        }
+
+        // SLZ MODIFIED 
+        public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
+        {
+            if (overrideTargets)
+            {
+                ConfigureTarget(colorTarget, depthTarget);
+            }
+        }
+
+        /// <inheritdoc/>
+        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+        {
+            m_PassData.m_IsOpaque = false;
+            m_PassData.m_RenderingData = renderingData;
+            m_PassData.m_RenderStateBlock = m_RenderStateBlock;
+            m_PassData.m_FilteringSettings = m_FilteringSettings;
+            m_PassData.m_ShaderTagIdList = m_ShaderTagIdList;
+            m_PassData.m_ProfilingSampler = m_ProfilingSampler;
+            m_PassData.m_IsActiveTargetBackBuffer = m_IsActiveTargetBackBuffer;
+            m_PassData.pass = this;
+            //m_PassData.m_UseMotionVectorData = useMotionVectorData;
+            //m_PassData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
+            CameraSetup(renderingData.commandBuffer, m_PassData, ref renderingData);
+            ExecutePass(context, m_PassData, ref renderingData, renderingData.cameraData.IsCameraProjectionMatrixFlipped());
+        }
+
+        private static void CameraSetup(CommandBuffer cmd, PassData data, ref RenderingData renderingData)
+        {
+            if (data.m_RenderStateBlock.depthState.compareFunction == CompareFunction.Equal)
+            {
+                data.m_RenderStateBlock.depthState = new DepthState(true, CompareFunction.LessEqual);
+                data.m_RenderStateBlock.mask |= RenderStateMask.Depth;
+            }
+        }
+
+        private static void ExecutePass(ScriptableRenderContext context, PassData data, ref RenderingData renderingData, bool yFlip)
+        {
+            var cmd = renderingData.commandBuffer;
+            using (new ProfilingScope(cmd, data.m_ProfilingSampler))
+            {
+                // Global render pass data containing various settings.
+                // x,y,z are currently unused
+                // w is used for knowing whether the object is opaque(1) or alpha blended(0)
+                Vector4 drawObjectPassData = new Vector4(0.0f, 0.0f, 0.0f, (data.m_IsOpaque) ? 1.0f : 0.0f);
+                cmd.SetGlobalVector(s_DrawObjectPassDataPropID, drawObjectPassData);
+
+#if ENABLE_VR && ENABLE_XR_MODULE
+                if (data.m_RenderingData.cameraData.xr.enabled && data.m_IsActiveTargetBackBuffer)
+                {
+                    cmd.SetViewport(data.m_RenderingData.cameraData.xr.GetViewport());
+                    if (data.m_RenderingData.cameraData.xr.supportsFoveatedRendering)
+                    {
+                        cmd.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
+                    }
+                }
+#endif
+
+                // scaleBias.x = flipSign
+                // scaleBias.y = scale
+                // scaleBias.z = bias
+                // scaleBias.w = unused
+                float flipSign = yFlip ? -1.0f : 1.0f;
+                Vector4 scaleBias = (flipSign < 0.0f)
+                    ? new Vector4(flipSign, 1.0f, -1.0f, 1.0f)
+                    : new Vector4(flipSign, 0.0f, 1.0f, 1.0f);
+                cmd.SetGlobalVector(ShaderPropertyId.scaleBiasRt, scaleBias);
+
+                // Set a value that can be used by shaders to identify when AlphaToMask functionality may be active
+                // The material shader alpha clipping logic requires this value in order to function correctly in all cases.
+                float alphaToMaskAvailable = ((renderingData.cameraData.cameraTargetDescriptor.msaaSamples > 1) && data.m_IsOpaque) ? 1.0f : 0.0f;
+                cmd.SetGlobalFloat(ShaderPropertyId.alphaToMaskAvailable, alphaToMaskAvailable);
+
+                Camera camera = renderingData.cameraData.camera;
+                var sortFlags = SortingCriteria.CommonTransparent;
+                var filterSettings = data.m_FilteringSettings;
+
+#if UNITY_EDITOR
+                // When rendering the preview camera, we want the layer mask to be forced to Everything
+                if (renderingData.cameraData.isPreviewCamera)
+                {
+                    filterSettings.layerMask = -1;
+                }
+#endif
+                
+                DrawingSettings drawSettings = RenderingUtils.CreateDrawingSettings(data.m_ShaderTagIdList, ref renderingData, sortFlags);
+
+                drawSettings.overrideMaterial = DebugMircotriangles.MicroTriMat;
+                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filterSettings);
+
+                // Clean up
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+            }
+        }
+
+        private class PassData
+        {
+            internal TextureHandle m_Albedo;
+            internal TextureHandle m_Depth;
+
+            internal RenderingData m_RenderingData;
+
+            internal bool m_IsOpaque;
+            internal RenderStateBlock m_RenderStateBlock;
+            internal FilteringSettings m_FilteringSettings;
+            internal List<ShaderTagId> m_ShaderTagIdList;
+            internal ProfilingSampler m_ProfilingSampler;
+			internal bool m_IsActiveTargetBackBuffer;
+
+            internal DrawDebugPass pass;
+            internal bool drawSkybox;
+            // SLZ MODIFIED
+            internal bool m_UseMotionVectorData;
+            // END SLZ MODIFIED
+        }
+
+        internal void Render(RenderGraph renderGraph, TextureHandle colorTarget, TextureHandle depthTarget, ref RenderingData renderingData)
+        {
+            Camera camera = renderingData.cameraData.camera;
+
+            using (var builder = renderGraph.AddRenderPass<PassData>("Draw Objects Pass", out var passData,
+                m_ProfilingSampler))
+            {
+                passData.m_Albedo = builder.UseColorBuffer(colorTarget, 0);
+                passData.m_Depth = builder.UseDepthBuffer(depthTarget, DepthAccess.Write);
+
+                passData.m_RenderingData = renderingData;
+
+                builder.AllowPassCulling(false);
+
+                passData.m_IsOpaque = m_IsOpaque;
+                passData.m_RenderStateBlock = m_RenderStateBlock;
+                passData.m_FilteringSettings = m_FilteringSettings;
+                passData.m_ShaderTagIdList = m_ShaderTagIdList;
+                passData.m_ProfilingSampler = m_ProfilingSampler;
+                passData.m_IsActiveTargetBackBuffer = m_IsActiveTargetBackBuffer;
+
+                passData.pass = this;
+
+                builder.SetRenderFunc((PassData data, RenderGraphContext context) =>
+                {
+                    ref var renderingData = ref data.m_RenderingData;
+
+                    // TODO RENDERGRAPH figure out where to put XR proj flip logic so that it can be auto handled in render graph
+#if ENABLE_VR && ENABLE_XR_MODULE
+                    if (renderingData.cameraData.xr.enabled)
+                    {
+                        // SetRenderTarget might alter the internal device state(winding order).
+                        // Non-stereo buffer is already updated internally when switching render target. We update stereo buffers here to keep the consistency.
+                        bool renderIntoTexture = data.m_Albedo != renderingData.cameraData.xr.renderTarget;
+                        renderingData.cameraData.PushBuiltinShaderConstantsXR(renderingData.commandBuffer, renderIntoTexture);
+                        XRSystemUniversal.MarkShaderProperties(renderingData.commandBuffer, renderingData.cameraData.xrUniversal, renderIntoTexture);
+                    }
+#endif
+
+                    bool yFlip = renderingData.cameraData.IsRenderTargetProjectionMatrixFlipped(data.m_Albedo, data.m_Depth);
+                    CameraSetup(context.cmd, data, ref renderingData);
+                    ExecutePass(context.renderContext, data, ref renderingData, yFlip);
+                });
+
+            }
+        }
+    }
+}

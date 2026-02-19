@@ -82,13 +82,6 @@ half3 ApplyTonemap(half3 input)
     return saturate(input);
 }
 
-float3 tony_mc_mapface_space(float3 stimulus) {
-    // Apply a non-linear transform that the LUT is encoded with.
-	//stimulus =  pow(2, stimulus.rgb * (8.0 + 13.0) - 13.0 );
-	//stimulus = pow(stimulus, 0.45454545);
-    const float3 encoded = stimulus / (stimulus + 1.0);
-	return encoded;
-}
 
 half3 ApplyColorGrading(half3 input, float postExposure, TEXTURE2D_PARAM(lutTex, lutSampler), float3 lutParams, TEXTURE2D_PARAM(userLutTex, userLutSampler), float3 userLutParams, float userLutContrib)
 {
@@ -128,8 +121,9 @@ half3 ApplyColorGrading(half3 input, float postExposure, TEXTURE2D_PARAM(lutTex,
         if (userLutContrib > 0.0)
         {
             //input.rgb = GetLinearToSRGB(input.rgb); // In LDR do the lookup in sRGB for the user LUT
+			//float3 colorLutSpace = saturate(LinearToLogC(input.rgb));
 			float3 colorLutSpace = saturate(LinearToLogC(input.rgb));
-            half3 outLut = half3(0.5,0.5,0.5);//ApplyLut2D(TEXTURE2D_ARGS(userLutTex, userLutSampler), colorLutSpace, userLutParams);
+            half3 outLut = ApplyLut2D(TEXTURE2D_ARGS(userLutTex, userLutSampler), colorLutSpace, userLutParams);
             input = lerp(input, outLut, userLutContrib);
             //input.rgb = GetSRGBToLinear(input.rgb);
         }
