@@ -121,7 +121,7 @@ namespace SLZ.SLZEditorTools
             m_DistanceValueField.SetValueWithoutNotify(distanceValue);
 
             SetDistance(distanceValue);
-            Debug.Log($"Distance: {distanceValue}");
+            //Debug.Log($"Distance: {distanceValue}");
             m_DistanceValueField.RegisterValueChangedCallback(SetDistanceEvent);
             m_DistanceHorizBox.Add(m_DistanceValueField);
 

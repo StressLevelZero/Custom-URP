@@ -31,6 +31,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
         _HalfShade("Enable Vulkan Per-Draw Shading Rate Hack", float) = 0
         _Slope("Offset Slope Factor", float) = 0
         _Offset("Offset Units", float) = 0
+        _SSRSmoothnessRange ("SSR Smoothness Range", Vector) = (0.4, 0.7, 0, 0)
     }
     SubShader
     {

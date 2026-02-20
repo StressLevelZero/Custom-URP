@@ -10,21 +10,6 @@ namespace UnityEngine.Rendering.Universal.Internal
   
     public class DrawDebugPass : ScriptableRenderPass
     {
-        static Material s_MicroTriMat;
-        static Material MicroTriMat
-        {
-            get
-            {
-                if (s_MicroTriMat == null)
-                {
-                    Shader s = Shader.Find("SLZ/Debug/Show Micro Triangles");
-                    s_MicroTriMat = new Material(s);
-                }
-                return s_MicroTriMat;
-            }
-        }
-
-
         FilteringSettings m_FilteringSettings;
         RenderStateBlock m_RenderStateBlock;
         List<ShaderTagId> m_ShaderTagIdList = new List<ShaderTagId>();

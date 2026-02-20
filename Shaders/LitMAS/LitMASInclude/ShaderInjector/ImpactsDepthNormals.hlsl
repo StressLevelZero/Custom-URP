@@ -11,9 +11,6 @@
 #else
 #endif
 
-// Begin Injection UNIVERSAL_DEFINES from Injection_SSR_CBuffer_Posespace.hlsl ----------------------------------------------------------
-#define _SSRTemporalMul 0
-// End Injection UNIVERSAL_DEFINES from Injection_SSR_CBuffer_Posespace.hlsl ----------------------------------------------------------
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
@@ -74,6 +71,9 @@ half  _Normals;
 	half  _EmissionFalloff;
 	half  _BakedMutiplier;
 // End Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
+	float4 _SSRSmoothnessRange;
+// End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
     int _Surface;
 CBUFFER_END
     
