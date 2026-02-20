@@ -195,7 +195,7 @@ Shader "SLZ/Debug/Show Micro Triangles"
                 [unroll] for (int k = 0; k < 3; k++)
                 {
                     float3 vtx2cam = wPos[k].xyz - _WorldSpaceCameraPos;
-                    float zOffset = isMinMicro ? -0.5f : -0.25f;
+                    float zOffset = isMinMicro ? -0.001f : -0.0005f;
                     wPos[k].xyz = wPos[k].xyz + zOffset * vtx2cam;
                     output[k] = (g2f)0;
                     output[k].vertex = TransformWorldToHClip(wPos[k].xyz);
