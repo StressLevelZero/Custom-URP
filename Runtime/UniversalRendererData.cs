@@ -165,6 +165,8 @@ namespace UnityEngine.Rendering.Universal
             public Texture2DArray blueNoiseRGBA;
             [Reload("Textures/BlueNoiseR.asset")]
             public Texture2DArray blueNoiseR;
+            [Reload("Textures/Default/3dNoiseTexture.asset")]
+            public Texture3D _3dNoiseTexture;
         }
 
         public TextureResources textures = null;
