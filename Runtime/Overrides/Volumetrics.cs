@@ -1,153 +1,148 @@
 ﻿using System;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 namespace UnityEngine.Rendering.Universal
 {
-
-
     [Serializable, VolumeComponentMenu("Atmospherics/Volumetrics")]
     public sealed class Volumetrics : VolumeComponent
     {
-        //static readonly int m_MipFogParam = Shader.PropertyToID("_MipFogParameters");
-        static readonly int m_GlobalExtinction = Shader.PropertyToID("_GlobalExtinction");
-        static readonly int m_FogBaseHeight = Shader.PropertyToID("_FogBaseHeight");
-        static readonly int m_FogMaxHeight = Shader.PropertyToID("_FogMaxHeight");
-        static readonly int m_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
-        static readonly int m_VolumetricAlbedo = Shader.PropertyToID("_GlobalScattering");
+        static readonly int m_GlobalExtinction       = Shader.PropertyToID("_GlobalExtinction");
+        // static readonly int m_FogBaseHeight          = Shader.PropertyToID("_FogBaseHeight");
+        // static readonly int m_FogMaxHeight           = Shader.PropertyToID("_FogMaxHeight");
+        static readonly int m_StaticLightMultiplier  = Shader.PropertyToID("_StaticLightMultiplier");
 
-        // Volumetric rendering scripts need to be aware that this script has
-        // set the shader global variables so they don't overwrite them
-        public static bool hasSetGlobals { get; private set; } 
+        static readonly int m_PanicRefresh           = Shader.PropertyToID("_PanicRefresh");
+       // static readonly int m_PanicRefreshDelta      = Shader.PropertyToID("_PanicRefreshDelta"); // optional debug
 
-        //static readonly int m_SkyTexture = Shader.PropertyToID("_SkyTexture");
-        //static readonly int m_SkyMipCount = Shader.PropertyToID("_SkyMipCount");
-
-        [Header("Fog Mipmap controls")]
-        [Tooltip("How close the mipfog starts")]
-        public MinFloatParameter mipFogNear = new MinFloatParameter( 0.0f , 0 );
-        [Tooltip("Where the mipfog ends")]
-        public MinFloatParameter mipFogFar = new MinFloatParameter( 1, 1 );
-        [Tooltip("Max mip level.")]
-        public ClampedFloatParameter mipFogMaxMip = new ClampedFloatParameter(1.0f, 0.0f, 1);
-        public CubemapParameter SkyTexture = new CubemapParameter(null);
-
-
-        [Space, Header("Voulmetric Controls")]
-
+        
+        // ------------------------
+        // Volumetric Controls
+        // ------------------------
+        [Space, Header("Volumetric Controls")]
         [Tooltip("Controls the global fog Density.")]
         public MinFloatParameter FogViewDistance = new MinFloatParameter(50, 1f);
-        [Tooltip("Height in world space where fog hits max density.")]
-        public FloatParameter FogBaseHeight = new FloatParameter(0);
-        [Tooltip("Height in world space where fog is minimum density.")]
-        public FloatParameter FogMaxHeight = new FloatParameter(50);
-        [Tooltip("Controls the global fog Density."),HideInInspector]
-        public ClampedFloatParameter MaxRenderDistance = new ClampedFloatParameter(50, 1f, 3000f); //Disabled until hooked up
+
+        // [Tooltip("Height in world space where fog hits max density.")]
+        // public FloatParameter FogBaseHeight = new FloatParameter(0);
+        //
+        // [Tooltip("Height in world space where fog is minimum density.")]
+        // public FloatParameter FogMaxHeight = new FloatParameter(50);
+
+        //[Tooltip("Controls the global fog Density."), HideInInspector]
+        //public ClampedFloatParameter MaxRenderDistance = new ClampedFloatParameter(50, 1f, 3000f); // Disabled until hooked up
+
+        [Header("ADVANCED SETTINGS — Don't use for normal circumstances")]
         [Tooltip("Baked static light multiplier.")]
+        [AdditionalProperty] // hidden unless Advanced/Additional Properties are shown
         public MinFloatParameter GlobalStaticLightMultiplier = new MinFloatParameter(1f, .1f);
-        public ColorParameter VolumetricAlbedo = new ColorParameter(Color.white,false);
-        [HideInInspector]
-        public BoolParameter isNullSky = new BoolParameter(true);
 
-        //public BoolParameter testBool = new BoolParameter(false);
 
-        //       public bool IsActive() => intensity.value > 0f && (type.value != FilmGrainLookup.Custom || texture.value != null);
-        //       public bool IsTileCompatible() => true;
+        // ------------------------
+        // Temporal Panic Refresh
+        // ------------------------
+        [Header("Temporal Panic Refresh")]
+        [Tooltip("When enabled, detects large parameter jumps and forces a temporal refresh for that frame.")]
+        [AdditionalProperty]
+        public BoolParameter PanicRefreshEnabled = new BoolParameter(true);
 
-        internal void PushFogShaderParameters()
+        [Tooltip("If the normalized delta exceeds this value, _PanicRefresh is set to 1 for that frame.")]
+        [AdditionalProperty]
+        public ClampedFloatParameter PanicRefreshThreshold = new ClampedFloatParameter(0.35f, 0.0f, 2.0f);
+
+        // [Tooltip("Meters that count as ~1.0 delta for height params (base/max height). Bigger = less sensitive.")]
+        // [AdditionalProperty]
+        // public MinFloatParameter PanicHeightScaleMeters = new MinFloatParameter(25.0f, 0.001f);
+
+
+        // ------------------------
+        // Runtime snapshot state (per stack instance)
+        // ------------------------
+        [NonSerialized] private bool _panicPrevValid;
+        [NonSerialized] private Snapshot _panicPrev;
+        [NonSerialized] private int _panicLastEvalFrame = -1;
+        [NonSerialized] private float _panicThisFrame;       // 0 or 1
+        //[NonSerialized] private float _panicDeltaThisFrame;  // optional debug
+
+        private struct Snapshot
         {
-            hasSetGlobals = true;
-            Shader.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value)); //ExtinctionFromMeanFreePath
-            Shader.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
-            Shader.SetGlobalFloat(m_FogBaseHeight, FogBaseHeight.value);
-            Shader.SetGlobalFloat(m_FogMaxHeight, FogMaxHeight.value);
-            Shader.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
+            public float extinction;
+            public float staticLightMul;
+            // public float baseHeight;
+            // public float maxHeight;
+        }
 
-            SkyManager.SetSkyMips(new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
-            //if (SkyTexture.value != null && SkyTexture.overrideState) SkyManager.SetSkyTexture(SkyTexture.value);
-            //else SkyManager.CheckSky();
+        private static float RelDiff(float a, float b)
+        {
+            float denom = Mathf.Max(Mathf.Abs(a), Mathf.Abs(b), 1e-4f);
+            return Mathf.Abs(a - b) / denom;
+        }
 
-            //if (isNullSky.value)
-            //{
-            //    Debug.Log("Null Sky was Set");
-            //}
+        private Snapshot CaptureSnapshot()
+        {
+            Snapshot s;
 
-            if (SkyTexture.overrideState && SkyTexture.value)
+            s.extinction     = VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value);
+            s.staticLightMul = GlobalStaticLightMultiplier.value;
+            // s.baseHeight     = FogBaseHeight.value;
+            // s.maxHeight      = FogMaxHeight.value;
+            return s;
+        }
+
+        private float ComputePanicDelta(in Snapshot curr, in Snapshot prev)
+        {
+            float d = 0.0f;
+
+            // Relative changes (scale-invariant)
+            d = Mathf.Max(d, RelDiff(curr.extinction,     prev.extinction));
+            d = Mathf.Max(d, RelDiff(curr.staticLightMul, prev.staticLightMul));
+
+            // Heights in meters -> normalized by PanicHeightScaleMeters
+            //float hScale = Mathf.Max(PanicHeightScaleMeters.value, 1e-4f);
+            // d = Mathf.Max(d, Mathf.Abs(curr.baseHeight - prev.baseHeight) / hScale);
+            // d = Mathf.Max(d, Mathf.Abs(curr.maxHeight  - prev.maxHeight)  / hScale);
+
+            return d;
+        }
+
+        private void EvaluatePanicOncePerFrame()
+        {
+            int frame = Time.frameCount;
+            if (_panicLastEvalFrame == frame)
+                return;
+
+            _panicLastEvalFrame = frame;
+            _panicThisFrame = 0.0f;
+            //_panicDeltaThisFrame = 0.0f;
+
+            Snapshot curr = CaptureSnapshot();
+
+            if (PanicRefreshEnabled.value && _panicPrevValid)
             {
-                SkyManager.SetSkyTexture(SkyTexture.value);
+                float delta = ComputePanicDelta(curr, _panicPrev);
+               // _panicDeltaThisFrame = delta;
+                if (delta >= PanicRefreshThreshold.value)
+                    _panicThisFrame = 1.0f;
             }
-            else
-            {
-                SkyManager.CheckSky();
-            }
 
-
-            // Only check if skytexture.value is null once and cache the result.
-            // For some reason, checking if a null texture is null causes a 0.15ms of Loading.IsObjectAvailable (when the actual rendering only takes 0.04ms!).
-            // This doesn't seem to happen if the texture is non-null
-            //if (!hasCheckedForNullOverride) 
-
-            //if (SkyTexture.overrideState)
-            //{
-            //    if (!checkedNullSky.value)
-            //    {
-            //        checkedNullSky.value = true;
-            //        if (SkyTexture.value == null)
-            //        {
-            //            SkyTexture.overrideState = false;
-            //            SkyManager.CheckSky();
-            //        }
-            //    }
-            //    else
-            //    {
-            //        SkyManager.SetSkyTexture(SkyTexture.value); // SkyTexture.value != null &&
-            //    }
-            //}
-            //else SkyManager.CheckSky();
+            _panicPrev = curr;
+            _panicPrevValid = true;
         }
 
         public void SetGlobalsOnCmdBuffer(CommandBuffer cmd)
         {
-            cmd.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value)); //ExtinctionFromMeanFreePath
+            EvaluatePanicOncePerFrame();
+            cmd.SetGlobalFloat(m_PanicRefresh, _panicThisFrame);
+           // cmd.SetGlobalFloat(m_PanicRefreshDelta, _panicDeltaThisFrame); // optional debug
+
+            cmd.SetGlobalFloat(m_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(FogViewDistance.value));
             cmd.SetGlobalFloat(m_StaticLightMultiplier, GlobalStaticLightMultiplier.value);
-            cmd.SetGlobalFloat(m_FogBaseHeight, FogBaseHeight.value);
-            cmd.SetGlobalFloat(m_FogMaxHeight, FogMaxHeight.value);
-            cmd.SetGlobalVector(m_VolumetricAlbedo, VolumetricAlbedo.value);
-            // same as SkyManager.SetSkyMips
-            cmd.SetGlobalVector(SkyManager.ID_MipFogParam, new Vector4(mipFogNear.value, mipFogFar.value, mipFogMaxMip.value, 0.0f));
-            if (SkyTexture.overrideState && !isNullSky.value && SkyTexture.value)
-            {
-                cmd.SetGlobalTexture(SkyManager.ID_SkyTexture, SkyTexture.value);
-                cmd.SetGlobalInt(SkyManager.ID_SkyMipCount, SkyTexture.value.mipmapCount);
-            }
-            else
-            {
-                SkyManager.CheckSky();
-            }
+            // cmd.SetGlobalFloat(m_FogBaseHeight, FogBaseHeight.value);
+            // cmd.SetGlobalFloat(m_FogMaxHeight, FogMaxHeight.value);
 
-        }
+            // same as SkyManager.SetSkyMips (fixed defaults)
+           // cmd.SetGlobalVector(SkyManager.ID_MipFogParam, k_DefaultMipFogParams);
 
-#if false //UNITY_EDITOR
-        // Only check if SkyTexture.value is null in editor and serialize the result.
-        // For some reason, checking if the texture inside of a CubemapParameter is null causes a 0.15ms of Loading.IsObjectAvailable if it actually is null.
-        private void OnValidate()
-        {
-           
-            if (isNullSky == null)
-            {
-                isNullSky = new BoolParameter(false);
-            }
-            //isNullSky.value = SkyTexture.value == null;
-            //isNullSky.overrideState = true;
-            SerializedObject so = new SerializedObject(this);
-            SerializedProperty sp_value = so.FindProperty("isNullSky.m_Value");
-            SerializedProperty sp_override = so.FindProperty("isNullSky.m_OverrideState");
-            sp_value.boolValue = SkyTexture.value == null;
-            sp_override.boolValue = true;
-            so.ApplyModifiedProperties();
-            so.Dispose();
+            // No SkyTexture override anymore; ensure SkyManager has a valid sky bound.
+           // SkyManager.CheckSky();
         }
-#endif
     }
 }

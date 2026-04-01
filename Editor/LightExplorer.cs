@@ -277,7 +277,7 @@ namespace UnityEditor
             {
                 new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.Enabled, "m_Enabled", 60), // 0: Enabled
                 new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Name, HDStyles.Name, null, 200), //Name
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float,  EditorGUIUtility.TrTextContent("View Distance"), "ViewDistance", 200), 
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float,  EditorGUIUtility.TrTextContent("Density"), "density", 200), 
                 new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float,  EditorGUIUtility.TrTextContent("Falloff"), "falloffDistance", 200), 
                 new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum,  EditorGUIUtility.TrTextContent("Shape Type"), "shapeType", 60), 
             };

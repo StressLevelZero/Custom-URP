@@ -135,6 +135,6 @@ TextureImporter:
     nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
-  userData: '{"detailMap":false,"hemiOctNormals":true,"geoRoughness":0,"geoRoughnessPow":1.0,"dontReadSource":false,"fileVersion":0,"settingsVersion":1}'
+  userData: '{"detailMap":true,"hemiOctNormals":true,"geoRoughness":0,"geoRoughnessPow":1.0,"dontReadSource":false,"fileVersion":0,"settingsVersion":1}'
   assetBundleName: 
   assetBundleVariant: 

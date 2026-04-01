@@ -114,9 +114,9 @@ public class BakedVolumetricArea : MonoBehaviour
         */
             OnValidate();
     //    Gizmos.DrawWireSphere(transform.position - (NormalizedScale* 0.5f), .5f);
-        Gizmos.color = new Color(0.5f,0.5f,0.5f,0.25f);
+        Gizmos.color = new Color(0.35f,0.35f,0.35f,0.15f);
         Gizmos.matrix = Matrix4x4.TRS(gameObject.transform.position, Quaternion.identity, NormalizedScale);
-        if (!DEBUG) Gizmos.DrawCube(Vector3.zero, Vector3.one);
+        if (!DEBUG) Gizmos.DrawCube(Vector3.zero, -Vector3.one);
         Gizmos.color = Color.white;
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
    //     Gizmos.DrawWireSphere(Corner, 0.5f);

@@ -14,11 +14,11 @@
 
 //#pragma multi_compile_fragment _ _LIGHT_COOKIES
 //#pragma multi_compile _ SHADOWS_SHADOWMASK
-#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
-#pragma multi_compile_fog
+#pragma multi_compile_fragment _  _VOLUMETRICS_ENABLED_HQ _VOLUMETRICS_ENABLED
+//#pragma multi_compile_fog
 //#pragma skip_variants FOG_LINEAR FOG_EXP
 //#pragma multi_compile_fragment _ DEBUG_DISPLAY
-#pragma multi_compile_fragment _ _DETAILS_ON
+#pragma multi_compile_local_fragment _ _DETAILS_ON _DETAILS_UV_ON
 //#pragma multi_compile_fragment _ _EMISSION_ON
 
 #if !defined(LITMAS_FEATURE_LIGHTMAPPING)
@@ -47,7 +47,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
 //#!INJECT_POINT INCLUDES
 
 
@@ -86,7 +86,7 @@ struct VertOut
 #define UNPACK_TANGENT(i) half3(i.uv0XY_tanXY.zw, i.normXYZ_tanZ.w)
 #define UNPACK_BITANGENT_SIGN(i) i.SHVertLights_btSign.w
 #define UNPACK_WPOS(i) i.wPos_fog.xyz
-#define UNPACK_FOG(i) i.wPos_fog.w
+//#define UNPACK_FOG(i) i.wPos_fog.w
 #define UNPACK_VERTLIGHTS(i) i.SHVertLights_btSign.xyz
 
 TEXTURE2D(_BaseMap);
@@ -107,18 +107,6 @@ CBUFFER_START(UnityPerMaterial)
     //#!INJECT_POINT MATERIAL_CBUFFER
     int _Surface;
 CBUFFER_END
-
-half3 OverlayBlendDetail(half source, half3 destination)
-{
-    half3 switch0 = round(destination); // if destination >= 0.5 then 1, else 0 assuming 0-1 input
-    half3 blendGreater = mad(mad(2.0, destination, -2.0), 1.0 - source, 1.0); // (2.0 * destination - 2.0) * ( 1.0 - source) + 1.0
-    half3 blendLesser = (2.0 * source) * destination;
-    return mad(switch0, blendGreater, mad(-switch0, blendLesser, blendLesser)); // switch0 * blendGreater + (1 - switch0) * blendLesser 
-    //return half3(destination.r > 0.5 ? blendGreater.r : blendLesser.r,
-    //             destination.g > 0.5 ? blendGreater.g : blendLesser.g,
-    //             destination.b > 0.5 ? blendGreater.b : blendLesser.b
-    //            );
-}
 
 //#!INJECT_POINT FUNCTIONS
 
@@ -142,8 +130,8 @@ VertOut vert(VertIn v)
 #endif
 
     // Exp2 fog
-    half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
-    o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
+    // half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
+    // o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
 
     //#!INJECT_POINT VERTEX_NORMALS
     //#!INJECT_DEFAULT
@@ -220,13 +208,12 @@ FragOut frag(VertOut i
 /*---Read Detail Map---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
-    #if defined(_DETAILS_ON) 
-
-        //#!INJECT_POINT DETAIL_MAP
-       
-        smoothness = saturate(2.0 * detailMap.b * smoothness);
-        albedo.rgb = OverlayBlendDetail(detailMap.r, albedo.rgb);
-
+    //#!INJECT_POINT DETAIL_MAP
+    
+    #if defined(_DETAILS_UV_ON)
+    DetailMap_UV_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
+    #elif defined(_DETAILS_ON)  
+    DetailMap_fractal_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
     #endif
 
     //#!INJECT_POINT PRE_NORMAL_TS_TO_WS
@@ -280,7 +267,7 @@ FragOut frag(VertOut i
 
     //#!INJECT_POINT VOLUMETRIC_FOG
     //#!INJECT_DEFAULT
-    color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
+    //color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
     color = VolumetricsSurf(color, fragData.position, _Surface);
     //#!INJECT_END
     

@@ -1,0 +1,579 @@
+#pragma kernel KTransmittance
+#pragma kernel KMultiScattering
+#pragma kernel KSkyView
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/SLZ_AtmosphereShared.hlsl"
+//#define PI 3.1415926535897932384626433832795
+
+
+// -----------------------------
+// LUTs
+// -----------------------------
+Texture2D<float4> _TransmittanceLUT;     
+Texture2D<float4> _MultiScatteringLUT;   
+
+RWTexture2D<float4> _RW_TransmittanceLUT;
+RWTexture2D<float4> _RW_MultiScatteringLUT;
+RWTexture2D<float4> _RW_SkyViewLUT;
+
+// resolutions (set in C# via Dispatch size)
+float2 _TransmittanceRes;
+float2 _MultiScatteringRes;
+float2 _SkyViewRes;
+
+// -----------------------------
+// Geometry helpers
+// -----------------------------
+float2 RaySphereIntersect(float3 o, float3 d, float r)
+{
+    float b = dot(o, d);
+    float c = dot(o, o) - r*r;
+    float h = b*b - c;
+    if (h < 0) return float2(-1, -1);
+    h = sqrt(h);
+    return float2(-b - h, -b + h); // near, far
+}
+
+float RaySphereExit(float3 o, float3 d, float r)
+{
+    return RaySphereIntersect(o, d, r).y;
+}
+
+bool RaySphereNearestPositive(float3 o, float3 d, float r, out float tHit)
+{
+    float2 t = RaySphereIntersect(o, d, r);
+    tHit = 1e20;
+    if (t.x > 0) tHit = t.x;
+    else if (t.y > 0) tHit = t.y;
+    return tHit < 1e19;
+}
+
+// -----------------------------
+// Medium model
+// -----------------------------
+// void Densities(float height, out float dR, out float dM)
+// {
+//     float h = max(height, 0.0);
+//     dR = exp(-h / max(_RayleighScaleHeight, 1.0));
+//     dM = exp(-h / max(_MieScaleHeight, 1.0));
+// }
+//
+// float3 SigmaS(float dR, float dM, float thickMul)
+// {
+//     return (_BetaRayleigh * dR + _BetaMie * dM) * thickMul;
+// }
+//
+// float3 SigmaT(float dR, float dM, float thickMul)
+// {
+//     // No separate absorption term here; add if desired (ozone, mie absorption)
+//     return (_BetaRayleigh * dR + _BetaMie * dM) * thickMul;
+// }
+
+float3 ExpNeg(float3 v) { return float3(exp(-v.x), exp(-v.y), exp(-v.z)); }
+
+float RayleighPhase(float cosTheta)
+{
+    // 3/(16π) (1+cos²)
+    return (3.0 / (16.0 * PI)) * (1.0 + cosTheta*cosTheta);
+}
+
+float HGPhase(float cosTheta, float g)
+{
+    // 1/(4π) * (1-g²) / (1+g²-2gcos)^(3/2)
+    float g2 = g*g;
+    float denom = pow(max(1.0 + g2 - 2.0*g*cosTheta, 1e-4), 1.5);
+    return (1.0 / (4.0 * PI)) * (1.0 - g2) / denom;
+}
+
+// -----------------------------
+// LUT sampling (simple linear maps)
+// -----------------------------
+float3 SampleTransmittance(float r, float mu)
+{
+    // uv.x: mu [-1..1], uv.y: height [0..1]
+    float h = saturate((r - _PlanetRadius) / max(_AtmosphereRadius - _PlanetRadius, 1.0));
+    float u = saturate(mu * 0.5 + 0.5);
+    float2 uv = float2(u, h);
+    return _TransmittanceLUT.SampleLevel(sampler_LinearClamp, uv, 0).xyz;
+}
+
+float3 SampleMultiScattering(float r, float muS)
+{
+    // uv.x: muS [-1..1], uv.y: height [0..1]
+    float h = saturate((r - _PlanetRadius) / max(_AtmosphereRadius - _PlanetRadius, 1.0));
+    float u = saturate(muS * 0.5 + 0.5);
+    float2 uv = float2(u, h);
+    return _MultiScatteringLUT.SampleLevel(sampler_LinearClamp, uv, 0).xyz;
+}
+
+// Reconstruct a view direction for SkyView LUT from:
+// mu = cos(viewZenith), nu = cos(angle(viewDir, sunDir))
+float3 BuildViewDir(float mu, float nu, float3 sunDir)
+{
+    float3 up = float3(0,1,0);
+    float muS = dot(sunDir, up);
+    float sinS = sqrt(saturate(1.0 - muS*muS));
+
+    float3 xAxis;
+    if (sinS > 1e-3)
+        xAxis = normalize(sunDir - up * muS); // sun projection on horizon plane
+    else
+        xAxis = float3(1,0,0);
+
+    float3 zAxis = normalize(cross(up, xAxis));
+
+    float sinV = sqrt(saturate(1.0 - mu*mu));
+
+    // nu = mu*muS + sinV*sinS*cos(phi)
+    float denom = max(1e-4, sinV * sinS);
+    float cosPhi = clamp((nu - mu * muS) / denom, -1.0, 1.0);
+    float sinPhi = sqrt(saturate(1.0 - cosPhi*cosPhi)); // choose + branch (symmetry)
+
+    float3 horiz = (cosPhi * xAxis + sinPhi * zAxis);
+    return normalize(mu * up + sinV * horiz);
+}
+
+
+
+// -----------------------------
+// Integration utility
+// -----------------------------
+void IntegrateSegment(
+    inout float3 T,             // transmittance to start of segment
+    float3 sigmaT,              // extinction at sample
+    float ds,
+    out float3 segmentIntegral, // (1-exp(-sigmaT*ds))/sigmaT elementwise
+    out float3 Tstep            // exp(-sigmaT*ds)
+)
+{
+    float3 tau = sigmaT * ds;
+    Tstep = ExpNeg(tau);
+    segmentIntegral = (1.0 - Tstep) / max(sigmaT, 1e-6);
+}
+// float ThicknessMul()
+// {
+//     float thick01 = saturate(_Thickness / 5.0);
+//     return lerp(0.25, 2.5, thick01);
+// }
+
+// Neutral underground extinction. This is not atmospheric;
+// it's just your artistic/visual "buried under dirt/rock" fade.
+float UndergroundSigma()
+{
+    float thick01 = saturate(_Thickness / 5.0);
+    return lerp(1.0 / 3000.0, 1.0 / 500.0, thick01);
+}
+
+// Surface ground color directly above the camera.
+// Keeps the same hue/lighting identity, then we dim it with depth.
+float3 LocalSurfaceGroundColor(float3 upDir, float3 sunDir)
+{
+    float muLG = saturate(dot(upDir, sunDir));
+    float muSunG = muLG;
+    float3 TsunG = SampleTransmittance(_PlanetRadius + 1., muSunG);
+
+    return (_GroundAlbedo * _GroundIntensity) * (_SunColor * TsunG) * (muLG / PI);
+}
+
+float3 IntegrateSkyOnly(float3 rayStart, float3 viewDir, float3 sunDir, float thickMul)
+{
+    float tExit = RaySphereExit(rayStart, viewDir, _AtmosphereRadius);
+    if (tExit <= 0.0)
+        return 0.0;
+
+    const int STEPS = 32;
+    float ds = tExit / STEPS;
+    float t = 0.5 * ds;
+
+    float3 T = 1.0;
+    float3 L = 0.0;
+
+    // Use local up at the start point for the multi-scatter lookup.
+    float muS = dot(normalize(rayStart), sunDir);
+
+    [loop] for (int i = 0; i < STEPS; i++)
+    {
+        float3 sp = rayStart + viewDir * t;
+        float rS = length(sp);
+        float height = rS - _PlanetRadius;
+
+        float dR, dM;
+        Densities(height, dR, dM);
+
+        float3 sigmaS = SigmaS(dR, dM, thickMul);
+        float3 sigmaT = SigmaT(dR, dM, thickMul);
+
+        float muSun = dot(sp, sunDir) / max(rS, 1e-4);
+        float3 Tsun = SampleTransmittance(rS, muSun);
+
+        float3 Lms = SampleMultiScattering(rS, muS);
+
+        float cosTheta = dot(viewDir, sunDir);
+        float phaseR = RayleighPhase(cosTheta);
+        float phaseM = HGPhase(cosTheta, _MieG);
+
+        float3 Ssun = _SunColor * Tsun;
+        float3 single = Ssun * ((_BetaRayleigh * dR) * phaseR + (_BetaMie * dM) * phaseM) * thickMul;
+        float3 multi  = Lms * sigmaS;
+
+        float3 segInt, Tstep;
+        IntegrateSegment(T, sigmaT, ds, segInt, Tstep);
+
+        L += T * (single + multi) * segInt;
+        T *= Tstep;
+        t += ds;
+    }
+
+    return L;
+}
+// -----------------------------
+// KTransmittance (2D)
+// -----------------------------
+[numthreads(8,8,1)]
+void KTransmittance(uint3 tid : SV_DispatchThreadID)
+{
+    if (tid.x >= (uint)_TransmittanceRes.x || tid.y >= (uint)_TransmittanceRes.y) return;
+
+    float2 uv = (float2(tid.xy) + 0.5) / float2(_TransmittanceRes);
+
+    float mu = uv.x * 2.0 - 1.0;
+    float r  = lerp(_PlanetRadius, _AtmosphereRadius, uv.y);
+
+    float3 p = float3(0, r, 0);
+    float sinT = sqrt(saturate(1.0 - mu * mu));
+    float3 d = normalize(float3(sinT, mu, 0));
+
+    float tExit = RaySphereExit(p, d, _AtmosphereRadius);
+
+    float tGround;
+    bool hitG = RaySphereNearestPositive(p, d, _PlanetRadius, tGround);
+
+    float tMax = (hitG && tGround < tExit) ? tGround : tExit;
+
+    float thick01 = saturate(_Thickness / 5.0);
+    float thickMul = lerp(0.25, 2.5, thick01);
+
+    const int STEPS = 64;
+    float ds = tMax / STEPS;
+    float t = 0.5 * ds;
+
+    float3 T = 1.0;
+
+    [loop] for (int i = 0; i < STEPS; i++)
+    {
+        float3 sp = p + d * t;
+        float height = length(sp) - _PlanetRadius;
+
+        float dR, dM;
+        Densities(height, dR, dM);
+
+        float3 sigmaT = SigmaT(dR, dM, thickMul);
+
+        float3 segInt, Tstep;
+        IntegrateSegment(T, sigmaT, ds, segInt, Tstep);
+        T *= Tstep;
+
+        t += ds;
+    }
+
+    // Planet is opaque.
+    if (hitG && tGround < tExit)
+        T = 0.0;
+
+    _RW_TransmittanceLUT[tid.xy] = float4(T, 1);
+}
+
+// -----------------------------
+// KMultiScattering (2D)
+// Hillaire-style "dual scattering" isotropic multi-scatter
+// -----------------------------
+[numthreads(8,8,1)]
+void KMultiScattering(uint3 tid : SV_DispatchThreadID)
+{
+    if (tid.x >= (uint)_MultiScatteringRes.x || tid.y >= (uint)_MultiScatteringRes.y) return;
+
+    float2 uv = (float2(tid.xy) + 0.5) / float2(_MultiScatteringRes);
+
+    float muS = uv.x * 2.0 - 1.0;
+    float r   = lerp(_PlanetRadius, _AtmosphereRadius, uv.y);
+
+    float3 p0 = float3(0, r, 0);
+
+    // Build a sun direction with this muS (azimuth 0)
+    float sinS = sqrt(saturate(1.0 - muS*muS));
+    float3 sunDir = normalize(float3(sinS, muS, 0));
+
+    // thickness multiplier
+    float thick01 = saturate(_Thickness / 5.0);
+    float thickMul = lerp(0.25, 2.5, thick01);
+
+    // Sample directions on the sphere (low count; LUT is low-res)
+    const int DIRS = 16;
+    const int STEPS = 24;
+
+    float3 sumL = 0.0;
+    float3 sumF = 0.0;
+
+    // Cosine-weight-ish would be better for irradiance, but we want isotropic average here.
+    // Use a simple low-discrepancy set.
+    [loop] for (int k=0;k<DIRS;k++)
+    {
+        // Hammersley-ish without tables
+        float u = (k + 0.5) / DIRS;
+        float v = frac((k + 0.5) * 0.61803398875);
+
+        float phi = 2.0 * PI * v;
+        float cosT = 1.0 - 2.0 * u;
+        float sinT = sqrt(saturate(1.0 - cosT*cosT));
+        float3 w = float3(sinT*cos(phi), cosT, sinT*sin(phi));
+
+        // March from p0 along w until leaving atmosphere / hitting ground
+        float tExit = RaySphereExit(p0, w, _AtmosphereRadius);
+
+        float tGround;
+        bool hitG = RaySphereNearestPositive(p0, w, _PlanetRadius, tGround);
+        float tMax = (hitG && tGround < tExit) ? tGround : tExit;
+
+        float ds = tMax / STEPS;
+        float t = 0.5 * ds;
+
+        float3 T = 1.0;
+        float3 L = 0.0;
+        float3 F = 0.0;
+
+        [loop] for (int i=0;i<STEPS;i++)
+        {
+            float3 sp = p0 + w * t;
+            float rS = length(sp);
+            float height = rS - _PlanetRadius;
+
+            float dR, dM;
+            Densities(height, dR, dM);
+
+            float3 sigmaS = SigmaS(dR, dM, thickMul);
+            float3 sigmaT = SigmaT(dR, dM, thickMul);
+
+            // sun transmittance at sample
+            float muSun = dot(sp, sunDir) / max(rS, 1e-4);
+            float3 Tsun = SampleTransmittance(rS, muSun);
+
+            // Isotropic “source” for multi-scatter build step: phase integrates to 1 over sphere.
+            float3 Ssun = _SunColor * Tsun;
+
+            float3 segInt, Tstep;
+            IntegrateSegment(T, sigmaT, ds, segInt, Tstep);
+
+            // L : integrated single-scattered radiance contribution (no phase here)
+            L += T * (Ssun * sigmaS) * segInt;
+
+            // F : integrated scattering factor (albedo-ish term for the dual scattering solve)
+            F += T * (sigmaS) * segInt;
+
+            T *= Tstep;
+            t += ds;
+        }
+
+        // Ground bounce contribution (Lambert) into the isotropic field
+        if (hitG && tGround < tExit)
+        {
+            float3 pG = p0 + w * tGround;
+            float3 nG = normalize(pG);
+
+            float muLG = saturate(dot(nG, sunDir));
+            float rG = length(pG);
+            float muSunG = dot(pG, sunDir) / max(rG, 1e-4);
+            float3 TsunG = SampleTransmittance(rG, muSunG);
+
+            // Radiance from Lambert ground = albedo * irradiance / π
+            float3 Lg = (_GroundAlbedo * _GroundIntensity) * (_SunColor * TsunG) * (muLG / PI);
+
+            // Attenuate from ground to p0 along ray (we ended with T at end of march)
+            L += T * Lg;
+        }
+
+        // Average over sphere: weight = 1 / (4π) * 4π/DIRS => 1/DIRS
+        sumL += L / DIRS;
+        sumF += F / DIRS;
+    }
+
+    // Dual scattering solve: Multi = L / (1 - F)
+    float3 denom = max(1.0 - sumF, 1e-3);
+    float3 multi = sumL / denom;
+
+    _RW_MultiScatteringLUT[tid.xy] = float4(multi, 1);
+}
+
+// -----------------------------
+// Underground mode
+// -----------------------------
+float3 EvaluateSkyViewUnderground(float3 cam, float3 viewDir, float3 sunDir, float thickMul)
+{
+    float3 upCam = normalize(cam);
+    float rCam = length(cam);
+    float depthBelowSurface = _PlanetRadius - rCam;
+
+    float3 groundBase = LocalSurfaceGroundColor(upCam, sunDir);
+    float groundDim = exp(-depthBelowSurface * UndergroundSigma() * 0.35);
+    float3 groundColor = groundBase * groundDim;
+
+    float muUp = dot(viewDir, upCam);
+
+    float3 skyColor = 0.0;
+    float skyVis = 0.0;
+
+    float horizonStart = 0.01;
+    float horizonEnd   = 0.08;
+
+    if (muUp > -0.02)
+    {
+        float tSurface = RaySphereExit(cam, viewDir, _PlanetRadius);
+        tSurface = max(tSurface, 0.0);
+
+        float3 pSurface = cam + viewDir * tSurface;
+        float3 nSurface = normalize(pSurface);
+
+        float surfaceEps = max(2.0, (_AtmosphereRadius - _PlanetRadius) * 2e-5);
+        float3 skyStart = pSurface + nSurface * surfaceEps + viewDir * surfaceEps;
+
+        skyColor = IntegrateSkyOnly(skyStart, viewDir, sunDir, thickMul);
+
+        skyVis = exp(-UndergroundSigma() * tSurface);
+      //  skyVis *= smoothstep(horizonStart, horizonEnd, muUp);
+    }
+
+    return lerp(groundColor, skyColor, saturate(skyVis));
+}
+
+// -----------------------------
+// Normal above-ground mode
+// -----------------------------
+float3 EvaluateSkyViewAboveGround(float3 cam, float3 viewDir, float3 sunDir, float thickMul)
+{
+    float tExit = RaySphereExit(cam, viewDir, _AtmosphereRadius);
+
+    float tGround;
+    bool hitG = RaySphereNearestPositive(cam, viewDir, _PlanetRadius, tGround);
+    float tMax = (hitG && tGround < tExit) ? tGround : tExit;
+
+    const int STEPS = 32;
+    float ds = tMax / STEPS;
+    float t = 0.5 * ds;
+
+    float3 T = 1.0;
+    float3 L = 0.0;
+
+    [loop] for (int i = 0; i < STEPS; i++)
+    {
+        float3 sp = cam + viewDir * t;
+        float rS = length(sp);
+        float height = rS - _PlanetRadius;
+
+        float dR, dM;
+        Densities(height, dR, dM);
+
+        float3 sigmaS = SigmaS(dR, dM, thickMul);
+        float3 sigmaT = SigmaT(dR, dM, thickMul);
+
+        float muSun = dot(sp, sunDir) / max(rS, 1e-4);
+        float3 Tsun = SampleTransmittance(rS, muSun);
+
+        // float muS = dot(sunDir, float3(0,1,0));
+        // float3 Lms = SampleMultiScattering(rS, muS);
+        float3 upS = sp / max(rS, 1e-4);
+        float muS = dot(upS, sunDir);
+        float3 Lms = SampleMultiScattering(rS, muS);        
+
+        float cosTheta = dot(viewDir, sunDir);
+        float phaseR = RayleighPhase(cosTheta);
+        float phaseM = HGPhase(cosTheta, _MieG);
+
+        float3 Ssun = _SunColor * Tsun;
+        float3 single = Ssun * ((_BetaRayleigh * dR) * phaseR + (_BetaMie * dM) * phaseM) * thickMul;
+        float3 multi  = Lms * sigmaS;
+
+        float3 segInt, Tstep;
+        IntegrateSegment(T, sigmaT, ds, segInt, Tstep);
+
+        L += T * (single + multi) * segInt;
+        T *= Tstep;
+        t += ds;
+    }
+
+    if (hitG && tGround < tExit)
+    {
+        float3 pG = cam + viewDir * tGround;
+        float3 nG = normalize(pG);
+
+        float muLG = saturate(dot(nG, sunDir));
+        float rG = length(pG);
+        float muSunG = dot(pG, sunDir) / max(rG, 1e-4);
+        float3 TsunG = SampleTransmittance(rG, muSunG);
+
+        float3 Lg = (_GroundAlbedo * _GroundIntensity) * (_SunColor * TsunG) * (muLG / PI);
+        L += T * Lg;
+    }
+
+    return L;
+}
+// -----------------------------
+// KSkyView (2D)
+// Depends on camera altitude + sunDir
+// LUT parameterization: x = nu = dot(viewDir, sunDir), y = mu = dot(viewDir, up)
+// -----------------------------
+[numthreads(8,8,1)]
+void KSkyView(uint3 tid : SV_DispatchThreadID)
+{
+    if (tid.x >= (uint)_SkyViewRes.x || tid.y >= (uint)_SkyViewRes.y) return;
+
+    float2 uv = (float2(tid.xy) + 0.5) / float2(_SkyViewRes);
+
+    float nu = uv.x * 2.0 - 1.0;
+    float mu = uv.y * 2.0 - 1.0;
+
+    float3 sunDir  = normalize(_SunDir);
+    float3 viewDir = BuildViewDir(mu, nu, sunDir);
+
+    float rCam = _PlanetRadius + _CameraAltitude;
+    float thickMul = ThicknessMul();
+
+    // Width of the crossfade band around the surface.
+    float surfaceBlendMeters = 5.0;
+
+    // 0 = underground model, 1 = above-ground model
+    float surfaceBlend = smoothstep(-surfaceBlendMeters, surfaceBlendMeters, _CameraAltitude);
+
+    // Keep each model on its valid side of the boundary.
+    float camSideEps = 1.0;
+
+    float rCamUnder = min(rCam, _PlanetRadius - camSideEps);
+    float rCamAbove = max(rCam, _PlanetRadius + camSideEps);
+
+    float3 Lunder = 0.0;
+    float3 Labove = 0.0;
+
+    bool needUnder = surfaceBlend < 0.999;
+    bool needAbove = surfaceBlend > 0.001;
+
+    if (needUnder)
+    {
+        float3 camUnder = float3(0, rCamUnder, 0);
+        Lunder = EvaluateSkyViewUnderground(camUnder, viewDir, sunDir, thickMul);
+    }
+
+    if (needAbove)
+    {
+        float3 camAbove = float3(0, rCamAbove, 0);
+        Labove = EvaluateSkyViewAboveGround(camAbove, viewDir, sunDir, thickMul);
+    }
+
+    float3 L;
+    if (needUnder && needAbove)
+        L = lerp(Lunder, Labove, surfaceBlend);
+    else if (needAbove)
+        L = Labove;
+    else
+        L = Lunder;
+
+    _RW_SkyViewLUT[tid.xy] = float4(L, 1);
+}

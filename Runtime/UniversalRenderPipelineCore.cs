@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.GlobalIllumination;
 using UnityEngine.Experimental.Rendering;
@@ -23,6 +24,16 @@ namespace UnityEngine.Rendering.Universal
         {
             return ref UnsafeUtility.ArrayElementAsRef<T>(array.GetUnsafePtr(), index);
         }
+        
+        public static unsafe ref readonly T UnsafeElementAtReadOnly<T>(this NativeArray<T> array, int index) where T : struct
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if ((uint)index >= (uint)array.Length)
+                throw new ArgumentOutOfRangeException(nameof(index), $"{index} / {array.Length}");
+#endif
+            return ref UnsafeUtility.ArrayElementAsRef<T>(array.GetUnsafeReadOnlyPtr(), index);
+        }
+
     }
 
     /// <summary>
@@ -766,22 +777,22 @@ namespace UnityEngine.Rendering.Universal
         public float SSRHitRadius;
         public float SSRTemporalWeight;
 
-        /// <summary>
-        /// Toggles rendering of volumetrics
-        /// </summary>
-        public bool volumetricsEnabled;
-
-        /// <summary>
-        /// The 3d volumetric rendertexture that shaders will read from
-        /// </summary>
-        public RenderTexture volumetricsClipMap;
-
-        /// <summary>
-        /// Computebuffer containing all the relevant settings shaders need to
-        /// read from the volumetrics, will be set as a global constant buffer
-        /// named "VolumetricsCB"
-        /// </summary>
-        public ComputeBuffer volumetricsConstants;
+        // /// <summary>
+        // /// Toggles rendering of volumetrics
+        // /// </summary>
+        // public bool volumetricsEnabled;
+        //
+        // /// <summary>
+        // /// The 3d volumetric rendertexture that shaders will read from
+        // /// </summary>
+        // public RenderTexture volumetricsClipMap;
+        //
+        // /// <summary>
+        // /// Computebuffer containing all the relevant settings shaders need to
+        // /// read from the volumetrics, will be set as a global constant buffer
+        // /// named "VolumetricsCB"
+        // /// </summary>
+        // public ComputeBuffer volumetricsConstants;
 
         // END SLZ MODIFIED
     }
@@ -1560,6 +1571,10 @@ namespace UnityEngine.Rendering.Universal
 
                 LightmapperUtils.Extract(light, out Cookie cookie);
 
+                //SLZ note: Range makes no sense on baked lights. It's completely non-physical and causes problems in level design.
+                //Unfortunately we can't remove range entirely from non-area lights because of a bug in the attenuation when the range set too high. The causes HUGE blow out areas near the light.
+                //This may be fixed in future Unity6+ versions, but it's completely broken for now.
+                
                 switch (light.type)
                 {
                     case LightType.Directional:
@@ -1570,6 +1585,7 @@ namespace UnityEngine.Rendering.Universal
                         {
                             // Size == 1 / Scale
                             cookie.sizes = additionalLightData.lightCookieSize;
+                            cookie.instanceID = light.cookie.GetInstanceID();
                             // Offset, Map cookie UV offset to light position on along local axes.
                             if (additionalLightData.lightCookieOffset != Vector2.zero)
                             {
@@ -1587,6 +1603,9 @@ namespace UnityEngine.Rendering.Universal
                         PointLight pointLight = new PointLight();
                         LightmapperUtils.Extract(light, ref pointLight);
                         lightData.Init(ref pointLight, ref cookie);
+                     // float pointdistfrominversesqr = 1/math.sqrt(256 * light.intensity );
+                        if (additionalLightData.IsPatched ) lightData.range = 9999999;
+                        
                         break;
                     case LightType.Spot:
                         SpotLight spotLight = new SpotLight();
@@ -1594,6 +1613,8 @@ namespace UnityEngine.Rendering.Universal
                         spotLight.innerConeAngle = light.innerSpotAngle * Mathf.Deg2Rad;
                         spotLight.angularFalloff = AngularFalloffType.AnalyticAndInnerAngle;
                         lightData.Init(ref spotLight, ref cookie);
+                      //  float spotdistfrominversesqr = math.sqrt(512 * light.intensity);
+                        if (additionalLightData.IsPatched ) lightData.range = 9999999;
                         break;
 #if UNITY_6000_0_OR_NEWER
                     case LightType.Rectangle:
@@ -1602,22 +1623,31 @@ namespace UnityEngine.Rendering.Universal
 #endif
                         RectangleLight rectangleLight = new RectangleLight();
                         LightmapperUtils.Extract(light, ref rectangleLight);
+                        rectangleLight.range = 9999999;
                         rectangleLight.mode = LightMode.Baked;
-                        lightData.Init(ref rectangleLight);
+                        lightData.Init(ref rectangleLight, ref cookie);
                         break;
                     case LightType.Disc:
                         DiscLight discLight = new DiscLight();
+                        discLight.range = 9999999;
                         LightmapperUtils.Extract(light, ref discLight);
                         discLight.mode = LightMode.Baked;
-                        lightData.Init(ref discLight);
+                        lightData.Init(ref discLight, ref cookie);
                         break;
                     default:
                         lightData.InitNoBake(light.GetInstanceID());
                         break;
                 }
 
-                lightData.falloff = FalloffType.InverseSquared;
-                lightsOutput[i] = lightData;
+                lightData.falloff = FalloffType.InverseSquaredNoRangeAttenuation;
+                //Checking for advanced options
+                if (!additionalLightData.advancedOptions)
+                {
+                    lightData.indirectColor = lightData.color;
+                    lightData.shadow = 1;
+                }
+
+            lightsOutput[i] = lightData;           
             }
 #else
                         // If Enlighten realtime GI isn't active, we don't extract lights.
@@ -1786,7 +1816,8 @@ namespace UnityEngine.Rendering.Universal
                 return;
 
             // Avoid memcpys. Pass by ref and locals for multiple uses.
-            ref VisibleLight lightData = ref lights.UnsafeElementAtMutable(lightIndex);
+            var unsafeElementAtReadOnly = lights.UnsafeElementAtReadOnly(lightIndex);
+            ref VisibleLight lightData = ref unsafeElementAtReadOnly;
             var light = lightData.light;
             var lightLocalToWorld = lightData.localToWorldMatrix;
             var lightType = lightData.lightType;

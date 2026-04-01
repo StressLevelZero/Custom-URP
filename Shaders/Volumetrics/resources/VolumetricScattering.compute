@@ -1,0 +1,1025 @@
+﻿///This is the realtime volumetric shader. It's the first froxel pass.
+		//#pragma multi_compile _VOLUMETRICS_ENABLED
+
+        #pragma use_dxc vulkan
+        #pragma kernel Scatter
+
+
+	////Pi constants//////
+        //#define M_PI 3.1415926535897932384626433832795		//Standard stored Pi.
+       // #define PI_x4 12.566370614359172953850573533118		//For inverse square.
+		//#define M_PIx2 6.283185307179586476925286766559
+		// Constants (avoid relying on PI defines)
+		//static const float INV_4PI = 0.07957747154594767;   // 1 / (4*pi)
+		//static const float INV_16PI_3 = 0.05968310365946075; // 3 / (16*pi)
+
+		#define EPS 1e-4h
+
+		#define rcpFrameAmount 0.14285714285714285714285714285714h  //(1.0f / 7.0f);
+		#define invRcpFrameAmount 0.85714285714285714285714285714286h  //1 - (1.0f / 7.0f);
+
+		 #include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/SLZ_AtmosphereShared.hlsl"
+		// Texture2D<float4> _AtmosphereTransmittanceLUT;
+		// SamplerState sampler_AtmosphereTransmittanceLUT;
+		// //
+		// Texture2D<float4> _AtmosphereMultiScatteringLUT;
+		// SamplerState sampler_AtmosphereMultiScatteringLUT;
+
+		#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+		// (Avoid _MAIN_LIGHT_SHADOWS_SCREEN for this volumetric compute path)
+
+		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+        
+        #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+		//Doing a custom InterleavedGradientNoise3D instead
+		//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl" 
+		//#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityInput.hlsl"
+
+		//const shared float4 _Time; //Time is globally defined, just assign it here instead of pulling UnityInput.hlsl
+        Texture3D<float4> PreviousFrameLighting;
+        RWTexture3D<float4> Result;
+
+		Texture3D<float4> Noise3d;
+
+		int   _HasMainLight;
+
+     
+        const shared float _GlobalExtinction;
+        // const shared float _FogBaseHeight;
+        // const shared float _FogMaxHeight;
+        const shared float _StaticLightMultiplier;
+
+        const float _ClipmapScale0;
+        const float _ClipmapScale1;
+		const float _ClipmapScale2;
+		const float _ClipmapScale3;
+
+        const float3 _ClipmapPosition0;
+        const float3 _ClipmapPosition1;
+        const float3 _ClipmapPosition2;
+        const float3 _ClipmapPosition3;
+
+		float _bakedTurbulence;
+
+		const float3 _invDimensions; 
+
+	//	  float2 _FoveaCenterUV;   // per-eye [0..1], default (0.5, 0.5)
+	//	  float  _FoveaStrength;   // a >= 0, 0 disables (try 0.3..0.8 on Quest)
+
+		//float2	_FoveationCenter = float2(.5,.5);
+		float	_FoveationInnerRadius;// = 0.3; // full-rate inside this radius
+		float	_FoveationOuterRadius;// = 0.4; // max decimation beyond this radius
+		bool	_FoveationEnabled;// = true;
+
+		shared float _PanicRefresh;
+//TEMP
+
+    //half3(0,.5,0), half3(.85,.95,1),10 ); //point
+	
+
+	// float3 pointpos	;
+	// float3 pointcolorint;
+	// float pointrange;
+
+
+    //(half3(1,.5,0), half3(0,1,0), half3(.85,.95,1),.5h,.7h ,10.h); //Cone
+
+	//float3 conepos	
+	//	float3 conecolorint
+	//	float2 conecosinout
+	//	float range
+
+
+//END TEMP
+
+        
+        CBUFFER_START(PerFrameCB)
+        float4x4 _VBufferCoordToViewDirWS; // >_>
+        float4x4 _PrevViewProjMatrix_L;
+        float4x4 _ViewMatrix_L;
+        float4x4 TransposedCameraProjectionMatrix_L;
+        float4x4 CameraProjectionMatrix_L;
+        float4 _VBufferDistanceEncodingParams_L;
+        float4 _VBufferDistanceDecodingParams;
+        float4 SeqOffset; //x offset, y offset, z offseter , time index (w)
+        float4 CameraPosition; //current camera position
+        float4 CameraMotionVector; //camera's motion per frame
+        CBUFFER_END
+        
+        // SH Used for sky occlusion
+		 // Monochromatic Spherical Harmonics Coefficients (Only 9 total)
+		// CBUFFER_START(MonoSHBuffer)
+		// 	float _SHMonoCoefficients[9];
+		// CBUFFER_END
+
+
+//float2 _FoveationCenter = float2(0.5,0.5);      // [0,1] in v-buffer UV; for per-eye, probably (0.5, 0.5)
+// float  _FoveationInnerRadius = 0.3; // full-rate inside this radius
+// float  _FoveationOuterRadius = 0.7; // max decimation beyond this radius
+// int    _FoveationEnabled = 1;     // 0/1
+	//	int    _FrameIndex;           // monotonically increasing frame inde
+        //shared float SeqOffsetPrv; //z offseter
+        
+        float _VBufferUnitDepthTexelSpacing;
+        //shared float4 _VBufferSharedUvScaleAndLimit;
+        //float4x4 PreviousFrameMatrix;
+        
+        SamplerState _LinearClamp;
+        SamplerState _Linear_repeat;
+        SamplerState Custom_trilinear_clamp_sampler;
+        SamplerState s_linear_clamp_sampler;
+        
+        Texture3D<float4> _VolumetricClipmapTexture0;
+        Texture3D<float4> _VolumetricClipmapTexture1;        
+        Texture3D<float4> _VolumetricClipmapTexture2;
+        Texture3D<float4> _VolumetricClipmapTexture3;
+
+		// float m_zSeq[7]	=
+		// 	{ 7.0f / 14.0f, 3.0f / 14.0f, 11.0f / 14.0f, 5.0f / 14.0f, 9.0f / 14.0f, 1.0f / 14.0f, 13.0f / 14.0f };
+
+
+		// Interleaved Gradient Noise — 3D (isotropic)
+		// Use integer-ish coordinates (voxel/pixel indices or rounded world-space)
+		inline float InterleavedGradientNoise3D(float3 p, int frameCount)
+		{
+			// These “magic” values just need to be incommensurate; they’re not sacred.
+			const float4 MAGIC = float4(0.06711056f, 0.00583715f, 0.10100101f, 52.9829189f);
+			const float3 FRAME_SCALE = float3(2.083f, 4.867f, 7.173f);
+
+			p += FRAME_SCALE * frameCount;
+			return frac(MAGIC.w * frac(dot(p, MAGIC.xyz)));
+		}
+
+		// // Rayleigh phase (molecules, symmetric-ish)
+		// inline float PhaseRayleigh(float mu)
+		// {
+		// 	return INV_16PI_3 * (1.0 + mu * mu);
+		// }
+		//
+		// // Henyey-Greenstein phase (aerosols / fog)
+		// // g > 0 => forward scattering (typical fog: 0.6..0.9)
+		// inline float PhaseHG(float mu, float g)
+		// {
+		// 	g = clamp(g, -0.99, 0.99);
+		// 	float gg = g * g;
+		// 	float denom = max(1e-4, 1.0 + gg - 2.0 * g * mu);
+		// 	return INV_4PI * (1.0 - gg) / (denom * sqrt(denom));
+		// }
+
+		// float3 SampleAtmosphereTransmittance(float r, float mu)
+		// {
+		// 	float h = saturate((r - _PlanetRadius) / max(_AtmosphereRadius - _PlanetRadius, 1.0));
+		// 	float u = saturate(mu * 0.5 + 0.5);
+		// 	return _AtmosphereTransmittanceLUT.SampleLevel(sampler_AtmosphereTransmittanceLUT, float2(u, h), 0).rgb;
+		// }
+		//
+		// float3 SampleAtmosphereMultiScattering(float r, float muS)
+		// {
+		// 	float h = saturate((r - _PlanetRadius) / max(_AtmosphereRadius - _PlanetRadius, 1.0));
+		// 	float u = saturate(muS * 0.5 + 0.5);
+		// 	return _AtmosphereMultiScatteringLUT.SampleLevel(sampler_AtmosphereMultiScatteringLUT, float2(u, h), 0).rgb;
+		// }
+
+		inline half SampleMainDirectionalShadow_Volumetric(float3 positionWS)
+		{
+			#if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE)
+			float4 shadowCoord = TransformWorldToShadowCoord(positionWS);
+			return MainLightRealtimeShadow(shadowCoord);
+			#else
+			return half(1.0);
+			#endif
+		}
+		// // Interleaved Gradient Noise — 3D (slice-preserving)
+		// // Keeps Jimenez 2D IGN per slice; Z only adds a phase to (x,y)
+		// inline float InterleavedGradientNoise3D_SliceStable(float3 p, int frameCount)
+		// {
+		//     const float2 MAGIC2      = float2(0.06711056f, 0.00583715f);
+		//     const float  K           = 52.9829189f;
+		//     const float2 FRAME_SCALE = float2(2.083f, 4.867f);
+		//     // Two irrational-ish offsets to decorrelate slices (avoid resonances with integer z)
+		//     const float2 Z_PHASE     = float2(0.754877666f, 0.569840296f);
+		//
+		//     float2 q = p.xy + FRAME_SCALE * frameCount + p.zz * Z_PHASE;
+		//     return frac(K * frac(dot(q, MAGIC2)));
+		// }
+		// Inside test in cuboid space around camera-centered box
+
+		float InsideClip(float3 ws, float scale, float3 center)
+		{
+			float3 p = ws - center;
+			float3 h = 0.5 * scale;
+			// 1 if |p| <= h on all axes
+			float3 inA = step(abs(p), h);
+			return inA.x * inA.y * inA.z;
+		}
+
+		float EdgeFade(float3 ws, float scale, float3 center, float fadeFrac) // fadeFrac ~ 0.04
+		{
+			float3 p = abs(ws - center);
+			float3 h = 0.5 * scale;
+			float3 d = h - p;                       // distance to box face along axes
+			float e = min(min(d.x, d.y), d.z);      // closest distance to any face
+			float fade = smoothstep(0, fadeFrac * scale, e);
+			return fade;
+		}
+
+		inline float ComputeClipLOD_Temporal(
+		float3 wsStable,         // centWSNJIT (or another stable anchor)
+		float3 wsRGB,            // WS_coordinate (rgb sampling position)
+		float3 wsA,              // clipnoisedWS (alpha sampling position)
+		float  scale,            // clipmap world size
+		Texture3D<float4> tex,
+		float  lodBias,          // negative = sharper
+		float  lodMax)           // cap blur
+		{
+			uint w,h,d,mips;
+			tex.GetDimensions(0, w,h,d, mips);
+
+			// how much we "wander" in this clipmap this frame (meters)
+			float move = max(length(wsRGB - wsStable), length(wsA - wsStable));
+
+			// convert to texel displacement in XY (usually w==h)
+			float texelsPerMeter = (float)w / scale;
+			float footprintTexels = move * texelsPerMeter;
+
+			// LOD for stability (only if we actually wander across multiple texels)
+			float lod = log2(max(1.0, footprintTexels)) + lodBias;
+
+			lod = clamp(lod, 0.0, min(lodMax, (float)(mips - 1)));
+			return lod;
+		}
+
+		float4 SampleClipL(float3 ws, float3 wsnoise, float3 uvwCenter, float scale, Texture3D<float4> tex, float lod)
+		{
+			float3 uvw      = (ws      - (uvwCenter - 0.5 * scale)) / scale.xxx;
+			float3 uvwNoise = (wsnoise - (uvwCenter - 0.5 * scale)) / scale.xxx;
+
+			float3 rgb = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvw,      lod).rgb;
+			float  a   = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvwNoise, lod).a;
+			return float4(rgb, a);
+		}
+
+		float4 SampleClipL(float3 ws, float3 wsnoise, float3 uvwCenter, float scale, Texture3D<float4> tex)
+		{
+			float3 uvw      = (ws      - (uvwCenter - 0.5 * scale)) / scale.xxx;
+			float3 uvwNoise = (wsnoise - (uvwCenter - 0.5 * scale)) / scale.xxx;
+
+			float3 rgb = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvw,      0).rgb;
+			float  a   = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvwNoise, 0).a;
+			return float4(rgb, a);
+		}
+        
+     //   shared TextureCube<float4> _SkyTexture;       
+        
+        //float reprojectionAmount;
+        //shared float4 _MipFogParameters; //near, far, mix
+      //  shared int _SkyMipCount;
+        
+		float3 EvalVolumetricAmbientSH_L1(
+		float3 viewDir,     // direction from sample toward camera
+		float  sigmaS,
+		float  g,           // anisotropy, 0 = isotropic
+		float3 L00,
+		float3 L1m1,
+		float3 L10,
+		float3 L11)
+		{
+			float3 A  = 0.282095f * L00;
+			float3 Gx = -0.488603f * L11;
+			float3 Gy = -0.488603f * L1m1;
+			float3 Gz =  0.488603f * L10;
+
+			float3 ambient = A + g * (viewDir.x * Gx + viewDir.y * Gy + viewDir.z * Gz);
+			return sigmaS * ambient;
+		}
+
+		float EvaluateMonochromaticSHL2(float3 normal)
+		{
+			// Monochromatic SH evaluation using the coefficients array
+			float shValue = _SHMonoCoefficients[0] +                             // L0 term (constant)
+							normal.y * _SHMonoCoefficients[1] +                  // L1 Y term (gradient)
+							normal.z * _SHMonoCoefficients[2] +                  // L1 Z term
+							normal.x * _SHMonoCoefficients[3] +                  // L1 X term
+							normal.x * normal.y * _SHMonoCoefficients[4] +       // L2 XY term
+							normal.y * normal.z * _SHMonoCoefficients[5] +       // L2 YZ term
+							(3.0 * normal.z * normal.z - 1.0) * _SHMonoCoefficients[6] +  // L2 Z² term
+							normal.x * normal.z * _SHMonoCoefficients[7] +       // L2 XZ term
+							(normal.x * normal.x - normal.y * normal.y) * _SHMonoCoefficients[8];  // L2 X² - Y² term
+
+			return shValue;
+		}
+        // Returns the forward (central) direction of the current view in the world space.
+        // float3 GetViewForwardDir()
+        // {
+        // 	float4x4 viewMat = _ViewMatrix;
+        // 	return -viewMat[2].xyz;
+        // }
+        
+        // Returns the forward (up) direction of the current view in the world space.
+        // float3 GetViewUpDir()
+        // {
+        // 	float4x4 viewMat = _ViewMatrix;
+        // 	return viewMat[1].xyz;
+        // }
+        
+        float3 GetFogColor(float3 V, float fragDist)
+        {
+        	float3 color = float3(1,1,1);
+			float4 _MipFogParameters = float4(1,1,1,7);
+        		// Based on Uncharted 4 "Mip Sky Fog" trick: http://advances.realtimerendering.com/other/2016/naughty_dog/NaughtyDog_TechArt_Final.pdf
+        		// mipLevel = (1.0h - _MipFogParameters.z * saturate((fragDist - _MipFogParameters.x) / (_MipFogParameters.y - _MipFogParameters.x))) * (_SkyMipCount - 1);
+        		// For the atmospheric scattering, we use the GGX convoluted version of the cubemap. That matches the of the idnex 0
+        		//color *= SampleSkyTexture(-V, mipLevel, 0).rgb; // '_FogColor' is the tint
+			//mipLevel =  (1-saturate((fragDist-1)/(10-1))) * 1;
+			float mipLevel = (1-fragDist) * 7 ;
+        	    color *= _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler,V, mipLevel).rgb; // '_FogColor' is the tint	
+				color *= saturate(EvaluateMonochromaticSHL2(V)); //Sky occlusion               
+        	return max(color,0); //Guard from negative values
+        }
+
+		float3 GetFogColorFromSky(float3 V,  float accum, float extinction, float travelDis)
+		{
+			//float denom = max(1e-6, (_MipFogParameters.y - _MipFogParameters.x));
+			//float t = saturate((fragDistWS - _MipFogParameters.x) / denom);
+
+			float tauToPrev2 = -log2(max((float)accum, 1e-6));
+			float tauSeg2    = (float)extinction * travelDis * 1.44269504;
+			float tauMid2    = tauToPrev2 + 0.5 * tauSeg2;  // better than using just prev
+
+			float skyMipMax = max(0.0, (float)(_SkyMipCount - 1));
+
+			// choose a tuning constant: tau2AtMaxBlur ~ 6..12 is a decent start
+			float tau2AtMaxBlur = 8.0;
+			float mipTau = saturate(tauMid2 / tau2AtMaxBlur) * skyMipMax;
+
+			// float skyMipMax = max(0.0, (float)(_SkyMipCount - 1));
+			//float mipLevel  = (1.0 - _MipFogParameters.z * t) * skyMipMax;
+			float mipLevel = mipTau;
+			float3 col = _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler, V, mipLevel).rgb;
+
+			// keep your occlusion behavior (optional)
+			col *= saturate(EvaluateMonochromaticSHL2(V));
+
+			return col;
+		}
+
+// 		float ComputeSkyMip_Scatter(float depth01Center, float distWS, float extinction)
+// 		{
+// 			float skyMipMax = max(0.0, (float)(_SkyMipCount - 1));
+//
+// 			// --- A) Your slice-based schedule (works with _MipFogParameters = 0..1) ---
+// 			float denom01 = max(1e-6, (_MipFogParameters.y - _MipFogParameters.x));
+// 			float t01     = saturate((depth01Center - _MipFogParameters.x) / denom01);
+// 			float mipSlice = (1.0 - _MipFogParameters.z * t01) * skyMipMax; // blur near, sharp far (in depth01)
+//
+// 			// --- B) Density-based blur (tau approximation) ---
+// 			// Using the same base-2 convention you already use in integration (exp2 stuff)
+// 			float tau2 = extinction * distWS * 1.44269504; // ≈ -log2(T) if extinction were constant
+// 			// Tune this: larger = less blur response to density
+// 			float tau2AtMaxBlur = 4.0;
+// 			float mipTau = saturate(tau2 / tau2AtMaxBlur) * skyMipMax;
+//
+// 			// Combine: never allow sharper than what density implies
+// 			float mip = max(mipSlice, mipTau);
+// 			return clamp(mip, 0.0, skyMipMax);
+// 		}
+//
+// float3 GetSkyFog_Scatter(float3 viewDirWS, float depth01Center, float distWS, float extinction)
+// 		{
+// 			float mip = ComputeSkyMip_Scatter(depth01Center, distWS, extinction);
+// 			return _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler, viewDirWS, mip).rgb;
+// 		}
+        
+        float ComputeHistoryWeight(int decimation, bool ReprojectionValid)
+        {
+        	// Compute the exponential moving average over 'n' frames:
+        	// X = (1 - a) * ValueAtFrame[n] + a * AverageOverPreviousFrames.
+        	// We want each sample to be uniformly weighted by (1 / n):
+        	// X = (1 / n) * Sum{i from 1 to n}{ValueAtFrame[i]}.
+        	// Therefore, we get:
+        	// (1 - a) = (1 / n) => a = (1 - 1 / n) = (n - 1) / n,
+        	// X = (1 / n) * ValueAtFrame[n] + (1 - 1 / n) * AverageOverPreviousFrames.
+        	// Why does it work? We need to make the following assumption:
+        	// AverageOverPreviousFrames ≈ AverageOverFrames[n - 1].
+        	// AverageOverFrames[n - 1] = (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+        	// This implies that the reprojected (accumulated) value has mostly converged.
+        	// X = (1 / n) * ValueAtFrame[n] + ((n - 1) / n) * (1 / (n - 1)) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+        	// X = (1 / n) * ValueAtFrame[n] + (1 / n) * Sum{i from 1 to n - 1}{ValueAtFrame[i]}.
+        	// X = Sum{i from 1 to n}{ValueAtFrame[i] / n}.
+        	// float numFrames = 7 ;
+        	// float frameWeight = 1 / numFrames;
+        	// float historyWeight = 1 - frameWeight;
+			//float historyWeight = invRcpFrameAmount;
+
+
+			///While this does reduce checkerboard ghosting, it does introdude more flickering and subtel checkboarding in the peripheral vision.
+			///Likely not worth it. Disabling for now.
+			// For decimation 1: factor = 1
+			// For decimation 2: factor ≈ 0.7
+			// For decimation 4: factor ≈ 0.5
+			// float foveationFactor = (decimation == 1) ? 1.0f :
+			//  						(decimation == 2) ? 0.7f :
+			//  											0.5f;
+			// historyWeight *= foveationFactor;
+        	//return historyWeight * ReprojectionValid;
+
+			if (!ReprojectionValid) return 0.0;
+
+			// Treat decimated regions as averaging over 7 * decimation real frames
+			float n = 7.0 * decimation;
+			float newW = 1.0 / n;
+			return 1.0 - newW;
+        }
+
+
+///LIGHT TYPES!
+///
+///		// Soft distance/range attenuation like URP (smoothly zero at 'range')
+		inline half RangeAttenuation(half dist2, half rangeMeters)
+        {
+        	// If range <= 0, treat as infinite range (no range clamp)
+        	if (rangeMeters <= 0.0h) return 1.0h;
+
+        	half invRange2 = rcp(max(EPS, rangeMeters * rangeMeters));
+        	half att = saturate(1.0h - dist2 * invRange2);
+        	return att * att; // quadratic falloff to zero at range
+        }
+
+		// Physically-based inverse-square irradiance from distance^2 and RGB intensity
+		// intensityRGB is radiant intensity per steradian (RGB). Result is irradiance RGB.
+		inline half3 InverseSquareIrradianceFromDist2(half dist2, half3 intensityRGB)
+        {
+        	// Clamp to avoid divide-by-zero and overflows very near the light
+        	return intensityRGB / max(EPS, (half)FOUR_PI * dist2);
+        }
+
+
+		// -----------------------------------------------------------------------------
+		// POINT LIGHT
+		// positionWS: light position
+		// intensityRGB: radiant intensity per steradian (RGB)
+		// rangeMeters: set <= 0 for infinite range; else soft rolloff to 0 at 'rangeMeters'
+		inline half3 EvaluatePointLightIrradiance(half3 P_ws, half3 positionWS, half3 intensityRGB, half rangeMeters)
+		{
+		    half3 toP = P_ws - positionWS;
+		    half dist2 = dot(toP, toP);
+
+		    half rangeAtt = RangeAttenuation(dist2, rangeMeters);
+		    half3 invSq   = InverseSquareIrradianceFromDist2(dist2, intensityRGB);
+		    return invSq * rangeAtt;
+		}
+
+		// -----------------------------------------------------------------------------
+		// SPOT LIGHT
+		// directionWS: unit vector pointing *from the light outward* along the cone axis
+		// inner/outer cones: pass as cosines for speed (cosInner >= cosOuter). See helper below.
+		// intensityRGB: radiant intensity per steradian (RGB)
+		// rangeMeters: same range handling as point
+		inline half SpotAngularAttenuationFromCos(half cosTheta, half cosInner, half cosOuter)
+		{
+		    // Smooth falloff between outer and inner cones
+		    half denom = max(EPS, cosInner - cosOuter);
+		    half t = saturate((cosTheta - cosOuter) / denom);
+		    // Square for a softer edge; tweak exponent to taste (2–4)
+		    return t * t;
+		}
+
+		inline half3 EvaluateSpotLightIrradiance_Cos(
+		    half3 P_ws,
+		    half3 positionWS,
+		    half3 directionWS,   // normalized, FROM light, along cone axis
+		    half3 intensityRGB,
+		    half  cosInner,      // cos(radians(innerCone))
+		    half  cosOuter,      // cos(radians(outerCone))  outer <= inner
+		    half  rangeMeters)
+		{
+		    half3 toP   = P_ws - positionWS;
+		    half dist2  = dot(toP, toP);
+		    half invLen = rsqrt(max(dist2, EPS));
+		    half3 L     = toP * invLen; // dir from light to point
+
+		    // Angle between cone axis and L (both normalized)
+		    half cosTheta = dot(L, directionWS);
+
+		    half angAtt   = SpotAngularAttenuationFromCos(cosTheta, cosInner, cosOuter);
+		    if (angAtt <= 0.0h) return half3(0,0,0);
+
+		    half rangeAtt = RangeAttenuation(dist2, rangeMeters);
+		    half3 invSq   = InverseSquareIrradianceFromDist2(dist2, intensityRGB);
+
+		    return invSq * (angAtt * rangeAtt);
+		}
+
+		// Convenience if you only have angles in degrees at call site
+		inline half3 EvaluateSpotLightIrradiance_Deg(
+		    half3 P_ws,
+		    half3 positionWS,
+		    half3 directionWS,   // normalized
+		    half3 intensityRGB,
+		    half  innerDeg,
+		    half  outerDeg,
+		    half  rangeMeters)
+		{
+		    // Precompute cosines once on CPU if you can; this version is a convenience.
+		    half cosInner = cos(radians(innerDeg));
+		    half cosOuter = cos(radians(outerDeg));
+		    return EvaluateSpotLightIrradiance_Cos(P_ws, positionWS, directionWS, intensityRGB, cosInner, cosOuter, rangeMeters);
+		}
+
+		// -----------------------------------------------------------------------------
+		// DIRECTIONAL LIGHT
+		// irradianceRGB: irradiance at the point (RGB). No distance falloff.
+		// directionWS: unit vector FROM light toward the scene (useful for phase function).
+		inline half3 EvaluateDirectionalLightIrradiance(half3 positionWS, half3 directionWS, half3 irradianceRGB)
+		{
+		    // No attenuation with distance for directional lights.
+		    // Keep 'directionWS' handy for your phase function (e.g., Henyey–Greenstein).
+		    return irradianceRGB;
+		}
+		        
+// Same rational curve as before:
+// r' = r / (1 + a(1-r))     (a >= 0)
+// inv: r = r'(1+a) / (1 + a r')
+
+// "Square radial" using Chebyshev norm so the square boundary stays pinned.
+float2 WarpSigned_SquareRadial(float2 s, float a)
+		{
+			float2 as = abs(s);
+			float r = max(as.x, as.y);     // 0..1 everywhere inside the square
+			if (r < 1e-6) return s;
+
+			float2 dir = s / r;           // max(|dir|) == 1
+			float rw = r / (1.0 + a * (1.0 - r)); //WarpRadius_Rational
+			return dir * rw;
+		}
+
+// float2 InvWarpSigned_SquareRadial(float2 sw, float a)
+// 		{
+// 			float2 asw = abs(sw);
+// 			float rw = max(asw.x, asw.y);  // 0..1
+// 			if (rw < 1e-6) return sw;
+//
+// 			float2 dir = sw / rw;
+// 			float r = (rw * (1.0 + a)) / (1.0 + a * rw); //InvWarpRadius_Rational
+// 			return dir * r;
+// 		}
+//
+// // Map uv in [0..1] to signed coord in [-1..1] around a center,
+// // with asymmetric extents so edges stay pinned even if center != 0.5.
+// float2 UVToSigned(float2 uv, float2 centerUV)
+// 		{
+// 			float2 leftExtent  = centerUV;            // distance to left/bottom edge
+// 			float2 rightExtent = 1.0 - centerUV;      // distance to right/top edge
+//
+// 			float2 s;
+// 			s.x = (uv.x < centerUV.x) ? ( (uv.x - centerUV.x) / max(leftExtent.x,  1e-6) )
+// 									  : ( (uv.x - centerUV.x) / max(rightExtent.x, 1e-6) );
+// 			s.y = (uv.y < centerUV.y) ? ( (uv.y - centerUV.y) / max(leftExtent.y,  1e-6) )
+// 									  : ( (uv.y - centerUV.y) / max(rightExtent.y, 1e-6) );
+// 			return s; // [-1..1]
+// 		}
+// float2 SignedToUV(float2 s, float2 centerUV)
+// 		{
+// 			float2 leftExtent  = centerUV;
+// 			float2 rightExtent = 1.0 - centerUV;
+//
+// 			float2 uv;
+// 			uv.x = (s.x < 0) ? centerUV.x + s.x * leftExtent.x
+// 							 : centerUV.x + s.x * rightExtent.x;
+// 			uv.y = (s.y < 0) ? centerUV.y + s.y * leftExtent.y
+// 							 : centerUV.y + s.y * rightExtent.y;
+// 			return uv;
+// 		}
+
+inline float ComputeNoiseLOD_FromSlice(
+	float e1, float invDimZ,
+	Texture3D<float4> noiseTex,
+	float worldToNoiseUV,     // your 0.15
+	float footprintScale,     // NEW: 0.25..1.0 (start at 0.35)
+	float lodBias,            // negative = sharper
+	float lodMax)
+		{
+			uint w, h, d, mips;
+			noiseTex.GetDimensions(0, w, h, d, mips);
+
+			// slice thickness in world meters (stable per froxel if you use e1, not rndVal)
+			float tHi = DecodeLogarithmicDepthGeneralized(e1,           _VBufferDistanceDecodingParams);
+			float tLo = DecodeLogarithmicDepthGeneralized(e1 - invDimZ, _VBufferDistanceDecodingParams);
+			float sliceMeters = abs(tHi - tLo);
+
+			// Treat footprint as a radius, not a diameter (reduces chunkiness a lot)
+			float radiusMeters = sliceMeters * 0.5;
+
+			// Texels-per-meter for your noise mapping (uvw = ws * worldToNoiseUV)
+			float texDim = (float)max(max(w, h), d);
+			float footprintTexels = radiusMeters * worldToNoiseUV * texDim;
+
+			// Tuning knob to slow down mip growth
+			footprintTexels *= footprintScale;
+
+			float lod = log2(max(1.0, footprintTexels)) + lodBias;
+			return clamp(lod, 0.0, min(lodMax, (float)(mips - 1)));
+		}
+
+
+groupshared float4 gCoarseScatter[64]; // 4*4*4 = 64 entries (one per thread slot)
+
+///Main scattering pass. Integration is done separately so we can reproject this result for XR rather than do it twice.
+///We Would have to store a pre integration version anyways for temporal reprojection
+[numthreads(4,4,4)]
+void Scatter(
+	uint3 id             : SV_DispatchThreadID,
+	uint3 groupID        : SV_GroupID,
+	uint3 groupThreadID  : SV_GroupThreadID)
+		{
+	
+////
+//General terms
+///			
+    float	e1 = (id.z + 1) * _invDimensions.z;	
+	float2	centerCoord = id.xy + 0.5;
+	// float3	rayDirWS = normalize(mul(-float4(centerCoord , 1, 1), _VBufferCoordToViewDirWS)).xyz ;
+
+	float2 uvGrid = centerCoord * _invDimensions.xy;
+
+	// jitter in grid space (more stable)
+	//uvGrid += (SeqOffset.xy * 0.5) * _invDimensions.xy;
+
+	float2 centerUV = _FoveaCenterUV.xy;// _FoveaCenterUV; // start (0.5, 0.5)
+	float  a =_FoveaStrength;        // e.g. 0.3..0.8 for Quest
+
+	float2 s      = UVToSigned(uvGrid, centerUV);
+	float2 sWarp  = WarpSigned_SquareRadial(s, a);      // <-- use radial version
+	float2 uvWarp = SignedToUV(sWarp, centerUV);
+
+	uvWarp = saturate(uvWarp);
+	float2 centerCoordWarped = uvWarp * (1/_invDimensions.xy);
+
+	//float2 coordStable = centerCoordWarped;
+	float2 coordJittered = centerCoordWarped + SeqOffset.xy * 0.5f;
+	
+	float3 rayDirWS = normalize(mul(-float4(centerCoordWarped, 1, 1), _VBufferCoordToViewDirWS).xyz);
+	float3 rayDirWS_NoJitter = rayDirWS;
+
+	float	pt = DecodeLogarithmicDepthGeneralized(  ( e1 - (.5h * _invDimensions.z)  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	//		rayDirWS.xy += SeqOffset.xy * _invDimensions.xy * 0.5f;
+	float3	centerDirWS = normalize(mul(-float4(coordJittered, 1, 1), _VBufferCoordToViewDirWS).xyz);// rayDirWS; // //jittered ray
+	float3	centWS_NoJIT = CameraPosition.xyz + pt * centerDirWS ; //non-jittered version for reprojection
+
+	
+	//Make this dynamic when we have eye-tracking
+	float2 _FoveationCenter = float2(0.5,0.5);      // [0,1] in v-buffer UV; for per-eye, probably (0.5, 0.5)
+////
+//REPROJECTION
+///
+
+	float3	prevPos = CameraPosition.xyz - CameraMotionVector.xyz; //just cache this and send it rather than calulating here
+	float3	ws_repro = centWS_NoJIT.xyz ;
+	float2	positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, _PrevViewProjMatrix_L);        	
+	float	vdistance = distance(ws_repro, prevPos);
+			
+	float	W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams_L);
+			
+	float2 sPrev      = UVToSigned(positionNDC, centerUV);
+	float2 sGridPrev  = InvWarpSigned_SquareRadial(sPrev, a); // inverse warp back to grid space
+	half3  validityGrid = half3(sGridPrev.xy,W); //Storing non-clamped values for a validity check
+	float2 uvGridPrev = SignedToUV(sGridPrev, centerUV);
+	float3 reprojectionUVW = saturate(float3(uvGridPrev, W));
+	//float3	reprojectionUVW = float3(positionNDC, W);			
+	bool	ReprojectionValid =  _PanicRefresh > .5 ? 0 : all(validityGrid >= 0.0) && all(validityGrid <= 1.0);
+	float4	previousResult = ReprojectionValid ? PreviousFrameLighting.SampleLevel(s_linear_clamp_sampler, reprojectionUVW, 0 ) : 0;
+
+
+///
+// -----------------------------------------------------
+// Group-level foveation decision (tile-based temporal rate)
+// -----------------------------------------------------
+	bool doScatter = true;
+	int	decimation = 1;
+	if (_FoveationEnabled)
+	{
+		// Base pixel coord for this group in xy
+		// groupID.xy is in "group space", each group is 4x4 threads
+		uint2 groupBasePixel = groupID.xy * uint2(4, 4);
+
+		// Approximate group center in pixel space
+		float2 groupCenterPix = (float2)groupBasePixel + float2(2.0, 2.0);
+
+		// Convert to [0,1] v-buffer UV
+		float2 uvGroup = groupCenterPix * _invDimensions.xy;
+
+		float2 d = uvGroup - _FoveationCenter;
+		float  r = length(d);
+
+    	if (ReprojectionValid)
+    	{
+    		if (r > _FoveationOuterRadius)
+    		{
+    			decimation = 4; // outer ring: update 1 in 4 frames
+    		}
+    		else if (r > _FoveationInnerRadius)
+    		{
+    			decimation = 2; // mid ring: update every other frame
+    		}
+    	}
+    	
+		if (decimation > 1)
+		{
+			// Important: hash only on groupID so this is UNIFORM in the group
+			uint hash  = (groupID.x * 73856093u) ^ (groupID.y * 19349663u) ^ (groupID.z * 83492791u);
+			uint phase = hash & (decimation - 1);
+			uint framePhase = (uint)_FrameIndex & (decimation - 1);
+
+			doScatter = (phase == framePhase);
+		}
+	}
+
+	if (!doScatter)
+	{
+		// Whole group reuses history; we still need per-froxel reprojection
+		Result[id.xyz] = previousResult;
+		//return;
+	}
+	// If we get here, the whole 4x4x4 tile does full scattering this frame
+
+	// -----------------------------------------------------
+	// Spatial coarse shading (VRS-like) inside the threadgroup
+	// -----------------------------------------------------
+	int spatialRate = 1;
+
+	// IMPORTANT: force full-rate when reprojection is invalid,
+	// otherwise block reuse will be very noticeable.
+	if (_FoveationEnabled && ReprojectionValid )
+	{
+		// reuse the SAME group radial logic you already computed
+		// (you can also base this on r directly if you keep it around)
+		uint2 groupBasePixel = groupID.xy * uint2(4, 4);
+		float2 groupCenterPix = (float2)groupBasePixel + float2(2.0, 2.0);
+		float2 uvGroup = groupCenterPix * _invDimensions.xy;
+
+		float2 d = uvGroup - _FoveationCenter;
+		float  r = length(d);
+
+		if (r > _FoveationOuterRadius)      spatialRate = 4; // 4x4 blocks
+		else if (r > _FoveationInnerRadius) spatialRate = 2; // 2x2 blocks
+	}
+
+	// Pick the leader for THIS thread's block (XY only, keep Z full-rate)
+	uint2 leaderXY = (groupThreadID.xy / spatialRate) * spatialRate;
+	bool  isLeader = all(groupThreadID.xy == leaderXY);
+
+	// Flattened index for groupshared
+	uint leaderIndex = leaderXY.x + leaderXY.y * 4 + groupThreadID.z * 16;
+
+float4 newLighting = 0;
+
+if (isLeader)
+{
+	float3 jitterDirWS = normalize(centerDirWS);        	
+	float rndVal = SeqOffset.z;
+		
+	float ign = InterleavedGradientNoise3D(float3(id),SeqOffset.w ); // [0,1)
+	float jitterLocal = ign - 0.5f;          // [-0.5, +0.5]
+	jitterLocal *= rcpFrameAmount ; //// keep it small relative to the 7-sample sequence
+	rndVal += + jitterLocal;			
+	rndVal = saturate(rndVal);                 // make sure we stay in [0,1]
+
+	float  t = DecodeLogarithmicDepthGeneralized(  ( e1 - (rndVal * _invDimensions.z)  ) , _VBufferDistanceDecodingParams); //Get log encoded distance based on linear UVWs
+	float3 centerWS =  CameraPosition.xyz + ( t * jitterDirWS); //Cast ray along direction and add cam pos to get WS pos
+	float3 WS_coordinate = float3(centerWS);
+		
+
+
+	// fallthrough == this froxel gets fully recomputed this frame
+////
+//REAL TIME LIGHTS
+///
+
+        // accumLighting.rgb += EvaluatePointLightIrradiance(WS_coordinate, pointpos, pointcolorint,pointrange );
+        // accumLighting.rgb += EvaluateSpotLightIrradiance_Cos(half3(1,.5,0),WS_coordinate, half3(0,1,0), half3(.85,.95,1),.5h,.7h ,10.h);
+
+/////
+//Baked light volumes
+/////
+
+	//Using combined clipmap instead of directly rendering baked maps. Reduces the amount of 3d texture look-ups per frame.
+	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)	
+
+    float3 C0 = _ClipmapPosition0; 
+    float3 C1 = _ClipmapPosition1; 
+    float3 C2 = _ClipmapPosition2; 
+    float3 C3 = _ClipmapPosition3; 
+    float s0 = _ClipmapScale0;
+    float s1 = _ClipmapScale1;
+    float s2 = _ClipmapScale2;
+    float s3 = _ClipmapScale3;
+
+    // Decide which level to use (smallest enclosing)
+    float in0 = InsideClip(WS_coordinate.xyz, s0, C0);
+    float in1 = (1 - in0) * InsideClip(WS_coordinate.xyz, s1, C1);
+    float in2 = (1 - in0) * (1 - in1) * InsideClip(WS_coordinate.xyz, s2, C2);
+    float in3 = (1 - in0) * (1 - in1) * (1 - in2) * InsideClip(WS_coordinate.xyz, s3, C2);
+    //float choose3 = (1 - in0) * (1 - in1) * (1 - in2);
+
+    // Optional tiny crossfade width (fraction of scale)
+    //const float  kFade = 0.04; // ~4% of box half-size
+
+	// Use a stable WS anchor for turbulence, NOT WS_coordinate (which jitters)
+	float3 turbuv = float3(
+		centWS_NoJIT.x,
+		centWS_NoJIT.y - _Time.y + (centWS_NoJIT.z * 0.33),
+		centWS_NoJIT.z
+	) * 0.15;	
+
+
+	float noiseLod = ComputeNoiseLOD_FromSlice(
+		e1, _invDimensions.z,
+		Noise3d,
+		0.15,        // worldToNoiseUV
+		0.35,        // footprintScale  (THIS is the magic anti-chunk knob)
+		-0.5,        // lodBias
+		2.0          // lodMax          (cap low to keep detail)
+	);
+			
+	//Hard clamping per level for now, but we really should compare voxel / froxel sizes for more accurate results
+	//bool useTurb = (in0 > 0.5) || (in1 > 0.5);
+	//float3 noiseturb = useTurb ? (Noise3d.SampleLevel(_Linear_repeat, turbuv, noiseLod).rgb-.5)*_bakedTurbulence : 0.0 ;
+	float3 clipnoisedWS = WS_coordinate.xyz;// + noiseturb;			
+    float4 cola = 0;
+	//RGB is total lighting, A is the total extinction
+	float4 accumLighting = float4(0,0,0,0);
+			
+			// stable anchor
+	float3 wsStable = centWS_NoJIT;
+
+	// positions you actually sample with
+	float3 wsRGB = WS_coordinate;
+	float3 wsA   = clipnoisedWS;
+
+	///
+	///Clipmap sampling!
+	///	
+	
+	// tuneables (start here)
+	float lodBias = -0.75;   // sharper (less blur)
+	float lodMax  = 1.25;    // don't over-blur
+			
+    if (in0 > 0.5)
+    {
+    	float lod0 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s0, _VolumetricClipmapTexture0, lodBias, lodMax);
+
+		/////Disabling the edge fades, likely not needed and more optimal//////
+        //float f0 = EdgeFade(WS_coordinate.xyz, s0, C, kFade);
+        // Fade against L1 when close to boundary
+        cola = SampleClipL(WS_coordinate, clipnoisedWS, C0, s0, _VolumetricClipmapTexture0, lod0);
+        //float3 b = SampleClipL(WS_coordinate.xyz, C, s1, _VolumetricClipmapTexture1);
+        //col = lerp(b, a, f0);   // mostly L0; blend to L1 at edges
+    }
+    else if (in1 > 0.5)
+    {
+    	float lod1 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s1, _VolumetricClipmapTexture1, lodBias, lodMax);
+
+        //float f1 = EdgeFade(WS_coordinate.xyz, s1, C, kFade);
+        cola = SampleClipL(WS_coordinate, clipnoisedWS, C1, s1, _VolumetricClipmapTexture1,lod1);
+        //float3 b = SampleClipL(WS_coordinate.xyz, C, s2, _VolumetricClipmapTexture2);
+        //col = lerp(b, a, f1);
+    }
+    else if (in2 > 0.5)
+    {
+    	float lod2 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s2, _VolumetricClipmapTexture2, lodBias, lodMax);
+
+        //float f2 = EdgeFade(WS_coordinate.xyz, s2, C, kFade);
+        cola = SampleClipL(WS_coordinate, clipnoisedWS.xyz, C2, s2, _VolumetricClipmapTexture2,lod2);
+        //float3 b = SampleClipL(WS_coordinate.xyz, C, s3, _VolumetricClipmapTexture3);
+        //col = lerp(b, a, f2);
+    }
+    else if (in3 > 0.5)
+    {
+    	float lod3 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s3, _VolumetricClipmapTexture3, lodBias, lodMax);
+        cola = SampleClipL(WS_coordinate, clipnoisedWS.xyz, C3, s3, _VolumetricClipmapTexture3,lod3);
+    }
+	//cola.rgb *=_StaticLightMultiplier;
+    accumLighting += cola ;
+	//accumLighting.rgb += GetFogColor(centerDirWS,W)*W; //Base fog color from cubemap;
+	// float tHi = DecodeLogarithmicDepthGeneralized(e1,           _VBufferDistanceDecodingParams);
+	// float tLo = DecodeLogarithmicDepthGeneralized(e1 - _invDimensions.z, _VBufferDistanceDecodingParams);
+	// float sliceMeters = abs(tHi - tLo);
+	//
+	// accumLighting.rgb += GetFogColorFromSky(centerDirWS,accumLighting.a,accumLighting.a,sliceMeters)*W; //Base fog color from cubemap;
+	
+//////////
+/// Fog Density
+//////////
+
+	//////
+	///Atomosphere
+	//////
+
+	
+	accumLighting.a += _GlobalExtinction;
+	AtmosphereSample atmo = SampleAtmosphereAtWS(WS_coordinate);
+
+	// keep whatever extinction came from local/baked fog volumes
+	float localSigmaT = accumLighting.a;
+//atmo.sigmaTScalar = max(atmo.sigmaT.r, max(atmo.sigmaT.g, atmo.sigmaT.b));
+	// add atmospheric extinction
+	accumLighting.a = localSigmaT + atmo.sigmaTScalar;
+
+	
+	// Use the stable distance to that slice center (pt) for mip tau estimate
+	//float distWS = pt;
+
+	// Extinction for this froxel (whatever you ended up with)
+	//float extinction = max(accumLighting.a, 0.0);
+
+
+	///
+	///Sampling Sky colors
+	///
+	
+	#ifdef _PhysicalSky
+	// float muS = dot(atmo.up, normalize(_SunDir));
+	// float3 Lms = SampleAtmosphereMultiScattering(atmo.r, muS);
+	// // multi-scattered ambient source in this froxel
+	// accumLighting.rgb += Lms * atmo.sigmaS ;// * sigma_t;	
+	#else
+	// Stable normalized depth for THIS froxel (center of slice, not jittered)
+	// float depth01Center = e1 - 0.5 * _invDimensions.z;
+	 //float3 skyFog = GetFogColor(rayDirWS_NoJitter,depth01Center);
+	 //float sigma_t = saturate( max(1-accumLighting.a, 0.0));
+	// accumLighting.rgb = skyFog * sigma_t * sigma_t * sigma_t * sigma_t;// * pow(depth01Center,2);
+	#endif
+	
+	//float3 source;
+	//source.g = EvalVolumetricAmbientSH_L1(rayDirWS_NoJitter, 1, depth01Center, 1, 0, 0, 2);
+	//source.rb = EvalVolumetricAmbientSH_L1(rayDirWS_NoJitter, 1, depth01Center, 1, 0, 0, -2);
+
+	// source = lerp(.5,source,depth01Center);
+	// accumLighting.rgb = source;
+	////REALTIME TESTER
+	// float pointdist = distance(WS_coordinate, float3(3,1,0));
+	// float inv2point = 1/(pointdist*pointdist);
+	// accumLighting.rgb +=  min(inv2point,100);
+
+	//////
+	///SUN
+	//////
+	// atmosphere direct sun single-scatter
+	//[UNITY_BRANCH]
+	if (_HasMainLight != 0)
+	{
+		float3 sunDirToSunWS = normalize(_SunDir);
+
+		float mu = clamp(dot(rayDirWS_NoJitter, sunDirToSunWS), -1.0, 1.0);
+		float phaseR = PhaseRayleigh(mu);
+		float phaseM = PhaseHG(mu, _MieG);
+
+		// float muSun = dot(atmo.up, sunDirToSunWS);
+		// float3 Tsun = SampleAtmosphereTransmittance(atmo.r, muSun); //A full lut is a bit of overkill
+		float3 Tsun = SampleLocalAtmosphereSunTransmittance(WS_coordinate); //Simple color array is good enough
+
+		// exact same coefficient split as sky LUT path
+		float3 singleScatter =
+			_SunColor * Tsun *
+			(atmo.sigmaS_R * phaseR + atmo.sigmaS_M * phaseM);
+
+		half shadowVis = SampleMainDirectionalShadow_Volumetric(centWS_NoJIT);
+
+		// #if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE)
+		// half shadowFade = GetMainLightShadowFade(centWS_NoJIT, _SunDir);
+		// shadowVis = lerp(shadowVis, 1.0h, shadowFade);
+		// #endif
+		//accumLighting.rgb += singleScatter * shadowVis ;
+		accumLighting.rgb += _SunColor * Tsun * shadowVis * (phaseR+phaseM);
+		
+	}
+	//////
+///END SUN///
+	/////
+	newLighting = accumLighting;
+
+	// Store leader result for neighbors
+	gCoarseScatter[leaderIndex] = newLighting;
+}
+
+	GroupMemoryBarrierWithGroupSync();
+	// Everyone reads their block leader value
+	newLighting = gCoarseScatter[leaderIndex];
+
+
+	
+	//accumLighting.a	*=	noiseturb;
+	//accumLighting.r = 1-ReprojectionValid; //debug
+	// if (spatialRate >= 2)
+	// newLighting.r =  .5;
+	// if (spatialRate >= 3)
+	// 	newLighting.r =  1;
+	//newLighting.rgb *= (spatialRate == 1) ? float3(0,1,0) : (spatialRate == 2) ? float3(1,1,0) : float3(1,0,0);
+
+	//accumLighting.rgb *= accumLighting.a; //Doing the premultiplication in the integration step instead
+	Result[id.xyz] = max(lerp(newLighting , previousResult, ComputeHistoryWeight(decimation, ReprojectionValid) ),0); // Temporal sampling // (1 / (id.z * id.z + .4h) + 1))
+}
+

@@ -158,7 +158,11 @@ namespace UnityEngine.Rendering.Universal
         }
 
         [SerializeField] uint m_RenderingLayers = 1;
+        
+        public bool advancedOptions;
 
+        [ContextMenu("Toggle advanced options")]
+        void ToggleAdvancedOptions() { advancedOptions = !advancedOptions;}
         /// <summary>
         /// Specifies which rendering layers this light will affect.
         /// </summary>
@@ -292,7 +296,7 @@ namespace UnityEngine.Rendering.Universal
         }
 
         // SLZ MODIFIED
-
+        [NonSerialized] public bool IsPatched = false;
         float m_Intensity;
         /// <summary>
         /// Get/Set the intensity of the light using the current light unit.
@@ -430,5 +434,16 @@ namespace UnityEngine.Rendering.Universal
                 light.renderingLayerMask = m_CustomShadowLayers ? (int)m_ShadowRenderingLayers : (int)m_RenderingLayers;
         }
 
+        #if UNITY_EDITOR
+        private void OnDrawGizmosSelected()
+        {
+            if (light.type == LightType.Spot || light.type == LightType.Point)
+            {
+                Gizmos.color = new Color(light.color.r, light.color.g, light.color.b, 0.25f);
+                Gizmos.DrawSphere(this.transform.position, light.shadowRadius);
+                Gizmos.DrawWireSphere(this.transform.position, light.shadowRadius);
+            }
+        }
+        #endif
     }
 }

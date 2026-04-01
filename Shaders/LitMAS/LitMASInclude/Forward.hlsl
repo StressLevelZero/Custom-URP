@@ -38,7 +38,7 @@
 
 #pragma multi_compile_fragment _ _LIGHT_COOKIES
 #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
-#pragma multi_compile_fog
+//#pragma multi_compile_fog
 #pragma skip_variants FOG_LINEAR FOG_EXP
 //#pragma multi_compile_fragment _ DEBUG_DISPLAY
 #pragma multi_compile_fragment _ _DETAILS_ON
@@ -431,7 +431,7 @@ half4 frag(VertOut i) : SV_Target
 
     #endif
 
-    color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
+   // color.rgb = MixFog(color.rgb, -fragData.viewDir, i.uv0XY_bitZ_fog.w);
     color = Volumetrics(color, fragData.position);
 
     return color;

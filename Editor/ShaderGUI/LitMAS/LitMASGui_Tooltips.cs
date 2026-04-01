@@ -40,8 +40,9 @@ namespace SLZ.SLZEditorTools
             "multiplier does not effect the brightness of this material as seen by reflection probes.";
 
         public static ReadOnlySpan<char> DetailMap =>
-            "Overlay Brighten/Darken (R), Normal X (G), Geometric Roughness (B), Normal Y (A).\nRed channel brightens or darkens the material, with 0.5 being neutral. " +
-            "The rest of the channels are exactly like the normal map, and are blended with the normal map to allow having two different scales of normal details";
+            "<color=#e45252>(R) = Overlay Brighten/Darken Albedo</color>  \n<color=#30d137>(G) = Normal X</color>  \n<color=#2f82ff>(B) = Overlay Roughen/Polish Smoothness</color>  \n<color=white>(A) = Normal Y</color>" + 
+            "\n \nRed channel brightens or darkens the base material, with 0.5 being neutral. " +
+            "Normals are blended with the base normal map. " + "Blue channel Roughen or Polishes the base material, with 0.5 being neutral";
 
         public static ReadOnlySpan<char> Surface =>
             "How the material is blended with the background. Opaque does what you'd expect and does not blend with what's behind it. Transparent is physically transparent, ie " +

@@ -1,0 +1,289 @@
+﻿//Second froxel pass 
+// 	Sebastien Hillaire https://www.slideshare.net/DICEStudio/physically-based-and-unified-volumetric-rendering-in-frostbite/26
+
+#pragma kernel StepAdd
+#define EPSILON  1e-8
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+
+RWTexture3D<half4> Result;
+Texture3D<half4> InLightingTexture;
+//Texture3D<half4> HistoryBuffer;
+SamplerState Custom_linear_clamp_sampler;
+
+
+// float4x4    LeftEyeMatrix;
+// float4x4    RightEyeMatrix;
+
+//shared float4 _VolumePlaneSettings;
+//shared float _GlobalExtinction;
+shared half4 _GlobalScattering;
+
+const half3 _invDimensions;
+const int _FroxelDepthCount;
+const half4 _VolZBufferParams;	
+float _StereoBaseline;   // world units, e.g. activeCam.stereoSeparation
+float _StereoFocalLen;   // 1 / tan(fovX * 0.5)
+
+int   _EyeCount;                 // 1 = mono, 2 = stereo (SBS)
+int   _StereoEnabled;            // 0/1
+float _StereoDisparityOverride;  // <= 0 disables override (use physical disparity)
+
+//shared float4 _VBufferDistanceEncodingParams;
+
+CBUFFER_START(PerFrameCB)
+const half4 _VBufferDistanceDecodingParams;
+const half3 SeqOffset; //z offseter
+CBUFFER_END
+
+///If we're doing mipfog in the integration step instead. Avoids temporal smearing, but can be more flickery
+
+// // --- ADD: Sky mip fog resources (moved from Scatter) ---
+// TextureCube<float4> _SkyTexture;
+// SamplerState Custom_trilinear_clamp_sampler;
+//
+// shared float4 _MipFogParameters; // near, far, mix
+// shared int    _SkyMipCount;
+//
+// // If you want the same sky occlusion modulation:
+// CBUFFER_START(MonoSHBuffer)
+//     float _SHMonoCoefficients[9];
+// CBUFFER_END
+//
+// float2   _FoveaCenterUV;            // per-eye [0..1]
+// float    _FoveaStrength;
+// float4x4 _VBufferCoordToViewDirWS;  // same meaning as in Scatter
+//
+// // --- ADD: fovea warp + view-dir reconstruction inputs ---
+// CBUFFER_START(PerFrameCB)
+//     // keep your existing ones (types can be float4/float3 here)
+//     float4 _VBufferDistanceDecodingParams;
+//     float3 SeqOffset;
+// CBUFFER_END
+
+// --- ADD: helpers copied from Scatter (only what we need) ---
+// float EvaluateMonochromaticSHL2(float3 normal)
+// {
+//     return _SHMonoCoefficients[0] +
+//            normal.y * _SHMonoCoefficients[1] +
+//            normal.z * _SHMonoCoefficients[2] +
+//            normal.x * _SHMonoCoefficients[3] +
+//            normal.x * normal.y * _SHMonoCoefficients[4] +
+//            normal.y * normal.z * _SHMonoCoefficients[5] +
+//            (3.0 * normal.z * normal.z - 1.0) * _SHMonoCoefficients[6] +
+//            normal.x * normal.z * _SHMonoCoefficients[7] +
+//            (normal.x * normal.x - normal.y * normal.y) * _SHMonoCoefficients[8];
+// }
+//
+// float2 UVToSigned(float2 uv, float2 centerUV)
+// {
+//     float2 leftExtent  = centerUV;
+//     float2 rightExtent = 1.0 - centerUV;
+//
+//     float2 s;
+//     s.x = (uv.x < centerUV.x) ? ((uv.x - centerUV.x) / max(leftExtent.x,  1e-6))
+//                               : ((uv.x - centerUV.x) / max(rightExtent.x, 1e-6));
+//     s.y = (uv.y < centerUV.y) ? ((uv.y - centerUV.y) / max(leftExtent.y,  1e-6))
+//                               : ((uv.y - centerUV.y) / max(rightExtent.y, 1e-6));
+//     return s;
+// }
+//
+// float2 SignedToUV(float2 s, float2 centerUV)
+// {
+//     float2 leftExtent  = centerUV;
+//     float2 rightExtent = 1.0 - centerUV;
+//
+//     float2 uv;
+//     uv.x = (s.x < 0) ? centerUV.x + s.x * leftExtent.x
+//                      : centerUV.x + s.x * rightExtent.x;
+//     uv.y = (s.y < 0) ? centerUV.y + s.y * leftExtent.y
+//                      : centerUV.y + s.y * rightExtent.y;
+//     return uv;
+// }
+//
+// float2 WarpSigned_SquareRadial(float2 s, float a)
+// {
+//     float2 as = abs(s);
+//     float r = max(as.x, as.y);
+//     if (r < 1e-6) return s;
+//
+//     float2 dir = s / r;
+//     float rw = r / (1.0 + a * (1.0 - r));
+//     return dir * rw;
+// }
+
+// float3 GetFogColorFromSky(float3 V, float fragDistWS, float accum, float extinction, float travelDis)
+// {
+//     //float denom = max(1e-6, (_MipFogParameters.y - _MipFogParameters.x));
+//     //float t = saturate((fragDistWS - _MipFogParameters.x) / denom);
+//
+//     float tauToPrev2 = -log2(max((float)accum, 1e-6));
+//     float tauSeg2    = (float)extinction * travelDis * 1.44269504;
+//     float tauMid2    = tauToPrev2 + 0.5 * tauSeg2;  // better than using just prev
+//
+//     float skyMipMax = max(0.0, (float)(_SkyMipCount - 1));
+//
+//     // choose a tuning constant: tau2AtMaxBlur ~ 6..12 is a decent start
+//     float tau2AtMaxBlur = 8.0;
+//     float mipTau = saturate(tauMid2 / tau2AtMaxBlur) * skyMipMax;
+//
+//    // float skyMipMax = max(0.0, (float)(_SkyMipCount - 1));
+//     //float mipLevel  = (1.0 - _MipFogParameters.z * t) * skyMipMax;
+//     float mipLevel = mipTau;
+//     float3 col = _SkyTexture.SampleLevel(Custom_trilinear_clamp_sampler, V, mipLevel).rgb;
+//
+//     // keep your occlusion behavior (optional)
+//     col *= saturate(EvaluateMonochromaticSHL2(V));
+//
+//     return col;
+// }
+
+// float3 ComputeViewDirWS_FromUV(float2 uv01, float eyeWidth, float eyeHeight)
+// {
+//     float2 s      = UVToSigned(uv01, _FoveaCenterUV);
+//     float2 sWarp  = WarpSigned_SquareRadial(s, _FoveaStrength);
+//     float2 uvWarp = saturate(SignedToUV(sWarp, _FoveaCenterUV));
+//
+//     float2 centerCoordWarped = float2(uvWarp.x * eyeWidth, uvWarp.y * eyeHeight);
+//
+//     // matches Scatter: normalize(mul(-float4(centerCoordWarped,1,1), _VBufferCoordToViewDirWS)).xyz
+//     return normalize(mul(-float4(centerCoordWarped, 1, 1), _VBufferCoordToViewDirWS)).xyz;
+// }
+
+//float4 StereoOffset() {
+//
+//
+//	float3 prevPos = CameraPosition - CameraMotionVector; //just cache this and send it rather than calulating here
+//	float3 ws_repro = WS_coordinate - CameraMotionVector;
+//
+//	//float2	positionNDC = ComputeNormalizedDeviceCoordinates(ws_repro, PrevViewProjMatrix );
+//	float	vdistance = distance(ws_repro, prevPos);
+//	float	W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
+//
+//
+//	half4 ls = half4(WS_coordinate - prevPos, -1); //_WorldSpaceCameraPos
+//
+//	ls = mul(ls, transpose(PreviousFrameMatrix));
+//	ls.xyz = ls.xyz / ls.w;
+//
+//	float3 reprojection = float3(ls.xy, W);
+//
+//
+//}
+
+float OneMinusExpNegOverX(float x)
+{
+    float ax = abs(x);
+
+    // Taylor series for (1 - exp(-x)) / x around x = 0
+    // = 1 - x/2 + x^2/6 - x^3/24 + ...
+    if (ax < 1e-3f)
+    {
+        float x2 = x * x;
+        return 1.0f - 0.5f * x + (1.0f / 6.0f) * x2 - (1.0f / 24.0f) * x2 * x;
+    }
+
+    return (1.0f - exp(-x)) / x;
+}
+
+[numthreads(8, 8, 1)]	
+void StepAdd(uint3 id : SV_DispatchThreadID)
+{
+    // Accumulated scattering (rgb) + transmittance (a)
+    float4 accum = half4(0, 0, 0, 1);
+
+    // Normalized coords over the *double-wide* integration buffer
+    // _invDimensions.x = 1 / (2 * FroxelWidthResolution)
+    float2 uvFull;
+    uvFull.x = ((float)id.x + 0.5) * _invDimensions.x;  // 0..1 across both eyes
+    uvFull.y = ((float)id.y + 0.5) * _invDimensions.y;  // 0..1 vertically
+
+    
+    // Eye: 0 = left, 1 = right (SBS)
+    uint eyeCount = (uint)max(_EyeCount, 1);
+    uint eye      = min((uint)floor(uvFull.x * (float)eyeCount), eyeCount - 1);
+    
+    // Only stereo uses +/- disparity. Mono should be 0.
+    float sign = (_StereoEnabled != 0 && eyeCount == 2)
+        ? ((eye == 0u) ? -1.0 : +1.0)
+        : 0.0;
+    // Left negative, right positive
+
+    // Local UV in [0,1] for each half
+    float2 uvEye;
+    uvEye.x = frac(uvFull.x * 2.0);
+    uvEye.y = uvFull.y;
+    
+
+    // derive per-eye pixel dimensions from double-wide inv dims
+    //float eyeWidth  = 0.5 / _invDimensions.x;  // = FroxelWidthResolution
+    //float eyeHeight = 1.0 / _invDimensions.y;
+    
+    float invDepthCount = _invDimensions.z; // 1 / depthResolution
+
+    // World-space distance of previous slice (start from near)
+    float prevDepthWS = DecodeLogarithmicDepthGeneralized(0.0, _VBufferDistanceDecodingParams);
+
+  
+    for (uint z = 0u; z < (uint)_FroxelDepthCount; ++z)
+    {
+        float slice   = ((float)z + 0.5) * invDepthCount;
+        float depthWS = DecodeLogarithmicDepthGeneralized(slice, _VBufferDistanceDecodingParams);
+        float travelDis = depthWS - prevDepthWS;
+
+        float disparityUV = 0.0f;
+        if (_StereoEnabled != 0 && eyeCount == 2)
+        {
+            float disparityNDC = _StereoBaseline * _StereoFocalLen / max(depthWS, 1e-6);
+            disparityUV = 0.5 * disparityNDC;
+
+            // Optional debug override (only in stereo)
+            if (_StereoDisparityOverride > 0.0f)
+                disparityUV = _StereoDisparityOverride;
+        }
+        
+        float sampleX = uvEye.x + (sign * disparityUV);
+
+        // // IMPORTANT: keep dir consistent with the sample you actually take
+        // float2 uvDir = saturate(float2(sampleX, uvEye.y));
+        // float3 Vws   = ComputeViewDirWS_FromUV(uvDir, eyeWidth, eyeHeight);
+
+        float3 uvw = float3(sampleX, uvEye.y, slice);
+
+        float4 scatteringExtinction =
+            InLightingTexture.SampleLevel(Custom_linear_clamp_sampler, uvw, 0);
+
+        // float3 skyFog = GetFogColorFromSky(Vws, slice, accum.a, scatteringExtinction.a, travelDis);
+        // scatteringExtinction.rgb += (half3)skyFog;
+
+        float extinction = max(scatteringExtinction.a, 0.0f);
+
+        // If rgb is stored as scattering-albedo-ish and you premultiply by extinction:
+        scatteringExtinction.rgb *= extinction;
+
+        // Optical depth
+        float tau = extinction * travelDis;
+
+        // Beer-Lambert transmittance
+        float transmittance = exp(-tau); // or exp2(-tau * 1.44269504f)
+
+        // Stable integrated segment factor = (1 - exp(-tau)) / extinction
+        // rewritten as travelDis * (1 - exp(-tau)) / tau
+        float segmentFactor = travelDis * OneMinusExpNegOverX(tau);
+
+        accum.rgb += scatteringExtinction.rgb * accum.a * segmentFactor;
+        accum.a   *= transmittance;
+
+        Result[int3(id.x, id.y, z)] = accum;
+
+        prevDepthWS = depthWS;
+
+        if (accum.a <= 1e-7)
+        {
+            for (uint d = z + 1u; d < (uint)_FroxelDepthCount; ++d)
+                Result[int3(id.x, id.y, d)] = accum;
+            break;
+        }
+        
+    }
+}

@@ -1360,21 +1360,21 @@ namespace UnityEngine.Rendering.Universal
             ///----------------------------------------------------------------------------------------
             /// SLZ Volumetrics
             ///----------------------------------------------------------------------------------------
-            if (additionalCameraData != null)
-            {
-                //Debug.Log("Found Additional Camera Data");
-                cameraData.volumetricsEnabled = additionalCameraData.m_EnableVolumetrics;
-                cameraData.volumetricsClipMap = additionalCameraData.m_VolumetricClipMap;
-                cameraData.volumetricsConstants = additionalCameraData.m_VolumetricShaderGlobals;
-            }
-            else
-            {
-                //Debug.LogError("Null Additional Camera Data");
-
-                cameraData.volumetricsEnabled = false;
-                cameraData.volumetricsClipMap = null;
-                cameraData.volumetricsConstants = null;
-            }
+            // if (additionalCameraData != null)
+            // {
+            //     //Debug.Log("Found Additional Camera Data");
+            //     cameraData.volumetricsEnabled = additionalCameraData.m_EnableVolumetrics;
+            //     cameraData.volumetricsClipMap = additionalCameraData.m_VolumetricClipMap;
+            //     cameraData.volumetricsConstants = additionalCameraData.m_VolumetricShaderGlobals;
+            // }
+            // else
+            // {
+            //     //Debug.LogError("Null Additional Camera Data");
+            //
+            //     cameraData.volumetricsEnabled = false;
+            //     cameraData.volumetricsClipMap = null;
+            //     cameraData.volumetricsConstants = null;
+            // }
 
             // END SLZ MODIFIED
 
@@ -1459,7 +1459,7 @@ namespace UnityEngine.Rendering.Universal
             InitializePostProcessingData(settings, cameraData.stackLastCameraOutputToHDR, out renderingData.postProcessingData);
 
             // SLZ MODIFIED // Set up volumetrics
-            SetupVolumetricConstants(cameraData);
+            //SetupVolumetricConstants(cameraData);
             // END SLZ MODIFIED
 
             renderingData.supportsDynamicBatching = settings.supportsDynamicBatching;
@@ -1840,17 +1840,17 @@ namespace UnityEngine.Rendering.Universal
 
         // SLZ MODIFIED
 
-        static void SetupVolumetricConstants(CameraData cameraData)
-        {
-            if (cameraData.volumetricsEnabled)
-            {
-                VolumetricConstants.instance.EnableVolumetrics(cameraData.volumetricsClipMap, cameraData.volumetricsConstants);
-            }
-            else
-            {
-                VolumetricConstants.instance.DisableVolumetrics();
-            }
-        }
+        // static void SetupVolumetricConstants(CameraData cameraData)
+        // {
+        //     if (cameraData.volumetricsEnabled)
+        //     {
+        //         VolumetricConstants.instance.EnableVolumetrics(cameraData.volumetricsClipMap, cameraData.volumetricsConstants);
+        //     }
+        //     else
+        //     {
+        //         VolumetricConstants.instance.DisableVolumetrics();
+        //     }
+        // }
 
         // END SLZ MODIFIED
 

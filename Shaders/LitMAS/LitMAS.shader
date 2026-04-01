@@ -13,7 +13,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         [HDR]_EmissionColor("Emission Color", Color) = (1,1,1,1)
         _EmissionFalloff("Emission Falloff", Float) = 1
         _BakedMutiplier("Emission Baked Mutiplier", Float) = 1
-        [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
+        [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 1
         _DetailMap("Detail Map", 2D) = "gray" {}
         [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 0
         // SSR temporal accumulation, no longer used

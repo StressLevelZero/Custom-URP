@@ -10,65 +10,93 @@ public class VolumetricRegisters
     public static List<LocalVolumetricFog> VolumetricMediaEntities = new List<LocalVolumetricFog>();
     public static List<BakedVolumetricArea> volumetricAreas = new List<BakedVolumetricArea>();
 
-    public static List<VolumetricRendering> volumetricRenderers = new List<VolumetricRendering>();
+   // public static List<VolumetricRendering> volumetricRenderers = new List<VolumetricRendering>();
     
     public static List<SkyOcclusionProbes> skyOcclusionProbes = new List<SkyOcclusionProbes>();
 
     public static List<SkyOcclusionDataAsset> SkyOcclusionDataAssets = new List<SkyOcclusionDataAsset>();
-    public static readonly List<Light> realtimeVolumetricLights = new List<Light>();
+    public static List<Light> realtimeVolumetricLights = new List<Light>();
 
-    public static bool _meshObjectsNeedRebuilding = true;
-
+    //public static bool _meshObjectsNeedRebuilding = true;
+    public static uint ClipmapRevision { get; private set; } = 1;
+    private static bool volumetricAreasNeedSort;
 
 
 #region VolumeAreas
 
     public static void RegisterVolumetricArea(BakedVolumetricArea volumetricArea)
     {
+        if (volumetricAreas.Contains(volumetricArea)) return;
 #if UNITY_EDITOR
         if (volumetricArea.bakedTexture == null && Application.isPlaying) return; //quick check to make sure that this is valid
 #else
         if (volumetricArea.bakedTexture == null) return; //quick check to make sure that this is valid
 #endif
         volumetricAreas.Add(volumetricArea);
-        ForceRefreshClipmaps();
-
+        volumetricAreasNeedSort = true;
+        MarkClipmapDirty();
     }
     public static void UnregisterVolumetricArea(BakedVolumetricArea volumetricArea)
     {
         volumetricAreas.Remove(volumetricArea);
-        ForceRefreshClipmaps();
+        MarkClipmapDirty();
     }
 
     public static void RegisterParticipatingMedia(LocalVolumetricFog volumetricMedia)
     {
         VolumetricMediaEntities.Add(volumetricMedia);
+        MarkClipmapDirty();
+
     }
     public static void UnregisterParticipatingMedia(LocalVolumetricFog volumetricMedia)
     {
         VolumetricMediaEntities.Remove(volumetricMedia);
+        MarkClipmapDirty();
     }
     
-    
-    public static void RegisterVolumetricRenderer(VolumetricRendering volumetricRenderer)
+    /// <summary>
+    ///Sorting from lowest to highest Texel Density so the generator biases towards the higher detail in-case of overlaps
+    /// </summary>
+    public static void EnsureVolumetricAreasSorted()
     {
-        if (!volumetricRenderers.Contains(volumetricRenderer)) volumetricRenderers.Add(volumetricRenderer);
-    }
-    public static void UnregisterVolumetricRenderer(VolumetricRendering volumetricRenderer)
-    {
-        if (volumetricRenderers.Contains(volumetricRenderer)) volumetricRenderers.Remove(volumetricRenderer);
+        if (!volumetricAreasNeedSort) return;
+
+        volumetricAreas.Sort((a, b) => a.TexelDensity.CompareTo(b.TexelDensity));
+        volumetricAreasNeedSort = false;
     }
     
+    // public static void RegisterVolumetricRenderer(VolumetricRendering volumetricRenderer)
+    // {
+    //     if (!volumetricRenderers.Contains(volumetricRenderer)) volumetricRenderers.Add(volumetricRenderer);
+    // }
+    // public static void UnregisterVolumetricRenderer(VolumetricRendering volumetricRenderer)
+    // {
+    //     if (volumetricRenderers.Contains(volumetricRenderer)) volumetricRenderers.Remove(volumetricRenderer);
+    // }
+    //
 
     #endregion
     
     
+    [System.Obsolete("Deprecated. Use MarkClipmapDirty instead")]
     public static void ForceRefreshClipmaps()
     {
-        foreach (VolumetricRendering VolumetricRenderer in volumetricRenderers)
-        {
-            VolumetricRenderer.VolumetricRegisterForceRefresh = true;
-        }
+        MarkClipmapDirty();
+        //TODO: Force the manager
+        // foreach (VolumetricRendering VolumetricRenderer in volumetricRenderers)
+        // {
+        //     VolumetricRenderer.VolumetricRegisterForceRefresh = true;
+        // }
+    }
+    
+    public static void MarkClipmapDirty()
+    {
+        unchecked { ClipmapRevision++; }
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
+        UnityEditor.SceneView.RepaintAll();
+#endif
     }
     
     

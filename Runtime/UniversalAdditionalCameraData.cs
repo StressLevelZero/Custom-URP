@@ -340,9 +340,9 @@ namespace UnityEngine.Rendering.Universal
         // SLZ MODIFIED
 
         /* SLZ Volumetrics */
-        [NonSerialized] public bool m_EnableVolumetrics = false;
-        [NonSerialized] public RenderTexture m_VolumetricClipMap = null;
-        [NonSerialized] public ComputeBuffer m_VolumetricShaderGlobals = null;
+        // [NonSerialized] public bool m_EnableVolumetrics = false;
+        // [NonSerialized] public RenderTexture m_VolumetricClipMap = null;
+        // [NonSerialized] public ComputeBuffer m_VolumetricShaderGlobals = null;
 
         // END SLZ MODIFIED
 

@@ -89,7 +89,7 @@ Shader "SLZ/Debug/Show Micro Triangles"
             {
                 v2g o = (v2g)0;
                 UNITY_SETUP_INSTANCE_ID(v);
-                UNITY_TRANSFER_INSTANCE_ID(v,o)
+                UNITY_TRANSFER_INSTANCE_ID(v,o);
                 #if !defined(STEREO_MULTIVIEW_ON)
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 #endif

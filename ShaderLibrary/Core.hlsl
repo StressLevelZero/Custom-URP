@@ -27,7 +27,10 @@
 
 // SLZ MODIFIED
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ImageBasedLighting.hlsl"
+//#if _VOLUMETRICS_ENABLED
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/VolumetricCore.hlsl"
+//#endif
+
 // END SLZ MODIFIED
 
 #if UNITY_REVERSED_Z

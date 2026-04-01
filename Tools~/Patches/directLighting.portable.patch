@@ -1,0 +1,24 @@
+diff --git a/Resources/OpenCL/kernels/directLighting.h b/Resources/OpenCL/kernels/directLighting.h
+--- a/Resources/OpenCL/kernels/directLighting.h
++++ b/Resources/OpenCL/kernels/directLighting.h
+@@ -574,8 +574,8 @@ static float3 ShadePointLight(
+         cookieAttenuation = GetCubemapCookieAttenuation(light, -surfaceToLightRay.d.xyz, cookiesBuffer KERNEL_VALIDATOR_BUFFERS);
+ 
+     const float nDotL = surfaceToLightRay.d.w;
+-    const float falloff = SampleFalloff(falloffIndex, distScale, distanceFalloffs_buffer KERNEL_VALIDATOR_BUFFERS);
+-
++    // const float falloff = SampleFalloff(falloffIndex, distScale, distanceFalloffs_buffer KERNEL_VALIDATOR_BUFFERS);
++	const float falloff = 1 / (distance * distance);
+     return falloff * nDotL * light.col.xyz * cookieAttenuation;
+ }
+ 
+@@ -674,7 +674,8 @@ static float3 ShadePyramidLight(
+     if (distScale > 1.0f)
+         return make_float3(0.0f, 0.0f, 0.0f);
+ 
+-    const float distFalloff = SampleFalloff(falloffIndex, distScale, distanceFalloffs_buffer KERNEL_VALIDATOR_BUFFERS);
++    //const float distFalloff = SampleFalloff(falloffIndex, distScale, distanceFalloffs_buffer KERNEL_VALIDATOR_BUFFERS);
++	const float distFalloff = 1 / (distance * distance);
+     const float nDotL = surfaceToLightRay.d.w;
+ 
+     int    cookieIndex       = light.dataUnion.pyramidLightData.cookieIndex;

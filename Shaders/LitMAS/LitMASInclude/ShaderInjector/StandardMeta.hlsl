@@ -136,6 +136,7 @@ half4 frag(v2f i) : SV_Target
 		emissionDefault.rgb *= _BakedMutiplier * _Emission;
 		emissionDefault.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emissionDefault.a);
 		emission += emissionDefault;
+		emission = max(emission,0);
 	}
 // End Injection EMISSION from Injection_Emission_Meta.hlsl ----------------------------------------------------------
 

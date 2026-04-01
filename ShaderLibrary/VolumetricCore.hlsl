@@ -6,8 +6,14 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 //#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderVariablesFunctions.hlsl"
 
-#define HiQSampling false
-
+//#if _VOLUMETRICS_ENABLED
+//#pragma multi_compile_fragment _ _HiQSampling 
+//#endif
+#if defined(UNITY_SINGLE_PASS_STEREO) || defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+    #define VOL_EYE_COUNT 2
+#else
+    #define VOL_EYE_COUNT 1
+#endif
 
 TEXTURECUBE(_SkyTexture);
 SAMPLER(sampler_SkyTexture);
@@ -61,119 +67,76 @@ float4 DitherVolumetrics(float4 base, float4 blend)
     return lerp(lo, hi, step(0.5, base));   // if base < 0.5 -> lo else hi
 }
 
-
-
-float Mitchell1D(float x, float B, float C)
+inline float4 CubicWeights_BSpline(float t)
 {
-    x = abs(x);
-    float x2 = x * x;
-    float x3 = x2 * x;
+    float t2 = t * t;
+    float t3 = t2 * t;
 
-    // Piecewise Mitchell–Netravali cubic
-    if (x < 1.0)
-    {
-        return ((12.0 - 9.0*B - 6.0*C) * x3 +
-                (-18.0 + 12.0*B + 6.0*C) * x2 +
-                (6.0 - 2.0*B)) / 6.0;
-    }
-    else if (x < 2.0)
-    {
-        return ((-B - 6.0*C) * x3 +
-                (6.0*B + 30.0*C) * x2 +
-                (-12.0*B - 48.0*C) * x +
-                (8.0*B + 24.0*C)) / 6.0;
-    }
-
-    return 0.0;
-}
-
-// Weights for taps [i-1, i, i+1, i+2] given fractional f in [0,1)
-float4 CubicWeights_MitchellNetravali(float f)
-{
-    const float B = 1.0/3.0;
-    const float C = 1.0/3.0;
-
-    // distances from sample position (i+f) to each tap
+    // weights for (-1,0,1,2)
     return float4(
-        Mitchell1D(1.0 + f, B, C),  // i-1
-        Mitchell1D(f,       B, C),  // i
-        Mitchell1D(1.0 - f, B, C),  // i+1
-        Mitchell1D(2.0 - f, B, C)   // i+2
+        (1 - 3*t + 3*t2 - t3) / 6.0,          // (1 - t)^3 / 6
+        (4 - 6*t2 + 3*t3) / 6.0,
+        (1 + 3*t + 3*t2 - 3*t3) / 6.0,
+        t3 / 6.0
     );
 }
 
-
-// 4 taps on a fixed Z slice (bilinear in XY), Mitchell weights reconstructed
-float4 SampleVol_BicubicXY_4Tap_Slice_MN(float2 uv01, int zSlice, int3 dimI, float3 invDim, float lod)
+// Fast tricubic: 8 trilinear samples
+inline float4 SampleTricubicLevel(Texture3D tex, SamplerState samp, float3 uvw, float lod)
 {
-    float2 dimXY = float2(dimI.x, dimI.y);
-    float2 p = uv01 * dimXY - 0.5;
-    int2  i = (int2)floor(p);
-    float2 f = p - (float2)i;
+    // Get mip dimensions (important if you ever change lod from 0)
+    uint w=0, h=0, d=0, l=0;
+    tex.GetDimensions((uint)lod, w, h, d,l);
+    float3 dim    = float3((float)w, (float)h, (float)d);
+    float3 invDim = 1.0 / dim;
 
-    // clamp base so [-1..+2] neighborhood is valid
-    int2 maxBase = int2(max(1, dimI.x - 3), max(1, dimI.y - 3));
-    i = clamp(i, int2(1,1), maxBase);
+    // Convert to "texel space" where integer coords land on texel centers
+    float3 x  = uvw * dim - 0.5;
+    float3 ix = floor(x);
+    float3 fx = x - ix;
 
-    float4 wx = CubicWeights_MitchellNetravali(f.x);
-    float4 wy = CubicWeights_MitchellNetravali(f.y);
+    // Per-axis cubic weights (4 each)
+    float4 wx4 = CubicWeights_BSpline(fx.x);
+    float4 wy4 = CubicWeights_BSpline(fx.y);
+    float4 wz4 = CubicWeights_BSpline(fx.z);
 
-    float2 sx = float2(wx.x + wx.y, wx.z + wx.w);
-    float2 sy = float2(wy.x + wy.y, wy.z + wy.w);
+    // Group into 2 weights per axis so we can use linear filtering:
+    // (w0+w1)*lerp(T[-1],T[0]) + (w2+w3)*lerp(T[+1],T[+2])
+    float2 wx = float2(wx4.x + wx4.y, wx4.z + wx4.w);
+    float2 wy = float2(wy4.x + wy4.y, wy4.z + wy4.w);
+    float2 wz = float2(wz4.x + wz4.y, wz4.z + wz4.w);
 
-    float ax0 = (sx.x > 1e-6) ? (wx.y / sx.x) : 0.0;
-    float ax1 = (sx.y > 1e-6) ? (wx.w / sx.y) : 0.0;
-    float ay0 = (sy.x > 1e-6) ? (wy.y / sy.x) : 0.0;
-    float ay1 = (sy.y > 1e-6) ? (wy.w / sy.y) : 0.0;
+    float2 tx = float2(wx.x > 0 ? (wx4.y / wx.x) : 0, wx.y > 0 ? (wx4.w / wx.y) : 0);
+    float2 ty = float2(wy.x > 0 ? (wy4.y / wy.x) : 0, wy.y > 0 ? (wy4.w / wy.y) : 0);
+    float2 tz = float2(wz.x > 0 ? (wz4.y / wz.x) : 0, wz.y > 0 ? (wz4.w / wz.y) : 0);
 
-    float px0 = (float)(i.x - 1) + ax0;
-    float px1 = (float)(i.x + 1) + ax1;
-    float py0 = (float)(i.y - 1) + ay0;
-    float py1 = (float)(i.y + 1) + ay1;
+    // Two sample positions per axis, in normalized UVW
+    // p0 between (i-1, i), p1 between (i+1, i+2)
+    float2 px = (ix.x + float2(-1.0 + tx.x, 1.0 + tx.y) + 0.5) * invDim.x;
+    float2 py = (ix.y + float2(-1.0 + ty.x, 1.0 + ty.y) + 0.5) * invDim.y;
+    float2 pz = (ix.z + float2(-1.0 + tz.x, 1.0 + tz.y) + 0.5) * invDim.z;
 
-    // force exact texel-center in Z so trilinear becomes bilinear in XY
-    float z = ((float)zSlice + 0.5) * invDim.z;
+    // 8 samples
+    float4 c000 = tex.SampleLevel(samp, float3(px.x, py.x, pz.x), lod);
+    float4 c100 = tex.SampleLevel(samp, float3(px.y, py.x, pz.x), lod);
+    float4 c010 = tex.SampleLevel(samp, float3(px.x, py.y, pz.x), lod);
+    float4 c110 = tex.SampleLevel(samp, float3(px.y, py.y, pz.x), lod);
 
-    float3 uvw00 = float3((px0 + 0.5) * invDim.x, (py0 + 0.5) * invDim.y, z);
-    float3 uvw10 = float3((px1 + 0.5) * invDim.x, (py0 + 0.5) * invDim.y, z);
-    float3 uvw01 = float3((px0 + 0.5) * invDim.x, (py1 + 0.5) * invDim.y, z);
-    float3 uvw11 = float3((px1 + 0.5) * invDim.x, (py1 + 0.5) * invDim.y, z);
+    float4 c001 = tex.SampleLevel(samp, float3(px.x, py.x, pz.y), lod);
+    float4 c101 = tex.SampleLevel(samp, float3(px.y, py.x, pz.y), lod);
+    float4 c011 = tex.SampleLevel(samp, float3(px.x, py.y, pz.y), lod);
+    float4 c111 = tex.SampleLevel(samp, float3(px.y, py.y, pz.y), lod);
 
-    float4 s00 = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, uvw00, lod);
-    float4 s10 = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, uvw10, lod);
-    float4 s01 = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, uvw01, lod);
-    float4 s11 = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, uvw11, lod);
+    // Combine with separable weights
+    float4 a00 = c000 * wx.x + c100 * wx.y;
+    float4 a10 = c010 * wx.x + c110 * wx.y;
+    float4 a01 = c001 * wx.x + c101 * wx.y;
+    float4 a11 = c011 * wx.x + c111 * wx.y;
 
-    return (s00 * (sx.x * sy.x)) +
-           (s10 * (sx.y * sy.x)) +
-           (s01 * (sx.x * sy.y)) +
-           (s11 * (sx.y * sy.y));
-}
+    float4 b0 = a00 * wy.x + a10 * wy.y;
+    float4 b1 = a01 * wy.x + a11 * wy.y;
 
-// 8 taps total: 4 taps at z0 + 4 taps at z1, then lerp in Z
-float4 SampleVol_BicubicXY_LinearZ_8Tap_MN(float3 uvw01, float lod)
-{
-    uint w, h, d;
-    _VolumetricResult.GetDimensions(w, h, d);
-
-    int3 dimI = int3((int)w, (int)h, (int)d);
-    float3 dimF = float3((float)w, (float)h, (float)d);
-    float3 invDim = rcp(max(dimF, 1.0));
-
-    // small safety fallback (optional)
-    if (dimI.x < 4 || dimI.y < 4 || dimI.z < 2)
-        return SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, uvw01, lod);
-
-    float pz = uvw01.z * dimF.z - 0.5;
-    int   iz = (int)floor(pz);
-    float fz = pz - (float)iz;
-
-    iz = clamp(iz, 0, max(0, dimI.z - 2));
-
-    float4 c0 = SampleVol_BicubicXY_4Tap_Slice_MN(uvw01.xy, iz,     dimI, invDim, lod);
-    float4 c1 = SampleVol_BicubicXY_4Tap_Slice_MN(uvw01.xy, iz + 1, dimI, invDim, lod);
-
-    return lerp(c0, c1, fz);
+    return b0 * wz.x + b1 * wz.y;
 }
 
 static float m_zSeq[7]	=
@@ -283,81 +246,59 @@ half4 GetVolumetricColor(float3 positionWS)
     float2 uvGrid = LinearUV_To_FroxelGridUV(uvLinear, _FoveaCenterUV, _FoveaStrength);
 
     // Pack into side-by-side stereo atlas (X half per eye)
-    float eye = (float)unity_StereoEyeIndex;
-    float xPacked = uvGrid.x * 0.5 + eye * 0.5;
-    float2 uvPacked = float2(uvGrid.x * 0.5 + eye * 0.5, uvGrid.y);
-    float3 DoubleUV = float3(xPacked, uvGrid.y, W);
+
+    // unity_StereoEyeIndex may not exist in non-stereo variants, so guard it.
+    int eye = 0;
+    #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED) || defined(UNITY_SINGLE_PASS_STEREO)
+    eye = (int)unity_StereoEyeIndex;
+    #endif
+    eye = clamp(eye, 0, VOL_EYE_COUNT - 1);
+
+    float invEyeCount = rcp((float)VOL_EYE_COUNT);
+    
+    // float xPacked = uvGrid.x * 0.5 + eye * 0.5;
+    // float2 uvPacked = float2(uvGrid.x * 0.5 + eye * 0.5, uvGrid.y);
+    // float3 DoubleUV = float3(xPacked, uvGrid.y, W);
+    
+    // Atlas-space UV for the 3D volume
+    float2 uvPacked = float2(uvGrid.x * invEyeCount + (float)eye * invEyeCount, uvGrid.y);
+    float3 sampleUVW = float3(uvPacked.x, uvPacked.y, W);
+
+    
     float2 pixCoord = floor(uvPacked * _ScaledScreenParams.xy);
+    // ---- Noise / jitter ----
     float noise = InterleavedGradientNoise(pixCoord, _FrameIndex);
     float2 xyoffset[7];
     GetHexagonalClosePackedSpheres7(xyoffset);  
     float2 invXY = rcp(float2(_VolumetricResultDim.x, _VolumetricResultDim.y));
     float  invZ  = rcp(_VolumetricResultDim.z);
     
-    int idx = (int)(noise * 7.0) % 7;    
+    int idx = (int)(noise * 7.0) % 7.;    
     // jitterRadiusTexels = how many *texels* you want at maximum.
     // Start small: 0.20–0.40 texels is a good range. //Make variable or keep magic numbers?
     float jitterRadiusTexelsXY = .3;   // e.g. 0.30
     float jitterRadiusTexelsZ  = .05;    // e.g. 0.05 (optional, tiny)
     float2 jitterUV = xyoffset[idx] * (jitterRadiusTexelsXY * invXY);
     // Apply
-    DoubleUV.xy += jitterUV;
-    DoubleUV.z += (noise - 0.5) * (jitterRadiusTexelsZ * invZ);
+    sampleUVW.xy += jitterUV;
+    sampleUVW.z += (noise - 0.5) * (jitterRadiusTexelsZ * invZ);
 
 
-    #if (HiQSampling) //
+   // #if (_HiQSampling) //
+    #if (_VOLUMETRICS_ENABLED_HQ)
     //Get's rid of stair-stepping from bilinear 
-    float4 volsample = SampleVol_BicubicXY_LinearZ_8Tap_MN( DoubleUV, 0) ;
+    float4 volsample = SampleTricubicLevel(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0) ;
     #else    
-    float4 volsample = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, DoubleUV, 0) ;
+    float4 volsample = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0) ;
     #endif
        
     volsample = DitherVolumetrics(volsample, noise * 0.08 + .5);    
     return volsample ;
 }
 
-
-// half4 GetVolumetricColorJittered(float3 positionWS, float2 noise)
-// {
-//     //float2 positionNDC = ComputeNormalizedDeviceCoordinates(positionWS, _PrevViewProjMatrix);//viewProjMatrix
-//
-//     half4 ls = half4(positionWS - _VolCameraPos, -1); //_WorldSpaceCameraPos
-//
-//     ls = mul(ls, TransposedCameraProjectionMatrix);
-//     ls.xyz = ls.xyz / ls.w;
-//
-//     float vdistance = distance(positionWS, _VolCameraPos);
-//
-//     // vdistance = LinearEyeDepth(vdistance, GetWorldToViewMatrix());
-//
-//     float W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
-//
-//     half halfU = ls.x * 0.5;
-//     // half halfU = positionNDC.x * 0.5;
-//
-//      //Figuring out both sides at once and zeroing out the other when blending. 
-//      //Is this better than branching with an if statement? Andorid doesn't like if statements anyway.
-//     half3 LUV = half3 (halfU.x, ls.y, W) * (1 - unity_StereoEyeIndex); //Left UV
-//     half3 RUV = half3(halfU + 0.5, ls.y, W) * (unity_StereoEyeIndex); //Right UV
-//     half3 DoubleUV = LUV + RUV; // Combined
-//     DoubleUV.xy += 0.25*(noise - 0.5) / _VolumetricResultDim.z; // don't jitter on Z since 3d textures are accessed like 2d arrays (i.e. only pixels in the same z layer are cached)
-//
-//                                                                 
-//      //TODO: Make sampling calulations run or not if they are inside or out of the clipped area
-//     //float ClipUVW =
-//     //    step(DoubleUV.x, 1) * step(0, DoubleUV.x) *
-//     //    step(DoubleUV.y, 1) * step(0, DoubleUV.y) ;
-//
-// //    float random = GenerateHashedRandomFloat(DoubleUV * 4000) * 0.003;
-//
-//     half4 volumetricColor = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_linear_clamp, DoubleUV, 0);
-//
-//     return volumetricColor;
-// }
-
 half4 Volumetrics(half4 color, float3 positionWS) {
 
-#if defined(_VOLUMETRICS_ENABLED)
+#if defined(_VOLUMETRICS_ENABLED) || defined(_VOLUMETRICS_ENABLED_HQ)
 
     half4 FroxelColor = GetVolumetricColor(positionWS);
     color.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
@@ -375,7 +316,7 @@ half4 Volumetrics(half4 color, float3 positionWS) {
  */
 half4 VolumetricsSurf(half4 color, float3 positionWS, int surfaceType) {
 
-#if defined(_VOLUMETRICS_ENABLED)
+#if defined(_VOLUMETRICS_ENABLED) || defined(_VOLUMETRICS_ENABLED_HQ)
 
     half4 FroxelColor = GetVolumetricColor(positionWS);
 	
@@ -435,11 +376,85 @@ half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
   //  return DecodeHDREnvironmentMip(SAMPLE_TEXTURECUBE_LOD(_SkyTexture, samplerunity_SpecCube0, viewDirectionWS, mipLevel), unity_SpecCube0_HDR);
     return (SAMPLE_TEXTURECUBE_LOD(_SkyTexture, sampler_TrilinearClamp, viewDirectionWS, mipLevel)).rgb * saturate(EvaluateMonochromaticSHL2(viewDirectionWS));
 
-
-
-
-    //viewDirectionWS
 }
 
+inline float2 GetVolumetricLinearUVFromWS(float3 positionWS)
+{
+    float4 ls = float4(positionWS - _VolCameraPos, -1.0);
+    ls = mul(ls, TransposedCameraProjectionMatrix);
+    return ls.xy / ls.w;
+}
+
+inline float3 BuildVolumetricUVW(float2 uvLinear, float distanceWS)
+{
+    float W = EncodeLogarithmicDepthGeneralized(distanceWS, _VBufferDistanceEncodingParams);
+
+    float2 uvGrid = LinearUV_To_FroxelGridUV(uvLinear, _FoveaCenterUV, _FoveaStrength);
+
+    int eye = 0;
+    #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED) || defined(UNITY_SINGLE_PASS_STEREO)
+    eye = (int)unity_StereoEyeIndex;
+    #endif
+    eye = clamp(eye, 0, VOL_EYE_COUNT - 1);
+
+    float invEyeCount = rcp((float)VOL_EYE_COUNT);
+    float2 uvPacked = float2(uvGrid.x * invEyeCount + (float)eye * invEyeCount, uvGrid.y);
+
+    return float3(uvPacked, W);
+}
+
+half4 SampleVolumetricUVW(float3 sampleUVW)
+{
+    float2 pixCoord = floor(sampleUVW.xy * _ScaledScreenParams.xy);
+    float noise = InterleavedGradientNoise(pixCoord, _FrameIndex);
+
+    float2 xyoffset[7];
+    GetHexagonalClosePackedSpheres7(xyoffset);
+
+    float2 invXY = rcp(float2(_VolumetricResultDim.x, _VolumetricResultDim.y));
+    float invZ   = rcp(_VolumetricResultDim.z);
+
+    int idx = (int)(noise * 7.0) % 7;
+    float jitterRadiusTexelsXY = 0.3;
+    float jitterRadiusTexelsZ  = 0.05;
+
+    sampleUVW.xy += xyoffset[idx] * (jitterRadiusTexelsXY * invXY);
+    sampleUVW.z  += (noise - 0.5) * (jitterRadiusTexelsZ * invZ);
+
+    #if (_VOLUMETRICS_ENABLED_HQ)
+        float4 volsample = SampleTricubicLevel(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
+    #else
+        float4 volsample = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
+    #endif
+
+    volsample = DitherVolumetrics(volsample, noise * 0.08 + 0.5);
+    return volsample;
+}
+
+half4 GetVolumetricColorWS(float3 positionWS)
+{
+    float2 uvLinear   = GetVolumetricLinearUVFromWS(positionWS);
+    float  distanceWS = distance(positionWS, _VolCameraPos);
+    return SampleVolumetricUVW(BuildVolumetricUVW(uvLinear, distanceWS));
+}
+
+half4 GetVolumetricColorSky(float3 rayDirWS, float skyDistanceWS)
+{
+    // Any point along the ray works for XY projection.
+    // The important part is that depth comes from skyDistanceWS, not far clip.
+    float3 rayPointWS = _VolCameraPos + rayDirWS * 10.0;
+
+    float2 uvLinear = GetVolumetricLinearUVFromWS(rayPointWS);
+    return SampleVolumetricUVW(BuildVolumetricUVW(uvLinear, skyDistanceWS));
+}
+
+half4 VolumetricsSky(half4 color, float3 rayDirWS, float skyDistanceWS)
+{
+    #if defined(_VOLUMETRICS_ENABLED) || defined(_VOLUMETRICS_ENABLED_HQ)
+    half4 froxel = GetVolumetricColorSky(rayDirWS, skyDistanceWS);
+    color.rgb = froxel.rgb + color.rgb * froxel.a;
+    #endif
+    return color;
+}
 
 #endif

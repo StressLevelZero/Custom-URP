@@ -1,0 +1,1543 @@
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Linq;
+using Unity.Mathematics;
+using UnityEngine;
+using UnityEditor;
+using UnityEngine.SceneManagement;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering.Universal;
+using System.IO;
+using Unity.Collections;
+using SLZ.SLZEditorTools;
+using UnityEngine.Rendering;
+#if UNITY_EDITOR_WIN
+using Microsoft.Win32;
+#endif 
+using UnityEditor.SceneManagement;
+using System.Diagnostics;
+using Debug = UnityEngine.Debug;
+
+public class VolumetricBaking : EditorWindow
+{
+    // Add menu item named "My Window" to the Window menu
+    [MenuItem("Stress Level Zero/Volumetrics/Manual Volumetric Baking Window")]
+    public static void ShowWindow()
+    {
+        //Show existing window instance. If one doesn't exist, make one.
+        GetWindow(typeof(VolumetricBaking));
+        SetGPUTimeout();
+        //   BuildComboList();
+        //   BuildSelectionGrid();
+    }
+    const int safeTdrDelay = 30; 
+    static void SetGPUTimeout()
+    {
+#if UNITY_EDITOR_WIN
+        const string key = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\GraphicsDrivers";
+        const string value = "TdrDelay";
+        object currentValueBoxed = Registry.GetValue(key, value, null);
+        int currentValue = currentValueBoxed != null ? (int)currentValueBoxed : 2;
+        //EditorPrefs.SetBool("VolBakeDontShowGPUTimeoutWarning", false);
+        if (!EditorPrefs.GetBool("VolBakeDontShowGPUTimeoutWarning", false) && currentValue < safeTdrDelay)
+        {
+            int allowKey = EditorUtility.DisplayDialogComplex("Increase GPU timeout",
+                "This tool needs to set a Windows registry key to increase the time the GPU is allowed to take " +
+                "processing graphics jobs in a single frame. Otherwise Windows will consider the GPU to be stalled out and will kill " +
+                $"Unity mid-bake.\n\n Key: {key}\\{value}\n\nIncrease the timeout from the default (2 seconds) to {safeTdrDelay}?\n",
+                "Proceed",
+                "Cancel",
+                "Cancel - Don't Show Again"
+
+                );
+
+            bool proceed = allowKey == 0;
+            //if (allowKey == 1)
+            //{
+            //    proceed = !EditorUtility.DisplayDialog("Don't increase timeout", "Are you sure? If the timeout period isn't increased, unity is almost guaranteed to crash when baking volumetrics." +
+            //        " Increasing the value of this key will not cause any issues, it only means that Windows will wait 30 seconds before killing applications that have actually experienced a GPU crash.",
+            //        "Don't increase timeout",
+            //        "Increase timeout");
+            //   
+            //}
+
+            if (allowKey == 2)
+            {
+                int choice2 = EditorUtility.DisplayDialogComplex("Don't increase timeout", "Are you sure? If the timeout period isn't increased, unity is almost guaranteed to crash when baking volumetrics." +
+                    $"\n\nIncreasing the value of this key should not cause any issues, it only means that Windows will wait {safeTdrDelay} seconds before killing applications that have actually experienced a GPU crash. " +
+                    "\n\nThis will never ask you again! Only do this if you know what you're doing!",
+                    "Don't increase timeout and never ask again",
+                    "Don't increase timeout",
+                    "Increase timeout");
+
+                proceed = choice2 == 2;
+                if (choice2 == 0) {
+                    EditorPrefs.SetBool("VolBakeDontShowGPUTimeoutWarning", true);
+                }
+            }
+
+
+            if (proceed)
+            {
+                // Registry.SetValue(key, value, 30, RegistryValueKind.DWord);
+                System.Diagnostics.Process process = new System.Diagnostics.Process();
+                System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
+                startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal;
+                startInfo.FileName = "cmd.exe";
+                startInfo.Arguments = $"/C reg add {key} /v {value} /t REG_DWORD /d {safeTdrDelay} /f";
+                //Debug.Log(startInfo.Arguments);
+                startInfo.Verb = "runas";
+                process.StartInfo = startInfo;
+                process.Start();
+                process.WaitForExit();
+                if (process.ExitCode != 0)
+                {
+                    Debug.LogError("Setting registry key failed");
+                }
+                //Debug.Log("Volumetric Baking: Set GPU Timeout Registry Key to 30 seconds (" + key + "\\" + value + ")");
+            }
+
+        }
+        Debug.Log("Volumetric Baking: GPU Timeout Registry Key value is " + currentValue + " seconds (" + key + "\\" + value + ")");
+#endif
+    }
+
+    //TODO: Save to scene asset file 
+    //Public variables
+    [Range(1, 2048)]
+    public int AreaLightSamples = 256;
+    [Range(4, 128), Tooltip("Size of the render buckets.")]
+    public int BucketSize = 32;
+    public bool DXRAcceletration = true;
+    public bool SkyboxContribution = true;
+    public Cubemap CustomEnvorment;
+    public int EnvLightSamples = 2048;
+    public int RayChunkSize = 4096;
+
+    bool checkedD3D12 = false;
+    bool isD3D12 = false;
+
+    //interal
+    bool saveWarning = false;
+    bool Running = false;
+    private void OnGUI()
+    {
+        DisplayProgress();
+        EditorGUILayout.LabelField("System Settings", EditorStyles.boldLabel);
+        GUI.enabled = !DXRAcceletration;
+        BucketSize = EditorGUILayout.IntSlider("Bucket Size", BucketSize, 4, 256);
+        GUI.enabled = true;
+        DXRAcceletration = EditorGUILayout.Toggle("DXR Acceletration", DXRAcceletration);
+        RayChunkSize = Mathf.RoundToInt((float)EditorGUILayout.IntSlider("DXR Ray Chunk Size", RayChunkSize, 512, 16384) / 512.0f) * 512;
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Light Settings", EditorStyles.boldLabel);
+        AreaLightSamples = EditorGUILayout.IntSlider("Area Samples", AreaLightSamples, 1, 1024);
+
+        EditorGUILayout.Space();
+        GUI.enabled = DXRAcceletration;
+        EditorGUILayout.LabelField("Enviorment Settings", EditorStyles.boldLabel);
+        SkyboxContribution = EditorGUILayout.Toggle("Skybox Contribution", SkyboxContribution);
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Custom Skybox", EditorStyles.label);
+        CustomEnvorment = (Cubemap)EditorGUILayout.ObjectField(CustomEnvorment, typeof(Cubemap), true);
+        EditorGUILayout.EndHorizontal();
+        EnvLightSamples = EditorGUILayout.IntSlider("Environmental Samples", EnvLightSamples, 1, 8192); ;
+        GUI.enabled = true;
+        //       EditorGUILayout.IntField(AreaLightSamples, "Area light samples" );
+
+
+        if (GUILayout.Button("Bake Volumetrics"))
+        {
+            ClearWarning();
+            if (VerifySettings() == false) return; //Check settings and return if something is wrong
+            if (DXRAcceletration)
+            {
+                VolumetricBakingV2.BakeDXR(RayChunkSize, EnvLightSamples, AreaLightSamples, SkyboxContribution, CustomEnvorment);
+            }
+            else
+            {
+                RebuildMeshObjectBuffers();
+                BakeLights();
+                ReleaseBuffers();
+            }
+
+        };
+        
+        if (GUILayout.Button("Bake Sky Occlusion"))
+        {
+            SkyOcclusionRenderer.RenderSkyOcclusion();
+        }
+
+        EditorGUILayout.LabelField(BakingStatus);
+        WarningGUI();
+        if (saveWarning) if (GUILayout.Button("Save scene(s)")) SaveScenes();
+
+        if (!checkedD3D12)
+        {
+            checkedD3D12 = true;
+            isD3D12 = SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D12;
+        }
+        if (!isD3D12)
+        {
+            if (GUILayout.Button("Restart Editor in DX12"))
+            {
+                SwtichToDX12();
+            }
+        }
+
+        //      EditorGUILayout.HelpBox("Some warning text", MessageType.Warning); //Todo: add warning box to window
+    }
+
+    public void SwtichToDX12()
+    {
+        //Debug.Log($"New API: {newAPI.ToString()}");
+        GraphicsAPISwitch APISwitch = ScriptableObject.CreateInstance<GraphicsAPISwitch>();
+        APISwitch.newAPI = GraphicsDeviceType.Direct3D12;
+        APISwitch.SwtichToNewAPI();
+        DestroyImmediate(APISwitch);
+        //if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        //{
+        //    Process cmd = new Process();
+        //    string projectPath = Path.GetDirectoryName(Application.dataPath);
+        //    string unity = EditorApplication.applicationPath;
+        //    cmd.StartInfo.FileName = "cmd.exe";
+        //    cmd.StartInfo.Arguments = $"/K timeout /t 7 & {unity} -projectPath \"{projectPath}\" -force-d3d12";
+        //    cmd.StartInfo.UseShellExecute = true;
+        //    cmd.Start();
+        //
+        //    EditorApplication.Exit(0);
+        //}
+    }
+
+
+
+    struct WarningStatus
+    {
+        public bool Display;
+        public string Text;
+    }
+
+    WarningStatus warningStatus;
+
+    void WarningGUI()
+    {
+        if (warningStatus.Display == false) return;
+        EditorGUILayout.HelpBox(warningStatus.Text, MessageType.Warning);
+    }
+
+    struct Progress {
+        public string title;
+        public string info;
+        public float percent;
+    }
+    Progress progress;
+    double ProgressTimeStart;
+    void DisplayProgress()
+    {
+        if (Application.isBatchMode) return;
+        if (Running)
+        {
+            EditorUtility.DisplayProgressBar(progress.title + EditorApplication.timeSinceStartup, progress.info, progress.percent);
+        }
+    }
+
+    private void UpdateProgress(string title, string info, float percent)
+    {
+        progress.title = title;
+        progress.info = info;
+        progress.percent = percent;
+
+        DisplayProgress();
+
+    }
+    string BakingStatus;
+
+    void UpdateStatus(string Status)
+    {
+        BakingStatus = Status;
+        Debug.Log(Status);
+        Repaint();
+    }
+
+    void UpdateWarning(string text)
+    {
+        warningStatus.Display = true;
+        warningStatus.Text = text;
+        Debug.LogWarning(warningStatus.Text);
+    }
+
+    void ClearWarning()
+    {
+        warningStatus.Display = false;
+        warningStatus.Text = null;
+        saveWarning = false;
+    }
+
+    bool VerifySettings()
+    {
+        if (DXRAcceletration && SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Direct3D12)
+        {
+            UpdateWarning("DirectX 12 not in use. DXR Acceletration requires it.");
+            return false;
+        }
+
+
+        if (VolumetricRegisters.volumetricAreas.Count < 1) //Checking volumes
+        {
+            UpdateWarning("No volumetric areas in the scene. Nothing to bake.");
+            return false;
+        }
+
+        if (AreScenesDirty() == true) //Checking if scenes are dirty then ask to save
+        {
+            bool notCancelled = UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+            if (notCancelled)
+            {
+                if (AreScenesDirty()) //checking AGAIN because only sets to false when cancelled
+                {
+                    UpdateWarning("Save your scene before baking."); //This is not techincally required, but it helps save progress incase of crash
+                    saveWarning = true;
+                    return false;
+                }
+            }
+
+            else
+            {
+                return false; //cancelled
+            }
+        }
+
+        if (SceneManager.sceneCount > 1) //Checking scene count
+        {
+            UpdateWarning("More than one scene open. Saving to active scene.");
+        }
+
+        return true; //everything checks out
+    }
+    bool AreScenesDirty()
+    {
+        for (int i = 0; i < SceneManager.sceneCount; i++)
+        {
+            if (SceneManager.GetSceneAt(i).isDirty) return true;
+        }
+        return false;
+    }
+
+    void SaveScene()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+
+        ClearWarning();
+    }
+
+    void SaveScenes()
+    {
+
+        for (int i = 0; i < SceneManager.sceneCount; i++)
+        {
+            Scene currentS = SceneManager.GetSceneAt(i);
+            if (currentS.isDirty)
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(currentS);
+                Debug.Log("Saved " + currentS.name);
+            }
+        }
+        AssetDatabase.SaveAssets();
+        ClearWarning();
+    }
+
+
+    // public int tex1Res = 64;
+    //  ComputeShader BakingShader; // Baking shader
+    // ComputeShader slicer; //Slicer shader for saving
+    //public Light[] BakeLights;
+
+    //  public Vector3 DirectionalLight = new Vector3(0,1,0);
+
+    public Vector3 Size = Vector3.one;
+
+    public float AmbientMedia = 0;
+
+    public GameObject[] Spheres;
+
+    //Data Lists
+    public struct LightStruct
+    {
+        public Color[] color;
+        public float[] extinction;
+        public Vector3[] Position;
+    }
+
+
+    /// <summary>
+    /// Triangle Object
+    /// </summary>
+
+    struct MeshObject
+    {
+        public Matrix4x4 localToWorldMatrix;
+        public int indices_offset;
+        public int indices_count;
+    }
+
+    private static List<MeshObject> _meshObjects = new List<MeshObject>();
+    private static List<Vector3> _vertices = new List<Vector3>();
+    private static List<int> _indices = new List<int>();
+    private ComputeBuffer _meshObjectBuffer;
+    private ComputeBuffer _vertexBuffer;
+    private ComputeBuffer _indexBuffer;
+
+    struct Debuger
+    {
+        public int DebugCcounter;
+    }
+   
+
+    static int prop_OutputDim = Shader.PropertyToID("_OutputDim");
+    static int prop_Input = Shader.PropertyToID("_Input");
+    static int prop_Output = Shader.PropertyToID("_Output");
+    const string Mip3DTextureGUID = "a7b6f45f3454c3345a78c989cedd7229";
+    static ComputeShader s_mip3DCompute;
+    static ComputeShader Mip3DCompute
+    {
+        get {
+            if (s_mip3DCompute == null)
+            {
+                string mip3dComputePath = AssetDatabase.GUIDToAssetPath(Mip3DTextureGUID);
+                if (string.IsNullOrEmpty(mip3dComputePath))
+                {
+                    throw new FileNotFoundException("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). Either the shader is missing or its meta file got regenerated");
+                }
+                ComputeShader t_mip3DCompute = AssetDatabase.LoadAssetAtPath<ComputeShader>(mip3dComputePath);
+                if (t_mip3DCompute == null)
+                {
+                    throw new FileNotFoundException("Volumetric Baking: Failed to load Mip3DTexture compute shader by hard-coded GUID (" + Mip3DTextureGUID + "). No compute shader was found at the path of the GUID, meaning another asset has the same GUID!");
+                }
+                s_mip3DCompute = t_mip3DCompute;
+            }
+            return s_mip3DCompute;
+        }
+    }
+
+    RenderTexture[] Get3DMips(RenderTexture mip0)
+    {
+        int numMips = (int)math.floor(math.log2(math.max(mip0.width, math.max(mip0.height, mip0.volumeDepth)))) + 1;
+        RenderTexture[] mips = new RenderTexture[numMips];
+
+        RenderTextureDescriptor rtDesc = mip0.descriptor;
+
+        ComputeShader mip3DCompute = Mip3DCompute;
+
+        int kernelMip = mip3DCompute.FindKernel("CalculateMip");
+
+        mips[0] = mip0;
+
+        for (int level = 1; level < numMips; level++)
+        {
+
+
+            rtDesc.width = math.max(rtDesc.width / 2, 1);
+            rtDesc.height = math.max(rtDesc.height / 2, 1);
+            rtDesc.volumeDepth = math.max(rtDesc.volumeDepth / 2, 1);
+            mips[level] = new RenderTexture(rtDesc);
+            mips[level].Create();
+
+            mip3DCompute.SetTexture(kernelMip, prop_Input, mips[level - 1]);
+            mip3DCompute.SetTexture(kernelMip, prop_Output, mips[level]);
+            mip3DCompute.SetInts(prop_OutputDim, new int[] { rtDesc.width, rtDesc.height, rtDesc.volumeDepth, 0 });
+
+            mip3DCompute.Dispatch(kernelMip, (rtDesc.width + 3) / 4, (rtDesc.height + 3) / 4, (rtDesc.volumeDepth + 3) / 4);
+        }
+        return mips;
+    }
+    Texture3D ReadRT2Tex3D(RenderTexture[] rtAndMips)
+    {
+
+        GraphicsFormat gfmt = rtAndMips[0].graphicsFormat;
+        TextureFormat tfmt = GraphicsFormatUtility.GetTextureFormat(gfmt);
+        int width = rtAndMips[0].width;
+        int height = rtAndMips[0].height;
+        int depth = rtAndMips[0].volumeDepth;
+
+        Texture3D output = new Texture3D(width, height, depth, gfmt, rtAndMips.Length > 1 ? TextureCreationFlags.MipChain : TextureCreationFlags.None);
+
+        AsyncGPUReadbackRequest[] request = new AsyncGPUReadbackRequest[rtAndMips.Length];
+        for (int i = 0; i < rtAndMips.Length; i++)
+        {
+            request[i] = AsyncGPUReadback.Request(rtAndMips[i], 0);
+        }
+
+        for (int mip = 0; mip < output.mipmapCount; mip++)
+        {
+            int currPtr = 0;
+
+            NativeArray<byte> outputRaw = output.GetPixelData<byte>(mip);
+            request[mip].WaitForCompletion();
+            int layers = request[mip].layerCount;
+            for (int slice = 0; slice < layers; slice++)
+            {
+
+                NativeArray<byte> readBackRaw = request[mip].GetData<byte>(slice);
+                NativeArray<byte>.Copy(readBackRaw, 0, outputRaw, currPtr, readBackRaw.Length);
+                currPtr += readBackRaw.Length;
+
+                readBackRaw.Dispose();
+            }
+        }
+        //Texture2D temp = new Texture2D(width, height, gfmt, TextureCreationFlags.None);
+        //Rect sliceRect = new Rect(0, 0, width, height);
+        //int sliceSize = width * height;
+        //RenderTexture oldActive = RenderTexture.active;
+        //RenderTexture.active = rt;
+        //int outputRawPtr = 0;
+        //for (int depthSlice = 0; depthSlice < depth; depthSlice++)
+        //{
+        //	Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, depthSlice);
+        //	temp.ReadPixels(sliceRect,0,0);
+        //	temp.Apply(false);
+        //	NativeArray<byte> tempNative = temp.GetPixelData<byte>(0);
+        //	NativeArray<byte>.Copy(tempNative, 0, outputRaw, outputRawPtr, tempNative.Length);
+        //	outputRawPtr += tempNative.Length;
+        //}
+        //Graphics.SetRenderTarget(oldActive, 0, CubemapFace.Unknown, 0);
+        //RenderTexture.active = oldActive;
+
+        return output;
+    }
+
+    static int prop_PrevMipDimOffset = Shader.PropertyToID("_PrevMipDimOffset");
+    static int prop_MipDimOffset = Shader.PropertyToID("_MipDimOffset");
+    static int prop_Buffer = Shader.PropertyToID("_Buffer");
+    ComputeBuffer Get3DMipsBuffer(RenderTexture mip0)
+    {
+        int numMips = (int)math.floor(math.log2(math.max(mip0.width, math.max(mip0.height, mip0.volumeDepth)))) + 1;
+        RenderTextureDescriptor rtDesc = mip0.descriptor;
+        int3 textureDim = new int3(rtDesc.width, rtDesc.height, rtDesc.volumeDepth);
+        int bufferCount = textureDim.x * textureDim.y * textureDim.z;
+        for (int i = 0; i < numMips; i++)
+        {
+            textureDim = math.max(textureDim / 2, 1);
+            bufferCount += textureDim.x * textureDim.y * textureDim.z;
+        }
+        CommandBuffer cmd = CommandBufferPool.Get("Mip3DTexToBuffer");
+
+        ComputeBuffer mips = new ComputeBuffer(bufferCount, 4 * sizeof(ushort), ComputeBufferType.Structured);
+
+        ComputeShader mip3DCompute = Mip3DCompute;
+
+        int initKernel = mip3DCompute.FindKernel("CopyTexToBuffer");
+        int mipKernel = mip3DCompute.FindKernel("CalculateMipBuffer");
+        int3 mipDim = new int3(rtDesc.width, rtDesc.height, rtDesc.volumeDepth);
+
+        cmd.SetComputeIntParams(mip3DCompute, prop_MipDimOffset, new int[] { mipDim.x, mipDim.y, mipDim.z, 0 });
+        cmd.SetComputeBufferParam(mip3DCompute, initKernel, prop_Buffer, mips);
+        cmd.SetComputeTextureParam(mip3DCompute, initKernel, prop_Input, mip0);
+        cmd.DispatchCompute(mip3DCompute, initKernel, (mipDim.x + 3) / 4, (mipDim.y + 3) / 4, (mipDim.z + 3) / 4);
+
+        int3 prevMipDim = mipDim;
+        int mipPtr = 0;
+        int prevMipPtr = 0;
+        cmd.SetComputeBufferParam(mip3DCompute, mipKernel, prop_Buffer, mips);
+        for (int level = 1; level < numMips; level++)
+        {
+            prevMipDim = mipDim;
+            prevMipPtr = mipPtr;
+            mipDim = math.max(mipDim / 2, new int3(1, 1, 1));
+            mipPtr += prevMipDim.x * prevMipDim.y * prevMipDim.z;
+            cmd.SetComputeIntParams(mip3DCompute, prop_PrevMipDimOffset, new int[] { prevMipDim.x, prevMipDim.y, prevMipDim.z, prevMipPtr });
+            cmd.SetComputeIntParams(mip3DCompute, prop_MipDimOffset, new int[] { mipDim.x, mipDim.y, mipDim.z, mipPtr });
+            cmd.DispatchCompute(mip3DCompute, mipKernel, (mipDim.x + 3) / 4, (mipDim.y + 3) / 4, (mipDim.z + 3) / 4);
+            GraphicsFence fence = cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
+            cmd.WaitOnAsyncGraphicsFence(fence);
+        }
+        Graphics.ExecuteCommandBuffer(cmd);
+        CommandBufferPool.Release(cmd);
+        return mips;
+    }
+
+    Texture3D ReadBufferToTex3D(ComputeBuffer rtAndMips, int width, int height, int depth)
+    {
+        GraphicsFormat gfmt = GraphicsFormat.R16G16B16A16_SFloat;
+        Texture3D output = new Texture3D(width, height, depth, gfmt, TextureCreationFlags.MipChain);
+        int stride = rtAndMips.stride / sizeof(ushort);
+        ushort[] bufferReadBack = new ushort[rtAndMips.count * stride];
+        rtAndMips.GetData(bufferReadBack);
+        Debug.Log($"Pixel 0 is ({math.f16tof32(bufferReadBack[0])}, {math.f16tof32(bufferReadBack[1])}, {math.f16tof32(bufferReadBack[2])}, {math.f16tof32(bufferReadBack[3])})");
+        int ptr = 0;
+        for (int mip = 0; mip < output.mipmapCount; mip++)
+        {
+
+            NativeArray<ushort> outputRaw = output.GetPixelData<ushort>(mip);
+            int copyCount = width * height * depth * stride;
+            NativeArray<ushort>.Copy(bufferReadBack, ptr, outputRaw, 0, width * height * depth * stride);
+            //if (mip == output.mipmapCount - 1)
+            //{
+            //    half4 lastColor = new half4(
+            //    new half() { value = bufferReadBack[ptr - 4] },
+            //    new half() { value = bufferReadBack[ptr - 3] },
+            //    new half() { value = bufferReadBack[ptr - 2] },
+            //    new half() { value = bufferReadBack[ptr - 1] });
+            //    Debug.Log("Last Color: " + lastColor.ToString());
+            //}
+            ptr += copyCount;
+            width = math.max(1, width / 2);
+            height = math.max(1, height / 2);
+            depth = math.max(1, depth / 2);
+        }
+        return output;
+    }
+
+    //////
+
+    ComputeShader BakingShader;
+
+
+    void BakeLights()
+    {
+        System.DateTime startTime = System.DateTime.Now;
+        BakingShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/VolumetricBaking.compute");
+        UpdateStatus("Baking " + SceneManager.GetActiveScene().name);
+        ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
+        int BlitBucketKernal = BlitShader.FindKernel("BlitBucket");
+
+        Running = true;
+
+        for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
+        {
+            //    EditorUtility.DisplayProgressBar("Baking Volumetrics... ", VolumetricRegisters.volumetricAreas[j].name, (float)j / (float)VolumetricRegisters.volumetricAreas.Count);
+
+            Vector3Int Texels = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+            RenderTextureDescriptor rtdiscrpt = new RenderTextureDescriptor();
+            rtdiscrpt.enableRandomWrite = true;
+            rtdiscrpt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
+            rtdiscrpt.width = Texels.x;
+            rtdiscrpt.height = Texels.y;
+            rtdiscrpt.volumeDepth = Texels.z;
+            rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
+            rtdiscrpt.msaaSamples = 1;
+
+            //Target buffer
+            RenderTexture RT3d = new RenderTexture(rtdiscrpt);
+            RT3d.Create();
+
+
+            //Bucket
+            rtdiscrpt.width = BucketSize;
+            rtdiscrpt.height = BucketSize;
+            rtdiscrpt.volumeDepth = BucketSize;
+
+            RenderTexture bucketBuffer = new RenderTexture(rtdiscrpt);
+            bucketBuffer.Create();
+
+            Light[] PointLights = GatherBakedLights(LightType.Point);
+
+            //Figuring out the buckets per dimension
+
+            int bx = Mathf.CeilToInt((float)Texels.x / BucketSize);
+            int by = Mathf.CeilToInt((float)Texels.y / BucketSize);
+            int bz = Mathf.CeilToInt((float)Texels.z / BucketSize);
+
+            //Total number of buckets
+            int BucketCount = bx * by * bz;
+
+            Debug.Log(BucketCount + " buckets");
+
+            BlitShader.SetTexture(BlitBucketKernal, "BucketBuffer", bucketBuffer);
+            BlitShader.SetTexture(BlitBucketKernal, "Result", RT3d);
+
+
+            //Bucket Loop
+            for (int b = 0; b < BucketCount; b++)
+            {
+
+                Vector3 ThreadsToDispatch = new Vector3(
+                            Mathf.CeilToInt((float)Texels.x / 4.0f),
+                            Mathf.CeilToInt((float)Texels.y / 4.0f),
+                            Mathf.CeilToInt((float)Texels.z / 4.0f));
+
+                Vector3 BucketThreads = new Vector3(
+                            Mathf.CeilToInt((float)BucketSize / 4.0f),
+                            Mathf.CeilToInt((float)BucketSize / 4.0f),
+                            Mathf.CeilToInt((float)BucketSize / 4.0f));
+
+
+                //Generate cell offset
+
+                int x = b % bx;
+                int y = (b / bx) % by;
+                int z = b / (by * bx);
+
+                Vector3Int CellOffset = new Vector3Int(x, y, z);
+                Vector3Int TextileOffset = CellOffset * BucketSize;
+
+                //    Debug.Log(TextileOffset + ", size:" + BucketSize);
+
+                ///    BlitShader.set
+                ///    
+                //Clear buffer
+                BakingShader.SetTexture(BakingShader.FindKernel("ClearBuffer"), "AccumulatedLights", bucketBuffer);
+                BakingShader.Dispatch(BakingShader.FindKernel("ClearBuffer"), (int)BucketThreads.x, (int)BucketThreads.y, (int)BucketThreads.z);
+
+                //Light Loop
+                for (int i = 0; i < PointLights.Length; i++)
+                {
+                    UpdateProgress("Baking " + (j + 1) + "/" + VolumetricRegisters.volumetricAreas.Count + " "
+                    + VolumetricRegisters.volumetricAreas[j].name + " "
+                    + (System.DateTime.Now.Minute - startTime.Minute) + ":" + (System.DateTime.Now.Second - startTime.Second) //TODO: Format correctly
+                    , PointLights[i].name, (float)i / PointLights.Length);
+
+                    //TODO: Do some checking to only render lights affecting the area. AABB?      
+
+                    //Render to bucket buffer
+                    DispatchLight(PointLights[i], bucketBuffer, new Vector3Int(BucketSize, BucketSize, BucketSize), j, TextileOffset);
+                }
+
+                //Blit from bucket to larger buffer
+                BlitShader.SetTexture(BlitBucketKernal, "BucketBuffer", bucketBuffer); //bucket buffer
+                BlitShader.SetTexture(BlitBucketKernal, "Result", RT3d); //target buffer
+                BlitShader.SetVector("BucketOffset", (Vector3)TextileOffset);
+                BlitShader.SetInt("BucketSize", BucketSize);
+                BlitShader.Dispatch(BlitBucketKernal, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+
+                //     RT3d
+
+            }
+            //do
+            //{
+
+            //} while (i < 0);
+            //bool dothething = true;
+            //while (dothething)
+            //{
+            //    UpdateProgress("Baking " + (j + 1) + "/" + VolumetricRegisters.volumetricAreas.Count + " "
+            //    + VolumetricRegisters.volumetricAreas[j].name + " "
+            //    + (System.DateTime.Now.Minute - startTime.Minute) + ":" + (System.DateTime.Now.Second - startTime.Second) //TODO: Format correctly
+            //    , PointLights[i].name, (float)i / PointLights.Length);
+
+            //    //TODO: Do some checking to only render lights affecting the area. AABB?                
+            //    DispatchLight(PointLights[i], RT3d, Texels, j);
+
+            //    Debug.Log("");
+
+            //    return;
+            //}
+
+            //Define path and save 3d texture
+            string path = CheckDirectoryAndReturnPath() + j;
+            RenderTexture[] mipChain = Get3DMips(RT3d);
+
+            Texture3D ReadBackTex = ReadRT2Tex3D(mipChain);
+            for (int i = 0; i < mipChain.Length; i++)
+            {
+                mipChain[i].Release();
+                DestroyImmediate(mipChain[i]);
+            }
+
+            Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
+
+            bucketBuffer.Release();
+            DestroyImmediate(bucketBuffer);
+
+            AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
+            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
+            EditorUtility.UnloadUnusedAssetsImmediate();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
+            //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
+
+        }
+
+        Running = false;
+        EditorUtility.ClearProgressBar();
+
+        System.DateTime endTime = System.DateTime.Now;
+
+        UpdateStatus(" Volumetric bake took " + (endTime.Minute - startTime.Minute) + " Minutes and " +
+            (endTime.Second - startTime.Second) + " Seconds. Baked " + VolumetricRegisters.volumetricAreas.Count + " areas."
+            );
+
+        //   UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+
+    }
+
+    // string CheckDirectoryAndReturnPath()
+    // {
+    //     //Define path 
+    //     string path = SceneManager.GetActiveScene().path;
+    //     path = path.Replace(".unity", "");
+    //     if (!Directory.Exists(path)) //Check if path exists
+    //     {
+    //         Directory.CreateDirectory(path); //if it doesn't, create it
+    //         Debug.Log("Made Directory " + path);
+    //         AssetDatabase.Refresh();
+    //     }
+    //     return path + "/" + "Volumemap-";
+    // }
+    
+    string CheckDirectoryAndReturnPath()
+    {
+        // Asset path (Unity)
+        string sceneAssetPath = SceneManager.GetActiveScene().path;        // e.g. Assets/BakeTesting/BakeTesting.unity
+        string dirAssetPath   = sceneAssetPath.Replace(".unity", "");      // e.g. Assets/BakeTesting/BakeTesting
+
+        // Absolute filesystem path
+        string projectRoot = Directory.GetParent(Application.dataPath).FullName; // .../YourProject
+        string dirAbsPath  = Path.GetFullPath(Path.Combine(projectRoot, dirAssetPath));
+
+        if (!Directory.Exists(dirAbsPath))
+        {
+            Directory.CreateDirectory(dirAbsPath);
+            Debug.Log("Made Directory (abs) " + dirAbsPath);
+            AssetDatabase.Refresh();
+        }
+
+        // Return asset path prefix for your Vol3d writer + importer
+        return dirAssetPath + "/Volumemap-";
+    }
+
+
+    ComputeShader m_clear3DTex;
+    ComputeShader Clear3DTexShader
+    {
+        get
+        {
+            if (m_clear3DTex == null)
+            {
+                m_clear3DTex = AssetDatabase.LoadAssetAtPath<ComputeShader>(AssetDatabase.GUIDToAssetPath("e78dcf06706ad9840b7c3b0ec9f489b7"));
+            }
+            return m_clear3DTex;
+        }
+    }
+
+    static int ID_Source = Shader.PropertyToID("_Source");
+    static int ID_SourceDim = Shader.PropertyToID("_SourceDim");
+    static int ID_ClearColor = Shader.PropertyToID("_ClearColor");
+
+    void Clear3DTex(RenderTexture RT3d, float r = 0, float g = 0, float b = 0, float a = 0)
+    {
+        ComputeShader clearShader = Clear3DTexShader;
+        int[] dim = new int[3] { RT3d.width, RT3d.height, RT3d.volumeDepth };
+        clearShader.SetTexture(0, ID_Source, RT3d);
+        clearShader.SetInts(ID_SourceDim, dim);
+        clearShader.SetVector(ID_ClearColor, new Vector4(r, g, b, a));
+
+        clearShader.Dispatch(0, (dim[0] + 3) / 4, (dim[1] + 3) / 4, (dim[2] + 3) / 4);
+    }
+
+    RenderTexture initializeVolume(int i)
+    {
+
+        Vector3Int Texels = VolumetricRegisters.volumetricAreas[i].NormalizedTexelDensity;
+        RenderTextureDescriptor rtdiscrpt = new RenderTextureDescriptor();
+        rtdiscrpt.enableRandomWrite = true;
+        rtdiscrpt.dimension = UnityEngine.Rendering.TextureDimension.Tex3D;
+        rtdiscrpt.width = Texels.x;
+        rtdiscrpt.height = Texels.y;
+        rtdiscrpt.volumeDepth = Texels.z;
+        rtdiscrpt.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R16G16B16A16_SFloat;
+        rtdiscrpt.msaaSamples = 1;
+
+        //Target buffer
+        RenderTexture RT3d = new RenderTexture(rtdiscrpt);
+        RT3d.Create();
+        Clear3DTex(RT3d);
+        return RT3d;
+    }
+
+    static Cubemap s_BlackSky;
+    static Cubemap BlackSky {
+
+        get
+        {
+            if (!s_BlackSky) s_BlackSky = AssetDatabase.LoadAssetAtPath<Cubemap>(AssetDatabase.GUIDToAssetPath("56b7b692370e11940b6f0323bf47a14a"));
+            return s_BlackSky;
+        }
+    }
+
+    Texture MakeEnvironmentalCubemap()
+    {
+        //Black Background
+        if (SkyboxContribution != true){
+
+            return BlackSky;
+            /*
+            RenderTexture cubetex = new RenderTexture(32, 32, 1, RenderTextureFormat.DefaultHDR);
+            cubetex.enableRandomWrite = true;
+            cubetex.dimension = UnityEngine.Rendering.TextureDimension.Cube;
+            cubetex.Create();
+
+            Camera renderCam = new GameObject().AddComponent<Camera>();
+            renderCam.cullingMask = 0;
+            renderCam.backgroundColor = Color.black;
+            renderCam.clearFlags = CameraClearFlags.Color;
+            renderCam.RenderToCubemap(cubetex);
+            DestroyImmediate(renderCam.gameObject);
+            return cubetex;
+            */
+        }
+
+        //Generate Skybox
+        if (CustomEnvorment == null)
+        {
+            RenderTexture cubetex = new RenderTexture(256, 256, 1, RenderTextureFormat.DefaultHDR);
+            cubetex.enableRandomWrite = true;
+            cubetex.dimension = UnityEngine.Rendering.TextureDimension.Cube;
+            cubetex.Create();
+
+            Camera renderCam = new GameObject().AddComponent<Camera>();
+            renderCam.cullingMask = 0;
+            renderCam.backgroundColor = Color.black;
+            renderCam.clearFlags = CameraClearFlags.Skybox;
+            renderCam.RenderToCubemap(cubetex);
+            DestroyImmediate(renderCam.gameObject);
+            return cubetex;
+        }
+        //Provided skybox
+        else
+        {
+            return CustomEnvorment;
+        }
+    }
+
+    void RefreshDebuggers()
+    {
+        for (int i = 0; i < VolumetricRegisters.volumetricAreas.Count; i++)
+        {
+            if (VolumetricRegisters.volumetricAreas[i].DEBUG) VolumetricRegisters.volumetricAreas[i].RefreshDebugMesh();
+        }
+    }
+
+    Color ColorExtraction(Light light)
+    {
+        Color colorModulation = light.color.linear;
+        if (light.useColorTemperature) colorModulation *= Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
+        colorModulation *= light.intensity;
+        colorModulation *= light.gameObject.GetComponent<UniversalAdditionalLightData>().volumetricDimmer;
+        return colorModulation;
+    }
+
+    static int id_startIdx = Shader.PropertyToID("StartRayIdx");
+
+    void BakeDXR()
+    {
+
+        System.DateTime startTime = System.DateTime.Now;
+        UpdateStatus("Baking " + SceneManager.GetActiveScene().name);
+        //ComputeShader BlitShader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/3dBlit.compute");
+
+        RayTracingShader rtshader = AssetDatabase.LoadAssetAtPath<RayTracingShader>("Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/DXR-Volumebaker.raytrace");
+        rtshader.SetShaderPass("BakedRaytrace");
+
+        RayTracingAccelerationStructure accelerationStructure = new RayTracingAccelerationStructure(); ;
+        Renderer[] renderers = GatherStaticRenderers();
+
+        RayTracingSubMeshFlags[] smflags = new RayTracingSubMeshFlags[64];
+        for (int smIdx = 0; smIdx < 64; smIdx++)
+        {
+            smflags[smIdx] = RayTracingSubMeshFlags.Enabled;
+        }
+
+        for (int i = 0; i < renderers.Length; i++) accelerationStructure.AddInstance(renderers[i], smflags);
+        accelerationStructure.Build();
+        rtshader.SetAccelerationStructure("g_SceneAccelStruct", accelerationStructure);
+
+        Running = true;
+
+        Vector3Int threads = new Vector3Int();
+
+
+        List<Light> PointLights, ConeLights, DirectionalLights, AreaLights;
+
+        Light[] Lights = GatherBakedLights();
+
+        PointLights = new List<Light>();
+        ConeLights = new List<Light>();
+        DirectionalLights = new List<Light>();
+        AreaLights = new List<Light>();
+
+        for (int i = 0; i < Lights.Length; i++)
+        {
+
+            switch (Lights[i].type)
+            {
+                case LightType.Point:
+                    PointLights.Add(Lights[i]);
+                    break;
+
+                case LightType.Spot:
+                    ConeLights.Add(Lights[i]);
+                    break;
+
+                case LightType.Directional:
+                    DirectionalLights.Add(Lights[i]);
+                    break;
+
+#if UNITY_6000_0_OR_NEWER
+                case LightType.Rectangle:
+#else
+                case LightType.Area:
+#endif
+                    AreaLights.Add(Lights[i]);
+                    break;
+
+                case LightType.Disc:
+                    AreaLights.Add(Lights[i]); //Stacking area and disc
+                    break;
+                default:
+
+                    break;
+            }
+        }
+
+        Debug.Log($"Skybox {SkyboxContribution}, {PointLights.Count} Point Lights, {ConeLights.Count} Cone Lights, {DirectionalLights.Count} Dir Lights, {AreaLights.Count} area lights.");
+
+        //Set up buffers with data stride. Keeping a min count of 1 to keep buffer valid. Get's skipped in shader.
+        ComputeBuffer pointBuffer = new ComputeBuffer(Mathf.Max(PointLights.Count, 1), (3 + 4) * 4);
+        ComputeBuffer coneBuffer = new ComputeBuffer(Mathf.Max(ConeLights.Count, 1), (3 + 4 + 3 + 2) * 4);
+        ComputeBuffer dirBuffer = new ComputeBuffer(Mathf.Max(DirectionalLights.Count, 1), (3 + 4) * 4);
+        ComputeBuffer areaBuffer = new ComputeBuffer(Mathf.Max(AreaLights.Count, 1), (4 * 4 + 4 * 4 + 3 + 4 + 3) * 4);
+
+        PointLightData[] PointLDatas = new PointLightData[PointLights.Count];
+        ConeLightData[] ConeLDatas = new ConeLightData[ConeLights.Count];
+        DirLightData[] DirLDatas = new DirLightData[DirectionalLights.Count];
+        AreaLightData[] AreaLDatas = new AreaLightData[AreaLights.Count];
+
+        for (int i = 0; i < PointLights.Count; i++)
+        {
+            PointLDatas[i].PointLightsPos = PointLights[i].transform.position;
+            PointLDatas[i].PointLightsColors = ColorExtraction(PointLights[i]);
+        }
+
+        for (int i = 0; i < ConeLights.Count; i++)
+        {
+            ConeLDatas[i].ConeLightsWS = ConeLights[i].transform.position;
+            ConeLDatas[i].ConeLightsColors = ColorExtraction(ConeLights[i]);
+            ConeLDatas[i].ConeLightsDir = ConeLights[i].transform.forward;
+
+            float flPhiDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].spotAngle * 0.5f * Mathf.Deg2Rad)); // outer cone
+            float flThetaDot = Mathf.Clamp01(Mathf.Cos(ConeLights[i].innerSpotAngle * 0.5f * Mathf.Deg2Rad)); // inner cone
+
+            ConeLDatas[i].ConeLightsPram = new Vector4(flPhiDot, 1.0f / Mathf.Max(0.01f, flThetaDot - flPhiDot), 0, 0);
+        }
+
+        for (int i = 0; i < DirectionalLights.Count; i++)
+        {
+            DirLDatas[i].DirLightsDir = DirectionalLights[i].transform.forward;
+            DirLDatas[i].DirLightsColors = ColorExtraction(DirectionalLights[i]);
+        }
+
+        for (int i = 0; i < AreaLights.Count; i++)
+        {
+            AreaLDatas[i].AreaLightsPos = AreaLights[i].transform.position;
+            AreaLDatas[i].AreaLightsMatrix = Matrix4x4.TRS(AreaLights[i].transform.position, AreaLights[i].transform.rotation, Vector3.one);
+            AreaLDatas[i].AreaLightsMatrixInv = AreaLDatas[i].AreaLightsMatrix.inverse;
+            AreaLDatas[i].AreaLightsColors = ColorExtraction(AreaLights[i]);
+            AreaLDatas[i].AreaLightsSize = new Vector3(AreaLights[i].areaSize.x, AreaLights[i].areaSize.y, AreaLights[i].type == LightType.Disc ? 1 : 0); //Packing for area or disc logic
+        }
+
+        pointBuffer.SetData(PointLDatas);
+        coneBuffer.SetData(ConeLDatas);
+        dirBuffer.SetData(DirLDatas);
+        areaBuffer.SetData(AreaLDatas);
+
+        Texture skyTex = MakeEnvironmentalCubemap();
+        //CommandBuffer cmd = CommandBufferPool.Get();
+
+
+
+
+        for (int j = 0; j < VolumetricRegisters.volumetricAreas.Count; j++)
+        {
+            Vector3Int resolution = VolumetricRegisters.volumetricAreas[j].NormalizedTexelDensity;
+            threads = resolution;
+            Vector3 boxSize = VolumetricRegisters.volumetricAreas[j].BoxScale;
+            float maxVoxelSize = math.max(boxSize.x / (float)resolution.x, math.max(boxSize.y / (float)resolution.y, boxSize.z / (float)resolution.z));
+
+            RenderTexture RT3dA = initializeVolume(j);
+            //RenderTexture RT3dB = initializeVolume(j);
+
+
+            //Point
+
+            //Dispatching
+            int maxRays = PointLDatas.Length + ConeLDatas.Length + DirLDatas.Length + EnvLightSamples + (AreaLDatas.Length * AreaLightSamples);
+            Debug.Log("Max Rays: " + maxRays);
+            bool swap = false;
+            //GraphicsFence[] fence = new GraphicsFence[(maxRays + (RayChunkSize - 1)) / RayChunkSize];
+            int loopIdx = 0;
+            for (int rayCount = 0; rayCount < maxRays; rayCount += RayChunkSize)
+            {
+                CommandBuffer cmd = CommandBufferPool.Get();
+                //if (loopIdx > 0) cmd.WaitOnAsyncGraphicsFence(fence[loopIdx - 1]);
+
+                cmd.Clear();
+
+                cmd.SetRayTracingIntParam(rtshader, "PointLightCount", PointLDatas.Length); //Add a stack overflow loop or computebuffer
+                cmd.SetRayTracingBufferParam(rtshader, "PLD", pointBuffer);
+
+                //Cone
+                cmd.SetRayTracingIntParam(rtshader, "ConeLightCount", ConeLDatas.Length); //Add a stack overflow loop or computebuffer
+                cmd.SetRayTracingBufferParam(rtshader, "CLD", coneBuffer);
+
+                //Directional
+                cmd.SetRayTracingIntParam(rtshader, "DirLightCount", DirLDatas.Length); //Add a stack overflow loop or computebuffer
+                cmd.SetRayTracingBufferParam(rtshader, "DLD", dirBuffer);
+
+                //Area
+                cmd.SetRayTracingIntParam(rtshader, "AreaLightCount", AreaLDatas.Length); //Add a stack overflow loop or computebuffer
+                cmd.SetRayTracingIntParam(rtshader, "AreaLightSamples", System.Convert.ToInt32(AreaLightSamples));
+                cmd.SetRayTracingBufferParam(rtshader, "ALD", areaBuffer);
+
+                //Env
+                cmd.SetRayTracingTextureParam(rtshader, "_SkyTexture", skyTex);
+                cmd.SetRayTracingIntParam(rtshader, "EnvLightSamples", System.Convert.ToInt32(EnvLightSamples));
+
+
+                cmd.SetRayTracingIntParam(rtshader, "PerDispatchRayCount", RayChunkSize);
+
+
+                cmd.SetRayTracingVectorParam(rtshader, "Size", VolumetricRegisters.volumetricAreas[j].NormalizedScale);
+                cmd.SetRayTracingVectorParam(rtshader, "WPosition", VolumetricRegisters.volumetricAreas[j].Corner);
+                cmd.SetRayTracingFloatParam(rtshader, "_Seed", (UnityEngine.Random.Range(0.0f, 64.0f)));
+                cmd.SetRayTracingFloatParam(rtshader, "HalfVoxelSize", maxVoxelSize * 0.5f);
+
+
+
+                cmd.SetRayTracingTextureParam(rtshader, "g_Output", RT3dA);// swap ? RT3dA : RT3dB);
+               // cmd.SetRayTracingTextureParam(rtshader, "g_Input", swap ? RT3dB : RT3dA);
+                cmd.SetRayTracingIntParam(rtshader, id_startIdx, rayCount);
+                cmd.DispatchRays(rtshader, "MainRayGenShader", (uint)threads.x, (uint)threads.y, (uint)threads.z);
+                GraphicsFence fence = cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
+                // Execute the command buffer once per volume, if we add all the volumes to the buffer then execute the gpu will time out!
+                Graphics.ExecuteCommandBuffer(cmd);
+                swap = !swap;
+                Graphics.WaitOnAsyncGraphicsFence(fence);
+
+                CommandBufferPool.Release(cmd);
+                loopIdx += 1;
+            }
+            //Debug.LogError($"Swap was {swap}");
+            RenderTexture RT3d = RT3dA;// swap ? RT3dB : RT3dA;
+
+            ///
+            /// 
+            ///
+
+            string path = CheckDirectoryAndReturnPath() + j;
+            ComputeBuffer mipChain = Get3DMipsBuffer(RT3d);
+
+            Texture3D ReadBackTex = ReadBufferToTex3D(mipChain, RT3d.width, RT3d.height, RT3d.volumeDepth);
+            mipChain.Release();
+            Debug.Log("Used Buffer Readback");
+            //for (int i = 0; i < mipChain.Length; i++)
+            //{
+            //    mipChain[i].Release();
+            //    DestroyImmediate(mipChain[i]);
+            //}
+            Vol3d.WriteTex3DToVol3D(ReadBackTex, path + Vol3d.fileExtension);
+            AssetDatabase.ImportAsset(path + Vol3d.fileExtension);
+            VolumetricRegisters.volumetricAreas[j].bakedTexture = (Texture3D)AssetDatabase.LoadAssetAtPath(path + Vol3d.fileExtension, typeof(Texture3D));
+            RT3dA.Release();
+            UnityEngine.Object.DestroyImmediate(RT3d);
+            //RT3dB.Release();
+
+            //Selection.activeObject = VolumetricRegisters.volumetricAreas[j].bakedTexture;
+
+            //   Debug.Log(VolumetricRegisters.volumetricAreas[j].gameObject.scene.name + VolumetricRegisters.volumetricAreas[j].name);
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(VolumetricRegisters.volumetricAreas[j].gameObject.scene);
+
+        }
+        pointBuffer.Release();
+        coneBuffer.Release();
+        dirBuffer.Release();
+        areaBuffer.Release();
+        Running = false;
+        EditorUtility.ClearProgressBar();
+        if (skyTex != null && skyTex.GetType() == typeof(RenderTexture))
+        {
+            RenderTexture rtSky = skyTex as RenderTexture;
+            rtSky.DiscardContents(true, true);
+            rtSky.Release();
+            DestroyImmediate(rtSky);
+        }
+        accelerationStructure.Dispose();
+
+        System.DateTime endTime = System.DateTime.Now;
+
+        UpdateStatus(" Volumetric bake took " + (endTime.Minute - startTime.Minute) + " Minutes and " +
+            (endTime.Second - startTime.Second) + " Seconds. Baked " + VolumetricRegisters.volumetricAreas.Count + " areas."
+            );
+
+        RefreshDebuggers();
+        EditorUtility.UnloadUnusedAssetsImmediate();
+        GC.Collect();
+    }
+
+
+    void DispatchLight(Light light, RenderTexture RT3d, Vector3Int Texels, int AreaID, Vector3Int TextileOffset ) //Used to render each light indavidually. TODO Generalize into pure pathtracing
+    {
+
+        //Setup light data
+
+        Vector4 lightColor = light.color * light.intensity;
+        Vector4 lightPos = light.transform.position;
+        int shaderKernel;
+
+        //Setup and dispatch Baking compute shader
+        switch (light.type)
+        {
+            case LightType.Point :
+                
+                    shaderKernel = BakingShader.FindKernel("PointLight");
+                break;
+            case LightType.Spot :                
+                    shaderKernel = BakingShader.FindKernel("SpotLight");
+
+                float flPhiDot = Mathf.Clamp01(Mathf.Cos(light.spotAngle * 0.5f * Mathf.Deg2Rad)); // outer cone
+                float flThetaDot = Mathf.Clamp01(Mathf.Cos(light.innerSpotAngle * 0.5f * Mathf.Deg2Rad)); // inner cone
+
+
+                BakingShader.SetFloat("SpotPram", flPhiDot);
+                BakingShader.SetFloat("InnerSpotPram", 1.0f / Mathf.Max(0.01f, flThetaDot - flPhiDot));
+
+                break;
+            case LightType.Directional:
+             shaderKernel = BakingShader.FindKernel("DirectionalLight");
+                break;
+            case LightType.Rectangle:
+           //     Debug.Log("baked " + light.name);
+                shaderKernel = BakingShader.FindKernel("RectangleLight");
+                BakingShader.SetVector("AreaSize", light.areaSize);
+                BakingShader.SetFloat("AreaLightSamples", AreaLightSamples);
+                BakingShader.SetMatrix("AreaMatrix", Matrix4x4.Rotate(light.transform.rotation));
+
+                BakingShader.SetFloat("_Seed", UnityEngine.Random.value);
+
+                break;
+            case LightType.Disc:
+                shaderKernel = BakingShader.FindKernel("DiscLight");
+                BakingShader.SetVector("AreaSize", light.areaSize); //Only the first float is used for radius
+                BakingShader.SetFloat("AreaLightSamples", AreaLightSamples);
+                BakingShader.SetMatrix("AreaMatrix", Matrix4x4.Rotate(light.transform.rotation));
+
+                BakingShader.SetFloat("_Seed", UnityEngine.Random.value);
+                break;
+            default:
+                return;
+        }
+
+
+        BakingShader.SetTexture(shaderKernel, "AccumulatedLights", RT3d);
+
+        BakingShader.SetVector("LightColor", lightColor);
+        BakingShader.SetVector("LightPosition", lightPos);
+
+        BakingShader.SetVector("LightDirection", light.transform.rotation * Vector3.forward);
+        //  BakingShader.SetVector("Size", VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale);
+
+        Vector3 BucketScaler =  (Vector3)VolumetricRegisters.volumetricAreas[AreaID].NormalizedTexelDensity / (float)BucketSize ;
+      //  BucketScaler = Vector3.one * 1.5f;
+
+        //Debug.Log("Bucket Scaler" + BucketScaler+
+        //    "NormalizedTexelDensity" + (VolumetricRegisters.volumetricAreas[AreaID].NormalizedTexelDensity)+
+        //    "BucketSize" + BucketSize       );
+
+        //Offset each cell in world space based on the textiles 
+        Vector3 D = VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale;
+        Vector3 T = (Vector3)VolumetricRegisters.volumetricAreas[AreaID].NormalizedTexelDensity;
+        Vector3 PositionOffset = new Vector3( (D.x / T.x) * TextileOffset.x, (D.y / T.y) * TextileOffset.y, (D.z / T.z) * TextileOffset.z);
+
+        BakingShader.SetVector("Size", new Vector3(VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale.x / BucketScaler.x,
+            VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale.y / BucketScaler.y,
+            VolumetricRegisters.volumetricAreas[AreaID].NormalizedScale.z / BucketScaler.z) );
+        //  BakingShader.SetVector("Size", (Vector3)(Vector3Int.one * BucketSize) );
+        BakingShader.SetVector("Position", VolumetricRegisters.volumetricAreas[AreaID].Corner + PositionOffset);
+
+
+        ///Temp Shadow spheres
+        Vector4[] SpherePos = new Vector4[0];
+        SetComputeBuffer("_MeshObjects", BakingShader, shaderKernel, _meshObjectBuffer);
+        SetComputeBuffer("_Vertices", BakingShader, shaderKernel, _vertexBuffer);
+        SetComputeBuffer("_Indices", BakingShader, shaderKernel, _indexBuffer);
+
+        BakingShader.SetVectorArray("OpaqueSphere", SpherePos);
+        BakingShader.SetInt("SphereCount", SpherePos.Length);
+        ///
+
+
+        Vector3 ThreadsToDispatch = new Vector3(
+        Mathf.CeilToInt(Texels.x / 4.0f),
+        Mathf.CeilToInt(Texels.y / 4.0f),
+        Mathf.CeilToInt(Texels.z / 4.0f)
+        );
+
+        int DebugCountStride = sizeof(int); //Size of debug strut
+        int DebugID = Shader.PropertyToID("DebugBuffer");
+
+        Debuger[] debuger = new Debuger[1];
+        debuger[0].DebugCcounter = 0;
+
+        ComputeBuffer BakeBuffer = new ComputeBuffer(1, DebugCountStride);
+        BakingShader.SetBuffer(shaderKernel, DebugID, BakeBuffer);
+
+        BakingShader.Dispatch(shaderKernel, (int)ThreadsToDispatch.x, (int)ThreadsToDispatch.y, (int)ThreadsToDispatch.z);
+
+        while (debuger[0].DebugCcounter == 0)
+        {
+            BakeBuffer.GetData(debuger);
+         //   Debug.Log("Counter " + debuger[0].DebugCcounter);
+        }
+
+        BakeBuffer.Release(); //Avoiding memory leak
+      //  return RT3d;
+    }
+
+    void SetComputeBuffer(string name, ComputeShader shader, int kernel, ComputeBuffer buffer)
+    {
+     //   Debug.Log("Setting buffer");
+        if (buffer != null)
+        {
+            shader.SetBuffer(kernel, name, buffer);
+
+       //     Debug.Log(name + " set");
+        }
+    }
+
+
+    Light[] GatherBakedLights(LightType lightType)
+    {
+        Light[] lights = FindObjectsOfType<Light>(); //TODO: Make it smarter to find only baked lights affecting zone.
+        List<Light> FilteredLights = new List<Light>();
+
+        for (int i = 0; i < lights.Length; i++)
+        {
+            //TODO: Handle mixed lights differently in the future
+            if (lights[i].lightmapBakeType == LightmapBakeType.Baked || lights[i].lightmapBakeType == LightmapBakeType.Mixed)
+            {
+                if (lights[i].enabled) FilteredLights.Add(lights[i]); 
+            }
+        }
+
+        return FilteredLights.ToArray();
+    }
+
+
+    Light[] GatherBakedLights()
+    {
+        Light[] lights = FindObjectsOfType<Light>(); //TODO: Make it smarter to find only baked lights affecting zone.
+        List<Light> FilteredLights = new List<Light>();
+
+        for (int i = 0; i < lights.Length; i++)
+        {
+            //TODO: Handle mixed lights differently in the future
+            if (lights[i].lightmapBakeType == LightmapBakeType.Baked || lights[i].lightmapBakeType == LightmapBakeType.Mixed)
+            {
+                if (lights[i].enabled) FilteredLights.Add(lights[i]);
+            }
+        }
+
+        return FilteredLights.ToArray();
+    }
+
+    GameObject[] GatherStaticObjects()    {
+
+        List<GameObject> StatcGameobject = new List<GameObject>();
+        Renderer[] AllRenderers = FindObjectsOfType<Renderer>();
+
+        StaticEditorFlags staticFlag = StaticEditorFlags.ContributeGI;
+
+        //Loop through GO's and see if the correct static flag is enabled. If it is, then add it to the list;
+        for (int i = 0; i < AllRenderers.Length; i++){
+            if (GameObjectUtility.AreStaticEditorFlagsSet(AllRenderers[i].gameObject, staticFlag) && AllRenderers[i].shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off) {
+                StatcGameobject.Add(AllRenderers[i].gameObject);
+              }
+        }
+
+        return StatcGameobject.ToArray();
+    }
+    Renderer[] GatherStaticRenderers()
+    {
+        List<Renderer> StatcRenderer = new List<Renderer>();
+        Renderer[] AllRenderers = FindObjectsOfType<Renderer>();
+        StaticEditorFlags staticFlag = StaticEditorFlags.ContributeGI;
+
+        //Loop through GO's and see if the correct static flag is enabled. If it is, then add it to the list;
+        for (int i = 0; i < AllRenderers.Length; i++)
+        {
+            if (GameObjectUtility.AreStaticEditorFlagsSet(AllRenderers[i].gameObject, staticFlag) && AllRenderers[i].shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off)
+            {
+                StatcRenderer.Add(AllRenderers[i]);
+            }
+        }
+        return StatcRenderer.ToArray();
+    }
+
+
+
+    public void RebuildMeshObjectBuffers()
+    {
+        //if (!VolumetricRegisters._meshObjectsNeedRebuilding)
+        //{
+        //    return;
+        //}
+
+    //    VolumetricBakingRegisters._meshObjectsNeedRebuilding = false;
+        int _currentSample = 0;
+
+        // Clear all lists
+        _meshObjects.Clear();
+        _vertices.Clear();
+        _indices.Clear();
+
+        GameObject[] staticGOs = GatherStaticObjects();        
+
+        // Loop over all objects and gather their data
+        for (int i=0; i< staticGOs.Length; i++)
+        {
+            Mesh mesh = staticGOs[i].GetComponent<MeshFilter>().sharedMesh;
+
+            if (mesh == null) return;
+            // Add vertex data
+            int firstVertex = _vertices.Count;
+
+         //   if (_vertices.Count == 0) return;
+
+            _vertices.AddRange(mesh.vertices);
+            // Add index data - if the vertex buffer wasn't empty before, the
+            // indices need to be offset
+//
+          //  Debug.Log(_indices.Count + " index");
+            int firstIndex = _indices.Count;
+            var indices = mesh.GetIndices(0); //Extend to support submeshes
+            //    _indices.AddRange(indices.Select(index => index + firstVertex))
+            _indices.AddRange( indices.Select(index => index + firstVertex) );
+
+            // Add the object itself
+            _meshObjects.Add(new MeshObject()
+            {
+                localToWorldMatrix = staticGOs[i].transform.localToWorldMatrix,
+                indices_offset = firstIndex,
+                indices_count = indices.Length
+            });
+        }
+
+
+        //TODO: Covert terrain data into an ingestable format!!
+        //for (int i = 0; i < staticGOs.Length; i++)
+        //{
+        //    Mesh mesh = staticGOs[i].GetComponent<MeshFilter>().sharedMesh;
+
+        //    if (mesh == null) return;
+        //    // Add vertex data
+        //    int firstVertex = _vertices.Count;
+
+        //    //   if (_vertices.Count == 0) return;
+
+        //    _vertices.AddRange(mesh.vertices);
+        //    // Add index data - if the vertex buffer wasn't empty before, the
+        //    // indices need to be offset
+        //    //
+        //    //  Debug.Log(_indices.Count + " index");
+        //    int firstIndex = _indices.Count;
+        //    var indices = mesh.GetIndices(0); //Extend to support submeshes
+        //    //    _indices.AddRange(indices.Select(index => index + firstVertex))
+        //    _indices.AddRange(indices.Select(index => index + firstVertex));
+
+        //    // Add the object itself
+        //    _meshObjects.Add(new MeshObject()
+        //    {
+        //        localToWorldMatrix = staticGOs[i].transform.localToWorldMatrix,
+        //        indices_offset = firstIndex,
+        //        indices_count = indices.Length
+        //    });
+        //}
+
+        //  Debug.Log(_meshObjects.Count);
+
+
+        CreateComputeBuffer(ref _meshObjectBuffer, _meshObjects, 72);
+        CreateComputeBuffer(ref _vertexBuffer, _vertices, 12);
+        CreateComputeBuffer(ref _indexBuffer, _indices, 4);
+    }
+
+    void ReleaseBuffers()
+    {
+        _meshObjectBuffer.Release();
+        _meshObjectBuffer = null;
+        _vertexBuffer.Release();
+        _vertexBuffer = null;
+        _indexBuffer.Release();
+        _indexBuffer = null;
+    }
+
+    private static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, List<T> data, int stride)
+    where T : struct
+    {
+        //Debug.Log("Making computebuffer ");
+        //buffer = new ComputeBuffer(data.Count, stride);
+
+        // Do we already have a compute buffer?
+        if (buffer != null && data != null && stride != null)
+        {
+            // If no data or buffer doesn't match the given criteria, release it
+            if (data.Count == 0 || buffer.count != data.Count || buffer.stride != stride)
+            {
+            //    Debug.Log("Buffer count = " + buffer.count);
+
+                buffer.Release();
+                buffer = null;
+            }
+        }
+
+        if (data.Count != 0)
+        {
+            // If the buffer has been released or wasn't there to
+            // begin with, create it
+            if (buffer == null)
+            {
+                buffer = new ComputeBuffer(data.Count, stride);
+
+        //        Debug.Log("Buffer count = " + buffer.count);
+
+            }
+
+            // Set data on the buffer
+            buffer.SetData(data);
+        }
+    }
+
+    struct PointLightData
+    {
+        //Point
+        public Vector3 PointLightsPos;
+        public Vector4 PointLightsColors;
+    }
+
+    struct ConeLightData
+    {
+        public Vector3 ConeLightsWS;
+        public Vector4 ConeLightsColors;
+        public Vector3 ConeLightsDir;
+        public Vector2 ConeLightsPram;
+    }
+
+    struct DirLightData
+    {
+        public Vector3 DirLightsDir;
+        public Vector4 DirLightsColors;
+    }
+    struct AreaLightData
+    {
+        public Matrix4x4 AreaLightsMatrix;
+        public Matrix4x4 AreaLightsMatrixInv;
+        public Vector3 AreaLightsPos;
+        public Vector4 AreaLightsColors;
+        public Vector3 AreaLightsSize;
+    }
+
+
+}

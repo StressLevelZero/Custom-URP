@@ -21,12 +21,6 @@
 	smoothness = saturate(smoothness + geoSmooth - 1.0);
 //#!INJECT_END
 
-//#!INJECT_BEGIN DETAIL_MAP 0
-		half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv_detail);
-		half3 detailTS = UnpackNormalAG(detailMap);
-		normalTS = SafeNormalize(BlendNormalRNM(normalTS, detailTS));
-//#!INJECT_END
-
 //#!INJECT_BEGIN NORMAL_TRANSFORM 0
 	half3 normalWS = UNPACK_NORMAL(i);
 	half3 tangentWS = UNPACK_TANGENT(i);

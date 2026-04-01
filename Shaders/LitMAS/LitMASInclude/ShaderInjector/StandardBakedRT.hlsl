@@ -10,6 +10,7 @@
 
 #include "UnityRaytracingMeshUtils.cginc"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
 
 // Unity Tries to define half as min16float, which isn't handled by unity's interface with the shader compiler for raytracing.
@@ -99,31 +100,39 @@ uint primitiveIndex = PrimitiveIndex();
 uint3 triangleIndicies = UnityRayTracingFetchTriangleIndices(primitiveIndex);
 Vertex v0, v1, v2;
 
+float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
+
+// Fetch object-space vertex normals (must exist in mesh stream)
+float3 n0OS = UnityRayTracingFetchVertexAttribute3(triangleIndicies.x, kVertexAttributeNormal);
+float3 n1OS = UnityRayTracingFetchVertexAttribute3(triangleIndicies.y, kVertexAttributeNormal);
+float3 n2OS = UnityRayTracingFetchVertexAttribute3(triangleIndicies.z, kVertexAttributeNormal);
+
+float3 NshOS = normalize(n0OS * barycentrics.x + n1OS * barycentrics.y + n2OS * barycentrics.z);
+float3 NshWS = normalize(TransformObjectToWorldNormal(NshOS));
+
+float3 rayDirWS = WorldRayDirection();
+
+if (dot(NshWS, -rayDirWS) <= 0.0f)
+{
+	payload.color = float4(0,0,0,1);
+	return;
+}
+
 v0.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.x, kVertexAttributeTexCoord0);
 v1.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.y, kVertexAttributeTexCoord0);
 v2.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.z, kVertexAttributeTexCoord0);
-
-// v0.normal = UnityRayTracingFetchVertexAttribute3(triangleIndicies.x, kVertexAttributeNormal);
-// v1.normal = UnityRayTracingFetchVertexAttribute3(triangleIndicies.y, kVertexAttributeNormal);
-// v2.normal = UnityRayTracingFetchVertexAttribute3(triangleIndicies.z, kVertexAttributeNormal);
-
-float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
-
+	
 Vertex vInterpolated;
 vInterpolated.texcoord = v0.texcoord * barycentrics.x + v1.texcoord * barycentrics.y + v2.texcoord * barycentrics.z;
-//TODO: Extract normal direction to ignore the backside of emissive objects
-//vInterpolated.normal = v0.normal * barycentrics.x + v1.normal * barycentrics.y + v2.normal * barycentrics.z;
-// if ( dot(vInterpolated.normal, float3(1,0,0) < 0) ) payload.color =  float4(0,10,0,1) ;
-// else payload.color =  float4(10,0,0,1) ;
-
-
+	
 float4 albedo = float4(_BaseMap.SampleLevel(sampler_BaseMap, vInterpolated.texcoord.xy * _BaseMap_ST.xy + _BaseMap_ST.zw, 0).rgb, 1) * _BaseColor;
 
 float4 emission = _Emission * _EmissionMap.SampleLevel(sampler_EmissionMap, vInterpolated.texcoord * _BaseMap_ST.xy + _BaseMap_ST.zw, 0) * _EmissionColor;
 
 emission.rgb *= lerp(albedo.rgb, 1, emission.a);
+emission = max(emission * _BakedMutiplier,0);
 
-payload.color.rgb = emission.rgb * _BakedMutiplier;
+payload.color.rgb = emission.rgb ;
 // End Injection CLOSEST_HIT from Injection_Emission_BakedRT.hlsl ----------------------------------------------------------
 
 }

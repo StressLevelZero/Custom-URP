@@ -1,6 +1,6 @@
 //#include "UnityShaderVariables.cginc"
 //#include "Noise.cginc"
-#pragma only_renderers d3d12
+//#pragma only_renderers d3d12
 
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Macros.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
@@ -11,6 +11,7 @@
 
 #define M_PI 3.1415926535897932384626433832795
 #define M_PHI 1.618033988749895
+#define M_INVPI 0.3183098861837906715377675267450
 
 // Input
 RaytracingAccelerationStructure g_SceneAccelStruct;
@@ -26,30 +27,81 @@ int	PerDispatchRayCount;
 int	StartRayIdx;
 float HalfVoxelSize;
 
-struct PointLightData{
-float3	PointLightsWS;
-float4	PointLightsColor;
+//Enviorment
+TextureCube  _SkyTexture;
+SamplerState  sampler_SkyTexture;
+
+// Point light cookies
+TextureCubeArray _PointCookies;
+SamplerState     sampler_PointCookies;
+
+struct PointLightData
+{
+    float3 PointLightsWS;
+    float  _pad0;
+
+    float4 PointLightsColor;
+
+    // x = cookie layer (>=0), y = cookie strength [0..1]
+    float4 CookieData;
+
+    // inverse rotation of the light (xyzw quaternion). Used to orient the cubemap cookie.
+    float4 CookieRotInv;
 };
 
 struct ConeLightData{
-float3	ConeLightsWS	;
-float4	ConeLightsColor	;
-float3	ConeLightsDir	;
-float2	ConeLightsPram	; //Outter , inner
+    float3  ConeLightsWS;
+    float   _pad0;
+
+    float4  ConeLightsColor;
+
+    float3  ConeLightsDir;
+    float   _pad1;
+
+    float2  ConeLightsPram;   // outerCos, inv(innerCos-outerCos)
+    float2  _pad2;
+
+    // Cookie projection basis (world space)
+    float3  CookieRightWS;
+    float   _pad3;
+    float3  CookieUpWS;
+    float   _pad4;
+
+    // x = cookie layer (>=0) or -1, y = strength (0..1), z/w unused for now
+    float4  CookieData;
 };
 
 struct DirLightData{
-float3	DirLightsDir;
-float4	DirLightsColor;
+    float3  DirLightsDir;
+    float   _pad0;
+
+    float4  DirLightsColor;
+
+    // Cookie anchor + basis
+    float3  CookiePosWS;
+    float   _pad1;
+    float3  CookieRightWS;
+    float   _pad2;
+    float3  CookieUpWS;
+    float   _pad3;
+
+    // x = cookie layer (>=0) or -1, y = strength (0..1), z = cookieSize, w unused
+    float4  CookieData;
 };
 
 struct AreaLightData{
-float4x4	AreaLightsMatrix;
-float4x4	AreaLightsMatrixInv;
-float3	AreaLightsWS;
-float4	AreaLightsColor;
-float3	AreaLightsSize;
+    float4x4 AreaLightsMatrix;
+    float4x4 AreaLightsMatrixInv;
+    float3   AreaLightsWS;
+    float4   AreaLightsColor;
+    float3   AreaLightsSize;   // x=width (or radius for disc), y=height, z=discFlag(1) or rect(0)
+
+    // x = cookie layer (>=0) or -1, y = strength (0..1), z/w unused
+    float4   CookieData;
 };
+
+Texture2DArray _LightCookies;
+SamplerState sampler_LightCookies;
 
 StructuredBuffer<PointLightData> PLD;
 StructuredBuffer<ConeLightData> CLD;
@@ -63,9 +115,7 @@ float3	Size = float3(1,1,1);
 RWTexture3D<float4> g_Output;
 Texture3D<float4> g_Input;
 
-//Enviorment
-TextureCube  _SkyTexture;
-SamplerState  sampler_SkyTexture;
+
 
 struct RayPayload
 {
@@ -89,7 +139,7 @@ void MainMissShader(inout RayPayload payload : SV_RayPayload)
 void zEnvMissShader(inout EnvRayPayload payload : SV_RayPayload)
 {
     //Enviormental    
-    payload.color = _SkyTexture.SampleLevel(sampler_SkyTexture, payload.dir, 0);
+    payload.color =  _SkyTexture.SampleLevel(sampler_SkyTexture, payload.dir, 0) / 2 ;
 }
 
 float InverseSquare(float distance){
@@ -173,6 +223,90 @@ float3 sampleUniformSphere(inout uint state)
     return float3(r * cos(phi), r * sin(phi), z);   // unit vector
 }
 
+float3 RotateByQuat(float3 v, float4 q)
+{
+    // q assumed normalized, (x,y,z,w)
+    float3 t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+float3 EvalPointCookieRGB(float3 voxelWS, uint lightIdx)
+{
+    float layer = PLD[lightIdx].CookieData.x;
+    if (layer < 0.0) return 1.0;
+
+    float strength = saturate(PLD[lightIdx].CookieData.y);
+
+    // direction from light -> point, then rotate into light local space
+    float3 dirWS = normalize(voxelWS - PLD[lightIdx].PointLightsWS);
+    float3 dirLS = RotateByQuat(dirWS, PLD[lightIdx].CookieRotInv);
+
+    float3 cookie = _PointCookies.SampleLevel(sampler_PointCookies, float4(dirLS, layer), 0).rgb;
+    return lerp(1.0, cookie, strength);
+}
+
+
+///COOKIE HELPERS///
+float3 SampleCookie2D(float2 uv, float4 cookieData)
+{
+    int layer = (int)cookieData.x;
+    if (layer < 0) return 1.0.xxx;
+
+    // match typical cookie behavior: outside = no light
+    if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1) return 0.0.xxx;
+
+    float strength = saturate(cookieData.y);
+    float3 c = _LightCookies.SampleLevel(sampler_LightCookies, float3(uv, layer), 0).rgb;
+    return lerp(1.0.xxx, c, strength);
+}
+
+float3 ConeCookieAt(float3 voxelWS, uint num)
+{
+    // vector from light to voxel
+    float3 toP = voxelWS - CLD[num].ConeLightsWS;
+
+    float x = dot(toP, CLD[num].CookieRightWS);
+    float y = dot(toP, CLD[num].CookieUpWS);
+    float z = dot(toP, CLD[num].ConeLightsDir);   // forward axis
+
+    if (z <= 1e-5f) return 0.0.xxx;
+
+    // derive tan(halfAngle) from outerCos (cosHalfAngle)
+    float outerCos = saturate(CLD[num].ConeLightsPram.x);
+    float tanHalf = sqrt(max(1.0f - outerCos * outerCos, 0.0f)) / max(outerCos, 1e-4f);
+
+    float2 uv = (float2(x, y) / (z * tanHalf)) * 0.5f + 0.5f;
+    return SampleCookie2D(uv, CLD[num].CookieData);
+}
+
+float3 DirCookieAt(float3 voxelWS, uint num)
+{
+    float cookieSize = max(DLD[num].CookieData.z, 1e-4f);
+    float3 toP = voxelWS - DLD[num].CookiePosWS;
+
+    float x = dot(toP, DLD[num].CookieRightWS);
+    float y = dot(toP, DLD[num].CookieUpWS);
+
+    float2 uv = float2(x, y) / cookieSize + 0.5f;
+    return SampleCookie2D(uv, DLD[num].CookieData);
+}
+
+float3 AreaCookieRectAt(uint num, float2 offsetXY)
+{
+    float2 wh = max(float2(ALD[num].AreaLightsSize.x, ALD[num].AreaLightsSize.y), 1e-4.xx);
+    // offsetXY is in [-0.5*w,0.5*w] / [-0.5*h,0.5*h]
+    float2 uv = offsetXY / wh + 0.5.xx;
+    uv.x = 1-uv.x;
+    return SampleCookie2D(uv, ALD[num].CookieData);
+}
+
+float3 AreaCookieDiscAt(uint num, float2 offsetXY)
+{
+    float r = max(ALD[num].AreaLightsSize.x, 1e-4); // you use x as radius for discs
+    // offsetXY is in [-r, r]
+    float2 uv = (offsetXY / (2.0 * r)) + 0.5.xx;
+    return SampleCookie2D(uv, ALD[num].CookieData);
+}
 
 //RTgems 3.11 FIBONACCI SPHERE
 //current index, number of samples
@@ -190,10 +324,10 @@ float3 sampleUniformSphere(inout uint state)
 ///
 ///Point light
 ///
-float4 PointLightCast(float3 VoxelWS, uint Num){
-
-	float LightRadius = distance(VoxelWS, PLD[Num].PointLightsWS ); 
-    float3 rayDirection =  -normalize(VoxelWS - PLD[Num].PointLightsWS)  ;
+float4 PointLightCast(float3 VoxelWS, uint Num)
+{
+    float LightRadius = distance(VoxelWS, PLD[Num].PointLightsWS);
+    float3 rayDirection = -normalize(VoxelWS - PLD[Num].PointLightsWS);
 
     RayDesc ray;
     ray.Origin    = VoxelWS;
@@ -205,69 +339,83 @@ float4 PointLightCast(float3 VoxelWS, uint Num){
     payload.color = float4(0, 0, 0, 1);
 
     uint missShaderIndex = 0;
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
+    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
 
-	return (1-payload.color.a) * InverseSquare(max(LightRadius, HalfVoxelSize)) * PLD[Num].PointLightsColor;
+    float  vis = (1 - payload.color.a);
+    float  att = InverseSquare(max(LightRadius, HalfVoxelSize));
+    float3 cookie = EvalPointCookieRGB(VoxelWS, Num);
+
+    float4 col = PLD[Num].PointLightsColor;
+    col.rgb *= cookie;
+
+    return vis * att * col;
 }
 
 ///
 /// Cone light
 ///
 
-float4 ConeLightCast(float3 VoxelWS, uint Num){
+float4 ConeLightCast(float3 VoxelWS, uint Num)
+{
+    float3 rayDirection = -normalize(VoxelWS - CLD[Num].ConeLightsWS);
 
+    float attenuation = dot(CLD[Num].ConeLightsDir, -rayDirection);
+    if (attenuation <= 0) return 0;
 
-    float3 rayDirection =  -normalize(VoxelWS - CLD[Num].ConeLightsWS)  ;
+    float flOuterConeCos = CLD[Num].ConeLightsPram.x;
+    float flTemp = dot(CLD[Num].ConeLightsDir, -rayDirection) - flOuterConeCos;
+    float vSpotAtten = saturate(flTemp * CLD[Num].ConeLightsPram.y);
 
-	//Currently taking a point light and adding attenuation
-	float attenuation = (dot(CLD[Num].ConeLightsDir, -rayDirection));
+    // Cookie (early-out if fully dark)
+    float3 cookie = ConeCookieAt(VoxelWS, Num);
+    if (all(cookie == 0)) return 0;
 
-    if (attenuation <= 0) return float4(0, 0, 0, 0); //early out
-
-    float LightRadius = (distance(VoxelWS, CLD[Num].ConeLightsWS )); 
-
-	/////
-	float flOuterConeCos = CLD[Num].ConeLightsPram.x;
-	float flTemp = dot(CLD[Num].ConeLightsDir, -rayDirection) - flOuterConeCos;
-	float vSpotAtten = saturate(flTemp * CLD[Num].ConeLightsPram.y);
-	///
+    float LightRadius = distance(VoxelWS, CLD[Num].ConeLightsWS);
 
     RayDesc ray;
-    ray.Origin    = VoxelWS;
+    ray.Origin = VoxelWS;
     ray.Direction = rayDirection;
-    ray.TMin      = 0.0f;
-    ray.TMax      = LightRadius;
+    ray.TMin = 0.0f;
+    ray.TMax = LightRadius;
 
     RayPayload payload;
     payload.color = float4(0, 0, 0, 1);
 
-    uint missShaderIndex = 0;
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
+    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, 0, ray, payload);
 
-	return  InverseSquare(max(LightRadius, HalfVoxelSize) ) * vSpotAtten * (1-payload.color.a) * CLD[Num].ConeLightsColor;
+    float shadow = (1 - payload.color.a);
+    float4 lit = InverseSquare(max(LightRadius, HalfVoxelSize)) * vSpotAtten * shadow * CLD[Num].ConeLightsColor;
+    lit.rgb *= cookie;
+    return lit;
 }
 
 //
 //Directional Light
 //
 
-float4 DirLightCast(float3 VoxelWS, uint Num){
+float4 DirLightCast(float3 VoxelWS, uint Num)
+{
+    // Cookie (early-out if fully dark)
+    float3 cookie = DirCookieAt(VoxelWS, Num);
+    if (all(cookie == 0)) return 0;
 
     float3 rayDirection = -DLD[Num].DirLightsDir;
 
     RayDesc ray;
-    ray.Origin    = VoxelWS;
+    ray.Origin = VoxelWS;
     ray.Direction = rayDirection;
-    ray.TMin      = 0.0f;
-    ray.TMax      =  1.#INF;
+    ray.TMin = 0.0f;
+    ray.TMax = 1.#INF;
 
     RayPayload payload;
     payload.color = float4(0, 0, 0, 1);
 
-    uint missShaderIndex = 0;
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
+    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, 0, ray, payload);
 
-	return  (1-payload.color.a) * DLD[Num].DirLightsColor;
+    float shadow = (1 - payload.color.a);
+    float4 lit = shadow * DLD[Num].DirLightsColor;
+    lit.rgb *= cookie;
+    return lit;
 }
 
 //
@@ -284,11 +432,17 @@ float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
 
   for (int j = startIdx; j < endIdx; j++) 
   {
+    float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz - lsPos, ALD[Num].AreaLightsMatrix).xyz; 
     //int loop64 = fmod(j + AreaLightSamples + id.x+id.y+id.z,64);
-    float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz -lsPos , ALD[Num].AreaLightsMatrix).xyz ;
-    float3 LightPosSample = LocalPos + float3( (rand(id.xyz + j)-0.5) *  ALD[Num].AreaLightsSize.x , (rand(id.xyz+j+20)-0.5) * ALD[Num].AreaLightsSize.y,0);
-    //float3 LightPosSample = LocalPos + float3( BlueNoiseInDisk[loop64].x *  AreaLightsSize[Num].x * 0.5  , BlueNoiseInDisk[loop64].y * AreaLightsSize[Num].y *0.5, 0   );
+    float2 offsetXY =
+        float2((rand(id.xyz + j) - 0.5) * ALD[Num].AreaLightsSize.x,
+           (rand(id.xyz + j + 20) - 0.5) * ALD[Num].AreaLightsSize.y);
 
+    float3 LightPosSample = LocalPos + float3(offsetXY, 0);
+
+    // Cookie mask on emitter surface
+    float3 cookie = AreaCookieRectAt(Num, offsetXY);
+    if (all(cookie == 0)) continue; // cheap skip
     float LightRadius = distance(VoxelLS, LightPosSample ); 
 
 	float3 rayDirection = -normalize(VoxelLS - LightPosSample);
@@ -307,8 +461,12 @@ float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
 
-    areaLightAccumulation += saturate(InverseSquare(LightRadius) * (1-payload.color.a) * ALD[Num].AreaLightsColor * attenuation) / AreaLightSamples;
-   }
+    float safeRadius = max(LightRadius, HalfVoxelSize);
+    float4 contrib = (InverseSquare(safeRadius)  * (1 - payload.color.a) * ALD[Num].AreaLightsColor * attenuation);
+    contrib.rgb *= cookie;
+
+    areaLightAccumulation += contrib / AreaLightSamples;   
+}
 	return  areaLightAccumulation;
 }
 
@@ -327,7 +485,9 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
 
   for (int j = startIdx; j < endIdx; j++) 
   {
-    float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz -lsPos , ALD[Num].AreaLightsMatrix).xyz ;
+float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+
+
     //https://stackoverflow.com/questions/5837572/generate-a-random-point-within-a-circle-uniformly
     float t = 2 * M_PI * rand(id.xyz + j + 30);
     float u = rand(id.xyz + j) + rand(id.xyz + j + 20);
@@ -336,10 +496,14 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
     else  r = u;
     //	[r * cos(t), r * sin(t)]
 
-    float3 LightPosSample = LocalPos +  
-        float3( ( r * cos(t)) * ALD[Num].AreaLightsSize.x,
-                ( r * sin(t)) * ALD[Num].AreaLightsSize.x,
-                0);
+    // You already compute t/u/r and build a disc offset:
+    float2 offsetXY = float2((r * cos(t)) * ALD[Num].AreaLightsSize.x,
+                             (r * sin(t)) * ALD[Num].AreaLightsSize.x);
+    float3 LightPosSample = LocalPos + float3(offsetXY, 0);
+
+    // Cookie mask on disc emitter
+    float3 cookie = AreaCookieDiscAt(Num, offsetXY);
+    if (all(cookie == 0)) continue;
 
 
     float LightRadius = distance(VoxelLS, LightPosSample ); 
@@ -359,8 +523,11 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
 
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
+    float safeRadius = max(LightRadius, HalfVoxelSize);
+    float4 contrib = (InverseSquare(safeRadius) * (1 - payload.color.a) * ALD[Num].AreaLightsColor * attenuation);
+    contrib.rgb *= cookie;
 
-    areaLightAccumulation += saturate(InverseSquare(LightRadius) * (1-payload.color.a) * ALD[Num].AreaLightsColor * attenuation) / AreaLightSamples;
+    areaLightAccumulation += contrib / AreaLightSamples;
    }
 	return  areaLightAccumulation;
 }
@@ -393,10 +560,12 @@ float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx)
  
          RayPayload payload;
          payload.color = 0;
- 
+         payload.dir   = rayDirection;
+
          uint missShaderIndex = 1;
          TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
- 
+
+         payload.color *= M_INVPI;
          Accumulation += payload.color;
      }
  
@@ -444,23 +613,41 @@ void MainRayGenShader()
 	start = max(0, start - (int)DirLightCount);
 	end -= (int)DirLightCount;
 	maxIter = min(EnvLightSamples, end);
-    LightAccumulation += EnvCast(VoxelWorldPosition, start, maxIter);
-
+    int globalBegin = StartRayIdx;
+    int globalEnd   = StartRayIdx + PerDispatchRayCount;
     
-	start = max(0, start - (int)EnvLightSamples);
-	end -= (int)EnvLightSamples;
-	maxIter = min(AreaLightSamples, end);
-	int light = 0;
-	while (end > 0)
-	{
-
-		if (ALD[light].AreaLightsSize.z == 0)  LightAccumulation += AreaLightCast(VoxelWorldPosition, light, start, maxIter); 
-		else  LightAccumulation += DiscLightCast(VoxelWorldPosition, light, start, maxIter);
-
-		start = max(0, start - (int)AreaLightSamples);
-		end -= (int)AreaLightSamples;
-		maxIter = min(AreaLightSamples, end);
-		light++;
+    int pointBegin = 0;
+    int coneBegin  = pointBegin + (int)PointLightCount;
+    int dirBegin   = coneBegin  + (int)ConeLightCount;
+    int envBegin   = dirBegin   + (int)DirLightCount;
+    int areaBegin  = envBegin   + (int)EnvLightSamples;
+    int areaEnd    = areaBegin  + (int)AreaLightCount * (int)AreaLightSamples;
+    
+    // Env
+    int envLocalBegin = max(globalBegin, envBegin) - envBegin;
+    int envLocalEnd   = min(globalEnd,   areaBegin) - envBegin;
+    if (envLocalBegin < envLocalEnd)
+        LightAccumulation += EnvCast(VoxelWorldPosition, envLocalBegin, envLocalEnd);
+    
+    // Area lights
+    int areaLocalBegin = max(globalBegin, areaBegin) - areaBegin;
+    int areaLocalEnd   = min(globalEnd,   areaEnd)   - areaBegin;
+    if (areaLocalBegin < areaLocalEnd)
+    {
+        int firstLight = areaLocalBegin / (int)AreaLightSamples;
+        int lastLight  = (areaLocalEnd - 1) / (int)AreaLightSamples;
+    
+        for (int light = firstLight; light <= lastLight && light < (int)AreaLightCount; ++light)
+        {
+            int localBegin = (light == firstLight) ? (areaLocalBegin % (int)AreaLightSamples) : 0;
+            int localEnd   = (light == lastLight)  ? ((areaLocalEnd - 1) % (int)AreaLightSamples) + 1
+                                                   : (int)AreaLightSamples;
+    
+            if (ALD[light].AreaLightsSize.z == 0)
+                LightAccumulation += AreaLightCast(VoxelWorldPosition, light, localBegin, localEnd);
+            else
+                LightAccumulation += DiscLightCast(VoxelWorldPosition, light, localBegin, localEnd);
+        }
     }
     
 

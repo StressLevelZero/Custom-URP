@@ -5,7 +5,7 @@ Shader "SLZ/Skybox/SLZ Cubemap"
         _Tex ("Sky Texture", CUBE) = "black" {}
         [HDR] _SkyColor ("Sky Color", Color) = (1,1,1,1)
         _Rotation ("Rotation", Range(0,360)) = 0
-        [Toggle(USE_DIST_FOG)]_UseFog ("Apply Distance Fog", Int) = 0
+      //  [Toggle(USE_DIST_FOG)]_UseFog ("Apply Distance Fog", Int) = 0
         _FogDist ("Fog Max Distance (0 to camera far clip)", Range(0,1)) = 1.0
        
     }
@@ -25,10 +25,10 @@ Shader "SLZ/Skybox/SLZ Cubemap"
             #pragma vertex vert
             #pragma fragment frag
             #pragma exclude_renderers gles
-            #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
-            #pragma multi_compile_fragment _ FOG_LINEAR FOG_EXP2
+            #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED_HQ _VOLUMETRICS_ENABLED
+           // #pragma multi_compile_fragment _ FOG_LINEAR FOG_EXP2
             #pragma multi_compile _ DRAW_SKY_PROCEDURAL // Declared when actually drawing to a camera. Unity's spherical harmonic baking assumes old icosphere mesh drawing.
-            #pragma shader_feature USE_DIST_FOG
+          //  #pragma shader_feature USE_DIST_FOG
             #define SHADERPASS SHADERPASS_FORWARD
 
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
@@ -142,16 +142,18 @@ Shader "SLZ/Skybox/SLZ Cubemap"
                     viewDir.x * i.rotMatrix.z + viewDir.z * i.rotMatrix.w);
                 half4 col = SAMPLE_TEXTURECUBE_LOD(_Tex, sampler_Tex, viewDir2, 0);
                 col *= _SkyColor;
-                #if defined(USE_DIST_FOG)
-                    col.rgb = MixFog(col.rgb, viewDir, i.wPos_xyz_fog_x.w);
-                #endif
-                col = Volumetrics(col, i.wPos_xyz_fog_x.xyz);
+                // #if defined(USE_DIST_FOG)
+                //     col.rgb = MixFog(col.rgb, viewDir, i.wPos_xyz_fog_x.w);
+                //#endif      
+  
+                float skyVolDist = 10000;// _VolumetricMaxDistance; // or something smarter 
+                col = VolumetricsSky(col, viewDir, skyVolDist);
                 #else
                 half4 col = SAMPLE_TEXTURECUBE_LOD(_Tex, sampler_Tex, i.uv0, 0);
                 col *= _SkyColor;
                 #endif
 
-                return col;
+                return max(col,0);
             }
             ENDHLSL
         }

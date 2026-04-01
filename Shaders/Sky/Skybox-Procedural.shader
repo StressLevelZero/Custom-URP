@@ -25,7 +25,7 @@ SubShader {
         #pragma fragment frag
 
         #pragma multi_compile _ DRAW_SKY_PROCEDURAL
-        #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
+        #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED_HQ _VOLUMETRICS_ENABLED 
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
@@ -85,7 +85,7 @@ SubShader {
         static const float kInnerRadius = 1.0;
         static const float kInnerRadius2 = 1.0;
 
-        static const float kCameraHeight = 0.0001;
+        static const float kCameraHeight = 0.001;
 
         #define kRAYLEIGH (lerp(0.0, 0.0025, _AtmosphereThickness*_AtmosphereThickness))      // Rayleigh constant
         #define kMIE 0.0010             // Mie constant
@@ -245,7 +245,16 @@ SubShader {
         #endif
         }
 
-
+        float2 RaySphereIntersect(float3 o, float3 d, float radius)
+        {
+            // Solves |o + t d|^2 = radius^2 for t (d must be normalized)
+            float b = dot(o, d);
+            float c = dot(o, o) - radius * radius;
+            float h = b * b - c;
+            if (h < 0.0) return float2(-1.0, -1.0);
+            h = sqrt(h);
+            return float2(-b - h, -b + h); // near, far
+        }
 
         half4 frag (v2f IN) : SV_Target
         {
@@ -259,28 +268,42 @@ SubShader {
 
             half kKrESun = kRAYLEIGH * kSUN_BRIGHTNESS;
             half kKr4PI = kRAYLEIGH * 4.0 * 3.14159265;
-
+            
+            // Camera position in the "planet" model
             half3 cameraPos = half3(0,kInnerRadius + kCameraHeight,0);    // The camera's current position
 
             // Get the ray from the camera to the vertex and its length (which is the far point of the ray passing through the atmosphere)
             half3 eyeRay = normalize(IN.cPos);
 
-            half far = 0.0;
-            half3 cIn, cOut;
-            
-            bool aboveHorizon = eyeRay.y >= 0.0;
+            half3 cIn, cOut;           
     
-            far = aboveHorizon ? sqrt(kOuterRadius2 + kInnerRadius2 * eyeRay.y * eyeRay.y - kInnerRadius2) - kInnerRadius * eyeRay.y :
-                                 (-kCameraHeight) / (min(-0.001, eyeRay.y));
 
+            // Intersections with atmosphere (outer) and planet (inner)
+            float2 tOuter = RaySphereIntersect(cameraPos, eyeRay, kOuterRadius);
+            float2 tInner = RaySphereIntersect(cameraPos, eyeRay, kInnerRadius);
+
+            // We are inside the outer sphere, so the exit distance is the FAR root.
+            float tExitAtmos = tOuter.y;
+
+            // Ground hit is the first positive hit on the inner sphere (near root normally).
+            float tGround = 1e20;
+            if (tInner.x > 0.0) tGround = tInner.x;
+            else if (tInner.y > 0.0) tGround = tInner.y;
+
+            // If we hit ground before exiting the atmosphere, this ray is "ground".
+            bool hitsGround  = (tGround < tExitAtmos);
+            bool aboveHorizon = !hitsGround;
+
+            float far = hitsGround ? tGround : tExitAtmos;
             float3 pos = cameraPos + far * eyeRay;
+            
             // Initialize the scattering loop variables
             float sampleLength = far / kSamples;
             float scaledLength = sampleLength * kScale;
             float3 sampleRay = eyeRay * sampleLength;
             float3 samplePoint = cameraPos + sampleRay * 0.5;
             half depth = exp((-kCameraHeight) * ( aboveHorizon ? kScaleOverScaleDepth : 1.0/kScaleDepth));
-            if(eyeRay.y >= 0.0)
+            if(aboveHorizon)
             {
 
                 // Sky
@@ -320,10 +343,11 @@ SubShader {
                 // Ground
                 // Calculate the ray's starting position, then calculate its scattering offset
                 
-                half cameraAngle = dot(-eyeRay, pos);
-                half lightAngle = dot(_WorldSpaceLightPosSun.xyz, pos);
+                half invPosLen   = rsqrt(max(dot(pos, pos), 1e-6));
+                half cameraAngle = dot(-eyeRay, pos) * invPosLen;
+                half lightAngle  = dot(_WorldSpaceLightPosSun.xyz, pos) * invPosLen;
                 half cameraScale = scale(cameraAngle);
-                half lightScale = scale(lightAngle);
+                half lightScale  = scale(lightAngle);
                 half cameraOffset = depth*cameraScale;
                 half temp = (lightScale + cameraScale);
 
@@ -367,17 +391,19 @@ SubShader {
     
             half3 col = half3(0.0, 0.0, 0.0);
 
-    
+        float r0 = length(cameraPos);
+        float horizonMu = -sqrt(saturate(1.0 - (kInnerRadius2 / (r0 * r0))));
+        float horizonRayY = -horizonMu; // because ray = -eyeRay
     
         // if y > 1 [eyeRay.y < -SKY_GROUND_THRESHOLD] - ground
         // if y >= 0 and < 1 [eyeRay.y <= 0 and > -SKY_GROUND_THRESHOLD] - horizon
         // if y < 0 [eyeRay.y > 0] - sky
         #if SKYBOX_SUNDISK == SKYBOX_SUNDISK_HQ
             half3 ray = -eyeRay;
-            half y = ray.y / SKY_GROUND_THRESHOLD;
+            half y = (ray.y - horizonRayY) / SKY_GROUND_THRESHOLD;
         #elif SKYBOX_SUNDISK == SKYBOX_SUNDISK_SIMPLE
             half3 ray = IN.rayDir.xyz;
-            half y = ray.y / SKY_GROUND_THRESHOLD;
+            half y = (ray.y - horizonRayY) / SKY_GROUND_THRESHOLD;
         #else
             half y = skyGroundFactor;
         #endif
@@ -413,7 +439,7 @@ SubShader {
             //float3 offset = finalColor.rgb > 0.0031308 ? (12.92).xxx : 1.055 * ( (1.0 / 2.4) * pow(finalColor.rgb, -0.5833333333333));
             //finalColor.rgb += 1/(32 * offset) * dither;
             finalColor.rgb += (1.0/255.0) * dither;
-            return finalColor;
+            return max(finalColor,0);
 
         }
         ENDHLSL

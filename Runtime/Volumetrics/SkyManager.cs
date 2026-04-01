@@ -21,12 +21,15 @@ public static class SkyManager
 {
     public static Texture skytexture;
     private static ComputeShader _scatteringComputeShader;
+    private static ComputeShader _skyRadianceComputeShader;
+    
+    private static int _scatteringkernelIndex;
+    private static int _skyRadiancekernelIndex;
 
     public static readonly int ID_SkyTexture = Shader.PropertyToID("_SkyTexture");
     public static readonly int ID_SkyMipCount = Shader.PropertyToID("_SkyMipCount");
     public static readonly int ID_MipFogParam = Shader.PropertyToID("_MipFogParameters");
-    
-    private static int _kernelIndex;
+
     private static readonly int ID_SHMonoCoefficients = Shader.PropertyToID("_SHMonoCoefficients");
     
     public static KdTree<MonoSH> tree; 
@@ -34,7 +37,22 @@ public static class SkyManager
     private static SkyOcclusionData _skyOcclusionData;
     private static float[] _skyMonoSHCoefficients = new float[9];
     
+    static SLZ.VolumetricSceneBindings bindings;
+    
+    private const int RuntimeFallbackMeanSkySamples = 256;
 
+    private static readonly int ID_EnvLightSamples     = Shader.PropertyToID("EnvLightSamples");
+    private static readonly int ID_PerDispatchRayCount = Shader.PropertyToID("PerDispatchRayCount");
+    private static readonly int ID_StartRayIdx         = Shader.PropertyToID("StartRayIdx");
+    private static readonly int ID_OutColor            = Shader.PropertyToID("_OutColor");
+    private static readonly int ID_GlobalSeed          = Shader.PropertyToID("_GlobalSeed");
+    private static readonly int ID_MipLevel            = Shader.PropertyToID("_MipLevel");
+
+    private static ComputeBuffer _skyMeanRadianceBuffer;
+    private static readonly Vector4[] _skyMeanRadianceZero = { Vector4.zero };
+    private static readonly Vector4[] _skyMeanRadianceReadback = new Vector4[1];
+
+    private static SLZ.BakedVolumetricsData _runtimeFallbackBakedVolumetricsData;
 
     private static int _skyOccCount = 0;
     private static bool _skyChanged;
@@ -196,39 +214,39 @@ public static class SkyManager
 #endif
     public static void RegenerateSkyTexture()
     {
-        if (RenderSettings.defaultReflectionMode != DefaultReflectionMode.Custom)
-        {
             if (skytexture)
             {
-#if UNITY_EDITOR
-        if (Application.isPlaying)    Object.Destroy(skytexture);
-        else Object.DestroyImmediate(skytexture);
-#else
-               Object.Destroy(skytexture);
-#endif
+                CoreUtils.Destroy(skytexture);
                 skytexture = null;
                 GenerateSkyTexture();
             }
-        }
     }
+    //
+    #if UNITY_EDITOR
+    [MenuItem("CONTEXT/Light/Regen sky")]
+    public static void SkyRegen()
+    {
+        GenerateSkyTexture();
+    }
+    #endif
 
     public static void GenerateSkyTexture()
     {
         //Generate Skybox
-        RenderTexture cubetex = new RenderTexture(32, 32, 1, RenderTextureFormat.DefaultHDR);
+        RenderTexture cubetex = new RenderTexture(32, 32, 1, GraphicsFormat.R16G16B16A16_SFloat,0);
         cubetex.enableRandomWrite = true;
         cubetex.useMipMap = true;
         cubetex.dimension = UnityEngine.Rendering.TextureDimension.Cube;
         cubetex.autoGenerateMips = false; //Do this after the scattering
         cubetex.name = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name + "_MipSky";
-        //cubetex.
-        //    cubetex.Create();
-
+        cubetex.depth = 0;
+        
         //Reducing density because certain skybox shaders render fog contribution which would double up the effect 
         float oldFogDensity = RenderSettings.fogDensity;
         RenderSettings.fogDensity = 0 ;
         
         Camera renderCam = new GameObject().AddComponent<Camera>();
+        renderCam.gameObject.AddComponent<SkipVolumetricsTag>();  // <—Making sure we skip volumetrics
         renderCam.gameObject.hideFlags = HideFlags.DontSave;
         renderCam.enabled = false;
         renderCam.cullingMask = 0;
@@ -236,45 +254,39 @@ public static class SkyManager
         renderCam.clearFlags = CameraClearFlags.Skybox;
         renderCam.allowHDR = true;
         renderCam.RenderToCubemap(cubetex);
-#if UNITY_EDITOR
-        if (Application.isPlaying)
-        {
-            Object.Destroy(renderCam.gameObject);
-        }
-        else
-        {
-            Object.DestroyImmediate(renderCam.gameObject);
-        }
-#else
-        Object.Destroy(renderCam.gameObject);
-#endif
+        
+        CoreUtils.Destroy(renderCam.gameObject);
+        
         RenderSettings.fogDensity = oldFogDensity;
         
         //Multi pass scattering
-       ApplyScattering(cubetex, 0.23f, 100);
-       ApplyScattering(cubetex, 0.47f, 500);
-       cubetex.GenerateMips();
-        
+        ApplyScattering(cubetex, 0.23f, 100);
+        ApplyScattering(cubetex, 0.47f, 500);
+      //cubetex.GenerateMips(); //Borked!
+        GenerateSeamlessMips(cubetex);
         skytexture = cubetex;
+        _skyChanged = true;
         //Debug.Log("Generated sky: " + cubetex.name );
         SetSkyTexture(skytexture);
         SetMonoSHToWhite(); //Clear sky occlusion
+
+       // RenderSettings.ambientProbe = BakeCubemapToSH(cubetex,256);
     }
     
     
     public static void CheckSky()
     {
 
-        if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom)
-        {
-            if (RenderSettings.customReflectionTexture != null && RenderSettings.customReflectionTexture.GetType() == typeof(Cubemap))
-            {
-                SetSkyTexture(RenderSettings.customReflectionTexture);
-            }
-            else SetSkyTexture(CoreUtils.blackCubeTexture);
-        }
-        else //DefaultReflectionMode.Skybox
-        {
+        // if (RenderSettings.defaultReflectionMode == DefaultReflectionMode.Custom)
+        // {
+        //     if (RenderSettings.customReflectionTexture != null && RenderSettings.customReflectionTexture.GetType() == typeof(Cubemap))
+        //     {
+        //         SetSkyTexture(RenderSettings.customReflectionTexture);
+        //     }
+        //     else SetSkyTexture(CoreUtils.blackCubeTexture);
+        // }
+        // else //DefaultReflectionMode.Skybox
+        // {
             if (skytexture == null)
             {
                 GenerateSkyTexture();
@@ -285,7 +297,134 @@ public static class SkyManager
                 SetSkyTexture(skytexture);
             }
             else SetSkyTexture(CoreUtils.blackCubeTexture);
+      //  }
+    }
+
+    public static Color GetAmbientSkyColor()
+    {
+        var volumetricbinds = TryGetBakedVolumetricsData();
+        return volumetricbinds ? volumetricbinds.meanSkyRadianceLinear  : Color.black;
+    }
+    
+    public static SLZ.BakedVolumetricsData TryGetBakedVolumetricsData()
+    {
+        if (!bindings)
+            bindings = Object.FindFirstObjectByType<SLZ.VolumetricSceneBindings>();
+
+        if (bindings && bindings.BakedVolumetricsData)
+            return bindings.BakedVolumetricsData;
+
+        return GetOrCreateRuntimeFallbackBakedVolumetricsData();
+    }
+    
+    static SLZ.BakedVolumetricsData GetOrCreateRuntimeFallbackBakedVolumetricsData()
+    {
+        if (!_runtimeFallbackBakedVolumetricsData)
+        {
+            _runtimeFallbackBakedVolumetricsData = ScriptableObject.CreateInstance<SLZ.BakedVolumetricsData>();
+            _runtimeFallbackBakedVolumetricsData.hideFlags = HideFlags.HideAndDontSave;
+            _skyChanged = true;
         }
+
+        if (_skyChanged)
+        {
+            if (TryPopulateRuntimeFallbackMeanSkyRadiance(_runtimeFallbackBakedVolumetricsData))
+                _skyChanged = false;
+        }
+
+        return _runtimeFallbackBakedVolumetricsData;
+    }
+
+    static bool TryPopulateRuntimeFallbackMeanSkyRadiance(SLZ.BakedVolumetricsData target)
+    {
+        if (target == null)
+            return false;
+
+        if (_skyRadianceComputeShader == null || _skyRadiancekernelIndex < 0)
+            LoadComputeShader();
+
+        if (_skyRadianceComputeShader == null || _skyRadiancekernelIndex < 0)
+        {
+            target.meanSkyRadianceLinear = Color.black;
+            target.environmentSampleCount = 0;
+            target.sourceScenePath = SceneManager.GetActiveScene().path;
+            target.lastBakeUtcTicks = DateTime.UtcNow.Ticks;
+            return false;
+        }
+
+        CheckSky();
+
+        Texture sourceSky = skytexture ? skytexture : CoreUtils.blackCubeTexture;
+        if (!sourceSky)
+        {
+            target.meanSkyRadianceLinear = Color.black;
+            target.environmentSampleCount = 0;
+            target.sourceScenePath = SceneManager.GetActiveScene().path;
+            target.lastBakeUtcTicks = DateTime.UtcNow.Ticks;
+            return false;
+        }
+
+        if (_skyMeanRadianceBuffer == null)
+            _skyMeanRadianceBuffer = new ComputeBuffer(1, sizeof(float) * 4, ComputeBufferType.Structured);
+
+        _skyMeanRadianceBuffer.SetData(_skyMeanRadianceZero);
+
+        CommandBuffer cmd = CommandBufferPool.Get("SkyManager Mean Sky Radiance");
+        cmd.Clear();
+
+        cmd.SetComputeTextureParam(_skyRadianceComputeShader, _skyRadiancekernelIndex, ID_SkyTexture, sourceSky);
+        cmd.SetComputeIntParam(_skyRadianceComputeShader, ID_EnvLightSamples, RuntimeFallbackMeanSkySamples);
+        cmd.SetComputeIntParam(_skyRadianceComputeShader, ID_PerDispatchRayCount, RuntimeFallbackMeanSkySamples);
+        cmd.SetComputeIntParam(_skyRadianceComputeShader, ID_StartRayIdx, 0);
+        cmd.SetComputeIntParam(_skyRadianceComputeShader, ID_GlobalSeed, 0x51A7C3D);
+        cmd.SetComputeFloatParam(_skyRadianceComputeShader, ID_MipLevel, 0.0f);
+        cmd.SetComputeBufferParam(_skyRadianceComputeShader, _skyRadiancekernelIndex, ID_OutColor, _skyMeanRadianceBuffer);
+
+        cmd.DispatchCompute(_skyRadianceComputeShader, _skyRadiancekernelIndex, 1, 1, 1);
+
+        Graphics.ExecuteCommandBuffer(cmd);
+        CommandBufferPool.Release(cmd);
+
+        _skyMeanRadianceBuffer.GetData(_skyMeanRadianceReadback);
+
+        Vector4 result = _skyMeanRadianceReadback[0];
+        target.meanSkyRadianceLinear = new Color(result.x, result.y, result.z, result.w);
+        target.environmentSampleCount = RuntimeFallbackMeanSkySamples;
+        target.sourceScenePath = SceneManager.GetActiveScene().path;
+        target.lastBakeUtcTicks = DateTime.UtcNow.Ticks;
+
+        return true;
+    }
+
+    public static void MarkSkyRadianceDirty()
+    {
+        _skyChanged = true;
+    }
+
+    static void ReleaseSkyManagerRuntimeResources()
+    {
+        if (_skyMeanRadianceBuffer != null)
+        {
+            _skyMeanRadianceBuffer.Release();
+            _skyMeanRadianceBuffer = null;
+        }
+
+        if (_runtimeFallbackBakedVolumetricsData)
+        {
+            if (Application.isPlaying)
+                Object.Destroy(_runtimeFallbackBakedVolumetricsData);
+            else
+                Object.DestroyImmediate(_runtimeFallbackBakedVolumetricsData);
+
+            _runtimeFallbackBakedVolumetricsData = null;
+        }
+
+        bindings = null;
+    }
+    
+    public static void CheckSkyNull()
+    {
+        if (skytexture is null) SetSkyTexture(CoreUtils.blackCubeTexture);
     }
 
     static public void SetSkyMips(Vector4 MipFogParam)
@@ -302,18 +441,20 @@ public static class SkyManager
     // // // // // // // /// 
     static void LoadComputeShader()
     {
-        // Load the ComputeShader from the Resources folder or using Shader.Find
-        //TODO: put the shader in a static path within the package and remove from resources
-        _scatteringComputeShader = Resources.Load<ComputeShader>("SkyboxScattering");
+        // Load the ComputeShader from the Resources folder
+        // TODO: serialize and remove from resources
+        _scatteringComputeShader  = Resources.Load<ComputeShader>("SkyboxScattering");
+        _skyRadianceComputeShader = Resources.Load<ComputeShader>("SkyRadiance");
         
-        if (_scatteringComputeShader != null)
-        {
-            _kernelIndex = _scatteringComputeShader.FindKernel("CSMain");
-        }
-        else
-        {
-            Debug.LogError("ComputeShader not found. Make sure it is located in the Resources folder or properly referenced.");
-        }
+        if (_scatteringComputeShader is not null)
+            _scatteringkernelIndex = _scatteringComputeShader.FindKernel("CSMain");
+        else Debug.LogError("ComputeShader not found. Make sure it is located in the Resources folder or properly referenced.");
+        
+        if (_skyRadianceComputeShader is not null)
+            _skyRadiancekernelIndex = _skyRadianceComputeShader.FindKernel("KSkyNoGeo_MeanRadiance");
+        else Debug.LogError("ComputeShader not found. Make sure it is located in the Resources folder or properly referenced.");
+        
+        
     }
     static void CopyArrayToCubemap(RenderTexture textureArray, RenderTexture cubemap)
     {
@@ -323,7 +464,49 @@ public static class SkyManager
             Graphics.CopyTexture(textureArray, i, 0, cubemap, i, 0);
         }
     }
+    static void GenerateSeamlessMips(RenderTexture cube)
+    {
+        int mipCount = cube.mipmapCount;
 
+        // We’ll read from mip 0 (already scattered) and write each lower mip.
+        for (int mip = 1; mip < mipCount; mip++)
+        {
+            int res = Mathf.Max(1, cube.width >> mip);
+
+            var tmp = new RenderTexture(res, res, 0, cube.format)
+            {
+                dimension = TextureDimension.Tex2DArray,
+                volumeDepth = 6,
+                enableRandomWrite = true,
+                useMipMap = false,
+                autoGenerateMips = false,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            tmp.Create();
+
+            _scatteringComputeShader.SetTexture(_scatteringkernelIndex, "SourceCubeMap", cube);
+            _scatteringComputeShader.SetTexture(_scatteringkernelIndex, "ResultTextureArray", tmp);
+
+            _scatteringComputeShader.SetInt("Resolution", res);
+            _scatteringComputeShader.SetInt("SourceMip", 0);
+            
+            float sigma = 0.5f * mip;          // start small, tune by eye
+            int samples = Mathf.Clamp(48*mip, 8, 512);
+            _scatteringComputeShader.SetFloat("ScatteringFactor", sigma);
+            _scatteringComputeShader.SetInt("sampleCount", samples);
+
+            int gx = (res + 7) / 8;
+            int gy = (res + 7) / 8;
+            _scatteringComputeShader.Dispatch(_scatteringkernelIndex, gx, gy, 6);
+
+            for (int face = 0; face < 6; face++)
+                Graphics.CopyTexture(tmp, face, 0, cube, face, mip);
+
+            if (Application.isPlaying) Object.Destroy(tmp);
+            else Object.DestroyImmediate(tmp);
+        }
+    }
     // Method to apply scattering and blurring to a cubemap using a compute shader
     public static void ApplyScattering(RenderTexture sourceCubemap, float scatteringFactor, int sampleCount)
     {
@@ -345,18 +528,20 @@ public static class SkyManager
         if (_scatteringComputeShader == null)
         {
             _scatteringComputeShader = Resources.Load<ComputeShader>("SkyboxScattering");
-            _kernelIndex = _scatteringComputeShader.FindKernel("CSMain");
+            _scatteringkernelIndex = _scatteringComputeShader.FindKernel("CSMain");
         }
 
         // Set the compute shader parameters
-        _scatteringComputeShader.SetTexture(_kernelIndex, "SourceCubeMap", sourceCubemap);
-        _scatteringComputeShader.SetTexture(_kernelIndex, "ResultTextureArray", textureArray); 
+        _scatteringComputeShader.SetTexture(_scatteringkernelIndex, "SourceCubeMap", sourceCubemap);
+        _scatteringComputeShader.SetTexture(_scatteringkernelIndex, "ResultTextureArray", textureArray); 
         _scatteringComputeShader.SetFloat("ScatteringFactor", scatteringFactor);
         _scatteringComputeShader.SetInt("Resolution", resolution);  
         _scatteringComputeShader.SetInt("sampleCount", sampleCount);  
 
         // Dispatch the compute shader
-        _scatteringComputeShader.Dispatch(_kernelIndex, resolution / 8, resolution / 8, 6);
+        int gx = (resolution + 7) / 8;
+        int gy = (resolution + 7) / 8;
+        _scatteringComputeShader.Dispatch(_scatteringkernelIndex, gx, gy, 6);
 
         // Copy the processed texture array back to the cubemap
         CopyArrayToCubemap(textureArray, sourceCubemap);

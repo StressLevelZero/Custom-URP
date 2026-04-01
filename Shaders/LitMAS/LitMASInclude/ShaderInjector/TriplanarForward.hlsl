@@ -29,7 +29,7 @@
 // the local is not Thus, if we have SSR enabled be the default state, the material can enable the disabled
 // keyword regardless of the global state
 
-#pragma multi_compile _ _SLZ_SSR_DISABLED
+#pragma multi_compile_local _ _SLZ_SSR_DISABLED
 
 #if !defined(_SLZ_SSR_DISABLED) && !defined(SHADER_API_MOBILE)
     #define _SSR_ENABLED
@@ -40,11 +40,11 @@
 
 //#pragma multi_compile_fragment _ _LIGHT_COOKIES
 //#pragma multi_compile _ SHADOWS_SHADOWMASK
-#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
-#pragma multi_compile_fog
+#pragma multi_compile_fragment _  _VOLUMETRICS_ENABLED_HQ _VOLUMETRICS_ENABLED
+//#pragma multi_compile_fog
 //#pragma skip_variants FOG_LINEAR FOG_EXP
 //#pragma multi_compile_fragment _ DEBUG_DISPLAY
-#pragma multi_compile_fragment _ _DETAILS_ON
+#pragma multi_compile_local_fragment _ _DETAILS_ON _DETAILS_UV_ON
 //#pragma multi_compile_fragment _ _EMISSION_ON
 
 #if !defined(LITMAS_FEATURE_LIGHTMAPPING)
@@ -83,7 +83,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
 // Begin Injection INCLUDES from Injection_Triplanar.hlsl ----------------------------------------------------------
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZTriplanar.hlsl"
 // End Injection INCLUDES from Injection_Triplanar.hlsl ----------------------------------------------------------
@@ -130,7 +130,7 @@ struct VertOut
 #define UNPACK_TANGENT(i) half3(i.uv0XY_tanXY.zw, i.normXYZ_tanZ.w)
 #define UNPACK_BITANGENT_SIGN(i) i.SHVertLights_btSign.w
 #define UNPACK_WPOS(i) i.wPos_fog.xyz
-#define UNPACK_FOG(i) i.wPos_fog.w
+//#define UNPACK_FOG(i) i.wPos_fog.w
 #define UNPACK_VERTLIGHTS(i) i.SHVertLights_btSign.xyz
 
 TEXTURE2D(_BaseMap);
@@ -169,18 +169,6 @@ CBUFFER_START(UnityPerMaterial)
     int _Surface;
 CBUFFER_END
 
-half3 OverlayBlendDetail(half source, half3 destination)
-{
-    half3 switch0 = round(destination); // if destination >= 0.5 then 1, else 0 assuming 0-1 input
-    half3 blendGreater = mad(mad(2.0, destination, -2.0), 1.0 - source, 1.0); // (2.0 * destination - 2.0) * ( 1.0 - source) + 1.0
-    half3 blendLesser = (2.0 * source) * destination;
-    return mad(switch0, blendGreater, mad(-switch0, blendLesser, blendLesser)); // switch0 * blendGreater + (1 - switch0) * blendLesser 
-    //return half3(destination.r > 0.5 ? blendGreater.r : blendLesser.r,
-    //             destination.g > 0.5 ? blendGreater.g : blendLesser.g,
-    //             destination.b > 0.5 ? blendGreater.b : blendLesser.b
-    //            );
-}
-
 
 VertOut vert(VertIn v)
 {
@@ -202,8 +190,8 @@ VertOut vert(VertIn v)
 #endif
 
     // Exp2 fog
-    half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
-    o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
+    // half clipZ_0Far = UNITY_Z_0_FAR_FROM_CLIPSPACE(o.vertex.z);
+    // o.wPos_fog.w = unity_FogParams.x * clipZ_0Far;
 
 // Begin Injection VERTEX_NORMALS from Injection_Triplanar.hlsl ----------------------------------------------------------
 	o.normXYZ_tanZ = half4(TransformObjectToWorldNormal(v.normal, false), v.tangent.z); //Avoid optimization that would remove the tangent from the vertex input (causes issues)
@@ -311,8 +299,6 @@ SLZ_DECLARE_FRAG_SIZE
 /*---Read Detail Map---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
-    #if defined(_DETAILS_ON) 
-
 // Begin Injection DETAIL_MAP from Injection_Triplanar.hlsl ----------------------------------------------------------
 		/*-Triplanar---------------------------------------------------------------------------------------------------------*/
 		float2 uv_detail = mad(uvTP, _DetailMap_ST.xx, _DetailMap_ST.zw);
@@ -328,10 +314,11 @@ SLZ_DECLARE_FRAG_SIZE
 		detailTS = _RotateUVs && !(_DetailsuseLocalUVs) ? half3(detailTS.y, -detailTS.x, detailTS.z) : detailTS;
 		normalTS = BlendNormal(normalTS, detailTS);
 // End Injection DETAIL_MAP from Injection_Triplanar.hlsl ----------------------------------------------------------
-       
-        smoothness = saturate(2.0 * detailMap.b * smoothness);
-        albedo.rgb = OverlayBlendDetail(detailMap.r, albedo.rgb);
-
+    
+    #if defined(_DETAILS_UV_ON)
+    DetailMap_UV_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
+    #elif defined(_DETAILS_ON)  
+    DetailMap_fractal_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
     #endif
 
 
@@ -376,6 +363,7 @@ SLZ_DECLARE_FRAG_SIZE
 		emission.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emission.a);
 		half emNoV = _EmissionFalloff >= 0 ? abs(fragData.NoV) : 1.0 - abs(fragData.NoV);
 		emission.rgb *= saturate(pow(emNoV, abs(_EmissionFalloff)));
+		emission = max(emission,0);
 	}
 // End Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 
@@ -401,7 +389,7 @@ SLZ_DECLARE_FRAG_SIZE
         //ssrExtra.temporalWeight = _SSRTemporalMul;
         ssrExtra.depthDerivativeSum = 0;
         ssrExtra.noise = noiseRGBA;
-        ssrExtra.fogFactor = UNPACK_FOG(i);
+       // ssrExtra.fogFactor = UNPACK_FOG(i);
         ssrExtra.roughnessRange = half2(1.0 - _SSRSmoothnessRange.y, 1.0 - _SSRSmoothnessRange.x);
         color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
         color.rgb = max(0, color.rgb);
@@ -413,7 +401,7 @@ SLZ_DECLARE_FRAG_SIZE
 
 // Begin Injection VOLUMETRIC_FOG from Injection_SSR.hlsl ----------------------------------------------------------
     #if !defined(_SSR_ENABLED)
-        color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
+      //  color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
         
         color = VolumetricsSurf(color, fragData.position, _Surface);
     #endif

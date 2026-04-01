@@ -78,12 +78,12 @@ namespace UnityEditor.Rendering.Universal
             CED.FoldoutGroup(LightUI.Styles.shadowHeader,
                 Expandable.Shadows,
                 k_ExpandedState,
-                DrawShadowsContent),
+                DrawShadowsContent)//,
             // SLZ MODIFIED
-            CED.FoldoutGroup(Styles.VolumetricsHeader,
-                Expandable.Volumetrics,
-                k_ExpandedState,
-                DrawVolumetricsContent)
+            // CED.FoldoutGroup(Styles.VolumetricsHeader,
+            //     Expandable.Volumetrics,
+            //     k_ExpandedState,
+            //     DrawVolumetricsContent)
             // END SLZ MODIFIED
         );
 
@@ -231,19 +231,120 @@ namespace UnityEditor.Rendering.Universal
             using (new EditorGUI.IndentLevelScope())
                 serializedLight.settings.DrawArea();
         }
+        static bool UseSimpleBakedShadowUI(UniversalRenderPipelineSerializedLight serializedLight)
+        {
+            // "Bake mode" = not Realtime (so Baked or Mixed)
+            // Only simplify when advanced options are OFF.
+            return !serializedLight.settings.isRealtime && !serializedLight.additionalLightData.advancedOptions;
+        }
 
+        static void DrawSimpleBakedShadowUI(UniversalRenderPipelineSerializedLight serializedLight)
+        {
+            // Assume shadows are enabled: if user set None, force to something enabled.
+            // (Soft vs Hard doesn't matter for the baked radius control; Soft is a sane default.)
+            if (serializedLight.settings.shadowsType.intValue == (int)LightShadows.None)
+            {
+                Undo.RecordObjects(serializedLight.serializedObject.targetObjects, "Enable Shadows");
+                serializedLight.settings.shadowsType.intValue = (int)LightShadows.Soft;
+                serializedLight.Apply();
+            }
+
+            var lightType = serializedLight.settings.light.type;
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                switch (lightType)
+                {
+                    case LightType.Point:
+                    case LightType.Spot:
+                        serializedLight.settings.DrawBakedShadowRadius();
+                        break;
+
+                    case LightType.Directional:
+                        serializedLight.settings.DrawBakedShadowAngle();
+                        break;
+
+                    default:
+                        // If you truly want *only* radius/angle and nothing else, just do nothing here.
+                        // Optional: show a tiny hint instead:
+                        // EditorGUILayout.HelpBox("No baked shadow radius/angle control for this light type.", MessageType.Info);
+                        break;
+                }
+            }
+        }
+
+
+        static void DrawRangeSLZ(UniversalRenderPipelineSerializedLight serializedLight)
+        {
+            
+            bool IsPatched = UnityKernelDirectLightingPatchStatus.IsPatched;
+            serializedLight.additionalLightData.IsPatched = IsPatched;
+            //Checking if baked. Disabling PropertyField if we are patched 
+            if (IsPatched && serializedLight.settings.light.lightmapBakeType == LightmapBakeType.Baked ) return; 
+            
+            GUIContent Range = EditorGUIUtility.TrTextContent(nameof (Range), "Controls how far the light is emitted from the center of the object.");
+            EditorGUILayout.PropertyField(serializedLight.settings.range, Range);
+            
+            //Only giving warning for baked lights.
+            //Realtime should technically abide by the same logic, but could negatively affect performance because it may not be culled.
+            //Ironically, the attenuation bug is only at baketime, so we can actually set it very high....
+            //kFalloffTextureWidth = 1024;
+            if (serializedLight.settings.light.lightmapBakeType != LightmapBakeType.Realtime )
+            {
+                if (serializedLight.settings.light.range > 100f & !IsPatched)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                
+
+                EditorGUILayout.HelpBox(
+                    $"Beware of the near attenuation bug! Will explode the area near the light at high values. Bad near range: {serializedLight.settings.light.range / 1024} ",
+                    MessageType.Warning);
+            #if MARROW_INTERNAL
+                        DrawPatchButton();
+            #endif
+                EditorGUILayout.EndHorizontal();
+                }
+
+                //Measuring based on 256 values for LDR displays.
+                //Realistically, HDR allows for a MUCH finer values, but those values quickly become unstable because of unity's attenuation bug.
+                float invsq_Measure = 256f / Mathf.Pow(serializedLight.settings.light.range, 2f);
+                invsq_Measure *= serializedLight.settings.light.intensity;
+                if (invsq_Measure > 0.45f & !IsPatched)
+                {
+                    EditorGUILayout.BeginHorizontal();
+
+                    EditorGUILayout.HelpBox("Beware of light clipping! ", MessageType.Warning);
+            #if MARROW_INTERNAL
+                    DrawPatchButton();
+            #endif
+                    EditorGUILayout.EndHorizontal();
+                }
+
+            }
+
+        }
+        
+        static void DrawPatchButton()
+        {
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Fix it", GUILayout.Width(60)))
+            {
+                UnityOpenCLKernelPatchWindow.ShowWindow();
+            }
+        }
         static void DrawEmissionContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
             serializedLight.settings.DrawIntensity();
-            serializedLight.settings.DrawBounceIntensity();
 
-            if (!serializedLight.settings.lightType.hasMultipleDifferentValues)
+
+        if (!serializedLight.settings.lightType.hasMultipleDifferentValues)
             {
                 var lightType = serializedLight.settings.light.type;
-                if (lightType != LightType.Directional)
+                if (lightType != LightType.Directional && lightType != LightType.Area)
                 {
 #if UNITY_2020_1_OR_NEWER
-                    serializedLight.settings.DrawRange();
+                    
+                    DrawRangeSLZ(serializedLight);
 #else
                     serializedLight.settings.DrawRange(false);
 #endif
@@ -251,13 +352,36 @@ namespace UnityEditor.Rendering.Universal
             }
 
             DrawLightCookieContent(serializedLight, owner);
+            
+            //advanced overrides
+            if (serializedLight.additionalLightData.advancedOptions){
+                serializedLight.settings.DrawBounceIntensity();
+                serializedLight.additionalLightData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier,
+                    serializedLight.additionalLightData.volumetricDimmer, 0f, 4f);
+
+                if (!Mathf.Approximately(serializedLight.settings.light.bounceIntensity, 1.0f)
+                    || !Mathf.Approximately(serializedLight.additionalLightData.volumetricDimmer, 1.0f))
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.HelpBox("Non-Physical Values!", MessageType.Warning);
+                    if (GUILayout.Button("FIT IT!"))
+                    {
+                        serializedLight.settings.light.bounceIntensity = 1;
+                        serializedLight.additionalLightData.volumetricDimmer = 1;
+                    }
+
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
         }
 
         // SLZ MODIFIED
         static void DrawUVContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
-            GUIContent UltravioletStyle = new GUIContent("Ultraviolet", "Ultraviolet light intensity. Used by fluorescent materials");
-            var light = (Light)owner.target;
+            var lightType = serializedLight.settings.light.type;
+            var lightbake = serializedLight.settings.light.lightmapBakeType;
+            if (lightbake == LightmapBakeType.Baked || lightType == LightType.Area) return;
+            GUIContent UltravioletStyle = new GUIContent("Ultraviolet", "Ultraviolet light intensity. Used by fluorescent materials");            var light = (Light)owner.target;
             light.color = new Color(light.color.r, light.color.g, light.color.b, EditorGUILayout.Slider(UltravioletStyle, light.color.a, 0f, 1f));
         }
 
@@ -287,7 +411,30 @@ namespace UnityEditor.Rendering.Universal
                 EditorGUILayout.HelpBox(Styles.CullingMaskWarning.text, MessageType.Info);
             }
         }
+        
+        static void DrawShadowsTypeSLZ(UniversalRenderPipelineSerializedLight serializedLight)
+        {
+            var setting = serializedLight.settings;
+            GUIContent CastShadows = EditorGUIUtility.TrTextContent("Cast Shadows", "Specifies whether Soft Shadows or No Shadows will be cast by the light.");
+            GUIContent ShadowType = EditorGUIUtility.TrTextContent("Shadow Type", "Specifies whether Hard Shadows, Soft Shadows, or No Shadows will be cast by the light.");
 
+            if (setting.isAreaLightType)
+            {
+                Rect controlRect = EditorGUILayout.GetControlRect();
+                EditorGUI.BeginProperty(controlRect, CastShadows, setting.shadowsType);
+                EditorGUI.BeginChangeCheck();
+                bool flag = EditorGUI.Toggle(controlRect, CastShadows, setting.shadowsType.intValue != 0);
+                if (EditorGUI.EndChangeCheck())
+                    setting.shadowsType.intValue = flag ? 2 : 0;
+                EditorGUI.EndProperty();
+            }
+            else
+                EditorGUILayout.PropertyField(setting.shadowsType, ShadowType);
+            
+                        
+            if (!serializedLight.settings.isRealtime && serializedLight.settings.light.shadows == LightShadows.None)
+                EditorGUILayout.HelpBox("Baked lights should have shadows", MessageType.Warning);
+        }
         static void DrawShadowsContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
             if (serializedLight.settings.lightType.hasMultipleDifferentValues)
@@ -295,8 +442,22 @@ namespace UnityEditor.Rendering.Universal
                 EditorGUILayout.HelpBox("Cannot multi edit shadows from different light types.", MessageType.Info);
                 return;
             }
+            // --- SLZ MODIFIED: simplified baked UI when advanced options are OFF ---
+            if (UseSimpleBakedShadowUI(serializedLight))
+            {
+                DrawSimpleBakedShadowUI(serializedLight);
 
-            serializedLight.settings.DrawShadowsType();
+                if (!UnityEditor.Lightmapping.bakedGI &&
+                    !serializedLight.settings.lightmapping.hasMultipleDifferentValues &&
+                    serializedLight.settings.isBakedOrMixed)
+                {
+                    EditorGUILayout.HelpBox(Styles.BakingWarning.text, MessageType.Warning);
+                }
+
+                return; // IMPORTANT: hide Shadow Type + realtime shadow UI
+            }
+           // serializedLight.settings.DrawShadowsType();
+           DrawShadowsTypeSLZ(serializedLight);
 
             if (serializedLight.settings.shadowsType.hasMultipleDifferentValues)
             {
@@ -504,8 +665,17 @@ namespace UnityEditor.Rendering.Universal
                 return;
             }
 
-            settings.DrawCookie();
+            // SLZ MODIFIED
+            //settings.DrawCookie();
+            //Cookies work on area lights, but unity's internal DrawCookie function doesn't show it.
+            EditorGUILayout.LabelField("Cookie");
+            EditorGUILayout.BeginHorizontal();
+            serializedLight.additionalLightData.light.cookie = (Texture)EditorGUILayout.ObjectField(serializedLight.additionalLightData.light.cookie, typeof(Texture), false, GUILayout.Width(64), GUILayout.Height(64));
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.StandaloneWindows && EditorUserBuildSettings.activeBuildTarget != BuildTarget.StandaloneWindows64)
 
+            EditorGUILayout.HelpBox("Cookies may not bake correctly with current build target.", MessageType.Warning);
+
+            EditorGUILayout.EndHorizontal();
             // Draw 2D cookie size for directional lights
             bool isDirectionalLight = settings.light.type == LightType.Directional;
             if (isDirectionalLight)
@@ -522,40 +692,41 @@ namespace UnityEditor.Rendering.Universal
         }
 
         // SLZ MODIFIED
-        static void DrawVolumetricsContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
-        {
-            var settings = serializedLight.settings;
-            var additionData = (settings.light).gameObject.GetComponent<UniversalAdditionalLightData>();
-            //if (additionData.customShadowLayers)
-            //    continue;
-
-            //settings.DrawCookie();
-
-            // Draw 2D cookie size for directional lights
-            bool isVolumetricsEnabled = additionData.useVolumetric;
-            //Realtime isn't implmented yet
-            if (isVolumetricsEnabled && serializedLight.settings.lightmapping.intValue != (int)LightmapBakeType.Realtime)
-            {
-                using (new EditorGUI.IndentLevelScope())
-                {
-                    additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
-                }
-                //EditorGUI.BeginChangeCheck();
-                //EditorGUILayout.PropertyField(serializedLight.lightCookieSizeProp, Styles.LightCookieSize);
-                //EditorGUILayout.PropertyField(serializedLight.lightCookieOffsetProp, Styles.LightCookieOffset);
-                //if (EditorGUI.EndChangeCheck())
-                //    Experimental.Lightmapping.SetLightDirty((UnityEngine.Light)serializedLight.serializedObject.targetObject);
-            }
-            else
-            {
-                using (new EditorGUI.IndentLevelScope())
-                {
-                    GUI.enabled = false;
-                    additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
-                    GUI.enabled = true;
-                }
-            }
-        }
+        // static void DrawVolumetricsContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
+        // {
+        //     var settings = serializedLight.settings;
+        //     var additionData = (settings.light).gameObject.GetComponent<UniversalAdditionalLightData>();
+        //     //if (additionData.customShadowLayers)
+        //     //    continue;
+        //     if (!additionData.advancedOptions)  return;
+        //
+        //     //settings.DrawCookie();
+        //
+        //     // Draw 2D cookie size for directional lights
+        //     bool isVolumetricsEnabled = additionData.useVolumetric;
+        //     //Realtime isn't implmented yet
+        //     if (isVolumetricsEnabled && serializedLight.settings.lightmapping.intValue != (int)LightmapBakeType.Realtime)
+        //     {
+        //         using (new EditorGUI.IndentLevelScope())
+        //         {
+        //             additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
+        //         }
+        //         //EditorGUI.BeginChangeCheck();
+        //         //EditorGUILayout.PropertyField(serializedLight.lightCookieSizeProp, Styles.LightCookieSize);
+        //         //EditorGUILayout.PropertyField(serializedLight.lightCookieOffsetProp, Styles.LightCookieOffset);
+        //         //if (EditorGUI.EndChangeCheck())
+        //         //    Experimental.Lightmapping.SetLightDirty((UnityEngine.Light)serializedLight.serializedObject.targetObject);
+        //     }
+        //     else
+        //     {
+        //         using (new EditorGUI.IndentLevelScope())
+        //         {
+        //             GUI.enabled = false;
+        //             additionData.volumetricDimmer = EditorGUILayout.Slider(Styles.VolumetricsMultiplier, additionData.volumetricDimmer, 0f, 4f);
+        //             GUI.enabled = true;
+        //         }
+        //     }
+        // }
 
         // END SLZ MODIFIED
     }

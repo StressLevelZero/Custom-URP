@@ -7,6 +7,13 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LightCookie/LightCookie.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Clustering.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/SLZ_AtmosphereShared.hlsl"
+
+// Texture2D<float4> _AtmosphereTransmittanceLUT;
+// SamplerState sampler_AtmosphereTransmittanceLUT;
+//
+// Texture2D<float4> _AtmosphereMultiScatteringLUT;
+// SamplerState sampler_AtmosphereMultiScatteringLUT;
 
 // Abstraction over Light shading data.
 struct Light
@@ -113,6 +120,7 @@ Light GetMainLight()
 
     // SLZ MODIFIED // switch to full RGBA for fluorescence
     light.color = _MainLightColor.rgba;
+
     //END SLZ MODIFIED
 
     light.layerMask = _MainLightLayerMask;
@@ -139,6 +147,10 @@ Light GetMainLight(float4 shadowCoord, float3 positionWS, half4 shadowMask)
         // END SLZ MODIFIED
     #endif
 
+   // #ifdef _PhysicalSky
+    light.color.rgb *= SampleLocalAtmosphereSunTransmittance(positionWS);
+   // #endif
+    
     return light;
 }
 

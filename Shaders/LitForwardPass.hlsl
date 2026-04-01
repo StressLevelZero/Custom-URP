@@ -327,7 +327,7 @@ void LitPassFragment(
 #endif    
 
 
-    color.rgb = MixFog(color.rgb, -viewDirWS, inputData.fogCoord);
+ //   color.rgb = MixFog(color.rgb, -viewDirWS, inputData.fogCoord);
     color = Volumetrics(color, input.positionWS);
     // END SLZ MODIFIED
 

@@ -24,7 +24,8 @@ Material:
   m_Shader: {fileID: 4800000, guid: e2bc12b142787a84e95ff4f3ca0bac39, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _DETAILS_ON
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -41,11 +42,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 7add0f38055e2274b893af9db333ae85, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailMap:
-        m_Texture: {fileID: 2800000, guid: 633cfe6a6d4ee694c98830c630980cad, type: 3}
+        m_Texture: {fileID: 2800000, guid: 7ccaabcdd0b606f46a542e0ec8a49b09, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissionMap:
@@ -53,7 +54,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
-        m_Texture: {fileID: 2800000, guid: 75f1fbacfa73385419ec8d7700a107ea, type: 3}
+        m_Texture: {fileID: 2800000, guid: bc05e38e03f8ab843858bcf79ad4a8d4, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -76,7 +77,7 @@ Material:
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DetailSmoothnessMapScale: 1
-    - _Details: 0
+    - _Details: 1
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _Emission: 0
@@ -115,7 +116,7 @@ Material:
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 1}
+    - _BaseColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
     - _Color: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 1, g: 1, b: 1, a: 1}

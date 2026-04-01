@@ -36,6 +36,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
 #endif
         const string keyword_DETAILS_ON = "_DETAILS_ON";
+        const string keyword_DETAILS_UV_ON = "_DETAILS_UV_ON";
         const string keyword_BRDF = "_BRDFMAP";
         const string keyword_EXPENSIVE_TP = "_EXPENSIVE_TP";
 
@@ -144,6 +145,59 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             //public int _SSRTemporalMul = -1;
             public List<int> unknownProperties;
             public int texturePropertyCount; 
+        }
+        enum DetailsMode
+        {
+            Off = 0,
+            Details = 1,
+            DetailsUV = 2,
+        }
+
+        static readonly List<DetailsMode> k_DetailsModes = new()
+        {
+            DetailsMode.Off,
+            DetailsMode.Details,
+            DetailsMode.DetailsUV
+        };
+
+        static string FormatDetailsMode(DetailsMode m) => m switch
+        {
+            DetailsMode.Off => "Off",
+            DetailsMode.Details => "Details (Fractal)",
+            DetailsMode.DetailsUV => "Details (UV)",
+            _ => m.ToString()
+        };
+
+        static DetailsMode GetDetailsMode(Material mat)
+        {
+            // If both are on (old/bad state), prefer UV.
+            if (mat.IsKeywordEnabled(keyword_DETAILS_UV_ON)) return DetailsMode.DetailsUV;
+            if (mat.IsKeywordEnabled(keyword_DETAILS_ON)) return DetailsMode.Details;
+            return DetailsMode.Off;
+        }
+
+        static void ApplyDetailsMode(Material mat, DetailsMode mode)
+        {
+            switch (mode)
+            {
+                case DetailsMode.Off:
+                    CoreUtils.SetKeyword(mat, keyword_DETAILS_ON, false);
+                    CoreUtils.SetKeyword(mat, keyword_DETAILS_UV_ON, false);
+                    mat.SetFloat("_Details", 0f); // keep your existing enable flag in sync (optional but handy)
+                    break;
+
+                case DetailsMode.Details:
+                    CoreUtils.SetKeyword(mat, keyword_DETAILS_ON, true);
+                    CoreUtils.SetKeyword(mat, keyword_DETAILS_UV_ON, false);
+                    mat.SetFloat("_Details", 1f);
+                    break;
+
+                case DetailsMode.DetailsUV:
+                    CoreUtils.SetKeyword(mat, keyword_DETAILS_ON, false);
+                    CoreUtils.SetKeyword(mat, keyword_DETAILS_UV_ON, true);
+                    mat.SetFloat("_Details", 1f);
+                    break;
+            }
         }
 
         HelpBox TransparentWarning;
@@ -683,31 +737,60 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             Foldout detailProps = new Foldout();
            
             bool hasDetails = false;
-
+            
+            var detailsBody = new VisualElement();
+            detailProps.tooltip = "Fractal texture sampling is effectively infinite textile density. UV is legacy behavior and should only be used if one fixed resolution or tiling is needed ";
+            detailProps.Add(detailsBody); // everything that should be disabled goes in here
             int detailMapIdx = PropertyIdx(ref propTable, PName._DetailMap);
             if (detailMapIdx != -1)
             {
                 TextureField detailsMapField = new TextureField(props[detailMapIdx], propIdx[detailMapIdx], false, shaderImporter?.GetDefaultTexture(props[detailMapIdx].name));
                 detailsMapField.tooltip2 = LitMASGui_Tooltips.DetailMap.ToString();
-                detailProps.Add(detailsMapField);
+                detailsBody.Add(detailsMapField);
                 materialFields.Add(detailsMapField);
                 hasDetails = true;
 
                 MaterialScaleOffsetField detailScaleOffset = new MaterialScaleOffsetField(props[detailMapIdx], propIdx[detailMapIdx]);
-                detailProps.Add(detailScaleOffset);
+                detailsBody.Add(detailScaleOffset);
                 materialFields.Add(detailScaleOffset);
             }
 
             int detailToggleIdx = PropertyIdx(ref propTable, PName._Details);
             if (detailToggleIdx != -1 && hasDetails)
             {
-                MaterialToggleField detailMatToggle = new MaterialToggleField();
-                detailMatToggle.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], keyword_DETAILS_ON, false, true);
-                detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => { detailProps.contentContainer.SetEnabled(evt.newValue); });
-                bool detailEnabled = props[detailToggleIdx].floatValue > 0.0f;
-                detailProps.contentContainer.SetEnabled(detailEnabled);
-                materialFields.Add(detailMatToggle);                
-                detailToggle = detailMatToggle;
+                var mats = props[detailToggleIdx].targets.Cast<Material>().ToArray();
+
+                DetailsMode first = GetDetailsMode(mats[0]);
+                bool mixed = mats.Skip(1).Any(m => GetDetailsMode(m) != first);
+
+                var detailsModePopup = new PopupField<DetailsMode>(
+                    "Details Mode",
+                    k_DetailsModes,
+                    first,
+                    FormatDetailsMode,
+                    FormatDetailsMode
+                );
+
+                detailsModePopup.showMixedValue = mixed;
+
+                // IMPORTANT: don't disable the foldout contentContainer (it would disable the popup)
+                detailsBody.SetEnabled(mixed || first != DetailsMode.Off);
+
+                detailsModePopup.RegisterValueChangedCallback(evt =>
+                {
+                    Undo.RecordObjects(mats, "Change Details Mode");
+
+                    foreach (var m in mats)
+                    {
+                        ApplyDetailsMode(m, evt.newValue);
+                        EditorUtility.SetDirty(m);
+                    }
+
+                    detailsBody.SetEnabled(evt.newValue != DetailsMode.Off);
+                });
+
+                // Put popup above the disabled body
+                detailProps.Insert(0, detailsModePopup);
             }
 
 

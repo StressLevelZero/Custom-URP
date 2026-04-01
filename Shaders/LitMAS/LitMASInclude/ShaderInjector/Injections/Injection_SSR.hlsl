@@ -13,7 +13,7 @@
 // the local is not Thus, if we have SSR enabled be the default state, the material can enable the disabled
 // keyword regardless of the global state
 
-#pragma multi_compile _ _SLZ_SSR_DISABLED
+#pragma multi_compile_local _ _SLZ_SSR_DISABLED
 
 #if !defined(_SLZ_SSR_DISABLED) && !defined(SHADER_API_MOBILE)
     #define _SSR_ENABLED
@@ -60,7 +60,7 @@ SLZ_DECLARE_FRAG_SIZE
         //ssrExtra.temporalWeight = _SSRTemporalMul;
         ssrExtra.depthDerivativeSum = 0;
         ssrExtra.noise = noiseRGBA;
-        ssrExtra.fogFactor = UNPACK_FOG(i);
+       // ssrExtra.fogFactor = UNPACK_FOG(i);
         ssrExtra.roughnessRange = half2(1.0 - _SSRSmoothnessRange.y, 1.0 - _SSRSmoothnessRange.x);
         color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
         color.rgb = max(0, color.rgb);
@@ -71,7 +71,7 @@ SLZ_DECLARE_FRAG_SIZE
 
 //#!INJECT_BEGIN VOLUMETRIC_FOG 0
     #if !defined(_SSR_ENABLED)
-        color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
+      //  color = MixFogSurf(color, -fragData.viewDir, UNPACK_FOG(i), _Surface);
         
         color = VolumetricsSurf(color, fragData.position, _Surface);
     #endif
