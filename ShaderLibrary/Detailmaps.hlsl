@@ -28,10 +28,16 @@ half OverlayBlendDetail(half source, half destination)
 }
 
 /// Automatically accounts for texture scaling 
-void DetailMap_fractal_blend_float(Texture2D _DetailMap, SamplerState sampler_DetailMap, float2 uv_detail,
+void DetailMap_fractal_blend_float(Texture2D _DetailMap, Texture2D _BaseMap, SamplerState sampler_DetailMap, float2 uv_detail, float2 uv_main,
                             inout half3 albedo, inout half smoothness, inout half3 normalTS  )
 {
     half4 detailMap = SAMPLE_TEXTURE2D_FRACTAL(_DetailMap, sampler_DetailMap, uv_detail);
+
+    //Fade off when main texture // Still working on this
+    half MainTextureDetailDensity = ComputeFractalDepth(uv_main, _BaseMap);
+    half FadeIntensity = lerp( 1/MainTextureDetailDensity , 1, 0.2); //add control here
+    detailMap = lerp(0.5 ,detailMap, saturate( FadeIntensity ) );
+    
     half3 detailTS = UnpackNormalAG(detailMap);
     normalTS = SafeNormalize(BlendNormalRNM(normalTS, detailTS));       
     smoothness = OverlayBlendDetail(detailMap.b, smoothness);

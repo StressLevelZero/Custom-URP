@@ -282,7 +282,7 @@ SLZ_DECLARE_FRAG_SIZE
     #if defined(_DETAILS_UV_ON)
     DetailMap_UV_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
     #elif defined(_DETAILS_ON)  
-    DetailMap_fractal_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
+    DetailMap_fractal_blend_float( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main,   albedo.rgb,   smoothness,   normalTS  );
     #endif
 
 
