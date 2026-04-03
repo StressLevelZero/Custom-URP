@@ -23,6 +23,9 @@ public static class SkyManager
     private static ComputeShader _scatteringComputeShader;
     private static ComputeShader _skyRadianceComputeShader;
     
+    private static bool _isGeneratingSkyTexture = false;
+
+    
     private static int _scatteringkernelIndex;
     private static int _skyRadiancekernelIndex;
 
@@ -232,6 +235,11 @@ public static class SkyManager
 
     public static void GenerateSkyTexture()
     {
+        if (_isGeneratingSkyTexture) return;
+        _isGeneratingSkyTexture = true;
+    
+        try
+        {
         //Generate Skybox
         RenderTexture cubetex = new RenderTexture(32, 32, 1, GraphicsFormat.R16G16B16A16_SFloat,0);
         cubetex.enableRandomWrite = true;
@@ -271,6 +279,11 @@ public static class SkyManager
         SetMonoSHToWhite(); //Clear sky occlusion
 
        // RenderSettings.ambientProbe = BakeCubemapToSH(cubetex,256);
+        }
+        finally
+        {
+            _isGeneratingSkyTexture = false;
+        }
     }
     
     
@@ -287,7 +300,7 @@ public static class SkyManager
         // }
         // else //DefaultReflectionMode.Skybox
         // {
-            if (skytexture == null)
+            if (skytexture == null && !_isGeneratingSkyTexture)
             {
                 GenerateSkyTexture();
             }

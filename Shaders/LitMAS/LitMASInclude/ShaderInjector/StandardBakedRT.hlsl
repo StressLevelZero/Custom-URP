@@ -114,8 +114,8 @@ float3 rayDirWS = WorldRayDirection();
 
 if (dot(NshWS, -rayDirWS) <= 0.0f)
 {
-	payload.color = float4(0,0,0,1);
-	return;
+    payload.color = float4(0,0,0,1);
+    return;
 }
 
 v0.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.x, kVertexAttributeTexCoord0);
@@ -124,14 +124,12 @@ v2.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.z, kVertexAt
 	
 Vertex vInterpolated;
 vInterpolated.texcoord = v0.texcoord * barycentrics.x + v1.texcoord * barycentrics.y + v2.texcoord * barycentrics.z;
-	
 float4 albedo = float4(_BaseMap.SampleLevel(sampler_BaseMap, vInterpolated.texcoord.xy * _BaseMap_ST.xy + _BaseMap_ST.zw, 0).rgb, 1) * _BaseColor;
 
 float4 emission = _Emission * _EmissionMap.SampleLevel(sampler_EmissionMap, vInterpolated.texcoord * _BaseMap_ST.xy + _BaseMap_ST.zw, 0) * _EmissionColor;
 
 emission.rgb *= lerp(albedo.rgb, 1, emission.a);
 emission = max(emission * _BakedMutiplier,0);
-
 payload.color.rgb = emission.rgb ;
 // End Injection CLOSEST_HIT from Injection_Emission_BakedRT.hlsl ----------------------------------------------------------
 

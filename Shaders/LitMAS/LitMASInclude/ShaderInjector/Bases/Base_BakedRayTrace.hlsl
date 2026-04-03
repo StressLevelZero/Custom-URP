@@ -3,6 +3,7 @@
 
 #include "UnityRaytracingMeshUtils.cginc"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
 //#!INJECT_POINT INCLUDES
 
