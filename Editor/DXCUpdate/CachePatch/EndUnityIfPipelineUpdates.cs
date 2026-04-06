@@ -98,6 +98,7 @@ public static class EndUnityIfPipelineUpdates
 
     static void Instagib()
     {
+#if !SLZ_RENDERPIPELINE_DEV
         Debug.LogWarning("Killing Unity immediately");
         int procID = Process.GetCurrentProcess().Id;
         Process cmd = new Process();
@@ -105,5 +106,6 @@ public static class EndUnityIfPipelineUpdates
         cmd.StartInfo.Arguments = $"/F /PID {procID}";
         cmd.StartInfo.UseShellExecute = false;
         cmd.Start();
+#endif
     }
 }

@@ -144,9 +144,10 @@ namespace SLZ.SLZEditorTools
             b.AppendLine( "    '-batchmode',");
             b.AppendLine( "    '-projectPath', $projectPath,");
             b.AppendLine( "    '-force-d3d12',");
+            b.AppendLine( "    '-buildTarget', 'standalone',");
             b.AppendLine($"    '-executeMethod', '{k_ExecuteMethod}',");
             b.AppendLine( "    '-logFile', $logPath,");
-            b.AppendLine( "    \"-vb_scenes=$scenesArg\",");
+            b.AppendLine( "    \"`\"-vb_scenes=$scenesArg`\"\",");
             b.AppendLine( "    \"-vb_rayChunk=$rayChunk\",");
             b.AppendLine( "    \"-vb_envSamples=$envSamples\",");
             b.AppendLine( "    \"-vb_areaSamples=$areaSamples\",");

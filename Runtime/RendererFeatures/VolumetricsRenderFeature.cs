@@ -990,6 +990,15 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
 
     void OnSceneGUI(UnityEditor.SceneView sv)
     {
+        // Guard against stale delegate firing after this object has been destroyed
+        // (e.g. domain reload). Unity's == null catches destroyed native objects
+        // even when the C# reference is still live.
+        if (this == null)
+        {
+            UnityEditor.SceneView.duringSceneGui -= OnSceneGUI;
+            return;
+        }
+        
         bool fog = sv.sceneViewState.fogEnabled;
         if (fog == _lastFogState) return;
         _lastFogState = fog;
