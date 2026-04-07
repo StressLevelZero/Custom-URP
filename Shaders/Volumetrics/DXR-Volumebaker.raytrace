@@ -686,6 +686,26 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
     return accum;
 }
 
+
+// Replace sampleUniformSphere with stratified version
+float3 sampleStratifiedSphere(uint sampleIdx, uint totalSamples, inout uint state)
+{
+    // Find a kz × kphi grid where kz*kphi ≈ totalSamples, kphi ≈ 2*kz (sphere aspect)
+    uint kz = max(1u, (uint)floor(sqrt((float)totalSamples * 0.5)));
+    uint kphi = max(1u, totalSamples / kz);
+
+    uint iz = sampleIdx % kz;
+    uint iphi = (sampleIdx / kz) % kphi;
+
+    float u1 = (iz + rand01(state)) / (float)kz;
+    float u2 = (iphi + rand01(state)) / (float)kphi;
+
+    float z = 1.0 - 2.0 * u1;
+    float r = sqrt(saturate(1.0 - z * z));
+    float phi = 2.0 * M_PI * u2;
+    return float3(r * cos(phi), r * sin(phi), z);
+}
+
 //Cast Ray from vox to env
 
 float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx)
@@ -704,7 +724,8 @@ float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx)
      // Use sampleCount actual samples, ignore the absolute j index
      for (int s = 0; s < sampleCount; ++s)
      {
-         float3 rayDirection = sampleUniformSphere(seed);
+         //float3 rayDirection = sampleUniformSphere(seed);
+         float3 rayDirection = sampleStratifiedSphere(s, (uint)sampleCount, seed);
 
          // Jitter origin within the voxel cell, [-0.5, 0.5] per axis
         float3 jitter = (rand3(seed)-.5) * HalfVoxelSize*2;
