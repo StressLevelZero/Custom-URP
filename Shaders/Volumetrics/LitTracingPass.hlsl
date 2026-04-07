@@ -59,6 +59,12 @@ void BakedClosestHit(inout RayPayload payload,
 {
     if (_EMISSION)
     {
+        if (HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
+        {
+            payload.color = float4(0, 0, 0, 1);
+            return;
+        }
+        
         uint2 launchIdx = DispatchRaysIndex();
         //    ShadingData shade = getShadingData( PrimitiveIndex(), attribs );
 

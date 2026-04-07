@@ -791,10 +791,11 @@ namespace SLZ.SLZEditorTools
 
         static float4 ResolveLightColor(Light light)
         {
+            var ald = light.gameObject.GetComponent<UniversalAdditionalLightData>();
             Color colorModulation = light.color.linear;
             if (light.useColorTemperature) colorModulation *= Mathf.CorrelatedColorTemperatureToRGB(light.colorTemperature);
             colorModulation *= light.intensity;
-            colorModulation *= light.gameObject.GetComponent<UniversalAdditionalLightData>().volumetricDimmer;
+            if (ald.advancedOptions) colorModulation *= ald.volumetricDimmer;
             return float4(colorModulation.r, colorModulation.g, colorModulation.b, colorModulation.a);
         }
         
@@ -1122,7 +1123,13 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 ? 100f * sampleStart / (float)udata.totalAreaSamples
                 : 0f;
 
+            var currentArea = VolumetricRegisters.volumetricAreas[areaIdx];
+
             TimeSpan elapsed2 = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
+            if (udata.currentChunkIndex == 0)
+            {
+                Debug.Log($"[VolBake] Baking area {udata.currentAreaIndex + 1} [{currentArea.name}] in scene [{currentArea.gameObject.scene.name}]");
+            }
             Debug.Log(
                 $"[VolBake] [{elapsed2:hh\\:mm\\:ss}] " +
                 $"Area {udata.currentAreaIndex + 1}/{VolumetricRegisters.volumetricAreas.Count} " +
@@ -1130,9 +1137,9 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 $"| Area {areaPct:F0}% ({sampleStart}/{udata.totalAreaSamples} samples) " +
                 $"| Overall {overallPct:F1}%"
             );
-            Vector3Int resolution = VolumetricRegisters.volumetricAreas[areaIdx].NormalizedTexelDensity;
+            Vector3Int resolution = currentArea.NormalizedTexelDensity;
             int3 threads = int3(resolution.x, resolution.y, resolution.z);
-            Vector3 boxSize = VolumetricRegisters.volumetricAreas[areaIdx].BoxScale;
+            Vector3 boxSize = currentArea.BoxScale;
             float maxVoxelSize = max(boxSize.x / (float)resolution.x, math.max(boxSize.y / (float)resolution.y, boxSize.z / (float)resolution.z));
 
  
@@ -1180,8 +1187,8 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 cmd.SetRayTracingTextureParam(rtshader, id__LightCookies, udata.cookieAtlas);
                 cmd.SetRayTracingTextureParam(rtshader, id__PointCookies, udata.pointCookieArray);
 
-                cmd.SetRayTracingVectorParam(rtshader, id_Size, VolumetricRegisters.volumetricAreas[areaIdx].NormalizedScale);
-                cmd.SetRayTracingVectorParam(rtshader, id_WPosition, VolumetricRegisters.volumetricAreas[areaIdx].Corner);
+                cmd.SetRayTracingVectorParam(rtshader, id_Size, currentArea.NormalizedScale);
+                cmd.SetRayTracingVectorParam(rtshader, id_WPosition, currentArea.Corner);
                 cmd.SetRayTracingFloatParam(rtshader, id__Seed, udata.areaSeed);
                 cmd.SetRayTracingFloatParam(rtshader, id_HalfVoxelSize, maxVoxelSize * 0.5f);
                

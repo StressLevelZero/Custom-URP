@@ -165,9 +165,18 @@ private void DrawFloatingScalarWidget(LocalVolumetricFog fog)
     }
     
     Handles.color = Color.white;
-    Handles.Label(camRight * .15f + anchor + camUp * ( panelHeight *.5f + hs * 0.15f),
-        $"Falloff {(fog.falloffDistance):0.##}\nDensity {fog.density:0.###}");
+    Handles.Label(
+        camRight * .15f + anchor + camUp * (panelHeight * .5f + hs * 0.15f),
+        $"<color=#ffca80>Density {fog.density:0.###}</color>\n<color=#80e8ff>Falloff {fog.falloffDistance:0.##}</color>",
+        LabelStyle
+    );
 }
+private static GUIStyle _labelStyle;
+private static GUIStyle LabelStyle => _labelStyle ??= new GUIStyle
+{
+    richText = true,
+    normal = { textColor = Color.white }
+};
 private void DrawScaledSphere(LocalVolumetricFog fog)
 {
     Transform t = fog.transform;

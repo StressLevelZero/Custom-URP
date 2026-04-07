@@ -324,212 +324,366 @@ float3 AreaCookieDiscAt(uint num, float2 offsetXY)
 ///
 ///Point light
 ///
-float4 PointLightCast(float3 VoxelWS, uint Num)
+float4 PointLightCast(float3 VoxelWS, uint Num, uint sampleCount = 8)
 {
-    float LightRadius = distance(VoxelWS, PLD[Num].PointLightsWS);
-    float3 rayDirection = -normalize(VoxelWS - PLD[Num].PointLightsWS);
+    // Cheap cookie early-out using voxel center
+    float3 cookieCenter = EvalPointCookieRGB(VoxelWS, Num);
+    if (all(cookieCenter == 0)) return 0;
 
-    RayDesc ray;
-    ray.Origin    = VoxelWS;
-    ray.Direction = rayDirection;
-    ray.TMin      = 0.0f;
-    ray.TMax      = LightRadius;
+    uint3 id = DispatchRaysIndex().xyz;
+    uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
+    seed ^= Num * 0x9e3779b9u;
 
-    RayPayload payload;
-    payload.color = float4(0, 0, 0, 1);
+    float lightRadius = 0.1; // TODO: plumb PLD[Num]._pad0 as SourceRadius
+    float4 accum = 0;
 
-    uint missShaderIndex = 0;
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+    for (uint s = 0; s < sampleCount; ++s)
+    {
+        float3 originJitter = (rand3(seed + s * 4) - 0.5) * HalfVoxelSize * 2;
+        float3 origin = VoxelWS + originJitter;
 
-    float  vis = (1 - payload.color.a);
-    float  att = InverseSquare(max(LightRadius, HalfVoxelSize));
-    float3 cookie = EvalPointCookieRGB(VoxelWS, Num);
+        // Uniform point on sphere for the light source offset
+        float2 xi = rand2(seed + s * 5);
+        float z = 1.0 - 2.0 * xi.x;
+        float r = sqrt(saturate(1.0 - z * z));
+        float phi = 6.2831853 * xi.y;
+        float3 sphereOffset = float3(r * cos(phi), r * sin(phi), z) * lightRadius;
+        float3 jitteredLight = PLD[Num].PointLightsWS + sphereOffset;
 
-    float4 col = PLD[Num].PointLightsColor;
-    col.rgb *= cookie;
+        float3 toLight = jitteredLight - origin;
+        float dist = length(toLight);
+        float3 rayDir = toLight / dist;
 
-    return vis * att * col;
+        RayDesc ray;
+        ray.Origin    = origin;
+        ray.Direction = rayDir;
+        ray.TMin      = 1e-3f;
+        ray.TMax      = dist - 1e-3f;
+
+        RayPayload payload;
+        payload.color = float4(0, 0, 0, 1);
+
+        TraceRay(g_SceneAccelStruct,
+                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                 0xFF, 0, 1, 0, ray, payload);
+
+        float vis = 1 - payload.color.a;
+        float att = InverseSquare(max(dist, HalfVoxelSize));
+        float3 cookie = EvalPointCookieRGB(origin, Num);
+
+        float4 col = PLD[Num].PointLightsColor;
+        col.rgb *= cookie;
+        accum += vis * att * col;
+    }
+
+    return accum / max(1u, sampleCount);
 }
 
 ///
 /// Cone light
 ///
 
-float4 ConeLightCast(float3 VoxelWS, uint Num)
+float4 ConeLightCast(float3 VoxelWS, uint Num, uint sampleCount = 32)
 {
-    float3 rayDirection = -normalize(VoxelWS - CLD[Num].ConeLightsWS);
-
-    float attenuation = dot(CLD[Num].ConeLightsDir, -rayDirection);
-    if (attenuation <= 0) return 0;
-
+    float3 lightPos = CLD[Num].ConeLightsWS;
+    float3 lightDir = CLD[Num].ConeLightsDir;
     float flOuterConeCos = CLD[Num].ConeLightsPram.x;
-    float flTemp = dot(CLD[Num].ConeLightsDir, -rayDirection) - flOuterConeCos;
-    float vSpotAtten = saturate(flTemp * CLD[Num].ConeLightsPram.y);
 
-    // Cookie (early-out if fully dark)
-    float3 cookie = ConeCookieAt(VoxelWS, Num);
-    if (all(cookie == 0)) return 0;
+    // Cheap early-outs using voxel center (avoid loop if obviously zero)
+    float3 toVoxel = normalize(VoxelWS - lightPos);
+    if (dot(lightDir, toVoxel) <= flOuterConeCos) return 0;
 
-    float LightRadius = distance(VoxelWS, CLD[Num].ConeLightsWS);
+    float3 cookieCenter = ConeCookieAt(VoxelWS, Num);
+    if (all(cookieCenter == 0)) return 0;
 
-    RayDesc ray;
-    ray.Origin = VoxelWS;
-    ray.Direction = rayDirection;
-    ray.TMin = 0.0f;
-    ray.TMax = LightRadius;
+    uint3 id = DispatchRaysIndex().xyz;
+    uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
+    seed ^= Num * 0x9e3779b9u;
 
-    RayPayload payload;
-    payload.color = float4(0, 0, 0, 1);
+    float lightRadius = 0.1;//CLD[Num]._pad0; // small, e.g. 0.05–0.2m
+    float4 accum = 0;
 
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, 0, ray, payload);
+    for (uint s = 0; s < sampleCount; ++s)
+    {
+        // Jitter shading origin within voxel cell
+        float3 originJitter = (rand3(seed+s*4)-.5) * HalfVoxelSize*2;
 
-    float shadow = (1 - payload.color.a);
-    float4 lit = InverseSquare(max(LightRadius, HalfVoxelSize)) * vSpotAtten * shadow * CLD[Num].ConeLightsColor;
-    lit.rgb *= cookie;
-    return lit;
+        float3 origin = VoxelWS + originJitter;
+
+        // Jitter light position on a disk perpendicular to lightDir
+        float2 diskXi = rand2(seed+s*5);
+        float r = sqrt(diskXi.x) * lightRadius;
+        float theta = 6.2831853 * diskXi.y;
+        float3 tangent = normalize(cross(lightDir, abs(lightDir.y) < 0.99 ? float3(0,1,0) : float3(1,0,0)));
+        float3 bitangent = cross(lightDir, tangent);
+        float3 jitteredLight = lightPos + (tangent * cos(theta) + bitangent * sin(theta)) * r;
+
+        float3 toLight = jitteredLight - origin;
+        float dist = length(toLight);
+        float3 rayDir = toLight / dist;
+
+        // Per-sample cone attenuation against the jittered geometry
+        float coneDot = dot(lightDir, -rayDir);
+        float spotAtten = saturate((coneDot - flOuterConeCos) * CLD[Num].ConeLightsPram.y);
+        if (spotAtten <= 0) continue;
+
+        RayDesc ray;
+        ray.Origin    = origin;
+        ray.Direction = rayDir;
+        ray.TMin      = 1e-3f;
+        ray.TMax      = dist - 1e-3f;
+
+        RayPayload payload;
+        payload.color = float4(0,0,0,1);
+
+        TraceRay(g_SceneAccelStruct, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, ray, payload);
+
+        float shadow = 1 - payload.color.a;
+        float3 cookie = ConeCookieAt(origin, Num);
+        float4 lit = InverseSquare(max(dist, HalfVoxelSize)) * spotAtten * shadow * CLD[Num].ConeLightsColor;
+        lit.rgb *= cookie;
+        accum += lit;
+    }
+
+    return accum / max(1u, sampleCount);
 }
 
 //
 //Directional Light
 //
 
-float4 DirLightCast(float3 VoxelWS, uint Num)
+float4 DirLightCast(float3 VoxelWS, uint Num, uint sampleCount = 8)
 {
-    // Cookie (early-out if fully dark)
-    float3 cookie = DirCookieAt(VoxelWS, Num);
-    if (all(cookie == 0)) return 0;
+    float3 cookieCenter = DirCookieAt(VoxelWS, Num);
+    if (all(cookieCenter == 0)) return 0;
 
-    float3 rayDirection = -DLD[Num].DirLightsDir;
+    uint3 id = DispatchRaysIndex().xyz;
+    uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
+    seed ^= Num * 0xb5297a4du;
 
-    RayDesc ray;
-    ray.Origin = VoxelWS;
-    ray.Direction = rayDirection;
-    ray.TMin = 0.0f;
-    ray.TMax = 1.#INF;
+    // Angular radius of the sun/source in radians. ~0.00465 is real sun; 0.02–0.05 gives visible penumbras.
+    float angularRadius = 0.02;
+    float3 L = -DLD[Num].DirLightsDir;
 
-    RayPayload payload;
-    payload.color = float4(0, 0, 0, 1);
+    // Build a basis around L
+    float3 tangent = normalize(cross(L, abs(L.y) < 0.99 ? float3(0,1,0) : float3(1,0,0)));
+    float3 bitangent = cross(L, tangent);
 
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, 0, ray, payload);
+    float4 accum = 0;
 
-    float shadow = (1 - payload.color.a);
-    float4 lit = shadow * DLD[Num].DirLightsColor;
-    lit.rgb *= cookie;
-    return lit;
+    for (uint s = 0; s < sampleCount; ++s)
+    {
+        float3 originJitter = (rand3(seed + s * 4) - 0.5) * HalfVoxelSize * 2;
+        float3 origin = VoxelWS + originJitter;
+
+        // Concentric disk sample, then tilt L by that offset scaled by angularRadius
+        float2 xi = rand2(seed + s * 7);
+        float r = sqrt(xi.x) * angularRadius;
+        float theta = 6.2831853 * xi.y;
+        float3 rayDir = normalize(L + (tangent * cos(theta) + bitangent * sin(theta)) * r);
+
+        RayDesc ray;
+        ray.Origin    = origin;
+        ray.Direction = rayDir;
+        ray.TMin      = 1e-3f;
+        ray.TMax      = 1.#INF;
+
+        RayPayload payload;
+        payload.color = float4(0, 0, 0, 1);
+
+        TraceRay(g_SceneAccelStruct,
+                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                 0xFF, 0, 1, 0, ray, payload);
+
+        float shadow = 1 - payload.color.a;
+        float3 cookie = DirCookieAt(origin, Num);
+        float4 lit = shadow * DLD[Num].DirLightsColor;
+        lit.rgb *= cookie;
+        accum += lit;
+    }
+
+    return accum / max(1u, sampleCount);
 }
 
 //
 //Area Light
 //
 
-float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
-  //  
-    float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3], ALD[Num].AreaLightsMatrix[1][3],ALD[Num].AreaLightsMatrix[2][3]);
-    float3 VoxelLS =  mul( float4(VoxelWS.xyz,1)-lsPos, ALD[Num].AreaLightsMatrix);
-    float4 areaLightAccumulation = float4(0,0,0,0);
-    if (VoxelLS.z <= 0) return areaLightAccumulation; //Early out
-    uint3 id =  DispatchRaysIndex().xyz; //redundent, oh well
+float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
+{
+    float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3],
+                          ALD[Num].AreaLightsMatrix[1][3],
+                          ALD[Num].AreaLightsMatrix[2][3]);
 
-  for (int j = startIdx; j < endIdx; j++) 
-  {
-    float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz - lsPos, ALD[Num].AreaLightsMatrix).xyz; 
-    //int loop64 = fmod(j + AreaLightSamples + id.x+id.y+id.z,64);
-    float2 offsetXY =
-        float2((rand(id.xyz + j) - 0.5) * ALD[Num].AreaLightsSize.x,
-           (rand(id.xyz + j + 20) - 0.5) * ALD[Num].AreaLightsSize.y);
+    float3 VoxelLS = mul(float4(VoxelWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+    if (VoxelLS.z <= 0) return 0; // behind the emitter plane
 
-    float3 LightPosSample = LocalPos + float3(offsetXY, 0);
+    uint3 id = DispatchRaysIndex().xyz;
+    uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
+    seed ^= Num * 0x9e3779b9u;
 
-    // Cookie mask on emitter surface
-    float3 cookie = AreaCookieRectAt(Num, offsetXY);
-    if (all(cookie == 0)) continue; // cheap skip
-    float LightRadius = distance(VoxelLS, LightPosSample ); 
+    // Stratification grid: round AreaLightSamples down to a square
+    int kSide = max(1, (int)floor(sqrt((float)AreaLightSamples)));
+    float invK = 1.0 / (float)kSide;
 
-	float3 rayDirection = -normalize(VoxelLS - LightPosSample);
+    float2 sizeXY = float2(ALD[Num].AreaLightsSize.x, ALD[Num].AreaLightsSize.y);
+    //float  area   = sizeXY.x * sizeXY.y;
 
-	float attenuation = saturate(dot(float3(0,0,1), -rayDirection));
+    float4 accum = 0;
 
-    RayDesc ray;
-    ray.Origin    = VoxelWS;
-    ray.Direction = mul(rayDirection, ALD[Num].AreaLightsMatrixInv);
-    ray.TMin      = 0.0f;
-    ray.TMax      = LightRadius;
+    for (int j = startIdx; j < endIdx; ++j)
+    {
+        // --- Origin jitter inside the voxel ---
+        float3 originJitter = (rand3(seed + (uint)j * 131u) - 0.5) * HalfVoxelSize * 2;
+        float3 jitteredOriginWS = VoxelWS + originJitter;
+        float3 jitteredOriginLS = mul(float4(jitteredOriginWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
 
-    RayPayload payload;
-    payload.color = float4(0, 0, 0, 1);
+        // --- Stratified emitter sample ---
+        int sx = j % kSide;
+        int sy = (j / kSide) % kSide;
+        float2 xi = rand2(seed + (uint)j * 6151u);
+        float2 stratified = (float2(sx, sy) + xi) * invK;        // [0,1]^2
+        float2 offsetXY = (stratified - 0.5) * sizeXY;           // emitter-local
 
-    uint missShaderIndex = 0;
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
+        // Cookie mask on emitter surface
+        float3 cookie = AreaCookieRectAt(Num, offsetXY);
+        if (all(cookie == 0)) continue;
 
-    float safeRadius = max(LightRadius, HalfVoxelSize);
-    float4 contrib = (InverseSquare(safeRadius)  * (1 - payload.color.a) * ALD[Num].AreaLightsColor * attenuation);
-    contrib.rgb *= cookie;
+        float3 LocalLightPos = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+        float3 LightPosSampleLS = LocalLightPos + float3(offsetXY, 0);
 
-    areaLightAccumulation += contrib / AreaLightSamples;   
-}
-	return  areaLightAccumulation;
+        float3 toLightLS = LightPosSampleLS - jitteredOriginLS;
+        float  dist      = length(toLightLS);
+        float3 rayDirLS  = toLightLS / dist;
+
+        // Lambertian emitter cosine (emitter normal is +Z in light-local space)
+        float cosEmitter = saturate(dot(float3(0, 0, 1), -rayDirLS));
+        if (cosEmitter <= 0) continue;
+
+        RayDesc ray;
+        ray.Origin    = jitteredOriginWS;
+        ray.Direction = mul(rayDirLS, ALD[Num].AreaLightsMatrixInv);
+        ray.TMin      = 1e-3f;
+        ray.TMax      = dist - 1e-3f;
+
+        RayPayload payload;
+        payload.color = float4(0, 0, 0, 1);
+
+        TraceRay(g_SceneAccelStruct,
+                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                 0xFF, 0, 1, 0, ray, payload);
+
+        float vis = 1 - payload.color.a;
+
+        // Geometry term: cosEmitter / dist^2, with 1/pdf = area for uniform area sampling
+        float safeDist2 = max(dist * dist, HalfVoxelSize * HalfVoxelSize);
+        float G = cosEmitter / safeDist2;
+
+        float4 contrib = vis * G * M_INVPI * ALD[Num].AreaLightsColor;
+        contrib.rgb *= cookie;
+
+        accum += contrib / (float)AreaLightSamples;
+    }
+
+    return accum;
 }
 
 //
 //Disk light
 //
 
-float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx){
-  //  
-    float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3], ALD[Num].AreaLightsMatrix[1][3],ALD[Num].AreaLightsMatrix[2][3]);
-    float3 VoxelLS =  mul( float4(VoxelWS.xyz,1)-lsPos, ALD[Num].AreaLightsMatrix);
-    float3 IntialDirection =  -normalize(VoxelWS - ALD[Num].AreaLightsWS)  ;
-    uint3 id =  DispatchRaysIndex().xyz;
-    float4 areaLightAccumulation = float4(0,0,0,0);
-    if (VoxelLS.z <= 0) return areaLightAccumulation;
+// Concentric (Shirley) mapping from [0,1]^2 -> unit disc, low distortion
+float2 ConcentricSampleDisk(float2 u)
+{
+    float2 uOffset = 2.0 * u - 1.0;
+    if (uOffset.x == 0 && uOffset.y == 0) return float2(0, 0);
 
-  for (int j = startIdx; j < endIdx; j++) 
-  {
-float3 LocalPos = mul(ALD[Num].AreaLightsWS.xyz - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+    float theta, r;
+    if (abs(uOffset.x) > abs(uOffset.y))
+    {
+        r = uOffset.x;
+        theta = (M_PI * 0.25) * (uOffset.y / uOffset.x);
+    }
+    else
+    {
+        r = uOffset.y;
+        theta = (M_PI * 0.5) - (M_PI * 0.25) * (uOffset.x / uOffset.y);
+    }
+    return r * float2(cos(theta), sin(theta));
+}
 
+float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
+{
+    float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3],
+                          ALD[Num].AreaLightsMatrix[1][3],
+                          ALD[Num].AreaLightsMatrix[2][3]);
 
-    //https://stackoverflow.com/questions/5837572/generate-a-random-point-within-a-circle-uniformly
-    float t = 2 * M_PI * rand(id.xyz + j + 30);
-    float u = rand(id.xyz + j) + rand(id.xyz + j + 20);
-    float r;
-    if (u > 1) r = (2 - u);
-    else  r = u;
-    //	[r * cos(t), r * sin(t)]
+    float3 VoxelLS = mul(float4(VoxelWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+    if (VoxelLS.z <= 0) return 0;
 
-    // You already compute t/u/r and build a disc offset:
-    float2 offsetXY = float2((r * cos(t)) * ALD[Num].AreaLightsSize.x,
-                             (r * sin(t)) * ALD[Num].AreaLightsSize.x);
-    float3 LightPosSample = LocalPos + float3(offsetXY, 0);
+    uint3 id = DispatchRaysIndex().xyz;
+    uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
+    seed ^= Num * 0xa511e9b3u;
 
-    // Cookie mask on disc emitter
-    float3 cookie = AreaCookieDiscAt(Num, offsetXY);
-    if (all(cookie == 0)) continue;
+    int kSide = max(1, (int)floor(sqrt((float)AreaLightSamples)));
+    float invK = 1.0 / (float)kSide;
 
+    float radius = max(ALD[Num].AreaLightsSize.x, 1e-4);
+    //float area   = M_PI * radius * radius;
 
-    float LightRadius = distance(VoxelLS, LightPosSample ); 
+    float4 accum = 0;
 
-	float3 rayDirection = -normalize(VoxelLS - LightPosSample);
+    for (int j = startIdx; j < endIdx; ++j)
+    {
+        float3 originJitter = (rand3(seed + (uint)j * 131u) - 0.5) * HalfVoxelSize * 2;
+        float3 jitteredOriginWS = VoxelWS + originJitter;
+        float3 jitteredOriginLS = mul(float4(jitteredOriginWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
 
-	float attenuation = saturate(dot(float3(0,0,1), -rayDirection));
+        // Stratified [0,1]^2, then concentric mapping to the disc
+        int sx = j % kSide;
+        int sy = (j / kSide) % kSide;
+        float2 xi = rand2(seed + (uint)j * 6151u);
+        float2 stratified = (float2(sx, sy) + xi) * invK;
+        float2 discXY = ConcentricSampleDisk(stratified) * radius;
 
-    RayDesc ray;
-    ray.Origin    = VoxelWS;
-    ray.Direction = mul(rayDirection, ALD[Num].AreaLightsMatrixInv);
-    ray.TMin      = 0.0f;
-    ray.TMax      = LightRadius;
+        float3 cookie = AreaCookieDiscAt(Num, discXY);
+        if (all(cookie == 0)) continue;
 
-    RayPayload payload;
-    payload.color = float4(0, 0, 0, 1);
+        float3 LocalLightPos = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+        float3 LightPosSampleLS = LocalLightPos + float3(discXY, 0);
 
-    uint missShaderIndex = 0;
-    TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload); //Add an anyhit shader to support transparencies 
-    float safeRadius = max(LightRadius, HalfVoxelSize);
-    float4 contrib = (InverseSquare(safeRadius) * (1 - payload.color.a) * ALD[Num].AreaLightsColor * attenuation);
-    contrib.rgb *= cookie;
+        float3 toLightLS = LightPosSampleLS - jitteredOriginLS;
+        float  dist      = length(toLightLS);
+        float3 rayDirLS  = toLightLS / dist;
 
-    areaLightAccumulation += contrib / AreaLightSamples;
-   }
-	return  areaLightAccumulation;
+        float cosEmitter = saturate(dot(float3(0, 0, 1), -rayDirLS));
+        if (cosEmitter <= 0) continue;
+
+        RayDesc ray;
+        ray.Origin    = jitteredOriginWS;
+        ray.Direction = mul(rayDirLS, ALD[Num].AreaLightsMatrixInv);
+        ray.TMin      = 1e-3f;
+        ray.TMax      = dist - 1e-3f;
+
+        RayPayload payload;
+        payload.color = float4(0, 0, 0, 1);
+
+        TraceRay(g_SceneAccelStruct,
+                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                 0xFF, 0, 1, 0, ray, payload);
+
+        float vis = 1 - payload.color.a;
+
+        float safeDist2 = max(dist * dist, HalfVoxelSize * HalfVoxelSize);
+        float G = cosEmitter / safeDist2;
+
+        float4 contrib = vis * G * M_INVPI * ALD[Num].AreaLightsColor;
+        contrib.rgb *= cookie;
+
+        accum += contrib / (float)AreaLightSamples;
+    }
+
+    return accum;
 }
 
 //Cast Ray from vox to env
@@ -551,9 +705,12 @@ float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx)
      for (int s = 0; s < sampleCount; ++s)
      {
          float3 rayDirection = sampleUniformSphere(seed);
- 
+
+         // Jitter origin within the voxel cell, [-0.5, 0.5] per axis
+        float3 jitter = (rand3(seed)-.5) * HalfVoxelSize*2;
+
          RayDesc ray;
-         ray.Origin    = VoxelWS;
+         ray.Origin    = VoxelWS + jitter;
          ray.Direction = rayDirection;
          ray.TMin      = 1e-3f;       // avoid self-hits
          ray.TMax      = 100000.0f;
@@ -563,7 +720,7 @@ float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx)
          payload.dir   = rayDirection;
 
          uint missShaderIndex = 1;
-         TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+         TraceRay(g_SceneAccelStruct, 0 , 0xFF, 0, 1, missShaderIndex, ray, payload);
 
          payload.color *= M_INVPI;
          Accumulation += payload.color;
