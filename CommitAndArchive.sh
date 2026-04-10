@@ -1,26 +1,16 @@
 PACKAGE_NAME=com.unity.render-pipelines.universal
 
-if [[ $# == 0 ]]; then
-    echo "USAGE: ./CommitAndArchive.sh [OPTIONS] \"Commit message\""
-    echo "Increments the package version number, dumps the current commit hash to a "
-    echo "file, commits the pending changes, and archives the project to a tarball"
-    echo "suitable for use with Unity Package Manager as a \"local-tarball\" type "
-    echo "package"
-    echo "Options:"
-    echo "    -i     Skip incrementing the version number"
-    echo "    -h     Skip dumping the commit hash to prevGitCommitHash.txt"
-    echo "    -c     Skip commiting the changes"
-    echo "    -a     Skip archiving the package to a tarball"
-    echo "    -p     Push the commit"
-    exit
-fi
 
-while getopts 'ihcap' opt; do
+
+while getopts 'hiscap' opt; do
     case $opt in
+        h) 
+        HELP="SET"
+        ;;
         i) 
         NO_INCREMENT="SET"
         ;;
-        h) NO_HASH="SET"
+        s) NO_HASH="SET"
         ;;
         c) NO_COMMIT="SET"
         ;;
@@ -30,13 +20,30 @@ while getopts 'ihcap' opt; do
         ;;
     esac
 done
-shift $((OPTIND-1))
-COMMIT_MESSAGE="$@"
 
-if [[ ! -v NO_COMMIT ]] && [[ -z "${COMMIT_MESSAGE}" ]]; then
-    "Missing commit message"
+if [[ -v HELP ]]; then
+    echo "USAGE: ./CommitAndArchive.sh [OPTIONS] \"Commit message\""
+    echo "Increments the package version number, dumps the current commit hash to a "
+    echo "file, commits the pending changes, and archives the project to a tarball"
+    echo "suitable for use with Unity Package Manager as a \"local-tarball\" type "
+    echo "package"
+    echo "Options:"
+    echo "    -h     Print this help message"
+    echo "    -i     Skip incrementing the version number"
+    echo "    -s     Skip dumping the commit hash to prevGitCommitHash.txt"
+    echo "    -c     Skip commiting the changes"
+    echo "    -a     Skip archiving the package to a tarball"
+    echo "    -p     Push the commit"
     exit
 fi
+
+# shift $((OPTIND-1))
+# COMMIT_MESSAGE="$@"
+# 
+# if [[ ! -v NO_COMMIT ]] && [[ -z "${COMMIT_MESSAGE}" ]]; then
+#     "Missing commit message"
+#     exit
+# fi
 
 # Dump current commit hash to a file
 if [[ ! -v NO_HASH ]]; then
@@ -52,7 +59,8 @@ fi
 
 # Commit the pending changes with the arguments to this script as the commit message
 if [[ ! -v NO_COMMIT ]]; then
-    git commit -m "\"$COMMIT_MESSAGE\""
+    git commit 
+    # -m "\"$COMMIT_MESSAGE\""
 fi
 
 if [[ ! -v NO_ARCHIVE ]]; then

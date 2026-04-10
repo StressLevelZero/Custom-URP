@@ -10,8 +10,6 @@ public static class UnityKernelDirectLightingPatchStatus
     
     private const string SessionKey = "SLZ.KernelPatched";
 
-    // A string that exists ONLY in the patched file.
-    private const string PatchSentinel = "const float falloff = 1 / (distance * distance)";
 
     public static readonly bool IsPatched;
 
@@ -42,12 +40,63 @@ public static class UnityKernelDirectLightingPatchStatus
             if (!File.Exists(kernelPath))
                 return false;
 
-            // ReadAllText is fine — kernel files are small.
-            return File.ReadAllText(kernelPath).Contains(PatchSentinel);
+            // Derive sentinels from the patch file itself so this never
+            // needs updating when the patch changes.
+            string[] sentinels = ExtractPatchSentinels();
+            if (sentinels == null || sentinels.Length == 0)
+                return false;
+
+            string kernelText = File.ReadAllText(kernelPath);
+            return System.Array.TrueForAll(sentinels, s => kernelText.Contains(s));
         }
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Reads the portable patch file and extracts added lines (+) as sentinels.
+    /// Skips patch header lines (+++), empty additions, and very short lines
+    /// that would match trivially. Returns null if the patch can't be read.
+    /// </summary>
+    private static string[] ExtractPatchSentinels()
+    {
+        try
+        {
+            // Reuse the same path resolution as PatchRunner
+            var package = UnityEditor.PackageManager.PackageInfo
+                .FindForAssetPath("Packages/com.unity.render-pipelines.universal");
+            if (package == null) return null;
+
+            string patchPath = Path.Combine(
+                package.resolvedPath,
+                "Tools~", "Patches", "directLighting.portable.patch");
+
+            if (!File.Exists(patchPath)) return null;
+
+            var sentinels = new List<string>();
+            foreach (string line in File.ReadAllLines(patchPath))
+            {
+                // +++ is the patch header, not content
+                if (!line.StartsWith("+") || line.StartsWith("+++"))
+                    continue;
+
+                // Strip the leading +, normalize whitespace for matching
+                string content = line.Substring(1).Trim();
+
+                // Skip empty lines and trivially short ones (e.g. lone braces)
+                if (content.Length < 10)
+                    continue;
+
+                sentinels.Add(content);
+            }
+
+            return sentinels.ToArray();
+        }
+        catch
+        {
+            return null;
         }
     }
     

@@ -408,12 +408,19 @@ public sealed class UnityOpenCLKernelPatchWindow : EditorWindow
                 return Fail("Unity kernel target not found:\n" + TargetKernelPath);
 
             Directory.CreateDirectory(Path.GetDirectoryName(PatchAbsolutePath)!);
-
+            
+            string fixContent = File.ReadAllText(FixAbsolutePath);
+            string fixNormalized = fixContent.Replace("\r\n", "\n");
+            string tempFix = Path.GetTempFileName();
+            File.WriteAllText(tempFix, fixNormalized, new UTF8Encoding(false));
+ 
             // Generate raw patch from actual target -> fix.
             var diff = RunProcess(
                 "git",
-                $"diff --no-index --binary -- {Q(TargetKernelPath)} {Q(FixAbsolutePath)}",
+                $"diff --no-index --ignore-cr-at-eol -- {Q(TargetKernelPath)} {Q(tempFix)}",
                 ProjectRoot);
+
+            File.Delete(tempFix);
 
             // git diff --no-index returns:
             // 0 => no differences
@@ -637,6 +644,10 @@ if errorlevel 1 (
 
 echo.
 echo Patch applied successfully.
+
+echo Normalizing line endings...
+powershell -NoProfile -Command ""(Get-Content -Raw '%TARGET_FILE%') -replace \""`r`n\"", \""`n\"" | Set-Content -NoNewline '%TARGET_FILE%'""
+
 echo Signaling watcher to relaunch Unity...
 echo done > ""%DONE_FILE%""
 
@@ -711,7 +722,10 @@ exit /b 0
                     "git apply failed.\n\n" +
                     "stdout:\n" + apply.StdOut + "\n\n" +
                     "stderr:\n" + apply.StdErr);
-
+            // After successful git apply:
+            string content = File.ReadAllText(TargetKernelPath);
+            string normalized = content.Replace("\r\n", "\n");
+            File.WriteAllBytes(TargetKernelPath, Encoding.UTF8.GetBytes(normalized));
             AssetDatabase.Refresh();
             return Success(
                 "Patch applied successfully to the current Unity editor.\n\n" +
@@ -756,6 +770,7 @@ exit /b 0
         private ProcessResult RunGitApplyCore(bool check, bool reverse)
         {
             var sb = new StringBuilder();
+            sb.Append("-c core.autocrlf=false ");
             sb.Append("apply --unsafe-paths ");
             if (check)   sb.Append("--check ");
             if (reverse) sb.Append("--reverse ");
@@ -765,7 +780,10 @@ exit /b 0
             sb.Append(' ');
             sb.Append(Q(PatchAbsolutePath));
 
-            return RunProcess("git", sb.ToString(), ProjectRoot);
+            // Use temp dir, NOT ProjectRoot — running from the project picks up
+            // its .gitattributes (e.g. "* text=auto eol=crlf") and converts
+            // every line to CRLF even when core.autocrlf=false.
+            return RunProcess("git", sb.ToString(), Path.GetTempPath());
         }
 
         private bool EnsureGitAvailable(out string error)

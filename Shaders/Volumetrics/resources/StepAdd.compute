@@ -224,6 +224,13 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
     // World-space distance of previous slice (start from near)
     float prevDepthWS = DecodeLogarithmicDepthGeneralized(0.0, _VBufferDistanceDecodingParams);
 
+    // --- Hard-coded prototype base atmosphere (sea level, standard atmosphere) ---
+    // Setting hard value for now to make sure there's a minimum value to make sure artists don't go outside of reality. // TODO: calculate the real value based on atmosphere & aerosols values
+    // static const float3 kRayleighSigmaE = float3(5.802e-6, 1.3558e-5, 3.3100e-5); // m^-1
+    // // Mie: scattering + absorption, ~clear day
+    // static const float3 kMieSigmaE      = float3(4.440e-6, 4.440e-6, 4.440e-6);   // m^-1 (3.996e-6 + 4.40e-7)
+    // Gray-ish single value. Weighted toward green.
+    static const float  kAtmoSigmaE_Mono = 1.8e-5; // m^-1, ~luminance-weighted sum
   
     for (uint z = 0u; z < (uint)_FroxelDepthCount; ++z)
     {
@@ -256,7 +263,7 @@ void StepAdd(uint3 id : SV_DispatchThreadID)
         // float3 skyFog = GetFogColorFromSky(Vws, slice, accum.a, scatteringExtinction.a, travelDis);
         // scatteringExtinction.rgb += (half3)skyFog;
 
-        float extinction = max(scatteringExtinction.a, 0.0f);
+        float extinction = max(scatteringExtinction.a, 0.0f) + kAtmoSigmaE_Mono;
 
         // If rgb is stored as scattering-albedo-ish and you premultiply by extinction:
         scatteringExtinction.rgb *= extinction;

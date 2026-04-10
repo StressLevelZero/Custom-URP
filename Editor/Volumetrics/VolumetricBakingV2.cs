@@ -138,65 +138,9 @@ namespace SLZ.SLZEditorTools
             return -1;
         }
 
-        static void BakeSceneSkyMeanRadiance()
-        {
-            if (udata == null)
-                return;
-
-            if (udata.skyShader == null)
-            {
-                Debug.LogWarning("Volumetric Baking: Sky mean radiance compute shader is null.");
-                return;
-            }
-
-            if (udata.skyTexture == null)
-            {
-                Debug.LogWarning("Volumetric Baking: Sky texture is null.");
-                return;
-            }
-
-            if (udata.skyColorBuffer == null)
-            {
-                Debug.LogWarning("Volumetric Baking: Sky result buffer is null.");
-                return;
-            }
-
-            int kernel;
-            try
-            {
-                kernel = SLZ.SkyMeanRadianceUtility.FindKernel(udata.skyShader);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogException(ex);
-                return;
-            }
-
-            CommandBuffer cmd = CommandBufferPool.Get("Bake Mean Sky Radiance");
-            cmd.Clear();
-
-            SLZ.SkyMeanRadianceUtility.Dispatch(
-                cmd,
-                udata.skyShader,
-                kernel,
-                udata.skyTexture,
-                udata.skyColorBuffer,
-                udata.environmentSampleCount,
-                0x51A7C3Du,
-                0.0f,
-                0);
-
-            Graphics.ExecuteCommandBuffer(cmd);
-            CommandBufferPool.Release(cmd);
-
-            Vector4[] result = new Vector4[1];
-            udata.skyColorBuffer.GetData(result);
-
-            udata.bakedSkyMeanRadiance = new Color(result[0].x, result[0].y, result[0].z, result[0].w);
-            udata.hasBakedSkyMeanRadiance = true;
-
-            Debug.Log($"Volumetric Baking: baked mean sky radiance = {result[0]}");
-        }
+        // Note: the old synchronous BakeSceneSkyMeanRadiance has been replaced by the
+        // BeginSkyMeanRadianceAsync → PollPendingSkyReadback pair, which avoids the
+        // ComputeBuffer.GetData() stall at the end of the bake.
 
         static SLZ.BakedVolumetricsData SaveOrUpdateBakedVolumetricsDataAsset(Color skyMeanRadianceLinear, int environmentSampleCount)
         {
@@ -267,6 +211,24 @@ namespace SLZ.SLZEditorTools
 
             EditorSceneManager.MarkSceneDirty(bindings.gameObject.scene);
         }
+        // Adaptive chunk sizing: governs how many samples we dispatch per editor tick.
+        // Target a ~120ms chunk so TDR has plenty of headroom on the worst case voxel.
+        // These bound the *per-tick* sample count; the overall sample budget per area
+        // is still driven by totalAreaSamples.
+        const double kTargetChunkMs = 120.0;
+        const int kMinChunkSamples = 1;
+        const int kMaxChunkSamples = 1024;
+
+        // Phases for the bake state machine. Separating tracing from async-readback
+        // phases lets us avoid synchronous GetData() stalls on the critical path.
+        enum BakePhase
+        {
+            Tracing,       // Dispatching ray chunks into the current area's rendertarget.
+            SavingArea,    // Area finished tracing; waiting on GPU readback to write to disk.
+            BakingSky,     // Dispatched sky mean-radiance kernel; waiting on readback.
+            Finalizing     // All GPU work done; doing asset/scene bookkeeping.
+        }
+
         class UpdateLoopData : IDisposable
         {
             public RayTracingShader rtShader;
@@ -297,14 +259,30 @@ namespace SLZ.SLZEditorTools
             public int areaLightSampleCount;
             public int currentAreaIndex = 0;
             public int currentChunkIndex = 0;
+            // Running count of samples actually dispatched in the current area. Used as the
+            // authoritative progress counter instead of (currentChunkIndex * chunkSampleCount),
+            // because chunkSampleCount is a moving target once adaptive sizing kicks in.
+            public int currentAreaSamplesTraced = 0;
             public int chunkSampleCount;
             public float areaSeed;
-            
+
+            // Bake state machine / async save plumbing.
+            public BakePhase phase = BakePhase.Tracing;
+            public bool assetEditingOpen = false;
+            // Sticky flag: once AsyncGPUReadback fails once in a session we stop trying it
+            // and use the synchronous path for the remainder of the bake.
+            public bool asyncReadbackDisabled = false;
+            public ComputeBuffer pendingMipBuffer;
+            public AsyncGPUReadbackRequest pendingAreaReadback;
+            public bool pendingAreaReadbackValid = false;
+            public string pendingSaveAbsPath;
+            public int pendingSaveAreaIndex;
+            public AsyncGPUReadbackRequest pendingSkyReadback;
+            public bool pendingSkyReadbackValid = false;
+
             public ComputeBuffer skyColorBuffer;
             public Color bakedSkyMeanRadiance = Color.black;
             public bool hasBakedSkyMeanRadiance = false;
-            
-            public bool finished = false;
 
             private bool disposed = false;
 
@@ -343,6 +321,8 @@ namespace SLZ.SLZEditorTools
                         areaBuffer = null;
                         skyColorBuffer?.Release();
                         skyColorBuffer = null;
+                        pendingMipBuffer?.Release();
+                        pendingMipBuffer = null;
                     }
 
                     // Textures are funky and won't be destroyed by the finalizer, treat them like unmanaged memory
@@ -378,6 +358,8 @@ namespace SLZ.SLZEditorTools
                 areaBuffer = null;
                 skyColorBuffer?.Release();
                 skyColorBuffer = null;
+                pendingMipBuffer?.Release();
+                pendingMipBuffer = null;
 
                 if (skyTexIsGenerated && skyTexture)
                 {
@@ -568,12 +550,54 @@ namespace SLZ.SLZEditorTools
             udata.rendertarget = rendertarget;
 
             AssetDatabase.StartAssetEditing();
+            udata.assetEditingOpen = true;
+            udata.phase = BakePhase.Tracing;
             EditorApplication.update += BakeEditorUpdate;
         }
 
+        /// <summary>
+        /// Centralized teardown. Every exit from the bake loop (success, cancel,
+        /// exception, abort) must go through this method so that
+        /// <see cref="AssetDatabase.StopAssetEditing"/> is guaranteed to be called
+        /// and all graphics resources are released. Previously the cancel path
+        /// leaked both of those.
+        /// </summary>
+        static void EndBake(bool success, string message = null)
+        {
+            try
+            {
+                EditorApplication.update -= BakeEditorUpdate;
+                EditorUtility.ClearProgressBar();
+
+                if (udata != null && udata.assetEditingOpen)
+                {
+                    try { AssetDatabase.StopAssetEditing(); }
+                    catch (Exception ex) { Debug.LogException(ex); }
+                    udata.assetEditingOpen = false;
+                }
+
+                if (!string.IsNullOrEmpty(message))
+                {
+                    if (success) Debug.Log("[VolBake] " + message);
+                    else Debug.LogError("[VolBake] " + message);
+                }
+            }
+            finally
+            {
+                udata?.Dispose();
+                udata = null;
+                BakeCompleted?.Invoke(success);
+            }
+        }
 
         static void BakeEditorUpdate()
         {
+            if (udata == null)
+            {
+                EditorApplication.update -= BakeEditorUpdate;
+                return;
+            }
+
             // Don't run while the asset database is importing
             if (EditorApplication.isUpdating)
             {
@@ -581,6 +605,8 @@ namespace SLZ.SLZEditorTools
             }
 
             // Only run the update once every 5 editor updates. Otherwise strange native D3D12 driver crashes occur. Not sure why, maybe unity's not freeing up resources when it should?
+            // Adaptive chunk sizing handles *how much* we dispatch; this frameSkip handles *how often* the editor
+            // gets to breathe between dispatches. They solve different problems, so we keep both.
             udata.currentFrame = (udata.currentFrame + 1) % UpdateLoopData.frameSkip;
             if (udata.currentFrame != 0)
             {
@@ -591,90 +617,400 @@ namespace SLZ.SLZEditorTools
                 return;
             }
 
-            if (udata.finished)
+            // Progress + cancel. Cancel routes through EndBake so StopAssetEditing() always fires.
+            if (!Application.isBatchMode && udata.phase != BakePhase.Finalizing)
             {
-                EditorApplication.update -= BakeEditorUpdate;
-
-                AssignTexturesToVolumes();
-                udata.Dispose();
-                udata = null;
-                BakeCompleted?.Invoke(true);
-
-                return;
-            }
-
-            int currentSample = udata.currentChunkIndex * udata.chunkSampleCount;
-            bool areaFinishedRendering = currentSample >= udata.totalAreaSamples;
-            TimeSpan runningTime = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
-
-            if (!Application.isBatchMode)
-            {
+                int currentSampleForUI = udata.currentChunkIndex * udata.chunkSampleCount;
+                TimeSpan runningTime = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
                 if (EditorUtility.DisplayCancelableProgressBar(
-                        $"Baking Volumes ({runningTime.ToString("hh':'mm':'ss")})",
-                        $"Volume {udata.currentAreaIndex} / {VolumetricRegisters.volumetricAreas.Count}, Sample {currentSample} / {udata.totalAreaSamples}",
-                        (float)(udata.currentAreaIndex) / (float)(VolumetricRegisters.volumetricAreas.Count)))
+                        $"Baking Volumes ({runningTime:hh\\:mm\\:ss})",
+                        $"Volume {udata.currentAreaIndex} / {VolumetricRegisters.volumetricAreas.Count}, Sample {currentSampleForUI} / {udata.totalAreaSamples} [{udata.phase}]",
+                        (float)udata.currentAreaIndex / (float)VolumetricRegisters.volumetricAreas.Count))
                 {
-                    EditorUtility.ClearProgressBar();
-                    EditorApplication.update -= BakeEditorUpdate;
-                    udata.Dispose();
-                    udata = null;
-                    EditorUtility.ClearProgressBar();
+                    EndBake(false, "Bake cancelled by user.");
                     return;
                 }
             }
 
+            try
+            {
+                switch (udata.phase)
+                {
+                    case BakePhase.Tracing:
+                        TickTracing();
+                        break;
+                    case BakePhase.SavingArea:
+                        PollPendingAreaSave();
+                        break;
+                    case BakePhase.BakingSky:
+                        PollPendingSkyReadback();
+                        break;
+                    case BakePhase.Finalizing:
+                        TickFinalizing();
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+                EndBake(false, "Bake aborted due to exception: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tracing tick: either dispatch another ray chunk into the current area,
+        /// or if the area is full, hand off to the async save path.
+        /// </summary>
+        static void TickTracing()
+        {
+            // Use the running counter, NOT (currentChunkIndex * chunkSampleCount) —
+            // chunkSampleCount changes under adaptive sizing, so reconstructing progress
+            // from it is incorrect and causes over-tracing (samples double-count in
+            // the additive raygen accumulator).
+            int currentSample = udata.currentAreaSamplesTraced;
+            bool areaFinishedRendering = currentSample >= udata.totalAreaSamples;
+
             if (!areaFinishedRendering)
             {
-                TraceChunk();
-            }
-            else // Area has finished rendering, save it to disk
-            {
-                SaveAreaToDisk();
+                // Clamp the final chunk so we don't over-trace past totalAreaSamples.
+                int raysThisChunk = Mathf.Min(udata.chunkSampleCount, udata.totalAreaSamples - currentSample);
+                if (raysThisChunk <= 0)
+                {
+                    // Defensive: shouldn't happen, but don't dispatch a zero-ray chunk.
+                    BeginSaveAreaAsync();
+                    return;
+                }
 
-                udata.currentChunkIndex = 0;
-                udata.currentAreaIndex += 1;
+                double t0 = EditorApplication.timeSinceStartup;
+                TraceChunk(currentSample, raysThisChunk);
+                double chunkMs = (EditorApplication.timeSinceStartup - t0) * 1000.0;
+
+                udata.currentAreaSamplesTraced += raysThisChunk;
+
+                // Adaptive resize only kicks in when timing is clearly off target.
+                // Bounded on both sides so the bake can't spiral into 1-sample chunks or 16k-sample monsters.
+                if (chunkMs > kTargetChunkMs * 1.5)
+                    udata.chunkSampleCount = Mathf.Max(kMinChunkSamples, udata.chunkSampleCount / 2);
+                else if (chunkMs < kTargetChunkMs * 0.5)
+                    udata.chunkSampleCount = Mathf.Min(kMaxChunkSamples, udata.chunkSampleCount * 2);
+            }
+            else
+            {
+                BeginSaveAreaAsync();
+            }
+        }
+
+        /// <summary>
+        /// Kick off GPU readback for the just-finished area. Falls back to the
+        /// old synchronous path if async readback isn't supported on the platform.
+        /// </summary>
+        static void BeginSaveAreaAsync()
+        {
+            string folder = CheckDirectoryAndReturnPath().Replace('\\', '/');
+            string assetPath = $"{folder}/Volumemap-{udata.currentAreaIndex}{Vol3d.fileExtension}";
+            udata.pendingSaveAbsPath = Path.GetFullPath(assetPath);
+            udata.pendingSaveAreaIndex = udata.currentAreaIndex;
+            udata.pendingMipBuffer = Get3DMipsBuffer(udata.rendertarget);
+
+            Debug.Log($"[VolBake] Area {udata.currentAreaIndex} trace complete, beginning readback → {assetPath}");
+
+            if (SystemInfo.supportsAsyncGPUReadback && !udata.asyncReadbackDisabled)
+            {
+                udata.pendingAreaReadback = AsyncGPUReadback.Request(udata.pendingMipBuffer);
+                udata.pendingAreaReadbackValid = true;
+                udata.phase = BakePhase.SavingArea;
+            }
+            else
+            {
+                // Synchronous fallback: platforms without async readback, or after a previous async failure.
+                FinishAreaSaveSync();
+            }
+        }
+
+        /// <summary>
+        /// Poll the pending area readback. When done, write the mipchain to disk,
+        /// advance to the next area (or finalization), and return to Tracing.
+        /// On async readback failure, falls back to the synchronous GetData path
+        /// on the still-valid pendingMipBuffer rather than aborting the bake —
+        /// AsyncGPUReadback on structured compute buffers has occasional quirks
+        /// on some D3D12 driver/Unity combinations.
+        /// </summary>
+        static void PollPendingAreaSave()
+        {
+            if (!udata.pendingAreaReadbackValid)
+            {
+                // Shouldn't happen, but don't spin forever.
+                udata.phase = BakePhase.Tracing;
+                return;
+            }
+
+            if (!udata.pendingAreaReadback.done)
+                return;
+
+            Texture3D tex = null;
+
+            if (udata.pendingAreaReadback.hasError)
+            {
+                // Fall back to synchronous readback on the same buffer. The mip compute
+                // already ran, so the data should be present — AsyncGPUReadback just
+                // refused to hand it back for some reason Unity doesn't report.
+                Debug.LogWarning(
+                    $"[VolBake] AsyncGPUReadback reported hasError for area {udata.pendingSaveAreaIndex} " +
+                    $"(buffer stride={udata.pendingMipBuffer?.stride}, count={udata.pendingMipBuffer?.count}). " +
+                    $"Falling back to synchronous ComputeBuffer.GetData and disabling async readback for this bake."
+                );
+                udata.asyncReadbackDisabled = true;
+
+                try
+                {
+                    tex = ReadBufferToTex3D(
+                        udata.pendingMipBuffer,
+                        udata.rendertarget.width,
+                        udata.rendertarget.height,
+                        udata.rendertarget.volumeDepth);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
+                    udata.pendingAreaReadbackValid = false;
+                    udata.pendingMipBuffer?.Release();
+                    udata.pendingMipBuffer = null;
+                    EndBake(false, $"Both async and sync readback failed for area {udata.pendingSaveAreaIndex}. See above exception.");
+                    return;
+                }
+            }
+            else
+            {
+                var data = udata.pendingAreaReadback.GetData<ushort>();
+                tex = ReadRawMipDataToTex3D(
+                    data,
+                    udata.rendertarget.width,
+                    udata.rendertarget.height,
+                    udata.rendertarget.volumeDepth);
+            }
+
+            Vol3d.WriteTex3DToVol3D(tex, udata.pendingSaveAbsPath);
+            UnityEngine.Object.DestroyImmediate(tex);
+
+            long bytes = File.Exists(udata.pendingSaveAbsPath) ? new FileInfo(udata.pendingSaveAbsPath).Length : 0;
+            Debug.Log($"[VolBake] Area {udata.pendingSaveAreaIndex} saved — {bytes / 1024} KB at {udata.pendingSaveAbsPath}");
+
+            udata.pendingMipBuffer?.Release();
+            udata.pendingMipBuffer = null;
+            udata.pendingAreaReadbackValid = false;
+
+            udata.currentChunkIndex = 0;
+            udata.currentAreaSamplesTraced = 0;
+            udata.currentAreaIndex += 1;
+
+            if (udata.currentAreaIndex >= VolumetricRegisters.volumetricAreas.Count)
+            {
                 TimeSpan totalTime = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
                 Debug.Log(
                     $"[VolBake] All {VolumetricRegisters.volumetricAreas.Count} areas traced " +
-                    $"in {totalTime:hh\\:mm\\:ss} — saving assets…"
+                    $"in {totalTime:hh\\:mm\\:ss} — baking sky mean radiance…"
                 );
-                // All volumes are finished, set the finished flag and begin importing volumes.
-                if (udata.currentAreaIndex == VolumetricRegisters.volumetricAreas.Count)
-                {
-                    Color bakedSkyColor = Color.black;
-                    bool hasSkyColor = false;
-                    int envSampleCount = udata.environmentSampleCount;
-
-                    try
-                    {
-                        BakeSceneSkyMeanRadiance();
-                        bakedSkyColor = udata.bakedSkyMeanRadiance;
-                        hasSkyColor = udata.hasBakedSkyMeanRadiance;
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogException(ex);
-                    }
-
-                    EditorUtility.ClearProgressBar();
-                    udata.finished = true;
-                    udata.DisposeGraphicsResources();
-
-                    AssetDatabase.StopAssetEditing();
-
-                    if (hasSkyColor)
-                    {
-                        var bakedAsset = SaveOrUpdateBakedVolumetricsDataAsset(bakedSkyColor, envSampleCount);
-                        EnsureSceneBindingObject(bakedAsset);
-                    }
-
-                    AssetDatabase.SaveAssets();
-                    AssetDatabase.Refresh();
-
-                    if (!Application.isBatchMode)
-                        VolumetricRegisters.MarkClipmapDirty();
-                }
+                BeginSkyMeanRadianceAsync();
             }
+            else
+            {
+                udata.phase = BakePhase.Tracing;
+            }
+        }
+
+        /// <summary>
+        /// Synchronous fallback used when AsyncGPUReadback is unavailable.
+        /// Preserves the old end-of-area behavior.
+        /// </summary>
+        static void FinishAreaSaveSync()
+        {
+            try
+            {
+                var tex = ReadBufferToTex3D(
+                    udata.pendingMipBuffer,
+                    udata.rendertarget.width,
+                    udata.rendertarget.height,
+                    udata.rendertarget.volumeDepth);
+                Vol3d.WriteTex3DToVol3D(tex, udata.pendingSaveAbsPath);
+                UnityEngine.Object.DestroyImmediate(tex);
+
+                long bytes = File.Exists(udata.pendingSaveAbsPath) ? new FileInfo(udata.pendingSaveAbsPath).Length : 0;
+                Debug.Log($"[VolBake] Area {udata.pendingSaveAreaIndex} saved (sync) — {bytes / 1024} KB");
+            }
+            finally
+            {
+                udata.pendingMipBuffer?.Release();
+                udata.pendingMipBuffer = null;
+            }
+
+            udata.currentChunkIndex = 0;
+            udata.currentAreaSamplesTraced = 0;
+            udata.currentAreaIndex += 1;
+
+            if (udata.currentAreaIndex >= VolumetricRegisters.volumetricAreas.Count)
+            {
+                BeginSkyMeanRadianceAsync();
+            }
+            else
+            {
+                udata.phase = BakePhase.Tracing;
+            }
+        }
+
+        /// <summary>
+        /// Kick off the sky mean-radiance compute and its readback. Previously this
+        /// was a synchronous GetData() call on the critical path.
+        /// </summary>
+        static void BeginSkyMeanRadianceAsync()
+        {
+            udata.phase = BakePhase.BakingSky;
+
+            if (udata.skyShader == null || udata.skyTexture == null || udata.skyColorBuffer == null)
+            {
+                Debug.LogWarning("Volumetric Baking: Sky inputs missing; skipping sky mean radiance bake.");
+                udata.phase = BakePhase.Finalizing;
+                return;
+            }
+
+            int kernel;
+            try
+            {
+                kernel = SLZ.SkyMeanRadianceUtility.FindKernel(udata.skyShader);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+                udata.phase = BakePhase.Finalizing;
+                return;
+            }
+
+            CommandBuffer cmd = CommandBufferPool.Get("Bake Mean Sky Radiance");
+            try
+            {
+                cmd.Clear();
+                SLZ.SkyMeanRadianceUtility.Dispatch(
+                    cmd,
+                    udata.skyShader,
+                    kernel,
+                    udata.skyTexture,
+                    udata.skyColorBuffer,
+                    udata.environmentSampleCount,
+                    0x51A7C3Du,
+                    0.0f,
+                    0);
+                Graphics.ExecuteCommandBuffer(cmd);
+            }
+            finally
+            {
+                CommandBufferPool.Release(cmd);
+            }
+
+            if (SystemInfo.supportsAsyncGPUReadback && !udata.asyncReadbackDisabled)
+            {
+                udata.pendingSkyReadback = AsyncGPUReadback.Request(udata.skyColorBuffer);
+                udata.pendingSkyReadbackValid = true;
+            }
+            else
+            {
+                // Sync fallback
+                Vector4[] result = new Vector4[1];
+                udata.skyColorBuffer.GetData(result);
+                udata.bakedSkyMeanRadiance = new Color(result[0].x, result[0].y, result[0].z, result[0].w);
+                udata.hasBakedSkyMeanRadiance = true;
+                Debug.Log($"Volumetric Baking: baked mean sky radiance (sync) = {result[0]}");
+                udata.phase = BakePhase.Finalizing;
+            }
+        }
+
+        static void PollPendingSkyReadback()
+        {
+            if (!udata.pendingSkyReadbackValid)
+            {
+                udata.phase = BakePhase.Finalizing;
+                return;
+            }
+
+            if (!udata.pendingSkyReadback.done)
+                return;
+
+            if (udata.pendingSkyReadback.hasError)
+            {
+                // Same quirk as area save: fall back to sync GetData on the same buffer.
+                Debug.LogWarning("[VolBake] Sky mean radiance async readback reported hasError; falling back to synchronous GetData.");
+                udata.asyncReadbackDisabled = true;
+                udata.pendingSkyReadbackValid = false;
+
+                try
+                {
+                    Vector4[] result = new Vector4[1];
+                    udata.skyColorBuffer.GetData(result);
+                    udata.bakedSkyMeanRadiance = new Color(result[0].x, result[0].y, result[0].z, result[0].w);
+                    udata.hasBakedSkyMeanRadiance = true;
+                    Debug.Log($"Volumetric Baking: baked mean sky radiance (sync fallback) = {result[0]}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
+                    Debug.LogError("Volumetric Baking: sky mean radiance sync fallback also failed; continuing finalization with black sky.");
+                }
+
+                udata.phase = BakePhase.Finalizing;
+                return;
+            }
+
+            var data = udata.pendingSkyReadback.GetData<float>();
+            if (data.Length >= 4)
+            {
+                udata.bakedSkyMeanRadiance = new Color(data[0], data[1], data[2], data[3]);
+                udata.hasBakedSkyMeanRadiance = true;
+                Debug.Log($"Volumetric Baking: baked mean sky radiance = ({data[0]}, {data[1]}, {data[2]}, {data[3]})");
+            }
+            else
+            {
+                Debug.LogWarning("Volumetric Baking: sky readback returned unexpected data size.");
+            }
+
+            udata.pendingSkyReadbackValid = false;
+            udata.phase = BakePhase.Finalizing;
+        }
+
+        /// <summary>
+        /// All GPU work is done. Release graphics resources, close asset-editing,
+        /// write the BakedVolumetricsData asset, assign per-area Texture3Ds, and
+        /// fire the BakeCompleted event.
+        /// </summary>
+        static void TickFinalizing()
+        {
+            Color bakedSkyColor = udata.bakedSkyMeanRadiance;
+            bool hasSkyColor = udata.hasBakedSkyMeanRadiance;
+            int envSampleCount = udata.environmentSampleCount;
+
+            udata.DisposeGraphicsResources();
+
+            // Close asset editing before we start touching the asset database for writes.
+            if (udata.assetEditingOpen)
+            {
+                try { AssetDatabase.StopAssetEditing(); }
+                catch (Exception ex) { Debug.LogException(ex); }
+                udata.assetEditingOpen = false;
+            }
+
+            if (hasSkyColor)
+            {
+                var bakedAsset = SaveOrUpdateBakedVolumetricsDataAsset(bakedSkyColor, envSampleCount);
+                EnsureSceneBindingObject(bakedAsset);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            AssignTexturesToVolumes();
+
+            if (!Application.isBatchMode)
+                VolumetricRegisters.MarkClipmapDirty();
+
+            TimeSpan totalTime = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
+            EndBake(true, $"Bake complete in {totalTime:hh\\:mm\\:ss}.");
         }
 
         static RayTracingAccelerationStructure BuildRTAccelerationStruct()
@@ -1104,16 +1440,24 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
         static int id__MipLevel   = Shader.PropertyToID("_MipLevel");
         
         /// <summary>
-        /// Traces a chunk of rays for the current volume, using the global data stored in udata to determine the volume and ray index to start at.
-        /// Automatically re-initializes and clears the global rendertarget for the first chunk in a a volume, and increments the global chunk index
-        /// when done. Does not increment the area index or reset the chunk index to 0 upon hitting the total ray count for an area, that is handled 
-        /// by the editor update loop.
+        /// Traces a chunk of rays for the current volume. The caller is responsible for
+        /// tracking <paramref name="sampleStart"/> (running sample count within the area)
+        /// and <paramml name="raysThisChunk"/> (the number of samples to dispatch on this
+        /// tick). Automatically clears the global rendertarget on the first chunk of an
+        /// area. Does not advance the area index; that is handled by the poll/save path.
         /// </summary>
-        static void TraceChunk()
+        /// <param name="sampleStart">
+        /// Running count of samples already dispatched for the current area. Becomes
+        /// <c>StartRayIdx</c> in the raygen shader.
+        /// </param>
+        /// <param name="raysThisChunk">
+        /// Number of sample slots to dispatch on this tick. Passed explicitly (rather than
+        /// using udata.chunkSampleCount) so the last chunk of an area can be clamped to
+        /// avoid over-tracing.
+        /// </param>
+        static void TraceChunk(int sampleStart, int raysThisChunk)
         {
             int areaIdx = udata.currentAreaIndex;
-            int sampleStart = udata.currentChunkIndex * udata.chunkSampleCount;
-            //Debug.Log($"Tracing Area {areaIdx} Chunk {udata.currentChunkIndex}  Sample {sampleStart} - {sampleStart + udata.chunkSampleCount} / {udata.chunkSampleCount}");
             int totalSamplesAllAreas = udata.totalAreaSamples * VolumetricRegisters.volumetricAreas.Count;
             float overallPct = totalSamplesAllAreas > 0
                 ? 100f * (udata.currentAreaIndex * udata.totalAreaSamples + sampleStart)
@@ -1133,7 +1477,7 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
             Debug.Log(
                 $"[VolBake] [{elapsed2:hh\\:mm\\:ss}] " +
                 $"Area {udata.currentAreaIndex + 1}/{VolumetricRegisters.volumetricAreas.Count} " +
-                $"| Chunk {udata.currentChunkIndex} " +
+                $"| Chunk {udata.currentChunkIndex} (rays={raysThisChunk}, chunkSize={udata.chunkSampleCount}) " +
                 $"| Area {areaPct:F0}% ({sampleStart}/{udata.totalAreaSamples} samples) " +
                 $"| Overall {overallPct:F1}%"
             );
@@ -1152,14 +1496,11 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
             }
 
             RayTracingShader rtshader = udata.rtShader;
-            ComputeShader skyshader = udata.skyShader;
 
-            //for (int rayCount = sampleStart; rayCount < sampleEnd; rayCount += udata.chunkSampleCount)
+            // try/finally guarantees the pooled command buffer is released even if dispatch throws.
+            CommandBuffer cmd = CommandBufferPool.Get("VolBake TraceChunk");
+            try
             {
-                
-                CommandBuffer cmd = CommandBufferPool.Get();
-                //if (loopIdx > 0) cmd.WaitOnAsyncGraphicsFence(fence[loopIdx - 1]);
-
                 cmd.Clear();
 
                 cmd.SetRayTracingIntParam(rtshader, id_PointLightCount, udata.pointLightCount);
@@ -1181,8 +1522,9 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 //Env
                 cmd.SetRayTracingTextureParam(rtshader, id__SkyTexture, udata.skyTexture);
                 cmd.SetRayTracingIntParam(rtshader, id_EnvLightSamples, udata.environmentSampleCount);
-                cmd.SetRayTracingIntParam(rtshader, id_PerDispatchRayCount, udata.chunkSampleCount);
-                
+                // NOTE: raysThisChunk, not chunkSampleCount. Last chunk of an area may be partial.
+                cmd.SetRayTracingIntParam(rtshader, id_PerDispatchRayCount, raysThisChunk);
+
                 //Cookies
                 cmd.SetRayTracingTextureParam(rtshader, id__LightCookies, udata.cookieAtlas);
                 cmd.SetRayTracingTextureParam(rtshader, id__PointCookies, udata.pointCookieArray);
@@ -1191,15 +1533,16 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 cmd.SetRayTracingVectorParam(rtshader, id_WPosition, currentArea.Corner);
                 cmd.SetRayTracingFloatParam(rtshader, id__Seed, udata.areaSeed);
                 cmd.SetRayTracingFloatParam(rtshader, id_HalfVoxelSize, maxVoxelSize * 0.5f);
-               
+
                 cmd.SetRayTracingTextureParam(rtshader, id_g_Output, udata.rendertarget);
 
                 cmd.SetRayTracingIntParam(rtshader, id_startIdx, sampleStart);
                 cmd.DispatchRays(rtshader, "MainRayGenShader", (uint)threads.x, (uint)threads.y, (uint)threads.z);
                 Graphics.ExecuteCommandBuffer(cmd);
-
+            }
+            finally
+            {
                 CommandBufferPool.Release(cmd);
-                
             }
 
             udata.currentChunkIndex += 1;
@@ -1220,37 +1563,9 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
             return path;
         }
 
-        // static void SaveAreaToDisk()
-        // {
-        //     string path = Path.Combine(CheckDirectoryAndReturnPath(), $"Volumemap-{udata.currentAreaIndex}{Vol3d.fileExtension}");
-        //     ComputeBuffer mipChain = Get3DMipsBuffer(udata.rendertarget);
-        //
-        //     Texture3D ReadBackTex = ReadBufferToTex3D(mipChain, udata.rendertarget.width, udata.rendertarget.height, udata.rendertarget.volumeDepth);
-        //     mipChain.Dispose();
-        //
-        //     Vol3d.WriteTex3DToVol3D(ReadBackTex, path);
-        //     UnityEngine.Object.DestroyImmediate(ReadBackTex);
-        // }
-        static void SaveAreaToDisk()
-        {
-            string folder = CheckDirectoryAndReturnPath().Replace('\\','/');
-            string assetPath = $"{folder}/Volumemap-{udata.currentAreaIndex}{Vol3d.fileExtension}";
-            string absPath = Path.GetFullPath(assetPath);
-
-            //Debug.Log($"SaveAreaToDisk: writing {assetPath} (abs {absPath})");
-            Debug.Log($"[VolBake] Saving area {udata.currentAreaIndex} → {assetPath}");
-
-            var mipChain = Get3DMipsBuffer(udata.rendertarget);
-            var tex = ReadBufferToTex3D(mipChain, udata.rendertarget.width, udata.rendertarget.height, udata.rendertarget.volumeDepth);
-            mipChain.Dispose();
-
-            Vol3d.WriteTex3DToVol3D(tex, absPath);
-            UnityEngine.Object.DestroyImmediate(tex);
-
-            //Debug.Log($"SaveAreaToDisk: exists={File.Exists(absPath)} bytes={(File.Exists(absPath) ? new FileInfo(absPath).Length : 0)}");
-            long bytes = File.Exists(absPath) ? new FileInfo(absPath).Length : 0;
-            Debug.Log($"[VolBake] Area {udata.currentAreaIndex} saved — {bytes / 1024} KB at {assetPath}");
-        }
+        // Note: the old synchronous SaveAreaToDisk has been replaced by the
+        // BeginSaveAreaAsync → PollPendingAreaSave pair (with FinishAreaSaveSync
+        // as a fallback when AsyncGPUReadback is unavailable).
 
         // static void AssignTexturesToVolumes()
         // {
@@ -1388,39 +1703,46 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 textureDim = math.max(textureDim / 2, 1);
                 bufferCount += textureDim.x * textureDim.y * textureDim.z;
             }
-            CommandBuffer cmd = CommandBufferPool.Get("Mip3DTexToBuffer");
-            cmd.Clear();
             ComputeBuffer mips = new ComputeBuffer(bufferCount, 4 * sizeof(ushort), ComputeBufferType.Structured);
 
-            ComputeShader mip3DCompute = Mip3DCompute;
-
-            int initKernel = mip3DCompute.FindKernel("CopyTexToBuffer");
-            int mipKernel = mip3DCompute.FindKernel("CalculateMipBuffer");
-            int3 mipDim = new int3(rtDesc.width, rtDesc.height, rtDesc.volumeDepth);
-
-            cmd.SetComputeIntParams(mip3DCompute, id_MipDimOffset, new int[] { mipDim.x, mipDim.y, mipDim.z, 0 });
-            cmd.SetComputeBufferParam(mip3DCompute, initKernel, id_Buffer, mips);
-            cmd.SetComputeTextureParam(mip3DCompute, initKernel, id_Input, mip0);
-            cmd.DispatchCompute(mip3DCompute, initKernel, (mipDim.x + 3) / 4, (mipDim.y + 3) / 4, (mipDim.z + 3) / 4);
-
-            int3 prevMipDim = mipDim;
-            int mipPtr = 0;
-            int prevMipPtr = 0;
-            cmd.SetComputeBufferParam(mip3DCompute, mipKernel, id_Buffer, mips);
-            for (int level = 1; level < numMips; level++)
+            CommandBuffer cmd = CommandBufferPool.Get("Mip3DTexToBuffer");
+            try
             {
-                prevMipDim = mipDim;
-                prevMipPtr = mipPtr;
-                mipDim = math.max(mipDim / 2, new int3(1, 1, 1));
-                mipPtr += prevMipDim.x * prevMipDim.y * prevMipDim.z;
-                cmd.SetComputeIntParams(mip3DCompute, id_PrevMipDimOffset, new int[] { prevMipDim.x, prevMipDim.y, prevMipDim.z, prevMipPtr });
-                cmd.SetComputeIntParams(mip3DCompute, id_MipDimOffset, new int[] { mipDim.x, mipDim.y, mipDim.z, mipPtr });
-                cmd.DispatchCompute(mip3DCompute, mipKernel, (mipDim.x + 3) / 4, (mipDim.y + 3) / 4, (mipDim.z + 3) / 4);
-                GraphicsFence fence = cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
-                cmd.WaitOnAsyncGraphicsFence(fence);
+                cmd.Clear();
+
+                ComputeShader mip3DCompute = Mip3DCompute;
+
+                int initKernel = mip3DCompute.FindKernel("CopyTexToBuffer");
+                int mipKernel = mip3DCompute.FindKernel("CalculateMipBuffer");
+                int3 mipDim = new int3(rtDesc.width, rtDesc.height, rtDesc.volumeDepth);
+
+                cmd.SetComputeIntParams(mip3DCompute, id_MipDimOffset, new int[] { mipDim.x, mipDim.y, mipDim.z, 0 });
+                cmd.SetComputeBufferParam(mip3DCompute, initKernel, id_Buffer, mips);
+                cmd.SetComputeTextureParam(mip3DCompute, initKernel, id_Input, mip0);
+                cmd.DispatchCompute(mip3DCompute, initKernel, (mipDim.x + 3) / 4, (mipDim.y + 3) / 4, (mipDim.z + 3) / 4);
+
+                int3 prevMipDim = mipDim;
+                int mipPtr = 0;
+                int prevMipPtr = 0;
+                cmd.SetComputeBufferParam(mip3DCompute, mipKernel, id_Buffer, mips);
+                for (int level = 1; level < numMips; level++)
+                {
+                    prevMipDim = mipDim;
+                    prevMipPtr = mipPtr;
+                    mipDim = math.max(mipDim / 2, new int3(1, 1, 1));
+                    mipPtr += prevMipDim.x * prevMipDim.y * prevMipDim.z;
+                    cmd.SetComputeIntParams(mip3DCompute, id_PrevMipDimOffset, new int[] { prevMipDim.x, prevMipDim.y, prevMipDim.z, prevMipPtr });
+                    cmd.SetComputeIntParams(mip3DCompute, id_MipDimOffset, new int[] { mipDim.x, mipDim.y, mipDim.z, mipPtr });
+                    cmd.DispatchCompute(mip3DCompute, mipKernel, (mipDim.x + 3) / 4, (mipDim.y + 3) / 4, (mipDim.z + 3) / 4);
+                    GraphicsFence fence = cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
+                    cmd.WaitOnAsyncGraphicsFence(fence);
+                }
+                Graphics.ExecuteCommandBuffer(cmd);
             }
-            Graphics.ExecuteCommandBuffer(cmd);
-            CommandBufferPool.Release(cmd);
+            finally
+            {
+                CommandBufferPool.Release(cmd);
+            }
             return mips;
         }
 
@@ -1443,6 +1765,45 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 height = math.max(1, height / 2);
                 depth = math.max(1, depth / 2);
             }
+            return output;
+        }
+
+        /// <summary>
+        /// NativeArray-based twin of <see cref="ReadBufferToTex3D"/> for the async
+        /// readback path. Takes the raw ushort NativeArray from an
+        /// <see cref="AsyncGPUReadbackRequest.GetData{T}"/> call and copies the
+        /// mip chain into a freshly created <see cref="Texture3D"/>. Avoids the
+        /// managed-array round-trip the sync path uses.
+        /// </summary>
+        static Texture3D ReadRawMipDataToTex3D(NativeArray<ushort> rawMipData, int width, int height, int depth)
+        {
+            const int channelsPerPixel = 4; // R16G16B16A16
+
+            GraphicsFormat gfmt = GraphicsFormat.R16G16B16A16_SFloat;
+            Texture3D output = new Texture3D(width, height, depth, gfmt, TextureCreationFlags.MipChain);
+
+            int ptr = 0;
+            for (int mip = 0; mip < output.mipmapCount; mip++)
+            {
+                NativeArray<ushort> outputRaw = output.GetPixelData<ushort>(mip);
+                int copyCount = width * height * depth * channelsPerPixel;
+
+                // Bounds guard against an undersized readback (shouldn't happen, but fail loudly if it does).
+                if (ptr + copyCount > rawMipData.Length)
+                {
+                    Debug.LogError(
+                        $"Volumetric Baking: async readback data ({rawMipData.Length}) smaller than expected mip chain (needed {ptr + copyCount}). " +
+                        $"Stopping at mip {mip}.");
+                    break;
+                }
+
+                NativeArray<ushort>.Copy(rawMipData, ptr, outputRaw, 0, copyCount);
+                ptr += copyCount;
+                width = math.max(1, width / 2);
+                height = math.max(1, height / 2);
+                depth = math.max(1, depth / 2);
+            }
+
             return output;
         }
 

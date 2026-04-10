@@ -33,75 +33,121 @@ public class VolumetricBaking : EditorWindow
         //   BuildSelectionGrid();
     }
     const int safeTdrDelay = 30; 
-    static void SetGPUTimeout()
+    const int safeTdrDdiDelay = 30;
+
+     static void SetGPUTimeout()
     {
 #if UNITY_EDITOR_WIN
-        const string key = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\GraphicsDrivers";
-        const string value = "TdrDelay";
-        object currentValueBoxed = Registry.GetValue(key, value, null);
-        int currentValue = currentValueBoxed != null ? (int)currentValueBoxed : 2;
-        //EditorPrefs.SetBool("VolBakeDontShowGPUTimeoutWarning", false);
-        if (!EditorPrefs.GetBool("VolBakeDontShowGPUTimeoutWarning", false) && currentValue < safeTdrDelay)
+        const string regPath = @"HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\GraphicsDrivers";
+        const string regAddPath = @"HKLM\System\CurrentControlSet\Control\GraphicsDrivers";
+
+        const string tdrDelayName = "TdrDelay";
+        const string tdrDdiDelayName = "TdrDdiDelay";
+
+        int currentTdrDelay = GetDword(regPath, tdrDelayName, 2);
+        int currentTdrDdiDelay = GetDword(regPath, tdrDdiDelayName, 5);
+
+        bool needsTdrDelay = currentTdrDelay < safeTdrDelay;
+        bool needsTdrDdiDelay = currentTdrDdiDelay < safeTdrDdiDelay;
+
+        if (!EditorPrefs.GetBool("VolBakeDontShowGPUTimeoutWarning", false) &&
+            (needsTdrDelay || needsTdrDdiDelay))
         {
-            int allowKey = EditorUtility.DisplayDialogComplex("Increase GPU timeout",
-                "This tool needs to set a Windows registry key to increase the time the GPU is allowed to take " +
-                "processing graphics jobs in a single frame. Otherwise Windows will consider the GPU to be stalled out and will kill " +
-                $"Unity mid-bake.\n\n Key: {key}\\{value}\n\nIncrease the timeout from the default (2 seconds) to {safeTdrDelay}?\n",
+            string msg =
+                "This tool needs to set Windows registry keys to increase the time the GPU/driver is allowed " +
+                "to complete long jobs during baking. Otherwise Windows may reset the driver and kill Unity mid-bake.\n\n" +
+                $"Key: {regPath}\n" +
+                $"{tdrDelayName} = {safeTdrDelay}\n" +
+                $"{tdrDdiDelayName} = {safeTdrDdiDelay}\n\n" +
+                $"Current values:\n{tdrDelayName} = {currentTdrDelay}\n{tdrDdiDelayName} = {currentTdrDdiDelay}";
+
+            int allowKey = EditorUtility.DisplayDialogComplex(
+                "Increase GPU timeout",
+                msg,
                 "Proceed",
                 "Cancel",
                 "Cancel - Don't Show Again"
-
-                );
+            );
 
             bool proceed = allowKey == 0;
-            //if (allowKey == 1)
-            //{
-            //    proceed = !EditorUtility.DisplayDialog("Don't increase timeout", "Are you sure? If the timeout period isn't increased, unity is almost guaranteed to crash when baking volumetrics." +
-            //        " Increasing the value of this key will not cause any issues, it only means that Windows will wait 30 seconds before killing applications that have actually experienced a GPU crash.",
-            //        "Don't increase timeout",
-            //        "Increase timeout");
-            //   
-            //}
 
             if (allowKey == 2)
             {
-                int choice2 = EditorUtility.DisplayDialogComplex("Don't increase timeout", "Are you sure? If the timeout period isn't increased, unity is almost guaranteed to crash when baking volumetrics." +
-                    $"\n\nIncreasing the value of this key should not cause any issues, it only means that Windows will wait {safeTdrDelay} seconds before killing applications that have actually experienced a GPU crash. " +
-                    "\n\nThis will never ask you again! Only do this if you know what you're doing!",
+                int choice2 = EditorUtility.DisplayDialogComplex(
+                    "Don't increase timeout",
+                    "Are you sure? If these timeout values aren't increased, Unity may crash during volumetric baking.\n\n" +
+                    "This will never ask you again.",
                     "Don't increase timeout and never ask again",
                     "Don't increase timeout",
-                    "Increase timeout");
+                    "Increase timeout"
+                );
 
                 proceed = choice2 == 2;
-                if (choice2 == 0) {
+                if (choice2 == 0)
                     EditorPrefs.SetBool("VolBakeDontShowGPUTimeoutWarning", true);
-                }
             }
-
 
             if (proceed)
             {
-                // Registry.SetValue(key, value, 30, RegistryValueKind.DWord);
-                System.Diagnostics.Process process = new System.Diagnostics.Process();
-                System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
-                startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal;
-                startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = $"/C reg add {key} /v {value} /t REG_DWORD /d {safeTdrDelay} /f";
-                //Debug.Log(startInfo.Arguments);
-                startInfo.Verb = "runas";
+                // Build one elevated command that sets whichever keys need updating.
+                string commands = "";
+
+                if (needsTdrDelay)
+                    commands += $"reg add \"{regAddPath}\" /v {tdrDelayName} /t REG_DWORD /d {safeTdrDelay} /f && ";
+
+                if (needsTdrDdiDelay)
+                    commands += $"reg add \"{regAddPath}\" /v {tdrDdiDelayName} /t REG_DWORD /d {safeTdrDdiDelay} /f && ";
+
+                if (commands.EndsWith(" && "))
+                    commands = commands.Substring(0, commands.Length - 4);
+
+                Process process = new Process();
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    WindowStyle = ProcessWindowStyle.Normal,
+                    FileName = "cmd.exe",
+                    Arguments = "/C " + commands,
+                    Verb = "runas",
+                    UseShellExecute = true
+                };
+
                 process.StartInfo = startInfo;
                 process.Start();
                 process.WaitForExit();
+
                 if (process.ExitCode != 0)
                 {
-                    Debug.LogError("Setting registry key failed");
+                    Debug.LogError("Setting TDR registry keys failed.");
                 }
-                //Debug.Log("Volumetric Baking: Set GPU Timeout Registry Key to 30 seconds (" + key + "\\" + value + ")");
+                else
+                {
+                    // Re-read after writing so the log reflects the actual final values.
+                    currentTdrDelay = GetDword(regPath, tdrDelayName, 2);
+                    currentTdrDdiDelay = GetDword(regPath, tdrDdiDelayName, 5);
+                }
             }
-
         }
-        Debug.Log("Volumetric Baking: GPU Timeout Registry Key value is " + currentValue + " seconds (" + key + "\\" + value + ")");
+
+        Debug.Log(
+            $"Volumetric Baking: {tdrDelayName}={currentTdrDelay}, {tdrDdiDelayName}={currentTdrDdiDelay} ({regPath})"
+        );
 #endif
+    }
+
+    static int GetDword(string keyPath, string valueName, int defaultValue)
+    {
+        object boxed = Registry.GetValue(keyPath, valueName, null);
+        if (boxed == null)
+            return defaultValue;
+
+        try
+        {
+            return System.Convert.ToInt32(boxed);
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 
     //TODO: Save to scene asset file 
