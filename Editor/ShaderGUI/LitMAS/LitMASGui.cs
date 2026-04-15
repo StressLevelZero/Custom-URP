@@ -777,9 +777,11 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             {
                 List<MaterialIntPopup.Choice> detailChoices = new List<MaterialIntPopup.Choice>() 
                 { 
-                    new MaterialIntPopup.Choice {value = (int)DetailsMode.Details,        label = "Normal",  enabledKws = new string[] {keyword_FRACTAL_DETAILS_OFF, keyword_DETAILS_ON}, disabledKws = null}, 
+                    new MaterialIntPopup.Choice {value = (int)DetailsMode.None,           label = "Disabled",enabledKws = null, disabledKws = new string[] {keyword_FRACTAL_DETAILS_OFF, keyword_DETAILS_ON}}, 
+                    new MaterialIntPopup.Choice {value = (int)DetailsMode.Details,        label = "Simple",  enabledKws = new string[] {keyword_FRACTAL_DETAILS_OFF, keyword_DETAILS_ON}, disabledKws = null}, 
                     new MaterialIntPopup.Choice {value = (int)DetailsMode.DetailsFractal, label = "Fractal", enabledKws = new string[] {keyword_DETAILS_ON}, disabledKws = new string[] {keyword_FRACTAL_DETAILS_OFF}}
                 };
+                List<int> visibleChoices = new List<int>() {1, 2};
                 
                 detailPopup = new MaterialIntPopup();
                 detailPopup.label = "Detail Mode";
@@ -822,7 +824,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                         int dummy;
                     }
                 }
-                detailPopup.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], detailChoices);
+                detailPopup.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], detailChoices, visibleChoices);
 
                 materialFields.Add(detailPopup);
                 detailProps.contentContainer.Insert(0,detailPopup);
@@ -832,8 +834,18 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             if (detailToggleIdx != -1 && hasDetails)
             {
                 MaterialToggleField detailMatToggle = new MaterialToggleField();
-                detailMatToggle.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], keyword_DETAILS_ON, false, true);
-                detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => { detailProps.contentContainer.SetEnabled(evt.newValue); detailPopup.value = evt.newValue ? 0 : -1;});
+                detailMatToggle.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], null, false, true);
+                detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => 
+                    { 
+                        // Remember the old detail value
+                        if (!evt.newValue && !detailMatToggle.materialProperty.hasMixedValue && !detailPopup.showMixedValue) 
+                        {
+                            detailMatToggle.onFloatValue = detailPopup.value;
+                        }
+                        detailProps.contentContainer.SetEnabled(evt.newValue); 
+                        detailPopup.value = evt.newValue ? detailPopup.GetValueIndex((int)detailMatToggle.onFloatValue) : (int)detailMatToggle.offFloatValue;
+                    }
+                    );
                 bool detailEnabled = props[detailToggleIdx].floatValue > 0.0f;
                 detailProps.contentContainer.SetEnabled(detailEnabled);
                 materialFields.Add(detailMatToggle);                

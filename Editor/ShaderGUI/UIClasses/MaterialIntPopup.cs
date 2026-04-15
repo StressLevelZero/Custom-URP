@@ -29,7 +29,7 @@ namespace UnityEditor.SLZMaterialUI
         int numChoices = 0;
 
 
-        public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx, List<Choice> choiceValues)
+        public void Initialize(MaterialProperty materialProperty, int shaderPropertyIdx, List<Choice> choiceValues, List<int> visibleChoiceIdxs = null)
         {
           
             this.numChoices = choiceValues.Count;
@@ -38,7 +38,14 @@ namespace UnityEditor.SLZMaterialUI
             this.materialProperty = materialProperty;
             this.shaderPropertyIdx = shaderPropertyIdx;
 
-            this.choices = Enumerable.Range(0, choiceValues.Count).ToList<int>();
+            if (visibleChoiceIdxs == null)
+            {
+                this.choices = Enumerable.Range(0, choiceValues.Count).ToList<int>();
+            }
+            else
+            {
+                this.choices = visibleChoiceIdxs;
+            }
 
             this.formatSelectedValueCallback = GetCurrentFlagName;
             this.formatListItemCallback = GetValidFlagName;
@@ -151,6 +158,18 @@ namespace UnityEditor.SLZMaterialUI
             {
                 return "-";
             }
+        }
+
+        public int GetValueIndex(int value)
+        {
+            for (int valueIdx = 0; valueIdx < numChoices; valueIdx++)
+            {
+                if (choiceValues[valueIdx].value == (int)materialProperty.floatValue)
+                {
+                    return valueIdx;
+                }       
+            }
+            return -1;
         }
     }
 }
