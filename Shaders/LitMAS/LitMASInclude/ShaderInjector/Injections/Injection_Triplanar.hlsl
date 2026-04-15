@@ -10,6 +10,10 @@
 	#endif
 //#!INJECT_END
 
+//#!INJECT_BEGIN UNIFORMS 0
+TEXTURE2D(_DetailMap);
+SAMPLER(sampler_DetailMap);
+//#!INJECT_END
 
 //#!INJECT_BEGIN INCLUDES 0
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZTriplanar.hlsl"

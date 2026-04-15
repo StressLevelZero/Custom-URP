@@ -12,15 +12,6 @@
 
 #endif
 
-//#pragma multi_compile_fragment _ _LIGHT_COOKIES
-//#pragma multi_compile _ SHADOWS_SHADOWMASK
-#pragma multi_compile_fragment _  _VOLUMETRICS_ENABLED_HQ _VOLUMETRICS_ENABLED
-//#pragma multi_compile_fog
-//#pragma skip_variants FOG_LINEAR FOG_EXP
-//#pragma multi_compile_fragment _ DEBUG_DISPLAY
-#pragma multi_compile_local_fragment _ _DETAILS_ON _DETAILS_UV_ON
-//#pragma multi_compile_fragment _ _EMISSION_ON
-
 #if !defined(LITMAS_FEATURE_LIGHTMAPPING)
 #define _DISABLE_LIGHTMAPS
 #endif
@@ -95,8 +86,7 @@ SAMPLER(sampler_BaseMap);
 TEXTURE2D(_BumpMap);
 TEXTURE2D(_MetallicGlossMap);
 
-TEXTURE2D(_DetailMap);
-SAMPLER(sampler_DetailMap);
+
 
 //#!INJECT_POINT UNIFORMS
 
@@ -176,7 +166,6 @@ FragOut frag(VertOut i
     //#!INJECT_DEFAULT
     float2 uv0 = UNPACK_UV0(i);
     float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
-    float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
     half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
     half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
     //#!INJECT_END
@@ -210,11 +199,7 @@ FragOut frag(VertOut i
 
     //#!INJECT_POINT DETAIL_MAP
     
-    #if defined(_DETAILS_UV_ON)
-    DetailMap_UV_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
-    #elif defined(_DETAILS_ON)  
-    DetailMap_fractal_blend_float( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main,   albedo.rgb,   smoothness,   normalTS  );
-    #endif
+
 
     //#!INJECT_POINT PRE_NORMAL_TS_TO_WS
 

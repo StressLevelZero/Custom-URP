@@ -10,6 +10,7 @@
 
 #include "UnityRaytracingMeshUtils.cginc"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
 
 // Unity Tries to define half as min16float, which isn't handled by unity's interface with the shader compiler for raytracing.
@@ -64,10 +65,12 @@ CBUFFER_START( UnityPerMaterial )
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 // Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-float4 _DetailMap_ST;
-half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+    float4 _DetailMap_ST;
+    float  _Details;
+// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_AudioLink_CBuffer.hlsl ----------------------------------------------------------
 	half  _AudioInputBoost;
 	half  _SmoothstepBlend;
@@ -95,37 +98,54 @@ void MyClosestHit(inout RayPayload payload, AttributeData attributes : SV_Inters
 	payload.dir = float3(1,0,0);
 
 // Begin Injection CLOSEST_HIT from Injection_Emission_BakedRT.hlsl ----------------------------------------------------------
+
+//#ifndef _DOUBLE_SIDED_EMISSION
+// Backface: occluded but no emission. Ray is done.
+if (HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
+{
+	payload.color = float4(0, 0, 0, 1);
+	return;
+}
+//#endif
+
 uint2 launchIdx = DispatchRaysIndex();
 
 uint primitiveIndex = PrimitiveIndex();
 uint3 triangleIndicies = UnityRayTracingFetchTriangleIndices(primitiveIndex);
 Vertex v0, v1, v2;
 
+//uint3 tri = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
+//float3 n0 = UnityRayTracingFetchVertexAttribute3(tri.x, kVertexAttributeNormal);
+//float3 n1 = UnityRayTracingFetchVertexAttribute3(tri.y, kVertexAttributeNormal);
+//float3 n2 = UnityRayTracingFetchVertexAttribute3(tri.z, kVertexAttributeNormal);
+
+float3 bary = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y,
+                     attributes.barycentrics.x, attributes.barycentrics.y);
+//float3 nOS = normalize(n0 * bary.x + n1 * bary.y + n2 * bary.z);
+//float3 nWS = normalize(TransformObjectToWorldNormal(nOS));
+	
+//#ifndef _DOUBLE_SIDED_EMISSION
+// Backface: occluded but no emission. Ray is done.
+if (HitKind() == HIT_KIND_TRIANGLE_BACK_FACE)
+{
+    payload.color = float4(0, 0, 0, 1);
+    return;
+}
+//#endif
+
 v0.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.x, kVertexAttributeTexCoord0);
 v1.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.y, kVertexAttributeTexCoord0);
 v2.texcoord = UnityRayTracingFetchVertexAttribute2(triangleIndicies.z, kVertexAttributeTexCoord0);
-
-// v0.normal = UnityRayTracingFetchVertexAttribute3(triangleIndicies.x, kVertexAttributeNormal);
-// v1.normal = UnityRayTracingFetchVertexAttribute3(triangleIndicies.y, kVertexAttributeNormal);
-// v2.normal = UnityRayTracingFetchVertexAttribute3(triangleIndicies.z, kVertexAttributeNormal);
-
-float3 barycentrics = float3(1.0 - attributes.barycentrics.x - attributes.barycentrics.y, attributes.barycentrics.x, attributes.barycentrics.y);
-
+		
 Vertex vInterpolated;
-vInterpolated.texcoord = v0.texcoord * barycentrics.x + v1.texcoord * barycentrics.y + v2.texcoord * barycentrics.z;
-//TODO: Extract normal direction to ignore the backside of emissive objects
-//vInterpolated.normal = v0.normal * barycentrics.x + v1.normal * barycentrics.y + v2.normal * barycentrics.z;
-// if ( dot(vInterpolated.normal, float3(1,0,0) < 0) ) payload.color =  float4(0,10,0,1) ;
-// else payload.color =  float4(10,0,0,1) ;
-
-
+vInterpolated.texcoord = v0.texcoord * bary.x + v1.texcoord * bary.y + v2.texcoord * bary.z;
 float4 albedo = float4(_BaseMap.SampleLevel(sampler_BaseMap, vInterpolated.texcoord.xy * _BaseMap_ST.xy + _BaseMap_ST.zw, 0).rgb, 1) * _BaseColor;
 
 float4 emission = _Emission * _EmissionMap.SampleLevel(sampler_EmissionMap, vInterpolated.texcoord * _BaseMap_ST.xy + _BaseMap_ST.zw, 0) * _EmissionColor;
 
 emission.rgb *= lerp(albedo.rgb, 1, emission.a);
-
-payload.color.rgb = emission.rgb * _BakedMutiplier;
+emission = max(emission * _BakedMutiplier,0);
+payload.color.rgb = emission.rgb ;
 // End Injection CLOSEST_HIT from Injection_Emission_BakedRT.hlsl ----------------------------------------------------------
 
 }

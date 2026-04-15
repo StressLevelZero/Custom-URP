@@ -1,3 +1,4 @@
 //#!INJECT_BEGIN MATERIAL_CBUFFER 0
-half  _Normals;
+    float4 _DetailMap_ST;
+    float  _Details;
 //#!INJECT_END

@@ -16,4 +16,5 @@ MonoBehaviour:
   baseInclude: {fileID: 10900000, guid: 5e4c2db9537ee1d48be13dcc77c3a6cb, type: 3}
   injectableIncludes:
   - {fileID: 10900000, guid: 86d5c622b75cede49857fef3a19dae5a, type: 3}
+  - {fileID: 10900000, guid: 7e6890bc36b6ec04fa12cb11c69b70ad, type: 3}
   - {fileID: 10900000, guid: 167bcaa96ee6fdd409eddf6b178d88d4, type: 3}

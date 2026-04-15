@@ -36,7 +36,8 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
 #endif
         const string keyword_DETAILS_ON = "_DETAILS_ON";
-        const string keyword_DETAILS_UV_ON = "_DETAILS_UV_ON";
+        const string keyword_FRACTAL_DETAILS_OFF = "_FRACTAL_DETAILS_OFF";
+        const string obsolete_keyword_DETAILS_UV_ON = "_DETAILS_UV_ON";
         const string keyword_BRDF = "_BRDFMAP";
         const string keyword_EXPENSIVE_TP = "_EXPENSIVE_TP";
 
@@ -148,54 +149,64 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
         }
         enum DetailsMode
         {
-            Off = 0,
+            None = 0,
             Details = 1,
-            DetailsUV = 2,
+            DetailsFractal = 2,
         }
 
+        /*
         static readonly List<DetailsMode> k_DetailsModes = new()
         {
-            DetailsMode.Off,
             DetailsMode.Details,
-            DetailsMode.DetailsUV
+            DetailsMode.DetailsFractal
         };
+        */
 
-        static string FormatDetailsMode(DetailsMode m) => m switch
+        static string FormatDetailsMode(DetailsMode m)
         {
-            DetailsMode.Off => "Off",
-            DetailsMode.Details => "Details (Fractal)",
-            DetailsMode.DetailsUV => "Details (UV)",
-            _ => m.ToString()
-        };
+            switch (m)
+            {
+                case DetailsMode.Details : return "Details";
+                case DetailsMode.DetailsFractal : return "Fractal Details";
+                default: return "None";
+            }
+        }
 
         static DetailsMode GetDetailsMode(Material mat)
         {
             // If both are on (old/bad state), prefer UV.
-            if (mat.IsKeywordEnabled(keyword_DETAILS_UV_ON)) return DetailsMode.DetailsUV;
-            if (mat.IsKeywordEnabled(keyword_DETAILS_ON)) return DetailsMode.Details;
-            return DetailsMode.Off;
+            if (mat.IsKeywordEnabled(keyword_DETAILS_ON))
+            {
+                if (mat.IsKeywordEnabled(keyword_FRACTAL_DETAILS_OFF))
+                {
+                    return DetailsMode.Details;
+                }
+                else
+                {
+                    return DetailsMode.DetailsFractal;
+                }
+            }
+            return DetailsMode.Details;
         }
 
         static void ApplyDetailsMode(Material mat, DetailsMode mode)
         {
             switch (mode)
             {
-                case DetailsMode.Off:
+                case DetailsMode.None:
                     CoreUtils.SetKeyword(mat, keyword_DETAILS_ON, false);
-                    CoreUtils.SetKeyword(mat, keyword_DETAILS_UV_ON, false);
-                    mat.SetFloat("_Details", 0f); // keep your existing enable flag in sync (optional but handy)
+                    CoreUtils.SetKeyword(mat, keyword_FRACTAL_DETAILS_OFF, false);
+                    mat.SetFloat("_Details", 0.0f);
                     break;
-
                 case DetailsMode.Details:
                     CoreUtils.SetKeyword(mat, keyword_DETAILS_ON, true);
-                    CoreUtils.SetKeyword(mat, keyword_DETAILS_UV_ON, false);
+                    CoreUtils.SetKeyword(mat, keyword_FRACTAL_DETAILS_OFF, true);
                     mat.SetFloat("_Details", 1f);
                     break;
-
-                case DetailsMode.DetailsUV:
-                    CoreUtils.SetKeyword(mat, keyword_DETAILS_ON, false);
-                    CoreUtils.SetKeyword(mat, keyword_DETAILS_UV_ON, true);
-                    mat.SetFloat("_Details", 1f);
+                case DetailsMode.DetailsFractal:
+                    CoreUtils.SetKeyword(mat, keyword_DETAILS_ON, true);
+                    CoreUtils.SetKeyword(mat, keyword_FRACTAL_DETAILS_OFF, false);
+                    mat.SetFloat("_Details", 2f);
                     break;
             }
         }
@@ -299,12 +310,16 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             int cullIdx = PropertyIdx(ref propTable, PName._Cull);
             if (cullIdx != -1)
             {
-                List<int> cullChoices = new List<int>() { (int)CullMode.Back, (int)CullMode.Front, (int)CullMode.Off};
-                Dictionary<int, string> cullLabels = new Dictionary<int, string>() { { (int)CullMode.Back, "Front" }, { (int)CullMode.Front, "Back" }, { (int)CullMode.Off, "Both (EXPENSIVE)" } };
-
+                List<MaterialIntPopup.Choice> cullChoices = new List<MaterialIntPopup.Choice>() 
+                { 
+                    new MaterialIntPopup.Choice {value = (int)CullMode.Back,  label = "Back",  enabledKws = null, disabledKws = null}, 
+                    new MaterialIntPopup.Choice {value = (int)CullMode.Front, label = "Front", enabledKws = null, disabledKws = null},
+                    new MaterialIntPopup.Choice {value = (int)CullMode.Off,   label = "Off",   enabledKws = null, disabledKws = null}
+                };
+                
                 MaterialIntPopup cullPopup = new MaterialIntPopup();
                 cullPopup.label = "Rendered Side";
-                cullPopup.Initialize(props[cullIdx], propIdx[cullIdx], cullChoices, cullLabels);
+                cullPopup.Initialize(props[cullIdx], propIdx[cullIdx], cullChoices);
                
                 materialFields.Add(cullPopup);
                 drawProps.contentContainer.Add(cullPopup);
@@ -737,60 +752,92 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             Foldout detailProps = new Foldout();
            
             bool hasDetails = false;
-            
-            var detailsBody = new VisualElement();
-            detailProps.tooltip = "Fractal texture sampling is effectively infinite textile density. UV is legacy behavior and should only be used if one fixed resolution or tiling is needed ";
-            detailProps.Add(detailsBody); // everything that should be disabled goes in here
+
+            //var detailsBody = new VisualElement();
+            // detailProps.tooltip = "Fractal texture sampling is effectively infinite textile density. UV is legacy behavior and should only be used if one fixed resolution or tiling is needed ";
+            // detailProps.Add(detailsBody); // everything that should be disabled goes in here
             int detailMapIdx = PropertyIdx(ref propTable, PName._DetailMap);
             if (detailMapIdx != -1)
             {
                 TextureField detailsMapField = new TextureField(props[detailMapIdx], propIdx[detailMapIdx], false, shaderImporter?.GetDefaultTexture(props[detailMapIdx].name));
                 detailsMapField.tooltip2 = LitMASGui_Tooltips.DetailMap.ToString();
-                detailsBody.Add(detailsMapField);
+                detailProps.Add(detailsMapField);
                 materialFields.Add(detailsMapField);
                 hasDetails = true;
 
                 MaterialScaleOffsetField detailScaleOffset = new MaterialScaleOffsetField(props[detailMapIdx], propIdx[detailMapIdx]);
-                detailsBody.Add(detailScaleOffset);
+                detailProps.Add(detailScaleOffset);
                 materialFields.Add(detailScaleOffset);
             }
 
+
+            MaterialIntPopup detailPopup = new MaterialIntPopup();
             int detailToggleIdx = PropertyIdx(ref propTable, PName._Details);
             if (detailToggleIdx != -1 && hasDetails)
             {
-                var mats = props[detailToggleIdx].targets.Cast<Material>().ToArray();
+                List<MaterialIntPopup.Choice> detailChoices = new List<MaterialIntPopup.Choice>() 
+                { 
+                    new MaterialIntPopup.Choice {value = (int)DetailsMode.Details,        label = "Normal",  enabledKws = new string[] {keyword_FRACTAL_DETAILS_OFF, keyword_DETAILS_ON}, disabledKws = null}, 
+                    new MaterialIntPopup.Choice {value = (int)DetailsMode.DetailsFractal, label = "Fractal", enabledKws = new string[] {keyword_DETAILS_ON}, disabledKws = new string[] {keyword_FRACTAL_DETAILS_OFF}}
+                };
+                
+                detailPopup = new MaterialIntPopup();
+                detailPopup.label = "Detail Mode";
 
-                DetailsMode first = GetDetailsMode(mats[0]);
-                bool mixed = mats.Skip(1).Any(m => GetDetailsMode(m) != first);
-
-                var detailsModePopup = new PopupField<DetailsMode>(
-                    "Details Mode",
-                    k_DetailsModes,
-                    first,
-                    FormatDetailsMode,
-                    FormatDetailsMode
-                );
-
-                detailsModePopup.showMixedValue = mixed;
-
-                // IMPORTANT: don't disable the foldout contentContainer (it would disable the popup)
-                detailsBody.SetEnabled(mixed || first != DetailsMode.Off);
-
-                detailsModePopup.RegisterValueChangedCallback(evt =>
+                if (!props[detailToggleIdx].hasMixedValue && props[detailToggleIdx].floatValue == 1.0f)
                 {
-                    Undo.RecordObjects(mats, "Change Details Mode");
-
-                    foreach (var m in mats)
+                    SerializedProperty keywordSerialized = serializedObject.FindProperty("m_ValidKeywords");
+                    SerializedProperty invalidSerialized = serializedObject.FindProperty("m_InvalidKeywords");
+                    if (!keywordSerialized.hasMultipleDifferentValues && !invalidSerialized.hasMultipleDifferentValues)
                     {
-                        ApplyDetailsMode(m, evt.newValue);
-                        EditorUtility.SetDirty(m);
+                        int numValid = keywordSerialized.arraySize;
+                        int numInvalid = invalidSerialized.arraySize;
+                        int obsoleteUV = -1;
+                        int fractalDetailsOff = -1;
+                        for (int iIdx = 0; iIdx < numInvalid; iIdx++)
+                        {
+                            SerializedProperty arrayElement = invalidSerialized.GetArrayElementAtIndex(iIdx);
+                            if (arrayElement.hasMultipleDifferentValues) goto finishedObsoleteDetails; 
+                            if (arrayElement.stringValue == obsolete_keyword_DETAILS_UV_ON) obsoleteUV = iIdx;
+                        }
+                        for (int vIdx = 0; vIdx < numValid; vIdx++)
+                        {
+                            SerializedProperty arrayElement = keywordSerialized.GetArrayElementAtIndex(vIdx);
+                            if (arrayElement.hasMultipleDifferentValues) goto finishedObsoleteDetails; 
+                            if (arrayElement.stringValue == keyword_FRACTAL_DETAILS_OFF) fractalDetailsOff = vIdx;
+                        }
+                        // Old keyword, replace with new
+                        if (obsoleteUV != -1 && fractalDetailsOff == -1)
+                        {
+                            keywordSerialized.InsertArrayElementAtIndex(numValid);
+                            keywordSerialized.GetArrayElementAtIndex(numValid).stringValue = keyword_FRACTAL_DETAILS_OFF;
+                            serializedObject.ApplyModifiedProperties();
+                        }
+                        // fractal details not off 
+                        else if (fractalDetailsOff == -1 && obsoleteUV == -1) 
+                        {
+                            props[detailToggleIdx].floatValue = 2;
+                        }
+                        finishedObsoleteDetails:
+                        int dummy;
                     }
+                }
+                detailPopup.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], detailChoices);
 
-                    detailsBody.SetEnabled(evt.newValue != DetailsMode.Off);
-                });
+                materialFields.Add(detailPopup);
+                detailProps.contentContainer.Insert(0,detailPopup);
+            }
 
-                // Put popup above the disabled body
-                detailProps.Insert(0, detailsModePopup);
+            
+            if (detailToggleIdx != -1 && hasDetails)
+            {
+                MaterialToggleField detailMatToggle = new MaterialToggleField();
+                detailMatToggle.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], keyword_DETAILS_ON, false, true);
+                detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => { detailProps.contentContainer.SetEnabled(evt.newValue); detailPopup.value = evt.newValue ? 0 : -1;});
+                bool detailEnabled = props[detailToggleIdx].floatValue > 0.0f;
+                detailProps.contentContainer.SetEnabled(detailEnabled);
+                materialFields.Add(detailMatToggle);                
+                detailToggle = detailMatToggle;
             }
 
 

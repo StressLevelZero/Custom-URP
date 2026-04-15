@@ -1,5 +1,13 @@
 #pragma once
 
+#if !defined(_DISABLE_VOLUMETRICs)
+	#if defined(SHADER_API_MOBILE)
+		#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
+	#else
+		#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED _VOLUMETRICS_ENABLED_HQ
+	#endif
+#endif
+
 //#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
 //#pragma multi_compile_fog
 #pragma skip_variants FOG_LINEAR FOG_EXP

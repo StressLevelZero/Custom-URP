@@ -40,6 +40,8 @@ namespace SLZ.Bonelab
 			injectField.headerTitle = "Injections";
 			injectField.showFoldoutHeader = true;
 			injectField.reorderable = true;
+			injectField.showAddRemoveFooter = true;
+			injectField.showBorder = true;
 
 			Button updateInjButton = new Button();
 			updateInjButton.text = "Inject and Create Output";

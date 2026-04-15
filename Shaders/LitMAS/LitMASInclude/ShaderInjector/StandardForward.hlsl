@@ -29,7 +29,7 @@
 // the local is not Thus, if we have SSR enabled be the default state, the material can enable the disabled
 // keyword regardless of the global state
 
-#pragma multi_compile_local _ _SLZ_SSR_DISABLED
+#pragma multi_compile _ _SLZ_SSR_DISABLED
 
 #if !defined(_SLZ_SSR_DISABLED) && !defined(SHADER_API_MOBILE)
     #define _SSR_ENABLED
@@ -37,15 +37,6 @@
 // End Injection STANDALONE_DEFINES from Injection_SSR.hlsl ----------------------------------------------------------
 
 #endif
-
-//#pragma multi_compile_fragment _ _LIGHT_COOKIES
-//#pragma multi_compile _ SHADOWS_SHADOWMASK
-#pragma multi_compile_fragment _  _VOLUMETRICS_ENABLED_HQ _VOLUMETRICS_ENABLED
-//#pragma multi_compile_fog
-//#pragma skip_variants FOG_LINEAR FOG_EXP
-//#pragma multi_compile_fragment _ DEBUG_DISPLAY
-#pragma multi_compile_local_fragment _ _DETAILS_ON _DETAILS_UV_ON
-//#pragma multi_compile_fragment _ _EMISSION_ON
 
 #if !defined(LITMAS_FEATURE_LIGHTMAPPING)
 #define _DISABLE_LIGHTMAPS
@@ -55,6 +46,11 @@
 
 #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"
 
+// Begin Injection UNIVERSAL_DEFINES from Injection_DetailMap.hlsl ----------------------------------------------------------
+#pragma shader_feature_local_fragment _ _DETAILS_ON
+// phrase fractal details keyword as a negative so it can be disabled both locally and globally
+#pragma multi_compile_fragment _ _FRACTAL_DETAILS_OFF
+// End Injection UNIVERSAL_DEFINES from Injection_DetailMap.hlsl ----------------------------------------------------------
 // Begin Injection UNIVERSAL_DEFINES from Injection_Cutout.hlsl ----------------------------------------------------------
 #pragma shader_feature_local_fragment _ALPHATEST_ON
 // End Injection UNIVERSAL_DEFINES from Injection_Cutout.hlsl ----------------------------------------------------------
@@ -76,6 +72,9 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
+// Begin Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
+// End Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
 // Begin Injection INCLUDES from Injection_SSR.hlsl ----------------------------------------------------------
 #if !defined(SHADER_API_MOBILE)
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLightingSSR.hlsl"
@@ -131,9 +130,16 @@ SAMPLER(sampler_BaseMap);
 TEXTURE2D(_BumpMap);
 TEXTURE2D(_MetallicGlossMap);
 
-TEXTURE2D(_DetailMap);
-SAMPLER(sampler_DetailMap);
 
+
+// Begin Injection UNIFORMS from Injection_DetailMap.hlsl ----------------------------------------------------------
+TEXTURE2D(_DetailMap);
+#if defined(_FRACTAL_DETAILS_OFF)
+    SAMPLER(sampler_DetailMap);
+#else
+    #define sampler_DetailMap sampler_TrilinearRepeat
+#endif
+// End Injection UNIFORMS from Injection_DetailMap.hlsl ----------------------------------------------------------
 // Begin Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
 TEXTURE2D(_EmissionMap);
 // End Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
@@ -142,10 +148,12 @@ CBUFFER_START(UnityPerMaterial)
     float4 _BaseMap_ST;
     half4 _BaseColor;
 // Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-float4 _DetailMap_ST;
-half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+    float4 _DetailMap_ST;
+    float  _Details;
+// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
 	float4 _SSRSmoothnessRange;
 // End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
@@ -238,10 +246,12 @@ SLZ_DECLARE_FRAG_SIZE
 
     float2 uv0 = UNPACK_UV0(i);
     float2 uv_main = mad(uv0, _BaseMap_ST.xy, _BaseMap_ST.zw);
-    float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
     half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv_main);
     half4 mas = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_BaseMap, uv_main);
 
+// Begin Injection FRAG_POST_READ from Injection_DetailMap.hlsl ----------------------------------------------------------
+    float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
+// End Injection FRAG_POST_READ from Injection_DetailMap.hlsl ----------------------------------------------------------
 // Begin Injection FRAG_POST_READ from Injection_Cutout.hlsl ----------------------------------------------------------
 #if defined(_ALPHATEST_ON)
 	clip((albedo.a * _BaseColor.a) - _Cutoff);
@@ -275,12 +285,15 @@ SLZ_DECLARE_FRAG_SIZE
 /*---Read Detail Map---------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
-    
-    #if defined(_DETAILS_UV_ON)
-    DetailMap_UV_blend_float( _DetailMap,  sampler_DetailMap,  uv_detail,   albedo.rgb,   smoothness,   normalTS  );
-    #elif defined(_DETAILS_ON)  
-    DetailMap_fractal_blend_float( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main,   albedo.rgb,   smoothness,   normalTS  );
+// Begin Injection DETAIL_MAP from Injection_DetailMap.hlsl ----------------------------------------------------------
+    #if defined(_DETAILS_ON) && defined(_FRACTAL_DETAILS_OFF)
+        BlendDetailMap( _DetailMap, sampler_DetailMap, uv_detail, albedo.rgb, smoothness, normalTS);
+    #elif defined(_DETAILS_ON)
+        BlendDetailMapFractal( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main, albedo.rgb, smoothness, normalTS);
     #endif
+// End Injection DETAIL_MAP from Injection_DetailMap.hlsl ----------------------------------------------------------
+    
+
 
 
 /*---------------------------------------------------------------------------------------------------------------------------*/
@@ -330,9 +343,9 @@ SLZ_DECLARE_FRAG_SIZE
 	{
 		emission += SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, uv_main) * _EmissionColor;
 		emission.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emission.a);
-		half emNoV = _EmissionFalloff >= 0 ? abs(fragData.NoV) : 1.0 - abs(fragData.NoV);
+		half emNoV = _EmissionFalloff >= half(0) ? abs(fragData.NoV) : half(1.0) - abs(fragData.NoV);
 		emission.rgb *= saturate(pow(emNoV, abs(_EmissionFalloff)));
-		emission = max(emission,0);
+		emission = max(emission,half(0));
 	}
 // End Injection EMISSION from Injection_Emission.hlsl ----------------------------------------------------------
 
@@ -359,9 +372,9 @@ SLZ_DECLARE_FRAG_SIZE
         ssrExtra.depthDerivativeSum = 0;
         ssrExtra.noise = noiseRGBA;
        // ssrExtra.fogFactor = UNPACK_FOG(i);
-        ssrExtra.roughnessRange = half2(1.0 - _SSRSmoothnessRange.y, 1.0 - _SSRSmoothnessRange.x);
+        ssrExtra.roughnessRange = half2(half(1.0) - _SSRSmoothnessRange.y, half(1.0) - _SSRSmoothnessRange.x);
         color = SLZPBRFragmentSSR(fragData, surfData, ssrExtra, _Surface);
-        color.rgb = max(0, color.rgb);
+        color.rgb = max(half(0), color.rgb);
     #else
         color = SLZPBRFragment(fragData, surfData, _Surface);
     #endif

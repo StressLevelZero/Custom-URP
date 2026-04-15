@@ -43,10 +43,12 @@ CBUFFER_START(UnityPerMaterial)
 	float4 _BaseMap_ST;
 	half4 _BaseColor;
 // Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-float4 _DetailMap_ST;
-half  _Details;
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+    float4 _DetailMap_ST;
+    float  _Details;
+// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
 	float4 _SSRSmoothnessRange;
 // End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
@@ -136,7 +138,6 @@ half4 frag(v2f i) : SV_Target
 		emissionDefault.rgb *= _BakedMutiplier * _Emission;
 		emissionDefault.rgb *= lerp(albedo.rgb, half3(1, 1, 1), emissionDefault.a);
 		emission += emissionDefault;
-		emission = max(emission,0);
 	}
 // End Injection EMISSION from Injection_Emission_Meta.hlsl ----------------------------------------------------------
 
