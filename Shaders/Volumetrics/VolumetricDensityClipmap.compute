@@ -1,19 +1,36 @@
-#pragma kernel  ClipMapDensity 
-//#pragma multi_compile_local _ _TextureSampleEnabled
-//#pragma multi_compile_local _ _Sphere 
+// =============================================================================
+// ClipMapDensity.compute — local volumetric fog density accumulation
+// =============================================================================
+//
+// This is the kernel that LocalVolumetricFog.computeShader is expected to
+// expose. Each fog entity carries its own compute shader instance (which is
+// why the manager caches FindKernel results per-ComputeShader), but they all
+// share this kernel signature and contract.
+//
+// Contract matches the C# manager:
+//   _ClipmapVoxelSize   : float   world units per voxel for this dispatch
+//   _ClipmapResolution  : int     texture resolution (per axis)
+//   _SlabVoxelBase      : int3    absolute voxel coord of thread (0,0,0)
+//   _SlabVoxelSize      : int3    voxels covered by this dispatch
+// =============================================================================
+
+#pragma kernel ClipMapDensity
 
 #define M_PI 3.1415926535897932384626433832795
+#define VolumeExponent M_PI
 
-// no keywords 
+// --- Per-dispatch uniforms ---
+float  _ClipmapVoxelSize;
+int    _ClipmapResolution;
+int3   _SlabVoxelBase;
+int3   _SlabVoxelSize;
+
 int _UseVolumeTexture;   // 0/1
 int _ShapeType;          // 0=Box, 1=Sphere
 
 RWTexture3D<float4> Result;
 
-float3 ClipmapWorldPosition;
-float  ClipmapScale;
-
-float3 VolumeWorldSize; 
+float3 VolumeWorldSize;
 float3 VolumeWorldPosition;
 
 Texture3D<float4> VolumeMap;
@@ -21,74 +38,65 @@ SamplerState linear_clamp_sampler;
 float VolumeDensity;
 float VolumeFalloff;
 
-// Region in voxel space (indices into Result)
-int3 _RegionOffset;   // starting voxel (inclusive)
-int3 _RegionSize;     // number of voxels in each axis
+// --- Falloff shapes, in volume-local UVW ---
 
-#define VolumeExponent M_PI
-
-float SphereFalloffWS(float3 MapUVW)
+float SphereFalloffWS(float3 mapUVW)
 {
-	float dist = distance(MapUVW, 0.5h) * 2.0;
-	float t = saturate((1.0 - dist) / max(VolumeFalloff, 1e-5));
-	return pow(t, max(VolumeExponent, 1e-5));
+    float dist = distance(mapUVW, 0.5) * 2.0;
+    float t = saturate((1.0 - dist) / max(VolumeFalloff, 1e-5));
+    return pow(t, max(VolumeExponent, 1e-5));
 }
 
-float BoxFalloffWS(float3 MapUVW)
+float BoxFalloffWS(float3 mapUVW)
 {
-	float3 d = abs(MapUVW * 2.0 - 1.0);      // 0 at center, 1 at faces
-	float edge = 1.0 - max(d.x, max(d.y, d.z)); // distance-to-box-edge style
-	float t = saturate(edge / max(VolumeFalloff, 1e-5));
-	return pow(t, max(VolumeExponent, 1e-5));
+    float3 d = abs(mapUVW * 2.0 - 1.0);
+    float edge = 1.0 - max(d.x, max(d.y, d.z));
+    float t = saturate(edge / max(VolumeFalloff, 1e-5));
+    return pow(t, max(VolumeExponent, 1e-5));
+}
+
+// Safe integer modulo: non-negative result for negative absVoxel.
+int3 WrapCoord(int3 absVoxel, int r)
+{
+    int3 w;
+    w.x = ((absVoxel.x % r) + r) % r;
+    w.y = ((absVoxel.y % r) + r) % r;
+    w.z = ((absVoxel.z % r) + r) % r;
+    return w;
 }
 
 [numthreads(4,4,4)]
-void ClipMapDensity(uint3 id : SV_DispatchThreadID)
+void ClipMapDensity(uint3 tid : SV_DispatchThreadID)
 {
-	// id is local within [0 .. _RegionSize - 1]
-	if (id.x >= (uint)_RegionSize.x ||
-		id.y >= (uint)_RegionSize.y ||
-		id.z >= (uint)_RegionSize.z)
-		return;
+    int3 local = (int3)tid;
 
-	int3 coord = int3(id) + _RegionOffset;
+    // Mask off threads past the slab's actual size (dispatches round up to
+    // multiples of 4).
+    if (any(local >= _SlabVoxelSize)) return;
 
-	int3 dims;
-	Result.GetDimensions(dims.x, dims.y, dims.z);
+    int3 absVoxel  = _SlabVoxelBase + local;
+    int3 wrapCoord = WrapCoord(absVoxel, _ClipmapResolution);
 
-	// Safety: guard against any weirdness
-	if (coord.x < 0 || coord.y < 0 || coord.z < 0 ||
-		coord.x >= dims.x || coord.y >= dims.y || coord.z >= dims.z)
-		return;
+    // World position of the voxel CENTER. Must match the scatter shader's
+    // sampling convention: sample at world W corresponds to texel
+    // W / voxelSize - origin, which is only correct if voxel v represents
+    // world position (v + 0.5) * voxelSize.
+    float3 worldPos = ((float3)absVoxel + 0.5) * _ClipmapVoxelSize;
 
-	float3 ClipRes = float3(dims);
-	float3 UVW     = (float3(coord) + 0.5) / ClipRes;
-	float3 WorldCoord = UVW * ClipmapScale + ClipmapWorldPosition;
-	float3 MapUVW     = (WorldCoord - VolumeWorldPosition) / VolumeWorldSize;
-	float4 colors = Result[coord]; //Current buffer
-	bool inBounds = all(MapUVW >= 0.0) && all(MapUVW <= 1.0);
-	float falloff = 0;
-	if (inBounds)
-	{
-		float VolDensity = 1;
-		//#if _TextureSampleEnabled
-//UNITY_BRANCH
-if (_UseVolumeTexture != 0)
-{
-		 VolDensity = VolumeMap.SampleLevel(linear_clamp_sampler, MapUVW, 0).a;
-		}//#endif		
-		//#if _Sphere
+    // Map to volume-local UVW for the media's bounds.
+    float3 mapUVW = (worldPos - VolumeWorldPosition) / VolumeWorldSize;
 
+    if (any(mapUVW < 0.0) || any(mapUVW > 1.0)) return;
 
-//UNITY_BRANCH
-if (_ShapeType == 1){ // Sphere
-		 falloff = SphereFalloffWS( MapUVW);
-		} else {//#else		
-		 falloff = BoxFalloffWS(MapUVW);
-		}//#endif
-		
-		colors.a += VolDensity * VolumeDensity * falloff;
-	}
-	
-	Result[coord] = colors;
+    float volDensity = 1.0;
+    if (_UseVolumeTexture != 0)
+        volDensity = VolumeMap.SampleLevel(linear_clamp_sampler, mapUVW, 0).a;
+
+    float falloff = (_ShapeType == 1) ? SphereFalloffWS(mapUVW) : BoxFalloffWS(mapUVW);
+
+    // Load-modify-store so we accumulate across multiple media entities in
+    // the same slab. Density goes in alpha; RGB reserved for other contribs.
+    float4 prev = Result[wrapCoord];
+    prev.a += volDensity * VolumeDensity * falloff;
+    Result[wrapCoord] = prev;
 }

@@ -52,15 +52,31 @@
         // const shared float _FogMaxHeight;
         const shared float _StaticLightMultiplier;
 
-        const float _ClipmapScale0;
-        const float _ClipmapScale1;
-		const float _ClipmapScale2;
-		const float _ClipmapScale3;
+  //       const float _ClipmapScale0;
+  //       const float _ClipmapScale1;
+		// const float _ClipmapScale2;
+		// const float _ClipmapScale3;
+  //
+  //       const float3 _ClipmapPosition0;
+  //       const float3 _ClipmapPosition1;
+  //       const float3 _ClipmapPosition2;
+  //       const float3 _ClipmapPosition3;
 
-        const float3 _ClipmapPosition0;
-        const float3 _ClipmapPosition1;
-        const float3 _ClipmapPosition2;
-        const float3 _ClipmapPosition3;
+
+		const float  _ClipmapVoxelSize0;
+		const float  _ClipmapVoxelSize1;
+		const float  _ClipmapVoxelSize2;
+		const float  _ClipmapVoxelSize3;
+
+		const int3   _ClipmapVoxelOrigin0;
+		const int3   _ClipmapVoxelOrigin1;
+		const int3   _ClipmapVoxelOrigin2;
+		const int3   _ClipmapVoxelOrigin3;
+
+		const int    _ClipmapResolution0;
+		const int    _ClipmapResolution1;
+		const int    _ClipmapResolution2;
+		const int    _ClipmapResolution3;
 
 		float _bakedTurbulence;
 
@@ -207,13 +223,16 @@
 		// }
 		// Inside test in cuboid space around camera-centered box
 
-		float InsideClip(float3 ws, float scale, float3 center)
+		// Returns 1 if worldPos sits inside the wrap window of this level.
+		// Origin is the absolute voxel coord of the low corner; the window spans
+		// [origin, origin + res) voxels, i.e. [origin * voxelSize, (origin + res) * voxelSize).
+		float InsideClipVoxel(float3 ws, float voxelSize, int3 voxelOrigin, int res)
 		{
-			float3 p = ws - center;
-			float3 h = 0.5 * scale;
-			// 1 if |p| <= h on all axes
-			float3 inA = step(abs(p), h);
-			return inA.x * inA.y * inA.z;
+			float3 loW = (float3)voxelOrigin * voxelSize;
+			float3 hiW = (float3)(voxelOrigin + int3(res, res, res)) * voxelSize;
+			float3 geLo = step(loW, ws);
+			float3 ltHi = 1.0 - step(hiW, ws); // exclusive high bound
+			return geLo.x * geLo.y * geLo.z * ltHi.x * ltHi.y * ltHi.z;
 		}
 
 		float EdgeFade(float3 ws, float scale, float3 center, float fadeFrac) // fadeFrac ~ 0.04
@@ -252,23 +271,24 @@
 			return lod;
 		}
 
-		float4 SampleClipL(float3 ws, float3 wsnoise, float3 uvwCenter, float scale, Texture3D<float4> tex, float lod)
+float4 SampleClipToroidal(
+	float3 ws, float3 wsnoise,
+	float voxelSize, int res,
+	Texture3D<float4> tex, float lod)
 		{
-			float3 uvw      = (ws      - (uvwCenter - 0.5 * scale)) / scale.xxx;
-			float3 uvwNoise = (wsnoise - (uvwCenter - 0.5 * scale)) / scale.xxx;
+			// Toroidal sampling: texel index is ws / voxelSize mod res, regardless of
+			// origin. The origin is only relevant for the InsideClipVoxel window test
+			// (to decide whether this world position is inside the level's window);
+			// the texture contents at this wrapped coord are always valid for the
+			// absolute voxel that world position corresponds to.
+			float invVoxel = 1.0 / voxelSize;
+			float invRes   = 1.0 / (float)res;
 
-			float3 rgb = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvw,      lod).rgb;
-			float  a   = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvwNoise, lod).a;
-			return float4(rgb, a);
-		}
+			float3 uvw      = frac(ws      * invVoxel * invRes);
+			float3 uvwNoise = frac(wsnoise * invVoxel * invRes);
 
-		float4 SampleClipL(float3 ws, float3 wsnoise, float3 uvwCenter, float scale, Texture3D<float4> tex)
-		{
-			float3 uvw      = (ws      - (uvwCenter - 0.5 * scale)) / scale.xxx;
-			float3 uvwNoise = (wsnoise - (uvwCenter - 0.5 * scale)) / scale.xxx;
-
-			float3 rgb = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvw,      0).rgb;
-			float  a   = tex.SampleLevel(Custom_trilinear_clamp_sampler, uvwNoise, 0).a;
+			float3 rgb = tex.SampleLevel(sampler_LinearRepeat, uvw,      lod).rgb;
+			float  a   = tex.SampleLevel(sampler_LinearRepeat, uvwNoise, lod).a;
 			return float4(rgb, a);
 		}
         
@@ -808,41 +828,37 @@ if (isLeader)
 	//Using combined clipmap instead of directly rendering baked maps. Reduces the amount of 3d texture look-ups per frame.
 	//Sample based on worldspace divided by texture's world size. (apply to 0-1 Tex Sampler, no need to know the resolution)	
 
-    float3 C0 = _ClipmapPosition0; 
-    float3 C1 = _ClipmapPosition1; 
-    float3 C2 = _ClipmapPosition2; 
-    float3 C3 = _ClipmapPosition3; 
-    float s0 = _ClipmapScale0;
-    float s1 = _ClipmapScale1;
-    float s2 = _ClipmapScale2;
-    float s3 = _ClipmapScale3;
+    // float3 C0 = _ClipmapPosition0; 
+    // float3 C1 = _ClipmapPosition1; 
+    // float3 C2 = _ClipmapPosition2; 
+    // float3 C3 = _ClipmapPosition3; 
+    // float s0 = _ClipmapScale0;
+    // float s1 = _ClipmapScale1;
+    // float s2 = _ClipmapScale2;
+    // float s3 = _ClipmapScale3;
 
-    // Decide which level to use (smallest enclosing)
-    float in0 = InsideClip(WS_coordinate.xyz, s0, C0);
-    float in1 = (1 - in0) * InsideClip(WS_coordinate.xyz, s1, C1);
-    float in2 = (1 - in0) * (1 - in1) * InsideClip(WS_coordinate.xyz, s2, C2);
-    float in3 = (1 - in0) * (1 - in1) * (1 - in2) * InsideClip(WS_coordinate.xyz, s3, C2);
+
     //float choose3 = (1 - in0) * (1 - in1) * (1 - in2);
 
     // Optional tiny crossfade width (fraction of scale)
     //const float  kFade = 0.04; // ~4% of box half-size
 
 	// Use a stable WS anchor for turbulence, NOT WS_coordinate (which jitters)
-	float3 turbuv = float3(
-		centWS_NoJIT.x,
-		centWS_NoJIT.y - _Time.y + (centWS_NoJIT.z * 0.33),
-		centWS_NoJIT.z
-	) * 0.15;	
-
-
-	float noiseLod = ComputeNoiseLOD_FromSlice(
-		e1, _invDimensions.z,
-		Noise3d,
-		0.15,        // worldToNoiseUV
-		0.35,        // footprintScale  (THIS is the magic anti-chunk knob)
-		-0.5,        // lodBias
-		2.0          // lodMax          (cap low to keep detail)
-	);
+	// float3 turbuv = float3(
+	// 	centWS_NoJIT.x,
+	// 	centWS_NoJIT.y - _Time.y + (centWS_NoJIT.z * 0.33),
+	// 	centWS_NoJIT.z
+	// ) * 0.15;	
+	//
+	//
+	// float noiseLod = ComputeNoiseLOD_FromSlice(
+	// 	e1, _invDimensions.z,
+	// 	Noise3d,
+	// 	0.15,        // worldToNoiseUV
+	// 	0.35,        // footprintScale  (THIS is the magic anti-chunk knob)
+	// 	-0.5,        // lodBias
+	// 	2.0          // lodMax          (cap low to keep detail)
+	// );
 			
 	//Hard clamping per level for now, but we really should compare voxel / froxel sizes for more accurate results
 	//bool useTurb = (in0 > 0.5) || (in1 > 0.5);
@@ -867,40 +883,51 @@ if (isLeader)
 	float lodBias = -0.75;   // sharper (less blur)
 	float lodMax  = 1.25;    // don't over-blur
 			
-    if (in0 > 0.5)
-    {
-    	float lod0 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s0, _VolumetricClipmapTexture0, lodBias, lodMax);
+	int   r0 = _ClipmapResolution0, r1 = _ClipmapResolution1,
+      r2 = _ClipmapResolution2, r3 = _ClipmapResolution3;
+	float v0 = _ClipmapVoxelSize0,  v1 = _ClipmapVoxelSize1,
+	      v2 = _ClipmapVoxelSize2,  v3 = _ClipmapVoxelSize3;
+	int3  o0 = _ClipmapVoxelOrigin0, o1 = _ClipmapVoxelOrigin1,
+	      o2 = _ClipmapVoxelOrigin2, o3 = _ClipmapVoxelOrigin3;
 
-		/////Disabling the edge fades, likely not needed and more optimal//////
-        //float f0 = EdgeFade(WS_coordinate.xyz, s0, C, kFade);
-        // Fade against L1 when close to boundary
-        cola = SampleClipL(WS_coordinate, clipnoisedWS, C0, s0, _VolumetricClipmapTexture0, lod0);
-        //float3 b = SampleClipL(WS_coordinate.xyz, C, s1, _VolumetricClipmapTexture1);
-        //col = lerp(b, a, f0);   // mostly L0; blend to L1 at edges
-    }
-    else if (in1 > 0.5)
-    {
-    	float lod1 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s1, _VolumetricClipmapTexture1, lodBias, lodMax);
+	// Decide which level to use (smallest enclosing)
+	float in0 = InsideClipVoxel(wsStable, v0, o0, r0);
+	float in1 = (1 - in0)                         * InsideClipVoxel(wsStable, v1, o1, r1);
+	float in2 = (1 - in0) * (1 - in1)             * InsideClipVoxel(wsStable, v2, o2, r2);
+	float in3 = (1 - in0) * (1 - in1) * (1 - in2) * InsideClipVoxel(wsStable, v3, o3, r3);
 
-        //float f1 = EdgeFade(WS_coordinate.xyz, s1, C, kFade);
-        cola = SampleClipL(WS_coordinate, clipnoisedWS, C1, s1, _VolumetricClipmapTexture1,lod1);
-        //float3 b = SampleClipL(WS_coordinate.xyz, C, s2, _VolumetricClipmapTexture2);
-        //col = lerp(b, a, f1);
-    }
-    else if (in2 > 0.5)
-    {
-    	float lod2 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s2, _VolumetricClipmapTexture2, lodBias, lodMax);
 
-        //float f2 = EdgeFade(WS_coordinate.xyz, s2, C, kFade);
-        cola = SampleClipL(WS_coordinate, clipnoisedWS.xyz, C2, s2, _VolumetricClipmapTexture2,lod2);
-        //float3 b = SampleClipL(WS_coordinate.xyz, C, s3, _VolumetricClipmapTexture3);
-        //col = lerp(b, a, f2);
-    }
-    else if (in3 > 0.5)
-    {
-    	float lod3 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, s3, _VolumetricClipmapTexture3, lodBias, lodMax);
-        cola = SampleClipL(WS_coordinate, clipnoisedWS.xyz, C3, s3, _VolumetricClipmapTexture3,lod3);
-    }
+	if (in0 > 0.5)
+	{
+	    float lod0 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v0 * (float)r0,
+	                                         _VolumetricClipmapTexture0, lodBias, lodMax);
+	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v0,  r0,
+	                              _VolumetricClipmapTexture0, lod0);
+
+		
+	}
+	else if (in1 > 0.5)
+	{
+	    float lod1 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v1 * (float)r1,
+	                                         _VolumetricClipmapTexture1, lodBias, lodMax);
+	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v1,  r1,
+	                              _VolumetricClipmapTexture1, lod1);
+	}
+	else if (in2 > 0.5)
+	{
+	    float lod2 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v2 * (float)r2,
+	                                         _VolumetricClipmapTexture2, lodBias, lodMax);
+	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v2,  r2,
+	                              _VolumetricClipmapTexture2, lod2);
+	}
+	else if (in3 > 0.5)
+	{
+	    float lod3 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v3 * (float)r3,
+	                                         _VolumetricClipmapTexture3, lodBias, lodMax);
+	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v3,  r3,
+	                              _VolumetricClipmapTexture3, lod3);
+	}
+
 	//cola.rgb *=_StaticLightMultiplier;
     accumLighting += cola ;
 	//accumLighting.rgb += GetFogColor(centerDirWS,W)*W; //Base fog color from cubemap;

@@ -596,14 +596,14 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
                 // ------------------------------------------------------------
                 m_Cam.UpdateVolumeStack();
                 var stack = m_Res.VolMana.stack;
-                var vol = stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
-                if (vol != null && vol.active) // active = component enabled + any overrides
-                {
-                    // Apply globals for this camera for this pass
-                    vol.SetGlobalsOnCmdBuffer(cmd);
-                }
-                else
-                {
+                 var vol = stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
+                 if (vol != null && vol.active) // active = component enabled + any overrides
+                 {
+                     // Apply globals for this camera for this pass
+                     vol.SetGlobalsOnCmdBuffer(cmd);
+                 }
+                 else
+                 {
                     // Defaults if no volume is present 
                     cmd.SetGlobalFloat(Shader.PropertyToID("_GlobalExtinction"), VolumeRenderingUtils.ExtinctionFromMeanFreePath(50f));
                     cmd.SetGlobalFloat(Shader.PropertyToID("_StaticLightMultiplier"), 1f);
