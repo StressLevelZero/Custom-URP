@@ -50,6 +50,7 @@ namespace UnityEngine.Rendering.Universal
         public GlobalKeyword HiZMinMaxKW { get; private set; }
 
         public RenderTexture VrOccDistanceTex;
+        public RTHandle VrOccDistanceTexHandle;
         public bool hasGeneratedVrOcDistTex = false;
         public Material VrOccDistanceMat;
 
@@ -382,8 +383,12 @@ namespace UnityEngine.Rendering.Universal
             //ConfigureTarget(new RenderTargetIdentifier(BuiltinRenderTextureType.None), new RenderTargetIdentifier(BuiltinRenderTextureType.None));
             //Debug.Log("Setup for " + camData.camera.name);
         }
+            public static readonly ProfilingSampler internalStartRendering = new ProfilingSampler($"{nameof(SLZGlobals)}.OnCameraSetup");
+
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
+            using (new ProfilingScope(null, internalStartRendering))
+            {
             CameraData camData = renderingData.cameraData;
             ref RenderTextureDescriptor targetDesc = ref camData.cameraTargetDescriptor;
             passData.cmd = cmd;
@@ -429,6 +434,7 @@ namespace UnityEngine.Rendering.Universal
 
                     passData.xrOcclusionMeshTexID = new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
                     cmd.GetTemporaryRT(SLZGlobals.VrOccMeshDistanceID, SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height));
+                    SLZGlobals.instance.VrOccDistanceTexHandle = RTHandles.Alloc(SLZGlobals.instance.VrOccDistanceTex);
                     passData.xrOcclusionMeshTex = RTHandles.Alloc(passData.xrOcclusionMeshTexID);
                     passData.xrOccDistanceMat = vrOccDistMat;
                 }
@@ -436,19 +442,20 @@ namespace UnityEngine.Rendering.Universal
                 {
                     passData.generateXrOcclusionMeshDistance = false;
                 }
+                passData.xrOccDistanceTex = SLZGlobals.instance.VrOccDistanceTexHandle;
             }
             else
             {
                 passData.generateXrOcclusionMeshDistance = false;
             }
 
-            passData.xrOccDistanceTex = RTHandles.Alloc(SLZGlobals.instance.VrOccDistanceTex);
+            
 
             if (camData.requiresColorPyramid)
                 passData.opaqueMipLevels = SLZGlobals.CalculateOpaqueTexMipLevels(targetDesc.width / opaqueTexSizeFrac, targetDesc.height / opaqueTexSizeFrac);
             else
                 passData.opaqueMipLevels = 1;
-            
+            }
         }
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {

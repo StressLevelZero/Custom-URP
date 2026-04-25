@@ -1472,7 +1472,7 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
             TimeSpan elapsed2 = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
             if (udata.currentChunkIndex == 0)
             {
-                Debug.Log($"[VolBake] Baking area {udata.currentAreaIndex + 1} [{currentArea.name}] in scene [{currentArea.gameObject.scene.name}]");
+                Debug.Log($"[VolBake] Baking area {udata.currentAreaIndex + 1} [{currentArea.name}] Resolution [ {currentArea.NormalizedTexelDensity} ] in scene [{currentArea.gameObject.scene.name}]");
             }
             Debug.Log(
                 $"[VolBake] [{elapsed2:hh\\:mm\\:ss}] " +

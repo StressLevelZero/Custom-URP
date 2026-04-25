@@ -14,6 +14,11 @@ using UnityEditor.SLZMaterialUI;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using static UnityEngine.Rendering.DebugUI.MessageBox;
+using UnityEditor.Search;
+using System.Runtime.InteropServices;
+using Unity.Mathematics;
+
+
 
 #if UNITY_6000_1_OR_NEWER
 using MaterialPropertyFlags = UnityEngine.Rendering.ShaderPropertyFlags;
@@ -40,6 +45,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
         const string obsolete_keyword_DETAILS_UV_ON = "_DETAILS_UV_ON";
         const string keyword_BRDF = "_BRDFMAP";
         const string keyword_EXPENSIVE_TP = "_EXPENSIVE_TP";
+        const string keyword_FLUORESCENCE = "_FLUORESCENCE";
 
         const string defaultMASGUID = "75f1fbacfa73385419ec8d7700a107ea";
         static string s_defaultMASPath;
@@ -69,6 +75,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             _BakedMutiplier,
             _Details,
             _DetailMap,
+            _DetailScale,
             g_tBRDFMap,
             BRDFMAP,
             _HitRamp,
@@ -91,7 +98,15 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             _RotateUVs,
             _DetailsuseLocalUVs,
             _UVScaler,
-        }
+
+            // Fluorescence
+            _Fluorescent,
+            _FluorMap,
+            _FluorColor,
+            _FluorAbsorbance,
+            _FluorAlbedoTint,
+        };
+
         static ReadOnlySpan<string> propertyNames => new string[] {
             "_BaseMap",
             "_BaseColor",
@@ -105,6 +120,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "_BakedMutiplier",
             "_Details",
             "_DetailMap",
+            "_DetailScale",
             "g_tBRDFMap",
             "BRDFMAP",
             "_HitRamp",
@@ -127,26 +143,38 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "_RotateUVs",
             "_DetailsuseLocalUVs",
             "_UVScaler",
+
+            // Fluorescence
+            "_Fluorescent",
+            "_FluorMap",
+            "_FluorColor",
+            "_FluorAbsorbance",
+            "_FluorAlbedoTint",
         };
+
+        static readonly Dictionary<string, PName> upgradeTextures = new Dictionary<string, PName>()
+        {
+            {"_Fluorescence", PName._FluorMap},
+        };
+
+        static readonly Dictionary<string, PName> upgradeVectors = new Dictionary<string, PName>()
+        {
+           {"_FluorescenceTint", PName._FluorColor},
+           {"_Absorbance",       PName._FluorAbsorbance},
+        };
+
+        static readonly Dictionary<string, PName> upgradeFloats = new Dictionary<string, PName>()
+        {
+           {"_AlbedotoFluorescence", PName._FluorAlbedoTint},
+        };
+
         class ShaderPropertyTable
         {
             public int[] nameToPropIdx;
-            //public int _BaseMap = -1;
-            //public int _BaseColor = -1;
-            //public int _Normals = -1;
-            //public int _MetallicGlossMap = -1;
-            //public int _Emission = -1;
-            //public int _EmissionMap = -1;
-            //public int _EmissionColor = -1;
-            //public int _EmissionFalloff = -1;
-            //public int _BakedMutiplier = -1;
-            //public int _Details = -1;
-            //public int _DetailMap = -1;
-            //public int _SSROff = -1;
-            //public int _SSRTemporalMul = -1;
             public List<int> unknownProperties;
             public int texturePropertyCount; 
         }
+
         enum DetailsMode
         {
             None = 0,
@@ -216,6 +244,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
         int AlphaClipWarningCount;
         HelpBox ZOffsetWarning;
         int ZOffsetWarningCount;
+        HelpBox DetailScaleError;
         SurfaceTypeField surfaceTypeField;
         RenderQueueDropdown renderQueue;
         MaterialToggleField alphaClipToggle;
@@ -244,6 +273,16 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             ShaderPropertyTable propTable = GetPropertyTable(props);
             materialFields = new List<BaseMaterialField>(props.Length + propTable.texturePropertyCount + 5); // Scale/offsets are separate fields, double the number of texture properties
             //int currentFieldIdx = 0;
+            
+            if (targets.Length < 2)
+            {
+                bool upgraded = UpgradeObsoleteMaterialProps(serializedObject, props, propTable, upgradeTextures, upgradeVectors, upgradeFloats, null);
+                if (upgraded) 
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
+                }
+            }
 
             //----------------------------------------------------------------
             // Warning Messages ----------------------------------------------
@@ -255,10 +294,13 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             ZOffsetWarning.style.display = DisplayStyle.None;
             AlphaClipWarning = new HelpBox("Opaque alpha clip materials are very expensive on Quest, prefer transparency if possible!", HelpBoxMessageType.Warning);
             AlphaClipWarning.style.display = DisplayStyle.None;
+            DetailScaleError = new HelpBox("Detail Scale Property Set! This is ONLY for modders. Use the correct textures instead of fudging it with a scale!", HelpBoxMessageType.Error);
+            DetailScaleError.style.display = DisplayStyle.None;
 
             MainWindow.Add(TransparentWarning);
             MainWindow.Add(AlphaClipWarning);
             MainWindow.Add(ZOffsetWarning);
+            MainWindow.Add(DetailScaleError);
 
             //----------------------------------------------------------------
             // Rendering Properties ------------------------------------------
@@ -312,9 +354,9 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             {
                 List<MaterialIntPopup.Choice> cullChoices = new List<MaterialIntPopup.Choice>() 
                 { 
-                    new MaterialIntPopup.Choice {value = (int)CullMode.Back,  label = "Back",  enabledKws = null, disabledKws = null}, 
-                    new MaterialIntPopup.Choice {value = (int)CullMode.Front, label = "Front", enabledKws = null, disabledKws = null},
-                    new MaterialIntPopup.Choice {value = (int)CullMode.Off,   label = "Off",   enabledKws = null, disabledKws = null}
+                    new MaterialIntPopup.Choice {value = (int)CullMode.Back,  label = "Front",  enabledKws = null, disabledKws = null}, 
+                    new MaterialIntPopup.Choice {value = (int)CullMode.Front, label = "Back",   enabledKws = null, disabledKws = null},
+                    new MaterialIntPopup.Choice {value = (int)CullMode.Off,   label = "Both",   enabledKws = null, disabledKws = null}
                 };
                 
                 MaterialIntPopup cullPopup = new MaterialIntPopup();
@@ -496,6 +538,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             //}
             MainWindow.Add(drawProps);
 
+#region Core Properties
             //----------------------------------------------------------------
             // Core Properties -----------------------------------------------
             //----------------------------------------------------------------
@@ -597,8 +640,12 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 }
                 hasCoreProperty = true;
             }
+#endregion // Core Properties
 
+#region Triplanar
+            //----------------------------------------------------------------
             // Triplanar options ---------------------------------------------
+            //----------------------------------------------------------------
 
             int fixSeamsIdx = PropertyIdx(ref propTable, PName._Expensive);
             if (fixSeamsIdx != -1)
@@ -625,6 +672,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 materialFields.Add(triplanarScaleField);
                 baseProps.Add(triplanarScaleField);
             }
+#endregion
 
             // Base map tiling offset ----------------------------------------
 
@@ -644,6 +692,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 MainWindow.Add(baseProps);
             }
 
+#region Emission
             //----------------------------------------------------------------
             // Emission Properties -------------------------------------------
             //----------------------------------------------------------------
@@ -743,7 +792,9 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 ShaderGUIUtils.SetHeaderStyle(emissionProps, "Emission", LightIcon, emissionToggle);
                 MainWindow.Add(emissionProps);
             }
+#endregion // Emission
 
+#region Details
             //----------------------------------------------------------------
             // Detail Properties ---------------------------------------------
             //----------------------------------------------------------------
@@ -769,11 +820,32 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 detailProps.Add(detailScaleOffset);
                 materialFields.Add(detailScaleOffset);
             }
+           
+            int detailScaleIdx = PropertyIdx(ref propTable, PName._DetailScale);
+            if (detailScaleIdx != -1)
+            {
+                
 
+                #if SLZ_RP_INTERNAL
+                if (props[detailScaleIdx].vectorValue != Vector4.one)
+                {
+                    DetailScaleError.style.display = DisplayStyle.Flex;
+                }
+                #endif
+            }
+            
 
             MaterialIntPopup detailPopup = new MaterialIntPopup();
             int detailToggleIdx = PropertyIdx(ref propTable, PName._Details);
-            if (detailToggleIdx != -1 && hasDetails)
+
+            bool hasFractalDetails = false;
+            if (detailToggleIdx != -1)
+            {
+                LocalKeyword fractalKw = base.shader.keywordSpace.FindKeyword(keyword_FRACTAL_DETAILS_OFF);
+                hasFractalDetails = fractalKw.isValid;
+            }
+
+            if (hasFractalDetails && hasDetails)
             {
                 List<MaterialIntPopup.Choice> detailChoices = new List<MaterialIntPopup.Choice>() 
                 { 
@@ -786,44 +858,6 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 detailPopup = new MaterialIntPopup();
                 detailPopup.label = "Detail Mode";
 
-                if (!props[detailToggleIdx].hasMixedValue && props[detailToggleIdx].floatValue == 1.0f)
-                {
-                    SerializedProperty keywordSerialized = serializedObject.FindProperty("m_ValidKeywords");
-                    SerializedProperty invalidSerialized = serializedObject.FindProperty("m_InvalidKeywords");
-                    if (!keywordSerialized.hasMultipleDifferentValues && !invalidSerialized.hasMultipleDifferentValues)
-                    {
-                        int numValid = keywordSerialized.arraySize;
-                        int numInvalid = invalidSerialized.arraySize;
-                        int obsoleteUV = -1;
-                        int fractalDetailsOff = -1;
-                        for (int iIdx = 0; iIdx < numInvalid; iIdx++)
-                        {
-                            SerializedProperty arrayElement = invalidSerialized.GetArrayElementAtIndex(iIdx);
-                            if (arrayElement.hasMultipleDifferentValues) goto finishedObsoleteDetails; 
-                            if (arrayElement.stringValue == obsolete_keyword_DETAILS_UV_ON) obsoleteUV = iIdx;
-                        }
-                        for (int vIdx = 0; vIdx < numValid; vIdx++)
-                        {
-                            SerializedProperty arrayElement = keywordSerialized.GetArrayElementAtIndex(vIdx);
-                            if (arrayElement.hasMultipleDifferentValues) goto finishedObsoleteDetails; 
-                            if (arrayElement.stringValue == keyword_FRACTAL_DETAILS_OFF) fractalDetailsOff = vIdx;
-                        }
-                        // Old keyword, replace with new
-                        if (obsoleteUV != -1 && fractalDetailsOff == -1)
-                        {
-                            keywordSerialized.InsertArrayElementAtIndex(numValid);
-                            keywordSerialized.GetArrayElementAtIndex(numValid).stringValue = keyword_FRACTAL_DETAILS_OFF;
-                            serializedObject.ApplyModifiedProperties();
-                        }
-                        // fractal details not off 
-                        else if (fractalDetailsOff == -1 && obsoleteUV == -1) 
-                        {
-                            props[detailToggleIdx].floatValue = 2;
-                        }
-                        finishedObsoleteDetails:
-                        int dummy;
-                    }
-                }
                 detailPopup.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], detailChoices, visibleChoices);
 
                 materialFields.Add(detailPopup);
@@ -834,8 +868,12 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             if (detailToggleIdx != -1 && hasDetails)
             {
                 MaterialToggleField detailMatToggle = new MaterialToggleField();
-                detailMatToggle.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], null, false, true);
-                detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => 
+                string detailToggleKw = hasFractalDetails ? null : "_DETAILS_ON";
+                detailMatToggle.Initialize(props[detailToggleIdx], propIdx[detailToggleIdx], detailToggleKw, false, true);
+
+                if (hasFractalDetails)
+                {
+                    detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => 
                     { 
                         // Remember the old detail value
                         if (!evt.newValue && !detailMatToggle.materialProperty.hasMixedValue && !detailPopup.showMixedValue) 
@@ -846,6 +884,15 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                         detailPopup.value = evt.newValue ? detailPopup.GetValueIndex((int)detailMatToggle.onFloatValue) : (int)detailMatToggle.offFloatValue;
                     }
                     );
+                }
+                else
+                {
+                    detailMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => 
+                    {
+                        detailProps.contentContainer.SetEnabled(evt.newValue); 
+                    }
+                    );
+                }
                 bool detailEnabled = props[detailToggleIdx].floatValue > 0.0f;
                 detailProps.contentContainer.SetEnabled(detailEnabled);
                 materialFields.Add(detailMatToggle);                
@@ -859,8 +906,9 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 ShaderGUIUtils.SetHeaderStyle(detailProps, "Details", detailIcon, detailToggle);
                 MainWindow.Add(detailProps);
             }
+#endregion // Details
 
-
+#region Impacts
             //----------------------------------------------------------------
             // Impact Properties --------------------------------------------
             //----------------------------------------------------------------
@@ -903,14 +951,102 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 ShaderGUIUtils.SetHeaderStyle(ImpactProps, "Impacts", impactIcon);
                 MainWindow.Add(ImpactProps);
             }
+#endregion // Impacts
 
+#region Fluorescence
+            //----------------------------------------------------------------
+            // Fluorescence Properties ---------------------------------------
+            //----------------------------------------------------------------
+
+            Toggle fluorToggle = null;
+            Foldout fluorProps = new Foldout();
+            bool hasFluorescence = false;
+
+            TextureField fluorMapField = null;
+            int fluorMapIdx = PropertyIdx(ref propTable, PName._FluorMap);
+            if (fluorMapIdx != -1)
+            {
+                fluorMapField = new TextureField(props[fluorMapIdx], propIdx[fluorMapIdx], false);
+                fluorMapField.tooltip2 = LitMASGui_Tooltips.FluorMap.ToString();
+                fluorProps.Add(fluorMapField);
+                materialFields.Add(fluorMapField);
+                hasFluorescence = true;
+            }
+
+
+            int fluorColorIdx = PropertyIdx(ref propTable, PName._FluorColor);
+            if (fluorColorIdx != -1)
+            {
+                MaterialColorField fluorColorField = new MaterialColorField();
+                if (fluorMapField != null)
+                {
+                    fluorColorField.Initialize(props[fluorColorIdx], propIdx[fluorColorIdx], true);
+                    fluorMapField.rightAlignBox.Add(fluorColorField);
+                }
+                else
+                {
+                    fluorColorField.Initialize(props[fluorColorIdx], propIdx[fluorColorIdx], false);
+                    fluorProps.Add(fluorColorField);
+                }
+                fluorColorField.tooltip = LitMASGui_Tooltips.FluorColor.ToString();
+                materialFields.Add(fluorColorField);
+                hasFluorescence = true;
+            }
+
+            int fluorAbsorbIdx = PropertyIdx(ref propTable, PName._FluorAbsorbance);
+            if (fluorAbsorbIdx != -1)
+            {
+                MaterialColorField fluorAbsorbField = new MaterialColorField();
+                fluorAbsorbField.Initialize(props[fluorAbsorbIdx], propIdx[fluorAbsorbIdx], false);
+                fluorProps.Add(fluorAbsorbField);
+                fluorAbsorbField.tooltip = LitMASGui_Tooltips.FluorAbsorbance.ToString();
+                if (fluorAbsorbField.label.StartsWith("Fluorescence")) fluorAbsorbField.label = fluorAbsorbField.label.Substring("Fluorescence".Length);
+                materialFields.Add(fluorAbsorbField);
+                hasFluorescence = true;
+            }
+
+            int fluorAlbedoTintIdx = PropertyIdx(ref propTable, PName._FluorAlbedoTint);
+            if (fluorAbsorbIdx != -1)
+            {
+                MaterialRangeField fluorAlbedoTintField = new MaterialRangeField();
+                fluorAlbedoTintField.Initialize(props[fluorAlbedoTintIdx], propIdx[fluorAlbedoTintIdx], false);
+                if (fluorAlbedoTintField.label.StartsWith("Fluorescence")) fluorAlbedoTintField.label = fluorAlbedoTintField.label.Substring("Fluorescence".Length);
+                fluorProps.Add(fluorAlbedoTintField);
+                fluorAlbedoTintField.tooltip = LitMASGui_Tooltips.FluorAlbedoTint.ToString();
+                materialFields.Add(fluorAlbedoTintField);
+                hasFluorescence = true;
+            }
+
+
+            int fluorToggleIdx = PropertyIdx(ref propTable, PName._Fluorescent);
+            if (hasFluorescence && fluorToggleIdx != -1)
+            {
+                MaterialToggleField fluorMatToggle = new MaterialToggleField();
+                fluorMatToggle.Initialize(props[fluorToggleIdx], propIdx[fluorToggleIdx], keyword_FLUORESCENCE, false, true);
+                materialFields.Add(fluorMatToggle);
+                fluorToggle = fluorMatToggle;
+
+                fluorMatToggle.RegisterCallback<ChangeEvent<bool>>(evt => { fluorProps.contentContainer.SetEnabled(evt.newValue); });
+                bool fluorEnabled = props[fluorToggleIdx].floatValue > 0.0f;
+                fluorProps.contentContainer.SetEnabled(fluorEnabled);
+            }
+
+            if (hasFluorescence)
+            {
+                Texture2D FluorIcon = ShaderGUIUtils.GetClosestUnityIconMip("AreaLight Icon", 16);
+                ShaderGUIUtils.SetHeaderStyle(fluorProps, "Fluorescence", FluorIcon, fluorToggle);
+                MainWindow.Add(fluorProps);
+            }
+#endregion // Fluorescence
+
+#region Unknown Properties
             //----------------------------------------------------------------
             // Unknown Properties --------------------------------------------
             //----------------------------------------------------------------
             Foldout unknownProps = new Foldout();
             Texture2D otherIcon = ShaderGUIUtils.GetClosestUnityIconMip("Settings Icon", 16);
             ShaderGUIUtils.SetHeaderStyle(unknownProps, "Other", otherIcon);
-
+            bool hasUnknown = false;
             int numUnknown = propTable.unknownProperties.Count;
             List<int> unknownPropIdx = propTable.unknownProperties;
             for (int i = 0; i < numUnknown; i++)
@@ -921,6 +1057,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 {
                     continue;
                 }
+                hasUnknown = true;
                 switch (prop.type) 
                 {
                     case (MaterialProperty.PropType.Texture):
@@ -996,10 +1133,11 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 }
             }
             
-            if (numUnknown > 0)
+            if (hasUnknown)
             {
                 MainWindow.Add(unknownProps);
             }
+#endregion // Unknown Properties
 
             if (hasAdvancedProps)
             {
@@ -1109,8 +1247,189 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             }
         }
 
-    }
+#region PropertyUpgrades
 
+        interface IMigrateProp
+        {
+            public PName Binding();
+            public void Populate(SerializedProperty array, int index, PName binding);
+            public void Migrate(MaterialProperty newProp);
+        }
 
+        [StructLayout(LayoutKind.Sequential)]
+        struct TexEnv : IMigrateProp
+        {
+            public PName binding;
+            public Texture texture;
+            public float4 scaleOffset;
 
-}
+            public readonly PName Binding() => binding;
+
+            public void Populate(SerializedProperty array, int index, PName binding)
+            {
+                SerializedProperty textureProp = array.FindPropertyRelative($"Array.data[{index}].second.m_Texture");
+                SerializedProperty scaleProp   = array.FindPropertyRelative($"Array.data[{index}].second.m_Scale");
+                SerializedProperty offsetProp  = array.FindPropertyRelative($"Array.data[{index}].second.m_Offset");
+                this.binding = binding;
+                this.texture = (Texture) textureProp.objectReferenceValue;
+                this.scaleOffset = math.float4(scaleProp.vector2Value, offsetProp.vector2Value);
+            }
+
+            public void Migrate(MaterialProperty newProp)
+            {
+                newProp.textureValue = texture;
+                newProp.textureScaleAndOffset = scaleOffset;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct FloatEnv : IMigrateProp
+        {
+            public PName binding;
+            public float value;
+
+            public readonly PName Binding() => binding;
+
+            public void Populate(SerializedProperty array, int index, PName binding)
+            {
+                SerializedProperty prop = array.FindPropertyRelative($"Array.data[{index}].second");
+                this.binding = binding;
+                this.value = prop.floatValue;
+            }
+
+            public void Migrate(MaterialProperty newProp)
+            {
+                newProp.floatValue = value;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct IntEnv : IMigrateProp
+        {
+            public PName binding;
+            public int value;
+
+            public readonly PName Binding() => binding;
+
+            public void Populate(SerializedProperty array, int index, PName binding)
+            {
+                SerializedProperty prop = array.FindPropertyRelative($"Array.data[{index}].second");
+                this.binding = binding;
+                this.value = prop.intValue;
+            }
+
+            public void Migrate(MaterialProperty newProp)
+            {
+                newProp.intValue = value;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct VectorEnv : IMigrateProp
+        {
+            public PName binding;
+            public Vector4 value;
+
+            public readonly PName Binding() => binding;
+
+            public void Populate(SerializedProperty array, int index, PName binding)
+            {
+                SerializedProperty prop = array.FindPropertyRelative($"Array.data[{index}].second");
+                this.binding = binding;
+                this.value = prop.colorValue; // Vectors saved as colors!
+            }
+
+            public void Migrate(MaterialProperty newProp)
+            {
+                if (newProp.type == MaterialProperty.PropType.Vector)
+                {
+                    newProp.vectorValue = value;
+                }
+                else
+                {
+                    newProp.colorValue = value;
+                }
+            }
+        }
+
+        static bool UpgradeObsoleteMaterialProps(SerializedObject target, MaterialProperty[] props, ShaderPropertyTable propTable,
+            Dictionary<string, PName> upgradeTextures,
+            Dictionary<string, PName> upgradeVectors,
+            Dictionary<string, PName> upgradeFloats,
+            Dictionary<string, PName> upgradeInts
+        )
+        {
+            bool needsReload = false;
+            if (upgradeTextures != null) needsReload |= UpgradePropertySingle<TexEnv>   (target, props, propTable, upgradeTextures, "m_SavedProperties.m_TexEnvs");
+            if (upgradeVectors != null)  needsReload |= UpgradePropertySingle<VectorEnv>(target, props, propTable, upgradeVectors,  "m_SavedProperties.m_Colors");
+            if (upgradeFloats != null)   needsReload |= UpgradePropertySingle<FloatEnv> (target, props, propTable, upgradeFloats,   "m_SavedProperties.m_Floats");
+            if (upgradeInts != null)     needsReload |= UpgradePropertySingle<IntEnv>   (target, props, propTable, upgradeInts,     "m_SavedProperties.m_Ints");
+
+            return needsReload;
+        }
+
+        static bool UpgradePropertySingle<TProp>(
+            SerializedObject target, 
+            MaterialProperty[] props, 
+            ShaderPropertyTable propTable, 
+            Dictionary<string, PName> upgradeMap,
+            string propertyArrayPath
+            ) where TProp : IMigrateProp
+        {
+            int upgradableCount = 0;
+            int obsoletePropCount = upgradeMap.Count;
+
+            foreach (KeyValuePair<string,PName> pair in upgradeMap)
+            {
+                if (PropertyIdx(ref propTable, pair.Value) != -1)
+                {
+                    upgradableCount++;
+                }
+            }
+
+            bool removedElements = false;
+            if (upgradableCount > 0)
+            {
+                List<TProp> oldValues = new List<TProp>(upgradableCount);
+                List<int> removeElements = new List<int>(upgradableCount);
+                SerializedProperty propertyArray = target.FindProperty(propertyArrayPath);
+
+                int arrayLength = propertyArray.arraySize;
+                for (int i = 0; i < arrayLength; i++)
+                {
+                    SerializedProperty subProp = propertyArray.FindPropertyRelative($"Array.data[{i}].first");
+                    string name = subProp.stringValue;
+                    if (upgradeMap.TryGetValue(name, out PName pName))
+                    {
+                        
+                        SerializedProperty texture = propertyArray.FindPropertyRelative($"Array.data[{i}].second.m_Texture");
+                        SerializedProperty scale = propertyArray.FindPropertyRelative($"Array.data[{i}].second.m_Scale");
+                        SerializedProperty offset = propertyArray.FindPropertyRelative($"Array.data[{i}].second.m_Offset");
+                        TProp migrateProp = default;
+                        migrateProp.Populate(propertyArray, i, pName);
+                        oldValues.Add(migrateProp);
+                        removeElements.Add(i);
+                    }
+                }
+
+                foreach (TProp migrateProp in oldValues)
+                {
+                    int propIdx = PropertyIdx(ref propTable, migrateProp.Binding());
+                    migrateProp.Migrate(props[propIdx]);
+                }
+                target.Update();
+                int numRemove = removeElements.Count();
+                removedElements = numRemove > 0;
+                for (int rIdx = numRemove - 1; rIdx >= 0; rIdx--)
+                {
+                    propertyArray.DeleteArrayElementAtIndex(removeElements[rIdx]);
+                }
+                target.ApplyModifiedProperties();
+            }
+            return removedElements;
+        }
+
+#endregion
+    
+    } // LitMASGui
+} // namespace

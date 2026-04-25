@@ -1,10 +1,14 @@
 #pragma once
 
-#if !defined(_DISABLE_VOLUMETRICs)
+#if !defined(_DISABLE_VOLUMETRICS)
 	#if defined(SHADER_API_MOBILE)
 		#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
 	#else
-		#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED _VOLUMETRICS_ENABLED_HQ
+		#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED_HQ _VOLUMETRICS_ENABLED
+		
+		#if defined(_VOLUMETRICS_ENABLED_HQ)
+			#define(_VOLUMETRICS_ENABLED)
+		#endif
 	#endif
 #endif
 

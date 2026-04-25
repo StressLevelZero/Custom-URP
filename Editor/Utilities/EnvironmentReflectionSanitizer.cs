@@ -24,7 +24,7 @@ public static class EnvironmentReflectionSanitizer
     private const string SS_OrigTexPath = "EnvReflSan_OrigTexPath";
     private const string SS_TempTexPath = "EnvReflSan_TempTexPath";
 
-    [MenuItem("Tools/Lighting/Sanitize Environment Reflection (Active Scene, Permanent)")]
+    [MenuItem("Stress Level Zero/Lighting Tools/Sanitize Environment Reflection (Active Scene, Permanent)")]
     public static void SanitizeActiveScenePermanentMenu()
     {
         var scene = SceneManager.GetActiveScene();
@@ -37,7 +37,7 @@ public static class EnvironmentReflectionSanitizer
             Debug.LogWarning(log);
     }
 
-    [MenuItem("Tools/Lighting/Sanitize Environment Reflection (All Build Scenes, Permanent)")]
+    [MenuItem("Stress Level Zero/Lighting Tools/Sanitize Environment Reflection (All Build Scenes, Permanent)")]
     public static void SanitizeAllBuildScenesPermanentMenu()
     {
         var setup = EditorSceneManager.GetSceneManagerSetup();

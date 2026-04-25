@@ -1,5 +1,8 @@
-//#!INJECT_BEGIN MATERIAL_CBUFFER 0
+//#!INJECT_BEGIN MATERIAL_CBUFFER_VECTORS 0
 	float4 _PenMap_ST;
-	half  _PenMono;
 	half4  _PenMonoColor;
+//#!INJECT_END
+
+//#!INJECT_BEGIN MATERIAL_CBUFFER 0
+	half  _PenMono;
 //#!INJECT_END

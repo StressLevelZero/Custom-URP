@@ -37,23 +37,10 @@ struct v2f
 #define UNPACK_NORMAL(i) i.normalWS.xyz
     
 
-CBUFFER_START(UnityPerMaterial)
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER from Injection_Triplanar_CBuffer.hlsl ----------------------------------------------------------
-float4 _DetailMap_ST;
-half  _Details;
-half  _Normals;
-half  _DetailsuseLocalUVs;
-half _RotateUVs;
-half _UVScaler;
-// End Injection MATERIAL_CBUFFER from Injection_Triplanar_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float4 _SSRSmoothnessRange;
-// End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-    int _Surface;
-CBUFFER_END
-    
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
+
 
 v2f vert(appdata v)
 {

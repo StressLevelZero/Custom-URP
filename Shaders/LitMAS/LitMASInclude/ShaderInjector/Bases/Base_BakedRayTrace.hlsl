@@ -50,15 +50,11 @@ struct Vertex
 
 //#!INJECT_POINT UNIFORMS
 
-CBUFFER_START( UnityPerMaterial )
-	//#!INJECT_POINT MATERIAL_CBUFFER_EARLY
-	float4 _BaseMap_ST;
-	half4 _BaseColor;
-	//#!INJECT_POINT MATERIAL_CBUFFER
-	int _AlphaPreMult;
-CBUFFER_END
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
 
-
+//#!INJECT_POINT FUNCTIONS
   
 //https://coty.tips/raytracing-in-unity/
 [shader("closesthit")]

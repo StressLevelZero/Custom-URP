@@ -45,7 +45,6 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
 
 
 
@@ -96,17 +95,9 @@ TEXTURE2D(_MetallicGlossMap);
 
 
 
-CBUFFER_START(UnityPerMaterial)
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-half  _Normals;
-// End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Anisotropic.hlsl ----------------------------------------------------------
-	half _AnisoAspect;
-// End Injection MATERIAL_CBUFFER from Injection_Anisotropic.hlsl ----------------------------------------------------------
-    int _Surface;
-CBUFFER_END
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
 
 
 VertOut vert(VertIn v)

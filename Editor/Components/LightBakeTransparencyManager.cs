@@ -15,14 +15,14 @@ namespace SLZ.SLZEditorTools
         [InitializeOnLoadMethod]
         static void RegisterBakeEvents()
         {
-            Lightmapping.bakeStarted += CreateTransparentLMObjs;
-            Lightmapping.bakeCompleted += DestroyTransparentBakeObjects;
+            Lightmapping.bakeStarted += AssignTransparentLmMaterials;
+            SLZ.SLZEditorTools.SortedPostBakeEvent.Register(ResetTransparentBakeObjects, -1000.0f);
         }
 
         static readonly int ID_MainTex = Shader.PropertyToID("_MainTex");
         static readonly int ID_TransparencyLM = Shader.PropertyToID("_TransparencyLM");
 
-        static void CreateTransparentLMObjs()
+        static void AssignTransparentLmMaterials()
         {
             Shader transparentLMShader = Shader.Find("SLZ/Transmissive Lightmap");
 
@@ -49,7 +49,7 @@ namespace SLZ.SLZEditorTools
                 
                 GameObject original = tint.gameObject;
                 MeshRenderer originalMr = original.GetComponent<MeshRenderer>();
-
+/*
                 if (!original.activeInHierarchy || !tint.isActiveAndEnabled || !originalMr.enabled)
                 {
                     continue;
@@ -80,8 +80,13 @@ namespace SLZ.SLZEditorTools
                 UnityEditorInternal.ComponentUtility.PasteComponentAsNew(clone);
                 MeshRenderer cloneMr = clone.GetComponent<MeshRenderer>();
                 cloneMr.hideFlags = dontsaveWithoutMemLeak;
-
-                Material[] cloneMaterials = cloneMr.sharedMaterials;
+*/
+                if (tint.originalMaterials == null || tint.originalMaterials.Length == 0) 
+                {
+                    tint.originalMaterials = originalMr.sharedMaterials;
+                    EditorUtility.SetDirty(tint);
+                }
+                Material[] cloneMaterials = (Material[])tint.originalMaterials.Clone();
 
                 foreach (var slot in tint.transparentMaterials)
                 {
@@ -102,15 +107,30 @@ namespace SLZ.SLZEditorTools
                     cloneMaterials[slot.materialIndex] = mat;
                 }
 
-                cloneMr.sharedMaterials = cloneMaterials;
+                originalMr.sharedMaterials = cloneMaterials;
 
-                originalMr.enabled = false;
-                disabledRenderers.Add(originalMr);
+                //originalMr.enabled = false;
+                //disabledRenderers.Add(originalMr);
             }
         }
 
-        static void DestroyTransparentBakeObjects()
+        static void ResetTransparentBakeObjects()
         {
+            Debug.Log("Resetting Transparent Bake Objects");
+            LightBakeTintedTransparency[] tints = GameObject.FindObjectsOfType<LightBakeTintedTransparency>(false);
+
+            foreach (var tint in tints)
+            {
+                GameObject original = tint.gameObject;
+                MeshRenderer originalMr = original.GetComponent<MeshRenderer>();
+                if (tint.originalMaterials != null && tint.originalMaterials.Length > 0)
+                {
+                    originalMr.sharedMaterials = tint.originalMaterials;
+                    tint.originalMaterials = null;
+                    EditorUtility.SetDirty(tint);
+                }
+            }
+            /*
             int numDisabled = disabledRenderers.Count;
             for (int dIdx = 0; dIdx < numDisabled; dIdx++)
             {
@@ -130,7 +150,7 @@ namespace SLZ.SLZEditorTools
                 }
             }
             TransparentBakeObjects.Clear();
-
+            */
             int numMats = TransparentBakeMats.Count;
             for (int mIdx = 0; mIdx < numMats; mIdx++)
             {
@@ -140,6 +160,7 @@ namespace SLZ.SLZEditorTools
                 }
             }
             TransparentBakeMats.Clear();
+            
         }
     }
 }

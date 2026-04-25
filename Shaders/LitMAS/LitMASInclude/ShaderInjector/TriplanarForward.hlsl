@@ -74,7 +74,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
+
 // Begin Injection INCLUDES from Injection_Triplanar.hlsl ----------------------------------------------------------
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZTriplanar.hlsl"
 // End Injection INCLUDES from Injection_Triplanar.hlsl ----------------------------------------------------------
@@ -83,7 +83,6 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLightingSSR.hlsl"
 #endif
 // End Injection INCLUDES from Injection_SSR.hlsl ----------------------------------------------------------
-
 
 
 struct VertIn
@@ -140,28 +139,9 @@ SAMPLER(sampler_DetailMap);
 TEXTURE2D(_EmissionMap);
 // End Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
 
-CBUFFER_START(UnityPerMaterial)
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER from Injection_Triplanar.hlsl ----------------------------------------------------------
-	float4 _DetailMap_ST;
-	half  _Details;
-	half  _Normals;
-	half  _DetailsuseLocalUVs;
-	half _RotateUVs;
-	half _UVScaler;
-// End Injection MATERIAL_CBUFFER from Injection_Triplanar.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-	half  _Emission;
-	half4 _EmissionColor;
-	half  _EmissionFalloff;
-	half  _BakedMutiplier;
-// End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float4 _SSRSmoothnessRange;
-// End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-    int _Surface;
-CBUFFER_END
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
 
 
 VertOut vert(VertIn v)

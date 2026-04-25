@@ -66,13 +66,16 @@ namespace UnityEditor.SLZMaterialUI
         public void OnChangedEvent(ChangeEvent<bool> evt)
         {
             //BeforeChange.Invoke(evt);
-            if (isIntField)
+            if (materialProperty != null)
             {
-                materialProperty.intValue = evt.newValue ? onIntValue : offIntValue;
-            }
-            else
-            {
-                materialProperty.floatValue = evt.newValue ? onFloatValue : offFloatValue;
+                if (isIntField)
+                {
+                    materialProperty.intValue = evt.newValue ? onIntValue : offIntValue;
+                }
+                else
+                {
+                    materialProperty.floatValue = evt.newValue ? onFloatValue : offFloatValue;
+                }
             }
             
             if (!string.IsNullOrEmpty(keyword))

@@ -49,5 +49,18 @@ namespace SLZ.SLZEditorTools
             "only the diffuse lighting component is alpha blended with the background. Specular reflections off the surface are unaffected by alpha and are added " +
             "to the background. Thus you can still see reflections off a 0 alpha transparent object. Addtionally, as the metallic goes to 1, the material becomes opaque. Fade is " +
             "simple alpha blending; as the alpha goes to 0 the material fully disappears";
+
+        public static ReadOnlySpan<char> FluorMap =>
+            "Map of the fluorescent strength and tint";
+
+        public static ReadOnlySpan<char> FluorColor =>
+            "Color multiplier on top of the fluorescence map";
+        
+        public static ReadOnlySpan<char> FluorAbsorbance =>
+            "For each of the red, green, blue, and alpha channels of incoming light, how much is converted into light of the color determined by the fluorescence map and tint."+
+            " The alpha channel represents UV, but is only available from realtime light sources.";
+
+        public static ReadOnlySpan<char> FluorAlbedoTint =>
+            "How much the base map and color tint the fluorescence";
     }
 }

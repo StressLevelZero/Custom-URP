@@ -38,9 +38,8 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
-//#!INJECT_POINT INCLUDES
 
+//#!INJECT_POINT INCLUDES
 
 
 struct VertIn
@@ -90,13 +89,9 @@ TEXTURE2D(_MetallicGlossMap);
 
 //#!INJECT_POINT UNIFORMS
 
-CBUFFER_START(UnityPerMaterial)
-    //#!INJECT_POINT MATERIAL_CBUFFER_EARLY
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-    //#!INJECT_POINT MATERIAL_CBUFFER
-    int _Surface;
-CBUFFER_END
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
 
 //#!INJECT_POINT FUNCTIONS
 

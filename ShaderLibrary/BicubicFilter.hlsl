@@ -51,6 +51,37 @@ float3 SampleBSplineRGB_LOD (Texture2D tex, SamplerState ss, float2 uv, float4 m
     return lerp(lerp(sample3, sample2, sx), lerp(sample1, sample0, sx), sy);
 }
 
+half4 SampleBSplineRGBA_LOD (Texture2D tex, SamplerState ss, float2 uv, float4 mip_TexelSize, int mipLevel = 0)
+{
+    float2 texSize = mip_TexelSize.zw;
+    float2 invTexSize = mip_TexelSize.xy;
+   
+    uv = uv * texSize - 0.5;
+
+    float2 fracUV = frac(uv);
+    float2 floorUV = floor(uv);
+
+    float4 xcubic = BSplineWeights(fracUV.x);
+    float4 ycubic = BSplineWeights(fracUV.y);
+
+    float4 c = floorUV.xxyy + float2(-0.5, +1.5).xyxy;
+    
+    float4 s = float4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
+    float4 offset = c + float4(xcubic.yw, ycubic.yw) / s;
+    
+    offset *= invTexSize.xxyy;
+    
+    half4 sample0 = tex.SampleLevel(ss, offset.xz, mipLevel).rgba;
+    half4 sample1 = tex.SampleLevel(ss, offset.yz, mipLevel).rgba;
+    half4 sample2 = tex.SampleLevel(ss, offset.xw, mipLevel).rgba;
+    half4 sample3 = tex.SampleLevel(ss, offset.yw, mipLevel).rgba;
+
+    float sx = s.x / (s.x + s.y);
+    float sy = s.z / (s.z + s.w);
+
+    return lerp(lerp(sample3, sample2, sx), lerp(sample1, sample0, sx), sy);
+}
+
 float3 SampleBSplineRGB_MipNearest(Texture2D tex, SamplerState ss, float2 uv, float mipBias = 0)
 {
     float2 resolution;

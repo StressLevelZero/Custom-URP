@@ -594,13 +594,15 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
                 // ------------------------------------------------------------
                 // Volume stack controller: 
                 // ------------------------------------------------------------
-                m_Cam.UpdateVolumeStack();
-                var stack = m_Res.VolMana.stack;
-                 var vol = stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
+                //m_Cam.UpdateVolumeStack();
+                //var stack = m_Res.VolMana.stack;
+                // var vol = stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
+                var vol = VolumeManager.instance.stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
+
                  if (vol != null && vol.active) // active = component enabled + any overrides
                  {
                      // Apply globals for this camera for this pass
-                     vol.SetGlobalsOnCmdBuffer(cmd);
+                     vol.SetGlobalsOnCmdBuffer(cmd); //TODO: Refactor and move the logic off the volume system. Causing garbage
                  }
                  else
                  {

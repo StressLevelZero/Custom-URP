@@ -318,6 +318,7 @@ half4 VolumetricsSurf(half4 color, float3 positionWS, int surfaceType) {
 
 #if defined(_VOLUMETRICS_ENABLED) || defined(_VOLUMETRICS_ENABLED_HQ)
 
+    color = max(half(0), color);  //clamping incoming colors so if negitive values get here they don't cause issue   
     half4 FroxelColor = GetVolumetricColor(positionWS);
 	
     FroxelColor.rgb = surfaceType == 1 ? FroxelColor.rgb * color.a : FroxelColor.rgb;

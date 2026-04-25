@@ -42,6 +42,7 @@ Shader "SLZ/Transmissive Lightmap"
         };
 
         TEXTURE2D(_MainTex);
+        TEXTURE2D(_TransparencyLM);
         SAMPLER(sampler_MainTex);
 
         CBUFFER_START(UnityPerMaterial)
@@ -65,11 +66,24 @@ Shader "SLZ/Transmissive Lightmap"
         half4 frag(v2f i) : SV_Target
         {
             UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
-            half4 col = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv_fogFactor.xy);
+            half4 col = 1e-9 * SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv_fogFactor.xy) + 
+                SAMPLE_TEXTURE2D(_TransparencyLM, sampler_MainTex, i.uv_fogFactor.xy)
+                ;
+
+            int2 checkerUV = (int2)floor(i.uv_fogFactor.xy * 4);
+            int checkerIdx = (checkerUV.x + checkerUV.y) & 1;
+            if (checkerIdx == 1)
+            {
+                col = 0.5 * col + float4(0.75, 0, 0.75, 0.5); 
+            }
+            else
+            {
+                col = 0.5 * col;
+            }
             // apply fog
-            float3 viewDir = i.wPos - _WorldSpaceCameraPos;
-            col.rgb = MixFog(col.rgb, viewDir, i.uv_fogFactor.z);
-            col = Volumetrics(col, i.wPos);
+            //float3 viewDir = i.wPos - _WorldSpaceCameraPos;
+            //col.rgb = MixFog(col.rgb, viewDir, i.uv_fogFactor.z);
+            //col = Volumetrics(col, i.wPos);
 
             return col;
         }

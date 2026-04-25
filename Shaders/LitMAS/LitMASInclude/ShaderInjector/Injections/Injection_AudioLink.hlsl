@@ -9,7 +9,7 @@ TEXTURE2D(_AudioLinkNoise);
 SAMPLER(sampler_AudioLinkNoise);
 //#!INJECT_END
 
-//#!INJECT_BEGIN MATERIAL_CBUFFER 0
+//#!INJECT_BEGIN MATERIAL_CBUFFER_HALF_SCALARS 0
 	half  _AudioInputBoost;
 	half  _SmoothstepBlend;
 	half  _AudioLinkBaseBlend;

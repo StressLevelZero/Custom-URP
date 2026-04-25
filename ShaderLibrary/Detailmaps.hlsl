@@ -3,6 +3,9 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/FractalSampling.hlsl"
 
+
+
+
 half3 OverlayBlendDetail(half source, half3 destination)
 {
     half3 switch0 = round(destination); // if destination >= 0.5 then 1, else 0 assuming 0-1 input

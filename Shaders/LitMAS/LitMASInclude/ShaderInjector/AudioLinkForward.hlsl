@@ -42,11 +42,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
+
 // Begin Injection INCLUDES from Injection_AudioLink.hlsl ----------------------------------------------------------
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/AudioLink/Shaders/AudioLink.cginc"
 // End Injection INCLUDES from Injection_AudioLink.hlsl ----------------------------------------------------------
-
 
 
 struct VertIn
@@ -105,32 +104,9 @@ TEXTURE2D(_AudioLinkNoise);
 SAMPLER(sampler_AudioLinkNoise);
 // End Injection UNIFORMS from Injection_AudioLink.hlsl ----------------------------------------------------------
 
-CBUFFER_START(UnityPerMaterial)
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-half  _Normals;
-// End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-    float4 _DetailMap_ST;
-    float  _Details;
-// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_AudioLink.hlsl ----------------------------------------------------------
-	half  _AudioInputBoost;
-	half  _SmoothstepBlend;
-	half  _AudioLinkBaseBlend;
-	half4 _LowsColor;
-	half4 _MidsColor;
-	half4 _HighsColor;
-// End Injection MATERIAL_CBUFFER from Injection_AudioLink.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-	half  _Emission;
-	half4 _EmissionColor;
-	half  _EmissionFalloff;
-	half  _BakedMutiplier;
-// End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-    int _Surface;
-CBUFFER_END
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
 
 // Begin Injection FUNCTIONS from Injection_AudioLink.hlsl ----------------------------------------------------------
 half GetALChannelIntensity(half channelValue, half channelMask)

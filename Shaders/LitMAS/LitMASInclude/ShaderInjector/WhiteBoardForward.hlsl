@@ -47,11 +47,10 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
+
 // Begin Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
 // End Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
-
 
 
 struct VertIn
@@ -115,11 +114,15 @@ TEXTURE2D(_PenMap);
 CBUFFER_START(UnityPerMaterial)
     float4 _BaseMap_ST;
     half4 _BaseColor;
+// Begin Injection MATERIAL_CBUFFER_VECTORS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+    float4 _DetailMap_ST;
+    //half4  _DetailScale;
+// End Injection MATERIAL_CBUFFER_VECTORS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+
 // Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
 half  _Normals;
 // End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-    float4 _DetailMap_ST;
     float  _Details;
 // End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER from Injection_WhiteBoard.hlsl ----------------------------------------------------------

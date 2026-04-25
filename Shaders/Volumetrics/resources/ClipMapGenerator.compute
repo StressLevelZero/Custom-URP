@@ -78,11 +78,11 @@ void ClipMapGen(uint3 tid : SV_DispatchThreadID)
 
    // float3 sample = VolumeMap.SampleLevel(linear_clamp_sampler, mapUVW, 0);
 
-    // Accumulate into whatever's already in the voxel (preserves contributions
-    // from other baked areas written earlier in this build).
-    float4 prev = Result[wrapCoord];
-    prev.rgb += VolumeMap.SampleLevel(linear_clamp_sampler, mapUVW, 0);
-    Result[wrapCoord] = prev ;
+    //float4 prev = Result[wrapCoord]; //reading to carry over previously bake density
+    // intentionally overriding the previously baked lighting (RGB) values to account for overlapping volumes.
+    // Higher densities are sorted to render after so the higher resolutions win
+    //prev.rgb = VolumeMap.SampleLevel(linear_clamp_sampler, mapUVW, 0); 
+    Result[wrapCoord] = float4(VolumeMap.SampleLevel(linear_clamp_sampler, mapUVW, 0).rgb, Result[wrapCoord].a);
 }
 
 // =============================================================================

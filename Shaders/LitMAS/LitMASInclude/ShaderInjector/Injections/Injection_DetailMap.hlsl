@@ -1,7 +1,15 @@
 //#!INJECT_BEGIN UNIVERSAL_DEFINES 0
 #pragma shader_feature_local_fragment _ _DETAILS_ON
-// phrase fractal details keyword as a negative so it can be disabled both locally and globally
-#pragma multi_compile_fragment _ _FRACTAL_DETAILS_OFF
+
+
+#if defined(NO_FRACTAL_DETAILS)
+    #if defined(_DETAILS_ON)
+        #define _FRACTAL_DETAILS_OFF
+    #endif
+#else
+    // phrase fractal details keyword as a negative so it can be disabled both locally and globally
+    #pragma multi_compile_fragment _ _FRACTAL_DETAILS_OFF
+#endif
 //#!INJECT_END
 
 //#!INJECT_BEGIN INCLUDES 0

@@ -68,6 +68,11 @@
             "name": "com.unity.inputsystem",
             "expression": "0.0.0",
             "define": "ENABLE_INPUT_SYSTEM_PACKAGE"
+        },
+        {
+            "name": "com.stresslevelzero.internal.rendering",
+            "expression": "0.0.0",
+            "define": "SLZ_INTERNAL_RENDERING"
         }
     ],
     "noEngineReferences": false

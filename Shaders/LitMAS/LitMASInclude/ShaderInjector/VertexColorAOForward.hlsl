@@ -48,8 +48,16 @@
 
 // Begin Injection UNIVERSAL_DEFINES from Injection_DetailMap.hlsl ----------------------------------------------------------
 #pragma shader_feature_local_fragment _ _DETAILS_ON
-// phrase fractal details keyword as a negative so it can be disabled both locally and globally
-#pragma multi_compile_fragment _ _FRACTAL_DETAILS_OFF
+
+
+#if defined(NO_FRACTAL_DETAILS)
+    #if defined(_DETAILS_ON)
+        #define _FRACTAL_DETAILS_OFF
+    #endif
+#else
+    // phrase fractal details keyword as a negative so it can be disabled both locally and globally
+    #pragma multi_compile_fragment _ _FRACTAL_DETAILS_OFF
+#endif
 // End Injection UNIVERSAL_DEFINES from Injection_DetailMap.hlsl ----------------------------------------------------------
 
 
@@ -68,7 +76,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
+
 // Begin Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
 // End Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
@@ -77,7 +85,6 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLightingSSR.hlsl"
 #endif
 // End Injection INCLUDES from Injection_SSR.hlsl ----------------------------------------------------------
-
 
 
 struct VertIn
@@ -147,27 +154,9 @@ TEXTURE2D(_DetailMap);
 TEXTURE2D(_EmissionMap);
 // End Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
 
-CBUFFER_START(UnityPerMaterial)
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-half  _Normals;
-// End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-    float4 _DetailMap_ST;
-    float  _Details;
-// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float4 _SSRSmoothnessRange;
-// End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-	half  _Emission;
-	half4 _EmissionColor;
-	half  _EmissionFalloff;
-	half  _BakedMutiplier;
-// End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-    int _Surface;
-CBUFFER_END
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
 
 
 VertOut vert(VertIn v)

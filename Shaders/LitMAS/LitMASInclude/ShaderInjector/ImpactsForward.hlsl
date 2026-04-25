@@ -48,9 +48,20 @@
 
 // Begin Injection UNIVERSAL_DEFINES from Injection_DetailMap.hlsl ----------------------------------------------------------
 #pragma shader_feature_local_fragment _ _DETAILS_ON
-// phrase fractal details keyword as a negative so it can be disabled both locally and globally
-#pragma multi_compile_fragment _ _FRACTAL_DETAILS_OFF
+
+
+#if defined(NO_FRACTAL_DETAILS)
+    #if defined(_DETAILS_ON)
+        #define _FRACTAL_DETAILS_OFF
+    #endif
+#else
+    // phrase fractal details keyword as a negative so it can be disabled both locally and globally
+    #pragma multi_compile_fragment _ _FRACTAL_DETAILS_OFF
+#endif
 // End Injection UNIVERSAL_DEFINES from Injection_DetailMap.hlsl ----------------------------------------------------------
+// Begin Injection UNIVERSAL_DEFINES from Injection_Fluorescence.hlsl ----------------------------------------------------------
+#pragma shader_feature_local_fragment _FLUORESCENCE
+// End Injection UNIVERSAL_DEFINES from Injection_Fluorescence.hlsl ----------------------------------------------------------
 
 
 
@@ -68,7 +79,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
+
 // Begin Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Detailmaps.hlsl"
 // End Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
@@ -83,7 +94,6 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLightingSSR.hlsl"
 #endif
 // End Injection INCLUDES from Injection_SSR.hlsl ----------------------------------------------------------
-
 
 
 struct VertIn
@@ -149,33 +159,15 @@ TEXTURE2D(_DetailMap);
 // Begin Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
 TEXTURE2D(_EmissionMap);
 // End Injection UNIFORMS from Injection_Emission.hlsl ----------------------------------------------------------
+// Begin Injection UNIFORMS from Injection_Fluorescence.hlsl ----------------------------------------------------------
+#if defined(_FLUORESCENCE)
+	TEXTURE2D(_FluorMap);
+#endif
+// End Injection UNIFORMS from Injection_Fluorescence.hlsl ----------------------------------------------------------
 
-CBUFFER_START(UnityPerMaterial)
-// Begin Injection MATERIAL_CBUFFER_EARLY from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-	half4x4 EllipsoidPosArray[HitMatrixCount];
-	int _NumberOfHits;
-	half4 _HitColor;
-// End Injection MATERIAL_CBUFFER_EARLY from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-half  _Normals;
-// End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-    float4 _DetailMap_ST;
-    float  _Details;
-// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-	half  _Emission;
-	half4 _EmissionColor;
-	half  _EmissionFalloff;
-	half  _BakedMutiplier;
-// End Injection MATERIAL_CBUFFER from Injection_Emission.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float4 _SSRSmoothnessRange;
-// End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-    int _Surface;
-CBUFFER_END
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
 
 
 VertOut vert(VertIn v)
@@ -263,6 +255,11 @@ SLZ_DECLARE_FRAG_SIZE
 // Begin Injection FRAG_POST_READ from Injection_DetailMap.hlsl ----------------------------------------------------------
     float2 uv_detail = mad(uv0, _DetailMap_ST.xy, _DetailMap_ST.zw);
 // End Injection FRAG_POST_READ from Injection_DetailMap.hlsl ----------------------------------------------------------
+// Begin Injection FRAG_POST_READ from Injection_Fluorescence.hlsl ----------------------------------------------------------
+#if defined(_FLUORESCENCE)
+	half4 fluorMap = SAMPLE_TEXTURE2D(_FluorMap, sampler_BaseMap, uv_main);
+#endif
+// End Injection FRAG_POST_READ from Injection_Fluorescence.hlsl ----------------------------------------------------------
 
     albedo *= _BaseColor;
     albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
@@ -307,6 +304,12 @@ SLZ_DECLARE_FRAG_SIZE
         BlendDetailMapFractal( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main, albedo.rgb, smoothness, normalTS);
     #endif
 // End Injection DETAIL_MAP from Injection_DetailMap.hlsl ----------------------------------------------------------
+// Begin Injection DETAIL_MAP from Injection_Fluorescence.hlsl ----------------------------------------------------------
+#if defined(_FLUORESCENCE)
+	half4 fluorescence = (fluorMap * _FluorColor) * half4(lerp(half3(1,1,1), albedo.rgb, _FluorAlbedoTint), 1.0);
+	albedo.rgb = lerp(albedo.rgb, half3(0,0,0), _FluorAlbedoTint * fluorMap);
+#endif
+// End Injection DETAIL_MAP from Injection_Fluorescence.hlsl ----------------------------------------------------------
     
 
 
@@ -368,6 +371,12 @@ SLZ_DECLARE_FRAG_SIZE
     SLZSurfData surfData = SLZGetSurfDataMetallicGloss(albedo.rgb, saturate(metallic), saturate(smoothness), ao, emission.rgb, albedo.a);
     half4 color = half4(1, 1, 1, 1);
 
+// Begin Injection PRE_LIGHTING_CALC from Injection_Fluorescence.hlsl ----------------------------------------------------------
+#if defined(_FLUORESCENCE)
+	surfData.fluorescence = fluorescence;
+	surfData.absorbance = _FluorAbsorbance;
+#endif
+// End Injection PRE_LIGHTING_CALC from Injection_Fluorescence.hlsl ----------------------------------------------------------
 
 // Begin Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
     #if defined(_SSR_ENABLED)

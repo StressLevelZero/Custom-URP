@@ -14,6 +14,8 @@ namespace SLZ.SLZEditorTools
         public static readonly string packageName = "com.stresslevelzero.urpconfig";
         public static readonly string projectSymbolsAssetPath = "Assets/Settings/ProjectShaderSymbols.asset";
         public static readonly string projectSymbolsInclPath = "Packages/com.stresslevelzero.urpconfig/include/ProjectSymbols.hlsl";
+        public static readonly string dxcUpdateStateInclPath = "Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl";
+        public static readonly string dxcUpdateStateSrcPath  = "Packages/com.unity.render-pipelines.universal/Editor/URPConfig/package~/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl";
         static string m_pkgPath;
         static bool m_initialized = false;
         public static string packagePath

@@ -20,7 +20,7 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         [HideInInspector]_NumberOfHits("_NumberOfHits", Int) = 0
         [Space(30)][Header(BRDF map)][Space(10)][Toggle(_BRDFMAP)] BRDFMAP("BRDFMAP enabled", Float) = 0
         [NoScaleOffset][SingleLineTexture]g_tBRDFMap("BRDF Ramp", 2D) = "black" {}
-        [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 0
+        [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 1
         //[Header(This should be 0 for skinned meshes)]
         [HideInInspector]_SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
 
@@ -34,6 +34,12 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         _Offset("Offset Units", float) = 0
 
         _SSRSmoothnessRange ("SSR Smoothness Range", Vector) = (0.4, 0.7, 0, 0)
+
+        [Toggle(_FLUORESCENCE)] _Fluorescent("Fluorescence", float) = 0
+        _FluorMap("Fluorescence Map", 2D) = "white" {}
+        _FluorColor("Fluorescence Color", Color) = (1,1,1,1)
+        _FluorAbsorbance("Fluorescence Absorbance", Color) = (0,0.1875,0.929,1)
+        _FluorAlbedoTint("Fluorescence Albedo Influence", Range( 0 , 1)) = 1
     }
     SubShader
     {
@@ -45,6 +51,7 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
 
 HLSLINCLUDE
 #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+#define CBUFFER_PATH "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/ImpactsCBuffer.hlsl"
 ENDHLSL
 
         Pass
@@ -74,7 +81,7 @@ ENDHLSL
             #define _SM6_QUAD 1
             #endif
 
-            #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
 
             ENDHLSL
         }
@@ -94,7 +101,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             
-            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -114,7 +121,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
 
-            #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -138,7 +145,7 @@ ENDHLSL
 
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
-            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShadowCaster.hlsl" 
 
 			ENDHLSL
 		}
@@ -150,7 +157,7 @@ ENDHLSL
             Tags{ "LightMode" = "BakedRaytrace" }
 			HLSLPROGRAM
 #pragma only_renderers vulkan
-            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }
@@ -189,7 +196,7 @@ ENDHLSL
             #define LITMAS_FEATURE_IMPACTS
             #pragma shader_feature_local_fragment _BRDFMAP
 
-            #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/ImpactsForward.hlsl"
 
             ENDHLSL
         }
@@ -209,7 +216,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             
-            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -230,7 +237,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
 
-            #include_with_pragmas "LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/ImpactsDepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -255,7 +262,7 @@ ENDHLSL
 
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
-            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShadowCaster.hlsl" 
 
 			ENDHLSL
 		}
@@ -268,7 +275,7 @@ ENDHLSL
 			HLSLPROGRAM
             #pragma exclude_renderers vulkan
 
-            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }

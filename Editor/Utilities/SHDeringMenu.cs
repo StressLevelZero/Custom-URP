@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 
 public static class SHDeringMenu
 {
-    private const string MenuRoot = "Tools/Lighting/SH Dering/";
+    private const string MenuRoot = "Stress Level Zero/Lighting Tools/SH Dering/";
 
     private const int   DefaultSamples = 128;
     private const float DefaultMinAllowed = -0.01f;

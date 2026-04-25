@@ -46,31 +46,10 @@ struct v2f
 	SAMPLER(sampler_BaseMap);
 // End Injection UNIFORMS from Injection_Cutout_DepthOnly.hlsl ----------------------------------------------------------
 
-CBUFFER_START(UnityPerMaterial)
-	float4 _BaseMap_ST;
-	half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-half  _Normals;
-// End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-    float4 _DetailMap_ST;
-    float  _Details;
-// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-	float4 _SSRSmoothnessRange;
-// End Injection MATERIAL_CBUFFER from Injection_SSR_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
-	half  _Emission;
-	half4 _EmissionColor;
-	half  _EmissionFalloff;
-	half  _BakedMutiplier;
-// End Injection MATERIAL_CBUFFER from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
-float _Cutoff;
-// End Injection MATERIAL_CBUFFER from Injection_Cutout_CBuffer.hlsl ----------------------------------------------------------
-	int _Surface;
-CBUFFER_END
-	
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
+
 
 v2f vert(appdata v)
 {

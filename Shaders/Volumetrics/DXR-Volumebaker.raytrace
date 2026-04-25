@@ -9,27 +9,28 @@
 
 #pragma max_recursion_depth 1
 
-#define M_PI 3.1415926535897932384626433832795
-#define M_PHI 1.618033988749895
-#define M_INVPI 0.3183098861837906715377675267450
+#define M_PI       3.1415926535897932384626433832795
+#define M_PHI      1.618033988749895
+#define M_INVPI    0.3183098861837906715377675267450
+#define M_INV4PI   0.07957747154594766788444188168626
 
 // Input
 RaytracingAccelerationStructure g_SceneAccelStruct;
 
-//Global inputs 
-uint	PointLightCount;
-uint	ConeLightCount;
-uint	DirLightCount;
-uint	AreaLightCount;
-uint	AreaLightSamples;
-uint	EnvLightSamples;
-int	PerDispatchRayCount;
-int	StartRayIdx;
+// Global inputs
+uint  PointLightCount;
+uint  ConeLightCount;
+uint  DirLightCount;
+uint  AreaLightCount;
+uint  AreaLightSamples;
+uint  EnvLightSamples;
+int   PerDispatchRayCount;
+int   StartRayIdx;
 float HalfVoxelSize;
 
-//Enviorment
+// Environment
 TextureCube  _SkyTexture;
-SamplerState  sampler_SkyTexture;
+SamplerState sampler_SkyTexture;
 
 // Point light cookies
 TextureCubeArray _PointCookies;
@@ -38,83 +39,75 @@ SamplerState     sampler_PointCookies;
 struct PointLightData
 {
     float3 PointLightsWS;
-    float  _pad0;
+    float  SourceRadius;   // was _pad0 — plumb from CPU; 0 means point source
 
     float4 PointLightsColor;
-
-    // x = cookie layer (>=0), y = cookie strength [0..1]
-    float4 CookieData;
-
-    // inverse rotation of the light (xyzw quaternion). Used to orient the cubemap cookie.
+    float4 CookieData;     // x = cookie layer (>=0) or -1, y = strength (0..1)
     float4 CookieRotInv;
 };
 
-struct ConeLightData{
-    float3  ConeLightsWS;
-    float   _pad0;
+struct ConeLightData
+{
+    float3 ConeLightsWS;
+    float  SourceRadius;   // was _pad0
 
-    float4  ConeLightsColor;
+    float4 ConeLightsColor;
 
-    float3  ConeLightsDir;
-    float   _pad1;
+    float3 ConeLightsDir;
+    float  _pad1;
 
-    float2  ConeLightsPram;   // outerCos, inv(innerCos-outerCos)
-    float2  _pad2;
+    float2 ConeLightsPram; // outerCos, inv(innerCos - outerCos)
+    float2 _pad2;
 
-    // Cookie projection basis (world space)
-    float3  CookieRightWS;
-    float   _pad3;
-    float3  CookieUpWS;
-    float   _pad4;
+    float3 CookieRightWS;
+    float  _pad3;
+    float3 CookieUpWS;
+    float  _pad4;
 
-    // x = cookie layer (>=0) or -1, y = strength (0..1), z/w unused for now
-    float4  CookieData;
+    float4 CookieData;
 };
 
-struct DirLightData{
-    float3  DirLightsDir;
-    float   _pad0;
+struct DirLightData
+{
+    float3 DirLightsDir;
+    float  AngularRadius;  // was _pad0 — radians; 0 means use default
 
-    float4  DirLightsColor;
+    float4 DirLightsColor;
 
-    // Cookie anchor + basis
-    float3  CookiePosWS;
-    float   _pad1;
-    float3  CookieRightWS;
-    float   _pad2;
-    float3  CookieUpWS;
-    float   _pad3;
+    float3 CookiePosWS;
+    float  _pad1;
+    float3 CookieRightWS;
+    float  _pad2;
+    float3 CookieUpWS;
+    float  _pad3;
 
-    // x = cookie layer (>=0) or -1, y = strength (0..1), z = cookieSize, w unused
-    float4  CookieData;
+    float4 CookieData;     // x=layer, y=strength, z=cookieSize
 };
 
-struct AreaLightData{
+struct AreaLightData
+{
     float4x4 AreaLightsMatrix;
     float4x4 AreaLightsMatrixInv;
     float3   AreaLightsWS;
     float4   AreaLightsColor;
-    float3   AreaLightsSize;   // x=width (or radius for disc), y=height, z=discFlag(1) or rect(0)
-
-    // x = cookie layer (>=0) or -1, y = strength (0..1), z/w unused
+    float3   AreaLightsSize;   // x=width (or radius for disc), y=height, z=discFlag
     float4   CookieData;
 };
 
 Texture2DArray _LightCookies;
-SamplerState sampler_LightCookies;
+SamplerState   sampler_LightCookies;
 
 StructuredBuffer<PointLightData> PLD;
-StructuredBuffer<ConeLightData> CLD;
-StructuredBuffer<DirLightData> DLD;
-StructuredBuffer<AreaLightData> ALD;
+StructuredBuffer<ConeLightData>  CLD;
+StructuredBuffer<DirLightData>   DLD;
+StructuredBuffer<AreaLightData>  ALD;
 
-float3	WPosition;
-float3	Size = float3(1,1,1);
+float3 WPosition;
+float3 Size = float3(1, 1, 1);
 
 // Output
 RWTexture3D<float4> g_Output;
-Texture3D<float4> g_Input;
-
+Texture3D<float4>   g_Input;
 
 
 struct RayPayload
@@ -138,67 +131,35 @@ void MainMissShader(inout RayPayload payload : SV_RayPayload)
 [shader("miss")]
 void zEnvMissShader(inout EnvRayPayload payload : SV_RayPayload)
 {
-    //Enviormental    
-    payload.color =  _SkyTexture.SampleLevel(sampler_SkyTexture, payload.dir, 0) / 2 ;
+    payload.color = _SkyTexture.SampleLevel(sampler_SkyTexture, payload.dir, 0) / 2;
 }
 
-float InverseSquare(float distance){
-	return	1 / (4 * M_PI * distance * distance);
-}
+// -----------------------------------------------------------------------------
+// RNG + Low-discrepancy sequences
+// -----------------------------------------------------------------------------
 
-//float _Seed;
-
-float rand(float2 Pixel)
+float InverseSquare(float distance)
 {
-    float _Seed = Pixel.x + Pixel.y ;
-
-	float result = frac(sin(_Seed / 100.0f * dot(Pixel, float2(12.9898f, 78.233f) ) ) * 43758.5453f);
-//	_Seed = _Seed + 1.0f;
-	return result;
-}
-
-float rand(float3 Pixel)
-{
-    float _Seed = Pixel.x + Pixel.y + Pixel.z ;
-
-	float result = frac(sin(_Seed / 100.0f * dot(Pixel, float3(12.9898f, 49.1165f, 29.1165f))) * 43758.5453f);
-//	_Seed += 1.0f;
-	return result;
+    return 1.0 / (4.0 * M_PI * distance * distance);
 }
 
 uint hash(uint x)
 {
-    x ^= x >> 17;
-    x *= 0xed5ad4bbU;
-    x ^= x >> 11;
-    x *= 0xac4c1b51U;
-    x ^= x >> 15;
-    x *= 0x31848babU;
+    x ^= x >> 17; x *= 0xed5ad4bbU;
+    x ^= x >> 11; x *= 0xac4c1b51U;
+    x ^= x >> 15; x *= 0x31848babU;
     x ^= x >> 14;
     return x;
 }
 
-float rand1(uint x)
-{
-    return (hash(x) & 0x00FFFFFFu) / 16777216.0f;
-}
-
-float2 rand2(uint x)
-{
-    return float2(rand1(x), rand1(x + 0x68bc21ebu));
-}
-
-float3 rand3(uint x)
-{
-    return float3(rand1(x), rand1(x + 0x68bc21ebu), rand1(x + 0x02e5be93u));
-}
+float rand1(uint x) { return (hash(x) & 0x00FFFFFFu) / 16777216.0f; }
+float2 rand2(uint x) { return float2(rand1(x), rand1(x + 0x68bc21ebu)); }
+float3 rand3(uint x) { return float3(rand1(x), rand1(x + 0x68bc21ebu), rand1(x + 0x02e5be93u)); }
 
 uint hash_u32(uint x)
 {
-    x ^= x >> 16;
-    x *= 0x7feb352du;
-    x ^= x >> 15;
-    x *= 0x846ca68bu;
+    x ^= x >> 16; x *= 0x7feb352du;
+    x ^= x >> 15; x *= 0x846ca68bu;
     x ^= x >> 16;
     return x;
 }
@@ -206,26 +167,81 @@ uint hash_u32(uint x)
 float rand01(inout uint state)
 {
     state = hash_u32(state);
-    // 24 bits of mantissa for a clean 0-1 float
     return (state & 0x00FFFFFFu) * (1.0f / 16777216.0f);
 }
 
-// Uniform sampling over the full sphere
-float3 sampleUniformSphere(inout uint state)
+// Van der Corput radical inverse, base 2
+float radicalInverse_VdC(uint bits)
 {
-    float u1 = rand01(state);
-    float u2 = rand01(state);
-
-    float z  = 1.0f - 2.0f * u1;                    // cos(theta) in [-1,1]
-    float r  = sqrt(saturate(1.0f - z * z));
-    float phi = 2.0f * M_PI * u2;
-
-    return float3(r * cos(phi), r * sin(phi), z);   // unit vector
+    bits = (bits << 16u) | (bits >> 16u);
+    bits = ((bits & 0x55555555u) << 1u)  | ((bits & 0xAAAAAAAAu) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u)  | ((bits & 0xCCCCCCCCu) >> 2u);
+    bits = ((bits & 0x0F0F0F0Fu) << 4u)  | ((bits & 0xF0F0F0F0u) >> 4u);
+    bits = ((bits & 0x00FF00FFu) << 8u)  | ((bits & 0xFF00FF00u) >> 8u);
+    return float(bits) * 2.3283064365386963e-10; // / 2^32
 }
+
+
+// Generic radical inverse for arbitrary integer base. Used for the
+// higher-dimensional Halton sequence (bases 3, 5, 7).
+// `base` is a compile-time constant at every call site below, so the
+// inliner constant-folds the divides into multiply-by-magic-number.
+float radicalInverseN(uint i, uint base)
+{
+    float invBase  = 1.0 / (float)base;
+    float invBaseN = invBase;
+    float result   = 0.0;
+    [loop]
+    while (i > 0u)
+    {
+        result   += (float)(i % base) * invBaseN;
+        i        /= base;
+        invBaseN *= invBase;
+    }
+    return result;
+}
+
+// 5D Halton-style sample for environment integration:
+//   dim 0 (i/N)  -> sphere z   (perfect stratification of cos θ)
+//   dim 1 (b=2)  -> sphere phi
+//   dim 2 (b=3)  -> origin offset x
+//   dim 3 (b=5)  -> origin offset y
+//   dim 4 (b=7)  -> origin offset z
+//
+// `cpDir` / `cpOrigin` are per-voxel Cranley–Patterson rotations applied
+// independently in each dimension. They preserve the N-stratum structure of
+// the sequence per voxel while decorrelating neighbours.
+struct EnvHaltonSample
+{
+    float3 direction;
+    float3 originOffset;   // in [-1, 1]^3 (scale by HalfVoxelSize at call site)
+};
+
+EnvHaltonSample envHalton5D(uint globalIdx, uint N,
+                              float2 cpDir, float3 cpOrigin)
+{
+    float h0 = frac((float)globalIdx / (float)N    + cpDir.x);
+    float h1 = frac(radicalInverse_VdC(globalIdx)  + cpDir.y);
+    float h2 = frac(radicalInverseN(globalIdx, 3u) + cpOrigin.x);
+    float h3 = frac(radicalInverseN(globalIdx, 5u) + cpOrigin.y);
+    float h4 = frac(radicalInverseN(globalIdx, 7u) + cpOrigin.z);
+
+    float z   = 1.0 - 2.0 * h0;
+    float r   = sqrt(saturate(1.0 - z * z));
+    float phi = 2.0 * M_PI * h1;
+
+    EnvHaltonSample s;
+    s.direction    = float3(r * cos(phi), r * sin(phi), z);
+    s.originOffset = float3(h2, h3, h4) * 2.0 - 1.0;
+    return s;
+}
+
+// -----------------------------------------------------------------------------
+// Cookie helpers
+// -----------------------------------------------------------------------------
 
 float3 RotateByQuat(float3 v, float4 q)
 {
-    // q assumed normalized, (x,y,z,w)
     float3 t = 2.0 * cross(q.xyz, v);
     return v + q.w * t + cross(q.xyz, t);
 }
@@ -236,23 +252,16 @@ float3 EvalPointCookieRGB(float3 voxelWS, uint lightIdx)
     if (layer < 0.0) return 1.0;
 
     float strength = saturate(PLD[lightIdx].CookieData.y);
-
-    // direction from light -> point, then rotate into light local space
     float3 dirWS = normalize(voxelWS - PLD[lightIdx].PointLightsWS);
     float3 dirLS = RotateByQuat(dirWS, PLD[lightIdx].CookieRotInv);
-
     float3 cookie = _PointCookies.SampleLevel(sampler_PointCookies, float4(dirLS, layer), 0).rgb;
     return lerp(1.0, cookie, strength);
 }
 
-
-///COOKIE HELPERS///
 float3 SampleCookie2D(float2 uv, float4 cookieData)
 {
     int layer = (int)cookieData.x;
     if (layer < 0) return 1.0.xxx;
-
-    // match typical cookie behavior: outside = no light
     if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1) return 0.0.xxx;
 
     float strength = saturate(cookieData.y);
@@ -262,18 +271,16 @@ float3 SampleCookie2D(float2 uv, float4 cookieData)
 
 float3 ConeCookieAt(float3 voxelWS, uint num)
 {
-    // vector from light to voxel
     float3 toP = voxelWS - CLD[num].ConeLightsWS;
 
     float x = dot(toP, CLD[num].CookieRightWS);
     float y = dot(toP, CLD[num].CookieUpWS);
-    float z = dot(toP, CLD[num].ConeLightsDir);   // forward axis
+    float z = dot(toP, CLD[num].ConeLightsDir);
 
     if (z <= 1e-5f) return 0.0.xxx;
 
-    // derive tan(halfAngle) from outerCos (cosHalfAngle)
     float outerCos = saturate(CLD[num].ConeLightsPram.x);
-    float tanHalf = sqrt(max(1.0f - outerCos * outerCos, 0.0f)) / max(outerCos, 1e-4f);
+    float tanHalf  = sqrt(max(1.0f - outerCos * outerCos, 0.0f)) / max(outerCos, 1e-4f);
 
     float2 uv = (float2(x, y) / (z * tanHalf)) * 0.5f + 0.5f;
     return SampleCookie2D(uv, CLD[num].CookieData);
@@ -283,10 +290,8 @@ float3 DirCookieAt(float3 voxelWS, uint num)
 {
     float cookieSize = max(DLD[num].CookieData.z, 1e-4f);
     float3 toP = voxelWS - DLD[num].CookiePosWS;
-
     float x = dot(toP, DLD[num].CookieRightWS);
     float y = dot(toP, DLD[num].CookieUpWS);
-
     float2 uv = float2(x, y) / cookieSize + 0.5f;
     return SampleCookie2D(uv, DLD[num].CookieData);
 }
@@ -294,31 +299,36 @@ float3 DirCookieAt(float3 voxelWS, uint num)
 float3 AreaCookieRectAt(uint num, float2 offsetXY)
 {
     float2 wh = max(float2(ALD[num].AreaLightsSize.x, ALD[num].AreaLightsSize.y), 1e-4.xx);
-    // offsetXY is in [-0.5*w,0.5*w] / [-0.5*h,0.5*h]
     float2 uv = offsetXY / wh + 0.5.xx;
-    uv.x = 1-uv.x;
+    uv.x = 1 - uv.x;
     return SampleCookie2D(uv, ALD[num].CookieData);
 }
 
 float3 AreaCookieDiscAt(uint num, float2 offsetXY)
 {
-    float r = max(ALD[num].AreaLightsSize.x, 1e-4); // you use x as radius for discs
-    // offsetXY is in [-r, r]
+    float r = max(ALD[num].AreaLightsSize.x, 1e-4);
     float2 uv = (offsetXY / (2.0 * r)) + 0.5.xx;
     return SampleCookie2D(uv, ALD[num].CookieData);
 }
 
-//RTgems 3.11 FIBONACCI SPHERE
-//current index, number of samples
- float3 sphericalFibonacci(float i, float n) 
- {
-     const float PHI = sqrt(5.) * 0.5f + 0.5f;
-     float fraction = (i * (PHI - 1)) - floor(i * (PHI - 1));
-     float phi = 2.f * M_PI * fraction;
-     float cosTheta = 1.f - (2.f * i + 1.f) * (1.f / n);
-     float sinTheta = sqrt(saturate(1.f - cosTheta*cosTheta));
-    
-     return float3(cos(phi) * sinTheta , sin(phi) * sinTheta , cosTheta);
+// Concentric (Shirley) disk mapping
+float2 ConcentricSampleDisk(float2 u)
+{
+    float2 uOffset = 2.0 * u - 1.0;
+    if (uOffset.x == 0 && uOffset.y == 0) return float2(0, 0);
+
+    float theta, r;
+    if (abs(uOffset.x) > abs(uOffset.y))
+    {
+        r = uOffset.x;
+        theta = (M_PI * 0.25) * (uOffset.y / uOffset.x);
+    }
+    else
+    {
+        r = uOffset.y;
+        theta = (M_PI * 0.5) - (M_PI * 0.25) * (uOffset.x / uOffset.y);
+    }
+    return r * float2(cos(theta), sin(theta));
 }
 
 ///
@@ -477,9 +487,9 @@ float4 DirLightCast(float3 VoxelWS, uint Num, uint sampleCount = 8)
         float3 origin = VoxelWS + originJitter;
 
         // Concentric disk sample, then tilt L by that offset scaled by angularRadius
-        float2 xi = rand2(seed + s * 7);
+            float2 xi = rand2(seed + s * 7);
         float r = sqrt(xi.x) * angularRadius;
-        float theta = 6.2831853 * xi.y;
+            float theta = 6.2831853 * xi.y;
         float3 rayDir = normalize(L + (tangent * cos(theta) + bitangent * sin(theta)) * r);
 
         RayDesc ray;
@@ -492,7 +502,7 @@ float4 DirLightCast(float3 VoxelWS, uint Num, uint sampleCount = 8)
         payload.color = float4(0, 0, 0, 1);
 
         TraceRay(g_SceneAccelStruct,
-                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                 RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
                  0xFF, 0, 1, 0, ray, payload);
 
         float shadow = 1 - payload.color.a;
@@ -505,18 +515,18 @@ float4 DirLightCast(float3 VoxelWS, uint Num, uint sampleCount = 8)
     return accum / max(1u, sampleCount);
 }
 
-//
-//Area Light
-//
+// -----------------------------------------------------------------------------
+// Area lights
+// -----------------------------------------------------------------------------
 
-float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
+float4 AreaLightCast(float3 origin, uint Num, int startIdx, int endIdx)
 {
     float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3],
                           ALD[Num].AreaLightsMatrix[1][3],
                           ALD[Num].AreaLightsMatrix[2][3]);
 
-    float3 VoxelLS = mul(float4(VoxelWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-    if (VoxelLS.z <= 0) return 0; // behind the emitter plane
+    float3 VoxelLS = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+    if (VoxelLS.z <= 0) return 0;
 
     uint3 id = DispatchRaysIndex().xyz;
     uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
@@ -527,18 +537,11 @@ float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
     float invK = 1.0 / (float)kSide;
 
     float2 sizeXY = float2(ALD[Num].AreaLightsSize.x, ALD[Num].AreaLightsSize.y);
-    //float  area   = sizeXY.x * sizeXY.y;
 
     float4 accum = 0;
 
     for (int j = startIdx; j < endIdx; ++j)
     {
-        // --- Origin jitter inside the voxel ---
-        float3 originJitter = (rand3(seed + (uint)j * 131u) - 0.5) * HalfVoxelSize * 2;
-        float3 jitteredOriginWS = VoxelWS + originJitter;
-        float3 jitteredOriginLS = mul(float4(jitteredOriginWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-
-        // --- Stratified emitter sample ---
         int sx = j % kSide;
         int sy = (j / kSide) % kSide;
         float2 xi = rand2(seed + (uint)j * 6151u);
@@ -549,19 +552,19 @@ float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
         float3 cookie = AreaCookieRectAt(Num, offsetXY);
         if (all(cookie == 0)) continue;
 
-        float3 LocalLightPos = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+        float3 VoxelLS_j = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+        float3 LocalLightPos    = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
         float3 LightPosSampleLS = LocalLightPos + float3(offsetXY, 0);
 
-        float3 toLightLS = LightPosSampleLS - jitteredOriginLS;
+        float3 toLightLS = LightPosSampleLS - VoxelLS_j;
         float  dist      = length(toLightLS);
         float3 rayDirLS  = toLightLS / dist;
 
-        // Lambertian emitter cosine (emitter normal is +Z in light-local space)
         float cosEmitter = saturate(dot(float3(0, 0, 1), -rayDirLS));
         if (cosEmitter <= 0) continue;
 
         RayDesc ray;
-        ray.Origin    = jitteredOriginWS;
+        ray.Origin    = origin;
         ray.Direction = mul(rayDirLS, ALD[Num].AreaLightsMatrixInv);
         ray.TMin      = 1e-3f;
         ray.TMax      = dist - 1e-3f;
@@ -570,7 +573,7 @@ float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
         payload.color = float4(0, 0, 0, 1);
 
         TraceRay(g_SceneAccelStruct,
-                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                 RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
                  0xFF, 0, 1, 0, ray, payload);
 
         float vis = 1 - payload.color.a;
@@ -588,71 +591,42 @@ float4 AreaLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
     return accum;
 }
 
-//
-//Disk light
-//
-
-// Concentric (Shirley) mapping from [0,1]^2 -> unit disc, low distortion
-float2 ConcentricSampleDisk(float2 u)
-{
-    float2 uOffset = 2.0 * u - 1.0;
-    if (uOffset.x == 0 && uOffset.y == 0) return float2(0, 0);
-
-    float theta, r;
-    if (abs(uOffset.x) > abs(uOffset.y))
-    {
-        r = uOffset.x;
-        theta = (M_PI * 0.25) * (uOffset.y / uOffset.x);
-    }
-    else
-    {
-        r = uOffset.y;
-        theta = (M_PI * 0.5) - (M_PI * 0.25) * (uOffset.x / uOffset.y);
-    }
-    return r * float2(cos(theta), sin(theta));
-}
-
-float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
+float4 DiscLightCast(float3 origin, uint Num, int startIdx, int endIdx)
 {
     float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3],
                           ALD[Num].AreaLightsMatrix[1][3],
                           ALD[Num].AreaLightsMatrix[2][3]);
 
-    float3 VoxelLS = mul(float4(VoxelWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+    float3 VoxelLS = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
     if (VoxelLS.z <= 0) return 0;
 
     uint3 id = DispatchRaysIndex().xyz;
     uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
     seed ^= Num * 0xa511e9b3u;
 
-    int kSide = max(1, (int)floor(sqrt((float)AreaLightSamples)));
-    float invK = 1.0 / (float)kSide;
+    int   kSide = max(1, (int)floor(sqrt((float)AreaLightSamples)));
+    float invK  = 1.0 / (float)kSide;
 
     float radius = max(ALD[Num].AreaLightsSize.x, 1e-4);
-    //float area   = M_PI * radius * radius;
 
     float4 accum = 0;
 
     for (int j = startIdx; j < endIdx; ++j)
     {
-        float3 originJitter = (rand3(seed + (uint)j * 131u) - 0.5) * HalfVoxelSize * 2;
-        float3 jitteredOriginWS = VoxelWS + originJitter;
-        float3 jitteredOriginLS = mul(float4(jitteredOriginWS, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-
-        // Stratified [0,1]^2, then concentric mapping to the disc
         int sx = j % kSide;
         int sy = (j / kSide) % kSide;
         float2 xi = rand2(seed + (uint)j * 6151u);
         float2 stratified = (float2(sx, sy) + xi) * invK;
-        float2 discXY = ConcentricSampleDisk(stratified) * radius;
+        float2 discXY     = ConcentricSampleDisk(stratified) * radius;
 
         float3 cookie = AreaCookieDiscAt(Num, discXY);
         if (all(cookie == 0)) continue;
 
-        float3 LocalLightPos = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+        float3 VoxelLS_j = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
+        float3 LocalLightPos    = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
         float3 LightPosSampleLS = LocalLightPos + float3(discXY, 0);
 
-        float3 toLightLS = LightPosSampleLS - jitteredOriginLS;
+        float3 toLightLS = LightPosSampleLS - VoxelLS_j;
         float  dist      = length(toLightLS);
         float3 rayDirLS  = toLightLS / dist;
 
@@ -660,7 +634,7 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
         if (cosEmitter <= 0) continue;
 
         RayDesc ray;
-        ray.Origin    = jitteredOriginWS;
+        ray.Origin    = origin;
         ray.Direction = mul(rayDirLS, ALD[Num].AreaLightsMatrixInv);
         ray.TMin      = 1e-3f;
         ray.TMax      = dist - 1e-3f;
@@ -669,13 +643,12 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
         payload.color = float4(0, 0, 0, 1);
 
         TraceRay(g_SceneAccelStruct,
-                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+                 RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
                  0xFF, 0, 1, 0, ray, payload);
 
-        float vis = 1 - payload.color.a;
-
+        float vis       = 1 - payload.color.a;
         float safeDist2 = max(dist * dist, HalfVoxelSize * HalfVoxelSize);
-        float G = cosEmitter / safeDist2;
+        float G         = cosEmitter / safeDist2;
 
         float4 contrib = vis * G * M_INVPI * ALD[Num].AreaLightsColor;
         contrib.rgb *= cookie;
@@ -685,150 +658,155 @@ float4 DiscLightCast(float3 VoxelWS, uint Num, int startIdx, int endIdx)
 
     return accum;
 }
-
-
-// Replace sampleUniformSphere with stratified version
-float3 sampleStratifiedSphere(uint sampleIdx, uint totalSamples, inout uint state)
+// -----------------------------------------------------------------------------
+// Environment
+//
+// 5D Halton over (sphere_z, sphere_phi, origin_xyz). Per-voxel CP rotation in
+// every dimension keeps the N-stratum structure intact across dispatches while
+// decorrelating neighbours, and the origin dimension resolves sub-voxel
+// visibility transitions (thin geometry edges, window frames) without breaking
+// direction-axis stratification.
+//
+// Estimator:  J(x) = (1/4pi) integral L(omega) V(x,omega) domega
+//                 ~= (1/N_total) Sum_i L_i V_i
+// (uniform sphere pdf 1/(4pi) cancels with the 1/(4pi) integrand weight.)
+//
+// Takes the *unjittered* voxel centre and does its own per-sample origin
+// jitter inside the cell.
+// -----------------------------------------------------------------------------
+float4 EnvCast(float3 voxelCenter, int globalStart, int globalEnd, uint totalEnvSamples)
 {
-    // Find a kz × kphi grid where kz*kphi ≈ totalSamples, kphi ≈ 2*kz (sphere aspect)
-    uint kz = max(1u, (uint)floor(sqrt((float)totalSamples * 0.5)));
-    uint kphi = max(1u, totalSamples / kz);
+    if (globalEnd <= globalStart || totalEnvSamples == 0) return 0;
 
-    uint iz = sampleIdx % kz;
-    uint iphi = (sampleIdx / kz) % kphi;
+    uint3 id = DispatchRaysIndex().xyz;
+    uint vseed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
 
-    float u1 = (iz + rand01(state)) / (float)kz;
-    float u2 = (iphi + rand01(state)) / (float)kphi;
+    // 5D per-voxel CP rotation, stable across dispatches for the same voxel.
+    float2 cpDir    = rand2(vseed ^ 0xC0FFEEu);
+    float3 cpOrigin = rand3(vseed ^ 0xBADF00Du);
 
-    float z = 1.0 - 2.0 * u1;
-    float r = sqrt(saturate(1.0 - z * z));
-    float phi = 2.0 * M_PI * u2;
-    return float3(r * cos(phi), r * sin(phi), z);
+    float4 accum = 0;
+
+    for (int g = globalStart; g < globalEnd; ++g)
+    {
+        EnvHaltonSample h = envHalton5D((uint)g, totalEnvSamples, cpDir, cpOrigin);
+        float3 origin     = voxelCenter + h.originOffset * HalfVoxelSize;
+
+        RayDesc ray;
+        ray.Origin    = origin;
+        ray.Direction = h.direction;
+        ray.TMin      = 1e-3f;
+        ray.TMax      = 100000.0f;
+
+        RayPayload payload;
+        payload.color = 0;
+        payload.dir   = h.direction;
+
+        const uint missShaderIndex = 1;
+        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+
+        accum += payload.color;
+    }
+
+    return accum / (float)totalEnvSamples;
 }
 
-//Cast Ray from vox to env
-
-float4 EnvCast(float3 VoxelWS, int startIdx, int endIdx)
- {
-     int sampleCount = endIdx - startIdx;
-     if (sampleCount <= 0)
-         return 0;
- 
-     // Per-voxel seed based on 3D ray index + sample window
-     uint3 id = DispatchRaysIndex().xyz;
-     uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
-     seed ^= (uint)startIdx * 0x9e3779b9u;
- 
-     float4 Accumulation = 0;
- 
-     // Use sampleCount actual samples, ignore the absolute j index
-     for (int s = 0; s < sampleCount; ++s)
-     {
-         //float3 rayDirection = sampleUniformSphere(seed);
-         float3 rayDirection = sampleStratifiedSphere(s, (uint)sampleCount, seed);
-
-         // Jitter origin within the voxel cell, [-0.5, 0.5] per axis
-        float3 jitter = (rand3(seed)-.5) * HalfVoxelSize*2;
-
-         RayDesc ray;
-         ray.Origin    = VoxelWS + jitter;
-         ray.Direction = rayDirection;
-         ray.TMin      = 1e-3f;       // avoid self-hits
-         ray.TMax      = 100000.0f;
- 
-         RayPayload payload;
-         payload.color = 0;
-         payload.dir   = rayDirection;
-
-         uint missShaderIndex = 1;
-         TraceRay(g_SceneAccelStruct, 0 , 0xFF, 0, 1, missShaderIndex, ray, payload);
-
-         payload.color *= M_INVPI;
-         Accumulation += payload.color;
-     }
- 
-     return Accumulation / max(1, sampleCount);
- }
-
-// [shader("closesthit")]
-// void MyClosestHit(inout RayPayload data,
-// BuiltInTriangleIntersectionAttributes attribs) {
-// data.color = float4( 1, 0, 0, 1 );
-// }
-
-//
-// Main shader
-//
+// -----------------------------------------------------------------------------
+// Ray generation
+// -----------------------------------------------------------------------------
 
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    uint3 launchIndex = DispatchRaysIndex().xyz ; //id
-    float3 launchDim = (float3)(DispatchRaysDimensions().xyz); //whd
-    float3 VoxelWorldPosition = WPosition + Size * ( ((float3)launchIndex + 0.5 ) / launchDim );
+    uint3 launchIndex = DispatchRaysIndex().xyz;
+    float3 launchDim  = (float3)(DispatchRaysDimensions().xyz);
 
-	float4 LightAccumulation = float4(0,0,0,0);
+    // Unjittered geometric centre of this voxel — env uses this directly and
+    // does its own 5D-stratified per-sample origin jitter inside the cell.
+    float3 VoxelCenter =
+        WPosition + Size * (((float3)launchIndex + 0.5) / launchDim);
 
-    
-	int start = StartRayIdx;
-	int end = StartRayIdx + PerDispatchRayCount;
-	int maxIter = min(PointLightCount, end);
-    
-	for (int i = start; i < maxIter; i++) LightAccumulation += PointLightCast(VoxelWorldPosition, i);
-	
-    
-	start = max(0, start - (int)PointLightCount);
-	end -= PointLightCount;
-	maxIter = min(ConeLightCount, end);
-	for (int i = start; i < maxIter; i++)  LightAccumulation += ConeLightCast(VoxelWorldPosition, i); 
+    // Single per-voxel origin jitter, shared across direct lights this dispatch.
+    // Stable across dispatches via StartRayIdx-free seed (otherwise different
+    // dispatches would jitter to different cells and the accumulation would be
+    // biased).
+    uint voxelSeed = launchIndex.x * 73856093u
+                   ^ launchIndex.y * 19349663u
+                   ^ launchIndex.z * 83492791u;
+    float3 jitter = (rand3(voxelSeed ^ 0x5F3759DFu) - 0.5) * HalfVoxelSize * 2;
 
-	start = max(0, start - (int)ConeLightCount);
-	end -= ConeLightCount;
-	maxIter = min(DirLightCount, end - 1);
-	for (int i = start; i < maxIter; i++)   LightAccumulation += DirLightCast(VoxelWorldPosition, i);
+    float3 VoxelWorldPosition = VoxelCenter + jitter;
 
-    
-	start = max(0, start - (int)DirLightCount);
-	end -= (int)DirLightCount;
-	maxIter = min(EnvLightSamples, end);
+    float4 LightAccumulation = float4(0, 0, 0, 0);
+
+    // -------- Per-dispatch ray-budget partitioning --------
     int globalBegin = StartRayIdx;
     int globalEnd   = StartRayIdx + PerDispatchRayCount;
-    
+
     int pointBegin = 0;
     int coneBegin  = pointBegin + (int)PointLightCount;
     int dirBegin   = coneBegin  + (int)ConeLightCount;
     int envBegin   = dirBegin   + (int)DirLightCount;
     int areaBegin  = envBegin   + (int)EnvLightSamples;
     int areaEnd    = areaBegin  + (int)AreaLightCount * (int)AreaLightSamples;
-    
-    // Env
-    int envLocalBegin = max(globalBegin, envBegin) - envBegin;
-    int envLocalEnd   = min(globalEnd,   areaBegin) - envBegin;
-    if (envLocalBegin < envLocalEnd)
-        LightAccumulation += EnvCast(VoxelWorldPosition, envLocalBegin, envLocalEnd);
-    
-    // Area lights
-    int areaLocalBegin = max(globalBegin, areaBegin) - areaBegin;
-    int areaLocalEnd   = min(globalEnd,   areaEnd)   - areaBegin;
-    if (areaLocalBegin < areaLocalEnd)
+
+    // -------- Punctual lights (one sample = one full light cast) --------
     {
-        int firstLight = areaLocalBegin / (int)AreaLightSamples;
-        int lastLight  = (areaLocalEnd - 1) / (int)AreaLightSamples;
-    
-        for (int light = firstLight; light <= lastLight && light < (int)AreaLightCount; ++light)
+        int start   = globalBegin;
+        int end     = globalEnd;
+        int maxIter = min((int)PointLightCount, end);
+        for (int i = max(start, 0); i < maxIter; ++i)
+            LightAccumulation += PointLightCast(VoxelWorldPosition, i);
+    }
+    {
+        int start   = max(0, globalBegin - (int)PointLightCount);
+        int end     = globalEnd - (int)PointLightCount;
+        int maxIter = min((int)ConeLightCount, end);
+        for (int i = start; i < maxIter; ++i)
+            LightAccumulation += ConeLightCast(VoxelWorldPosition, i);
+    }
+    {
+        int start   = max(0, globalBegin - (int)PointLightCount - (int)ConeLightCount);
+        int end     = globalEnd - (int)PointLightCount - (int)ConeLightCount;
+        int maxIter = min((int)DirLightCount, end);
+        for (int i = start; i < maxIter; ++i)
+            LightAccumulation += DirLightCast(VoxelWorldPosition, i);
+    }
+
+    // -------- Environment (5D Halton over direction x origin) --------
+    {
+        int envLocalBegin = max(globalBegin, envBegin)  - envBegin;
+        int envLocalEnd   = min(globalEnd,   areaBegin) - envBegin;
+        if (envLocalBegin < envLocalEnd && EnvLightSamples > 0)
+            LightAccumulation += EnvCast(VoxelCenter,
+                                         envLocalBegin, envLocalEnd,
+                                         EnvLightSamples);
+    }
+
+    // -------- Area lights --------
+    {
+        int areaLocalBegin = max(globalBegin, areaBegin) - areaBegin;
+        int areaLocalEnd   = min(globalEnd,   areaEnd)   - areaBegin;
+        if (areaLocalBegin < areaLocalEnd && AreaLightSamples > 0)
         {
-            int localBegin = (light == firstLight) ? (areaLocalBegin % (int)AreaLightSamples) : 0;
-            int localEnd   = (light == lastLight)  ? ((areaLocalEnd - 1) % (int)AreaLightSamples) + 1
-                                                   : (int)AreaLightSamples;
-    
-            if (ALD[light].AreaLightsSize.z == 0)
-                LightAccumulation += AreaLightCast(VoxelWorldPosition, light, localBegin, localEnd);
-            else
-                LightAccumulation += DiscLightCast(VoxelWorldPosition, light, localBegin, localEnd);
+            int firstLight = areaLocalBegin / (int)AreaLightSamples;
+            int lastLight  = (areaLocalEnd - 1) / (int)AreaLightSamples;
+
+            for (int light = firstLight; light <= lastLight && light < (int)AreaLightCount; ++light)
+            {
+                int localBegin = (light == firstLight)
+                    ? (areaLocalBegin % (int)AreaLightSamples) : 0;
+                int localEnd   = (light == lastLight)
+                    ? ((areaLocalEnd - 1) % (int)AreaLightSamples) + 1
+                    : (int)AreaLightSamples;
+
+                if (ALD[light].AreaLightsSize.z == 0)
+                    LightAccumulation += AreaLightCast(VoxelWorldPosition, light, localBegin, localEnd);
+                else
+                    LightAccumulation += DiscLightCast(VoxelWorldPosition, light, localBegin, localEnd);
+            }
         }
     }
-    
 
-  //  LightAccumulation.a = 1; //filling alpha
-    g_Output[launchIndex] =  g_Output[launchIndex] + LightAccumulation;
+    g_Output[launchIndex] = g_Output[launchIndex] + LightAccumulation;
 }

@@ -10,7 +10,7 @@ using Debug = UnityEngine.Debug;
 public sealed class UnityOpenCLKernelPatchWindow : EditorWindow
 {
     private const string WindowTitle = "OpenCL Kernel Patch";
-    private const string MenuPath = "Tools/OpenCL Kernel Patch";
+    private const string MenuPath = "Stress Level Zero/Graphics/OpenCL Kernel Patch";
 
     // Project-relative paths
     private const string FixRelativePath   = "Tools~/raw/directLighting.h";

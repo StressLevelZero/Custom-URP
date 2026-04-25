@@ -18,6 +18,7 @@ namespace SLZ.SLZEditorTools
         }
 #if UNITY_EDITOR
         public TransparentMaterialSlot[] transparentMaterials;
+        [HideInInspector] public Material[] originalMaterials;
 #endif
     }
 }

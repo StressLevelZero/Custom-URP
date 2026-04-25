@@ -4,6 +4,12 @@
 
 //#!INJECT_BEGIN MATERIAL_CBUFFER_EARLY 0
 	half4x4 EllipsoidPosArray[HitMatrixCount];
-	int _NumberOfHits;
+//#!INJECT_END
+
+//#!INJECT_BEGIN MATERIAL_CBUFFER_HALF_VECTORS 0
 	half4 _HitColor;
+//#!INJECT_END
+
+//#!INJECT_BEGIN MATERIAL_CBUFFER_FLOAT_SCALARS 0
+	int _NumberOfHits;
 //#!INJECT_END

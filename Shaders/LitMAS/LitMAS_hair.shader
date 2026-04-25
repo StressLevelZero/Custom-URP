@@ -33,6 +33,7 @@ Shader "WIP/SLZ/LitMAS/LitMAS Hair"
 
 HLSLINCLUDE
 #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+#define CBUFFER_PATH "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/hairCBuffer.hlsl"
 ENDHLSL
 
         Pass
@@ -54,7 +55,7 @@ ENDHLSL
             #define LITMAS_FEATURE_SSR
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
-            #include_with_pragmas "LitMASInclude/ShaderInjector/hairForward.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/hairForward.hlsl"
 
             ENDHLSL
         }
@@ -72,7 +73,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include_with_pragmas "LitMASInclude/DepthOnly.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/DepthOnly.hlsl" 
 
             ENDHLSL
         }
@@ -92,7 +93,7 @@ ENDHLSL
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include_with_pragmas "LitMASInclude/DepthNormals.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/DepthNormals.hlsl" 
 
             ENDHLSL
         }
@@ -114,7 +115,7 @@ ENDHLSL
             #pragma fragment frag
             #pragma multi_compile _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include_with_pragmas "LitMASInclude/ShadowCaster.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShadowCaster.hlsl" 
 
             ENDHLSL
         }   
@@ -141,7 +142,7 @@ ENDHLSL
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
 
-            #include_with_pragmas "LitMASInclude/MetaPass.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/MetaPass.hlsl" 
             ENDHLSL
         }
 
@@ -152,7 +153,7 @@ ENDHLSL
             Tags{ "LightMode" = "BakedRaytrace" }
             HLSLPROGRAM
 
-            #include_with_pragmas "LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/BakedRayTrace.hlsl"
 
             ENDHLSL
         }

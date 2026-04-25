@@ -1,5 +1,35 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-788196739216993199
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c48a9123746096e418df387956e63d5f, type: 3}
+  m_Name: VolumetricRenderingFeature_2022
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  settings:
+    volumetricData: {fileID: 11400000, guid: 9aa770ca8d706d24aa3f993a2394fd83, type: 2}
+    froxelFogCompute: {fileID: 7200000, guid: 62ecf5c506e2b9d4db18e8e96a92107f, type: 3}
+    froxelIntegrationCompute: {fileID: 7200000, guid: c6ab875809b37f5489628e8a3ed0ae94,
+      type: 3}
+    clipmapCompute: {fileID: 7200000, guid: a273e9d897989a74fbff10054c9b4fed, type: 3}
+    passEvent: 100
+    maxClipmapBuildStepsPerFrame: 8
+    runInSceneView: 1
+    sliceDistributionUniformity: 0.05
+    foveationEnabled: 1
+    foveationInnerRadius: 0.3
+    foveationOuterRadius: 0.4
+    bakedTurbulence: 5
+    panic: 0
+    enableVolumetricsKeyword: 1
+    enableHiQSamplingKeyword: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16,9 +46,11 @@ MonoBehaviour:
     debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7,
       type: 3}
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
+  m_RendererFeatures:
+  - {fileID: -788196739216993199}
+  m_RendererFeatureMap: 5194d9e13dc30ff5
   m_UseNativeRenderPass: 0
+  m_UseNativeRenderPassSLZ: 0
   textures:
     blueNoiseRGBA: {fileID: 18700000, guid: 1b2caf7a618cad3419945d7ef3a5858b, type: 2}
     blueNoiseR: {fileID: 18700000, guid: 712b2d2a3c1660c429e2748554a1c72c, type: 2}
