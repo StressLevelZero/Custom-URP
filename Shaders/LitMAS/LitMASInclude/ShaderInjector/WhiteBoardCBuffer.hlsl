@@ -1,0 +1,34 @@
+/*-----------------------------------------------------------------------------------------------------*
+ *-----------------------------------------------------------------------------------------------------*
+ * WARNING: THIS FILE WAS CREATED WITH SHADERINJECTOR, AND SHOULD NOT BE EDITED DIRECTLY. MODIFY THE   *
+ * BASE INCLUDE AND INJECTED FILES INSTEAD, AND REGENERATE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   *
+ *-----------------------------------------------------------------------------------------------------*
+ *-----------------------------------------------------------------------------------------------------*/
+
+
+
+cbuffer UnityPerMaterial 
+{
+    float4 _BaseMap_ST;
+// Begin Injection MATERIAL_CBUFFER_FLOAT_VECTORS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+    float4 _DetailMap_ST;
+    //half4  _DetailScale;
+// End Injection MATERIAL_CBUFFER_FLOAT_VECTORS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER_FLOAT_VECTORS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
+	float4 _PenMap_ST;
+// End Injection MATERIAL_CBUFFER_FLOAT_VECTORS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
+    half4 _BaseColor;
+// Begin Injection MATERIAL_CBUFFER_HALF_VECTORS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
+	half4  _PenMonoColor;
+// End Injection MATERIAL_CBUFFER_HALF_VECTORS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
+    int _Surface;
+// Begin Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
+    half  _Normals;
+// End Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+    half  _Details;
+// End Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
+// Begin Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
+	half  _PenMono;
+// End Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
+};

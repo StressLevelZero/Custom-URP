@@ -148,6 +148,8 @@ half4 GetALChannelValue(half2 audioLinkMask, half channelValue, half4 channelCol
 	return a * (aNoise + aMain);
 }
 
+half4 GetSSSColor() {return (half4)0;}
+
 // End Injection FUNCTIONS from Injection_AudioLink.hlsl ----------------------------------------------------------
 
 VertOut vert(VertIn v)

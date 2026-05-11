@@ -21,6 +21,10 @@ Shader "SLZ/LitMAS/LitMAS Whiteboard"
     }
     SubShader
     {
+HLSLINCLUDE
+#define CBUFFER_PATH "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/WhiteboardCBuffer.hlsl"
+ENDHLSL
+
         Tags {"RenderPipeline" = "UniversalPipeline"  "RenderType" = "Opaque" "Queue" = "Geometry" "DisableBatching"="True"}
         //Blend One Zero
 		//ZWrite On

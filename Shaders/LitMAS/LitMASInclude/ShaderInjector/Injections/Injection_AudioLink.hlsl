@@ -58,6 +58,8 @@ half4 GetALChannelValue(half2 audioLinkMask, half channelValue, half4 channelCol
 	return a * (aNoise + aMain);
 }
 
+half4 GetSSSColor() {return (half4)0;}
+
 //#!INJECT_END
 
 //#!INJECT_BEGIN EMISSION 0

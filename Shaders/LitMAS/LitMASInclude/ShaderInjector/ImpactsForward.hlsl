@@ -169,6 +169,12 @@ TEXTURE2D(_EmissionMap);
 #include CBUFFER_PATH
 #endif
 
+// Begin Injection FUNCTIONS from Injection_Impacts.hlsl ----------------------------------------------------------
+half4 GetSSSColor()
+{
+	return _SSSColor;
+}
+// End Injection FUNCTIONS from Injection_Impacts.hlsl ----------------------------------------------------------
 
 VertOut vert(VertIn v)
 {

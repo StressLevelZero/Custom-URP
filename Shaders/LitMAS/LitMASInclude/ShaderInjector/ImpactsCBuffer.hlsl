@@ -23,6 +23,7 @@ cbuffer UnityPerMaterial
     half4 _BaseColor;
 // Begin Injection MATERIAL_CBUFFER_HALF_VECTORS from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 	half4 _HitColor;
+	half4 _SSSColor;
 // End Injection MATERIAL_CBUFFER_HALF_VECTORS from Injection_Impacts_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER_HALF_VECTORS from Injection_Emission_CBuffer.hlsl ----------------------------------------------------------
 	half4 _EmissionColor;

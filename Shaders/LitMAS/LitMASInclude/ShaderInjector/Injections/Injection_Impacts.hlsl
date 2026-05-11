@@ -6,6 +6,13 @@
 //#!TEXCOORD float3 unskinnedObjPos 1
 //#!INJECT_END
 
+//#!INJECT_BEGIN FUNCTIONS 0 
+half4 GetSSSColor()
+{
+	return _SSSColor;
+}
+//#!INJECT_END
+
 //#!INJECT_BEGIN VERTEX_END 1
 	o.unskinnedObjPos = v.uv1.xyz;
 //#!INJECT_END

@@ -7,12 +7,14 @@
 #define M_PI  3.1415926535897932384626433832795		//Standard stored Pi.
 #define PI_x4 12.566370614359172953850573533118		//For inverse square.
 #define PI_R  0.31830988618f                        //Reciprocal
-#define PI_R_REAL real(0.318309886183790672)
+#define PI_R_REAL half(0.318309886183790672)
 
 #if defined(_BRDFMAP)
 TEXTURE2D(g_tBRDFMap); //Force sampler state to avoid wrapping issues
-float3 _SSSColor;
 #endif
+
+// Must be defined by shader to return the SSS color material property
+half4 GetSSSColor();
 
 //Extention Libary to add into pipeline. Should make future package upgrading simpler.
 
@@ -76,13 +78,13 @@ void BlendFluorescence(inout half3 Diffuse, half4 LightColors, half4 absorbance,
     #endif
 }
 
-float GGXTerm (half3 N, half3 H, half NdotH, half roughness)
+half GGXTerm (half3 N, half3 H, half NdotH, half roughness)
 {
      //float d = (NdotH * a2 - NdotH) * NdotH + 1.0f; // 2 mad
     half3 NxH = cross(N,H);
 	half NxH2 = dot(NxH, NxH);
     half a = NdotH * roughness;
-    half d = roughness / max(a * a + NxH2, REAL_MIN);
+    half d = roughness / max(a * a + NxH2, HALF_MIN);
     half d2 = (d * d * PI_R_REAL);
     return d2; // This function is not intended to be running on Mobile,
                                                 // therefore epsilon is smaller than what can be represented by half
@@ -136,7 +138,7 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
 //	return interpolated;
 //}
 //Making a copy from the core to avoid sampling the directional map twice
- real4 SampleDirectionalLightmapSLZ(TEXTURE2D_PARAM(lightmapTex, lightmapSampler), TEXTURE2D_PARAM(lightmapDirTex, lightmapDirSampler), float2 uv, float4 transform, float3 normalWS, float smoothness, float3 viewDirWS, bool encodedLightmap, real4 decodeInstructions)
+ half4 SampleDirectionalLightmapSLZ(TEXTURE2D_PARAM(lightmapTex, lightmapSampler), TEXTURE2D_PARAM(lightmapDirTex, lightmapDirSampler), float2 uv, float4 transform, float3 normalWS, float smoothness, float3 viewDirWS, bool encodedLightmap, real4 decodeInstructions)
  {
      // In directional mode Enlighten bakes dominant light direction
      // in a way, that using it for half Lambert and then dividing by a "rebalancing coefficient"
@@ -148,22 +150,22 @@ half DirectionalLightmapSpecular(float4 direction, float3 normalWorld, float3 vi
      // transform is scale and bias
      uv = uv * transform.xy + transform.zw;
 
-     real4 direction = SAMPLE_TEXTURE2D(lightmapDirTex, lightmapDirSampler, uv);
+     half4 direction = SAMPLE_TEXTURE2D(lightmapDirTex, lightmapDirSampler, uv);
      // Remark: baked lightmap is RGBM for now, dynamic lightmap is RGB9E5
      //real3 illuminance = real3(0.0, 0.0, 0.0);
      //if (encodedLightmap)
      //{
-         real4 encodedIlluminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgba;
-     real3 illuminance = encodedLightmap ? DecodeLightmap(encodedIlluminance, decodeInstructions) : encodedIlluminance.rgb;
+         half4 encodedIlluminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgba;
+     half3 illuminance = encodedLightmap ? DecodeLightmap(encodedIlluminance, decodeInstructions) : encodedIlluminance.rgb;
      //}
      //else
      //{
      //    illuminance = SAMPLE_TEXTURE2D(lightmapTex, lightmapSampler, uv).rgb;
      //}
-     real halfLambert = dot(normalWS, direction.xyz - 0.5) + 0.5;
-     real3 IndirectDiffuse = max(real(0), illuminance * halfLambert / max(1e-4, direction.w));
-     real IndirectSpecular = DirectionalLightmapSpecular(direction, normalWS, viewDirWS, smoothness) ;
-     return real4(IndirectDiffuse.xyz, IndirectSpecular) ;
+     half halfLambert = dot(normalWS, direction.xyz - half(0.5)) + half(0.5);
+     half3 IndirectDiffuse = max(half(0), illuminance * halfLambert / max(half(1e-4), direction.w));
+     half IndirectSpecular = DirectionalLightmapSpecular(direction, normalWS, viewDirWS, smoothness) ;
+     return half4(IndirectDiffuse.xyz, IndirectSpecular) ;
   //   return 0;
  }
 

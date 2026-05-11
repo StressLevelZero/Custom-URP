@@ -1026,9 +1026,9 @@ void SLZSHDiffuse(inout half3 diffuse, half3 normal)
             
             // Soften normal per channel — red scatters deepest, blue not at all.
             // Tune these to taste / expose as material params.
-            half3 nR = SLZSafeHalf3Normalize(lerp(normal, dominantDir, _SSSColor.r));
-            half3 nG = SLZSafeHalf3Normalize(lerp(normal, dominantDir, _SSSColor.g));
-            half3 nB = SLZSafeHalf3Normalize(lerp(normal, dominantDir, _SSSColor.b));
+            half3 nR = SLZSafeHalf3Normalize(lerp(normal, dominantDir, GetSSSColor().r));
+            half3 nG = SLZSafeHalf3Normalize(lerp(normal, dominantDir, GetSSSColor().g));
+            half3 nB = SLZSafeHalf3Normalize(lerp(normal, dominantDir, GetSSSColor().b));
             
             half3 shL0L1 ;
             shL0L1.r = SHEvalLinearL0L1Channel(nR, unity_SHAr);
