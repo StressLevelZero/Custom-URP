@@ -13,7 +13,10 @@
 		//static const float INV_4PI = 0.07957747154594767;   // 1 / (4*pi)
 		//static const float INV_16PI_3 = 0.05968310365946075; // 3 / (16*pi)
 
-		#define EPS 1e-4h
+		// Half-safe epsilon. Half's smallest normal is ~6.1e-5, so 1e-4 is uncomfortably
+		// close to the denormal cliff. 1e-3 gives us headroom; sub-millimeter light radii
+		// aren't physically meaningful in fog anyway.
+		#define EPS 1e-3h
 
 		#define rcpFrameAmount 0.14285714285714285714285714285714h  //(1.0f / 7.0f);
 		#define invRcpFrameAmount 0.85714285714285714285714285714286h  //1 - (1.0f / 7.0f);
@@ -28,11 +31,16 @@
 		#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
 		// (Avoid _MAIN_LIGHT_SHADOWS_SCREEN for this volumetric compute path)
 
+		#pragma multi_compile _ _VOLUMETRIC_TURBULENCE
+		// _VOLUMETRIC_TURBULENCE on: alpha samples at an offset position (noise turbulence),
+		// costing a second 3D texture fetch per clipmap level in SampleClipToroidal.
+		// Off: rgb and alpha share one fetch. Enable CPU-side only when turbulence is active.
+
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
         
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+		//#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
 		//Doing a custom InterleavedGradientNoise3D instead
 		//#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl" 
@@ -88,7 +96,7 @@
 		//float2	_FoveationCenter = float2(.5,.5);
 		float	_FoveationInnerRadius;// = 0.3; // full-rate inside this radius
 		float	_FoveationOuterRadius;// = 0.4; // max decimation beyond this radius
-		bool	_FoveationEnabled;// = true;
+		int	_FoveationEnabled;// = true;
 
 		shared float _PanicRefresh;
 //TEMP
@@ -226,10 +234,13 @@
 		// Returns 1 if worldPos sits inside the wrap window of this level.
 		// Origin is the absolute voxel coord of the low corner; the window spans
 		// [origin, origin + res) voxels, i.e. [origin * voxelSize, (origin + res) * voxelSize).
+		// We pad 1 voxel in from each face to avoid the toroidal wrap seam; more than
+		// 1 starts eating significant volume (2 voxels on a 32^3 clipmap ≈ 33% volume loss)
+		// and can expose dead bands where no level considers itself "inside".
 		float InsideClipVoxel(float3 ws, float voxelSize, int3 voxelOrigin, int res)
 		{
-			float3 loW = (float3)voxelOrigin * voxelSize;
-			float3 hiW = (float3)(voxelOrigin + int3(res, res, res)) * voxelSize;
+			float3 loW = ((float3)voxelOrigin + 1) * voxelSize;
+			float3 hiW = ((float3)(voxelOrigin + int3(res, res, res)) - 1) * voxelSize;
 			float3 geLo = step(loW, ws);
 			float3 ltHi = 1.0 - step(hiW, ws); // exclusive high bound
 			return geLo.x * geLo.y * geLo.z * ltHi.x * ltHi.y * ltHi.z;
@@ -246,23 +257,16 @@
 		}
 
 		inline float ComputeClipLOD_Temporal(
-		float3 wsStable,         // centWSNJIT (or another stable anchor)
-		float3 wsRGB,            // WS_coordinate (rgb sampling position)
-		float3 wsA,              // clipnoisedWS (alpha sampling position)
-		float  scale,            // clipmap world size
-		Texture3D<float4> tex,
+		float  moveMeters,       // pre-computed max(|wsRGB-wsStable|, |wsA-wsStable|) — level-independent
+		float  scale,            // clipmap world size (voxelSize * resolution)
+		uint   texDim,           // level's texture width (caller queried once)
+		uint   mips,             // level's mip count
 		float  lodBias,          // negative = sharper
 		float  lodMax)           // cap blur
 		{
-			uint w,h,d,mips;
-			tex.GetDimensions(0, w,h,d, mips);
-
-			// how much we "wander" in this clipmap this frame (meters)
-			float move = max(length(wsRGB - wsStable), length(wsA - wsStable));
-
-			// convert to texel displacement in XY (usually w==h)
-			float texelsPerMeter = (float)w / scale;
-			float footprintTexels = move * texelsPerMeter;
+			// convert wander distance to texel displacement
+			float texelsPerMeter = (float)texDim / scale;
+			float footprintTexels = moveMeters * texelsPerMeter;
 
 			// LOD for stability (only if we actually wander across multiple texels)
 			float lod = log2(max(1.0, footprintTexels)) + lodBias;
@@ -284,12 +288,19 @@ float4 SampleClipToroidal(
 			float invVoxel = 1.0 / voxelSize;
 			float invRes   = 1.0 / (float)res;
 
-			float3 uvw      = frac(ws      * invVoxel * invRes);
-			float3 uvwNoise = frac(wsnoise * invVoxel * invRes);
+			float3 uvw = frac(ws * invVoxel * invRes);
+			float4 s0  = tex.SampleLevel(sampler_LinearRepeat, uvw, lod);
 
-			float3 rgb = tex.SampleLevel(sampler_LinearRepeat, uvw,      lod).rgb;
-			float  a   = tex.SampleLevel(sampler_LinearRepeat, uvwNoise, lod).a;
-			return float4(rgb, a);
+		#if defined(_VOLUMETRIC_TURBULENCE)
+			// Turbulence active: alpha samples at an offset world position, so we need
+			// a second 3D fetch. Costly; only compile this path when turbulence is on.
+			float3 uvwNoise = frac(wsnoise * invVoxel * invRes);
+			float  alpha    = tex.SampleLevel(sampler_LinearRepeat, uvwNoise, lod).a;
+			return float4(s0.rgb, alpha);
+		#else
+			// No turbulence: ws == wsnoise, reuse the single fetch.
+			return s0;
+		#endif
 		}
         
      //   shared TextureCube<float4> _SkyTexture;       
@@ -448,8 +459,9 @@ float4 SampleClipToroidal(
 
 			if (!ReprojectionValid) return 0.0;
 
-			// Treat decimated regions as averaging over 7 * decimation real frames
-			float n = 7.0 * decimation;
+			// decimation already gates the update cadence; keep per-update weight constant
+			// so we actually get a 7-frame EMA rather than a 7*decimation lag in periphery.
+			float n = 7.0;
 			float newW = 1.0 / n;
 			return 1.0 - newW;
         }
@@ -647,6 +659,12 @@ inline float ComputeNoiseLOD_FromSlice(
 
 groupshared float4 gCoarseScatter[64]; // 4*4*4 = 64 entries (one per thread slot)
 
+// Group-wide OR-reduction of per-thread ReprojectionValid. We store "any invalid"
+// (initialized to 0, set to 1 by any thread with invalid reprojection).
+// Used to force-scatter a whole group when any of its froxels have invalid history,
+// preventing stale/dark peripheral tiles on screen-edge camera motion.
+groupshared uint gAnyReprojInvalid;
+
 ///Main scattering pass. Integration is done separately so we can reproject this result for XR rather than do it twice.
 ///We Would have to store a pre integration version anyways for temporal reprojection
 [numthreads(4,4,4)]
@@ -705,46 +723,59 @@ void Scatter(
 			
 	float2 sPrev      = UVToSigned(positionNDC, centerUV);
 	float2 sGridPrev  = InvWarpSigned_SquareRadial(sPrev, a); // inverse warp back to grid space
-	half3  validityGrid = half3(sGridPrev.xy,W); //Storing non-clamped values for a validity check
 	float2 uvGridPrev = SignedToUV(sGridPrev, centerUV);
-	float3 reprojectionUVW = saturate(float3(uvGridPrev, W));
-	//float3	reprojectionUVW = float3(positionNDC, W);			
-	bool	ReprojectionValid =  _PanicRefresh > .5 ? 0 : all(validityGrid >= 0.0) && all(validityGrid <= 1.0);
+	float3 reprojectionUVW = float3(uvGridPrev, W); // sampler is linear_clamp, no need to saturate
+
+	// Validity: (1) pre-warp NDC must be inside [-1,1] so the previous camera actually saw this point.
+	//           (2) post-warp grid coord must also be inside [-1,1] in signed space.
+	//           (3) W must be inside [0,1] in UV space, with half-texel margin to avoid clamped edge taps.
+	float halfTexelZ = 0.5 * _invDimensions.z;
+	bool xyValidPre  = all(abs(sPrev)     <= 1.0);
+	bool xyValidPost = all(abs(sGridPrev) <= 1.0);
+	bool wValid      = (W >= halfTexelZ) && (W <= 1.0 - halfTexelZ);
+	bool ReprojectionValid = (_PanicRefresh <= 0.5) && xyValidPre && xyValidPost && wValid;
 	float4	previousResult = ReprojectionValid ? PreviousFrameLighting.SampleLevel(s_linear_clamp_sampler, reprojectionUVW, 0 ) : 0;
+
+	// ---------------------------------------------------------------------
+	// Group-wide OR-reduction: "does any thread in this group have invalid
+	// reprojection?" Result is a GROUP-UNIFORM bool used below to force-scatter
+	// tiles that would otherwise skip into a stale/dark state (screen-edge
+	// camera motion, recent disocclusion, clipmap-origin snap, etc.).
+	// ---------------------------------------------------------------------
+	if (all(groupThreadID == uint3(0,0,0))) gAnyReprojInvalid = 0;
+	GroupMemoryBarrierWithGroupSync();
+	if (!ReprojectionValid) { InterlockedOr(gAnyReprojInvalid, 1u); }
+	GroupMemoryBarrierWithGroupSync();
+	bool anyInvalidInGroup = (gAnyReprojInvalid != 0);
 
 
 ///
 // -----------------------------------------------------
 // Group-level foveation decision (tile-based temporal rate)
 // -----------------------------------------------------
+
+	// Hoisted once: group-center radial distance from foveation center.
+	// Used by BOTH the temporal-decimation decision and the spatial-rate decision below.
+	uint2  groupBasePixel = groupID.xy * uint2(4, 4);
+	float2 groupCenterPix = (float2)groupBasePixel + float2(2.0, 2.0);
+	float2 uvGroup        = groupCenterPix * _invDimensions.xy;
+	float  groupR         = length(uvGroup - _FoveationCenter);
+
 	bool doScatter = true;
 	int	decimation = 1;
-	if (_FoveationEnabled)
+	[branch] if (_FoveationEnabled)
 	{
-		// Base pixel coord for this group in xy
-		// groupID.xy is in "group space", each group is 4x4 threads
-		uint2 groupBasePixel = groupID.xy * uint2(4, 4);
-
-		// Approximate group center in pixel space
-		float2 groupCenterPix = (float2)groupBasePixel + float2(2.0, 2.0);
-
-		// Convert to [0,1] v-buffer UV
-		float2 uvGroup = groupCenterPix * _invDimensions.xy;
-
-		float2 d = uvGroup - _FoveationCenter;
-		float  r = length(d);
-
-    	if (ReprojectionValid)
-    	{
-    		if (r > _FoveationOuterRadius)
-    		{
-    			decimation = 4; // outer ring: update 1 in 4 frames
-    		}
-    		else if (r > _FoveationInnerRadius)
-    		{
-    			decimation = 2; // mid ring: update every other frame
-    		}
-    	}
+		// NOTE: decimation must be GROUP-UNIFORM so doScatter is group-uniform, which
+		// the early-out below depends on. Both inputs here (groupR, anyInvalidInGroup)
+		// are group-uniform by construction.
+		if (groupR > _FoveationOuterRadius)
+		{
+			decimation = 4; // outer ring: update 1 in 4 frames
+		}
+		else if (groupR > _FoveationInnerRadius)
+		{
+			decimation = 2; // mid ring: update every other frame
+		}
     	
 		if (decimation > 1)
 		{
@@ -755,36 +786,40 @@ void Scatter(
 
 			doScatter = (phase == framePhase);
 		}
+
+		// Override: if any froxel in this group has invalid history, the whole group
+		// must scatter this frame. Otherwise skipped tiles would stay dark/stale for
+		// multiple frames until the next scheduled scatter cadence — very visible at
+		// screen edges during head rotation.
+		if (anyInvalidInGroup) doScatter = true;
 	}
 
+	// doScatter is UNIFORM across the group (depends only on _FoveationEnabled, groupR,
+	// groupID, _FrameIndex, anyInvalidInGroup — all group-uniform), so every thread
+	// takes the same branch — safe to early-out without barrier-divergence hang.
 	if (!doScatter)
 	{
-		// Whole group reuses history; we still need per-froxel reprojection
-		Result[id.xyz] = previousResult;
-		//return;
+		// Skip-frame path: reuse history. By construction anyInvalidInGroup was false
+		// when we took this branch, so every thread in the group has valid reprojection
+		// and previousResult is trustworthy. NaN guard is belt-and-suspenders.
+		float4 hist = AnyIsNaN(previousResult) ? float4(0,0,0,0) : previousResult;
+		Result[id.xyz] = max(hist, 0.0);
+		return;
 	}
-	// If we get here, the whole 4x4x4 tile does full scattering this frame
 
 	// -----------------------------------------------------
 	// Spatial coarse shading (VRS-like) inside the threadgroup
 	// -----------------------------------------------------
+	// NOTE: spatialRate must be GROUP-UNIFORM because it controls the groupshared-mem
+	// barrier below. Inputs here (groupR, anyInvalidInGroup) are group-uniform.
+	// When any thread in the group has invalid history, force full-rate so we don't
+	// propagate a single leader's fresh scatter across an area that may span a
+	// disocclusion boundary.
 	int spatialRate = 1;
-
-	// IMPORTANT: force full-rate when reprojection is invalid,
-	// otherwise block reuse will be very noticeable.
-	if (_FoveationEnabled && ReprojectionValid )
+	if (_FoveationEnabled != 0 && !anyInvalidInGroup)
 	{
-		// reuse the SAME group radial logic you already computed
-		// (you can also base this on r directly if you keep it around)
-		uint2 groupBasePixel = groupID.xy * uint2(4, 4);
-		float2 groupCenterPix = (float2)groupBasePixel + float2(2.0, 2.0);
-		float2 uvGroup = groupCenterPix * _invDimensions.xy;
-
-		float2 d = uvGroup - _FoveationCenter;
-		float  r = length(d);
-
-		if (r > _FoveationOuterRadius)      spatialRate = 4; // 4x4 blocks
-		else if (r > _FoveationInnerRadius) spatialRate = 2; // 2x2 blocks
+		if      (groupR > _FoveationOuterRadius) spatialRate = 4; // 4x4 blocks
+		else if (groupR > _FoveationInnerRadius) spatialRate = 2; // 2x2 blocks
 	}
 
 	// Pick the leader for THIS thread's block (XY only, keep Z full-rate)
@@ -796,9 +831,14 @@ void Scatter(
 
 float4 newLighting = 0;
 
+// spatialRate==1 means every thread is a leader — no coarse-shading redistribution
+// needed, so we can skip the groupshared write + barrier + read entirely.
+bool needsBarrier = (spatialRate > 1);
+
 if (isLeader)
 {
-	float3 jitterDirWS = normalize(centerDirWS);        	
+	// centerDirWS is already normalized above; no need to renormalize.
+	float3 jitterDirWS = centerDirWS;
 	float rndVal = SeqOffset.z;
 		
 	float ign = InterleavedGradientNoise3D(float3(id),SeqOffset.w ); // [0,1)
@@ -890,6 +930,9 @@ if (isLeader)
 	int3  o0 = _ClipmapVoxelOrigin0, o1 = _ClipmapVoxelOrigin1,
 	      o2 = _ClipmapVoxelOrigin2, o3 = _ClipmapVoxelOrigin3;
 
+	// Move distance is level-independent; compute once outside the ladder.
+	float move = max(length(wsRGB - wsStable), length(wsA - wsStable));
+
 	// Decide which level to use (smallest enclosing)
 	float in0 = InsideClipVoxel(wsStable, v0, o0, r0);
 	float in1 = (1 - in0)                         * InsideClipVoxel(wsStable, v1, o1, r1);
@@ -899,8 +942,8 @@ if (isLeader)
 
 	if (in0 > 0.5)
 	{
-	    float lod0 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v0 * (float)r0,
-	                                         _VolumetricClipmapTexture0, lodBias, lodMax);
+	    uint w0,h0,d0,m0; _VolumetricClipmapTexture0.GetDimensions(0, w0,h0,d0, m0);
+	    float lod0 = ComputeClipLOD_Temporal(move, v0 * (float)r0, w0, m0, lodBias, lodMax);
 	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v0,  r0,
 	                              _VolumetricClipmapTexture0, lod0);
 
@@ -908,22 +951,22 @@ if (isLeader)
 	}
 	else if (in1 > 0.5)
 	{
-	    float lod1 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v1 * (float)r1,
-	                                         _VolumetricClipmapTexture1, lodBias, lodMax);
+	    uint w1,h1,d1,m1; _VolumetricClipmapTexture1.GetDimensions(0, w1,h1,d1, m1);
+	    float lod1 = ComputeClipLOD_Temporal(move, v1 * (float)r1, w1, m1, lodBias, lodMax);
 	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v1,  r1,
 	                              _VolumetricClipmapTexture1, lod1);
 	}
 	else if (in2 > 0.5)
 	{
-	    float lod2 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v2 * (float)r2,
-	                                         _VolumetricClipmapTexture2, lodBias, lodMax);
+	    uint w2,h2,d2,m2; _VolumetricClipmapTexture2.GetDimensions(0, w2,h2,d2, m2);
+	    float lod2 = ComputeClipLOD_Temporal(move, v2 * (float)r2, w2, m2, lodBias, lodMax);
 	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v2,  r2,
 	                              _VolumetricClipmapTexture2, lod2);
 	}
 	else if (in3 > 0.5)
 	{
-	    float lod3 = ComputeClipLOD_Temporal(wsStable, wsRGB, wsA, v3 * (float)r3,
-	                                         _VolumetricClipmapTexture3, lodBias, lodMax);
+	    uint w3,h3,d3,m3; _VolumetricClipmapTexture3.GetDimensions(0, w3,h3,d3, m3);
+	    float lod3 = ComputeClipLOD_Temporal(move, v3 * (float)r3, w3, m3, lodBias, lodMax);
 	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v3,  r3,
 	                              _VolumetricClipmapTexture3, lod3);
 	}
@@ -947,7 +990,9 @@ if (isLeader)
 
 	
 	accumLighting.a += _GlobalExtinction;
-	AtmosphereSample atmo = SampleAtmosphereAtWS(WS_coordinate);
+	// Atmosphere varies slowly in world space — sample at the stable (un-jittered) anchor
+	// so we don't inject per-frame jitter noise into an otherwise smooth quantity.
+	AtmosphereSample atmo = SampleAtmosphereAtWS(centWS_NoJIT);
 
 	// keep whatever extinction came from local/baked fog volumes
 	float localSigmaT = accumLighting.a;
@@ -995,8 +1040,7 @@ if (isLeader)
 	///SUN
 	//////
 	// atmosphere direct sun single-scatter
-	//[UNITY_BRANCH]
-	if (_HasMainLight != 0)
+	[branch] if (_HasMainLight != 0)
 	{
 		float3 sunDirToSunWS = normalize(_SunDir);
 
@@ -1006,7 +1050,8 @@ if (isLeader)
 
 		// float muSun = dot(atmo.up, sunDirToSunWS);
 		// float3 Tsun = SampleAtmosphereTransmittance(atmo.r, muSun); //A full lut is a bit of overkill
-		float3 Tsun = SampleLocalAtmosphereSunTransmittance(WS_coordinate); //Simple color array is good enough
+		// Sample at stable anchor (same reasoning as SampleAtmosphereAtWS above).
+		float3 Tsun = SampleLocalAtmosphereSunTransmittance(centWS_NoJIT); //Simple color array is good enough
 
 		// exact same coefficient split as sky LUT path
 		float3 singleScatter =
@@ -1028,13 +1073,22 @@ if (isLeader)
 	/////
 	newLighting = accumLighting;
 
-	// Store leader result for neighbors
-	gCoarseScatter[leaderIndex] = newLighting;
+	// Store leader result for neighbors only when coarse shading is active;
+	// at spatialRate==1, every thread is its own leader and reads its own local newLighting.
+	if (needsBarrier)
+	{
+		gCoarseScatter[leaderIndex] = newLighting;
+	}
 }
 
-	GroupMemoryBarrierWithGroupSync();
-	// Everyone reads their block leader value
-	newLighting = gCoarseScatter[leaderIndex];
+	// Coarse-shading redistribution: skip barrier entirely in the common spatialRate==1 path.
+	// needsBarrier is group-uniform (see spatialRate comment above), so this conditional
+	// barrier is safe — all threads in the group take the same side.
+	[branch] if (needsBarrier)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		newLighting = gCoarseScatter[leaderIndex];
+	}
 
 
 	
@@ -1047,6 +1101,9 @@ if (isLeader)
 	//newLighting.rgb *= (spatialRate == 1) ? float3(0,1,0) : (spatialRate == 2) ? float3(1,1,0) : float3(1,0,0);
 
 	//accumLighting.rgb *= accumLighting.a; //Doing the premultiplication in the integration step instead
+	// Guard: if history contains NaN (or the occasional HDR spike that slipped through),
+	// don't drag it forward through the EMA.
+	previousResult = AnyIsNaN(previousResult) ? newLighting : previousResult;
 	Result[id.xyz] = max(lerp(newLighting , previousResult, ComputeHistoryWeight(decimation, ReprojectionValid) ),0); // Temporal sampling // (1 / (id.z * id.z + .4h) + 1))
 }
 

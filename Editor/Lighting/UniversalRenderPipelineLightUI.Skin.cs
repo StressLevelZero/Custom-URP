@@ -31,6 +31,14 @@ namespace UnityEditor.Rendering.Universal
             public static readonly GUIContent ShadowDepthBias = EditorGUIUtility.TrTextContent("Depth", "Determines the bias at which shadows are pushed away from the shadow-casting Game Object along the line from the Light.");
             public static readonly GUIContent ShadowInfo = EditorGUIUtility.TrTextContent("Unity might reduce the Light's shadow resolution to ensure that shadow maps fit in the shadow atlas. Consider this when selecting the the size of the shadow atlas, the shadow resolution of Lights, the number of Lights in your scene and whether you use soft shadows.");
 
+            /// SLZ MODIFIED
+            public static readonly GUIContent Portal = EditorGUIUtility.TrTextContent("Behavior", "Normal - Light is treated as an emissive surface. Portal - light rays are emitted perpendicular to the surface as if it were a window with a directional light on the other side.");
+            public static readonly GUIContent PortalAdvancedFoldout = EditorGUIUtility.TrTextContent("Advanced");
+            public static readonly string PortalHelpText =
+                "Portal mode marks this rectangle as an opening that samples lighting from outside (e.g., a window onto the sky or a brighter adjacent room) rather than emitting on its own. Use only when you specifically need to redirect existing environment/area lighting through a bounded aperture.";
+
+            /// END SLZ MODIFIED 
+
             // Resolution (default or custom)
             public static readonly GUIContent ShadowResolution = EditorGUIUtility.TrTextContent("Resolution", $"Sets the rendered resolution of the shadow maps. A higher resolution increases the fidelity of shadows at the cost of GPU performance and memory usage. Rounded to the next power of two, and clamped to be at least {UniversalAdditionalLightData.AdditionalLightsShadowMinimumResolution}.");
             public static readonly int[] ShadowResolutionDefaultValues =

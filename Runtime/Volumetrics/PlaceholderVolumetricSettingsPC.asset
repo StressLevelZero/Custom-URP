@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   near: 0.01
   far: 10000
-  FroxelWidthResolution: 96
-  FroxelHeightResolution: 96
-  FroxelDepthResolution: 64
+  FroxelWidthResolution: 256
+  FroxelHeightResolution: 256
+  FroxelDepthResolution: 128
   ClipmapLevel0:
     ClipMapResolution: 128
     ClipmapScale: 20

@@ -223,10 +223,11 @@ namespace SLZ.SLZEditorTools
         // phases lets us avoid synchronous GetData() stalls on the critical path.
         enum BakePhase
         {
-            Tracing,       // Dispatching ray chunks into the current area's rendertarget.
-            SavingArea,    // Area finished tracing; waiting on GPU readback to write to disk.
-            BakingSky,     // Dispatched sky mean-radiance kernel; waiting on readback.
-            Finalizing     // All GPU work done; doing asset/scene bookkeeping.
+            Tracing,         // Dispatching direct+env ray chunks into the current area's rendertarget.
+            TracingIndirect, // Direct done; iterating V_{n+1} = D + B(V_n) into rendertarget.
+            SavingArea,      // Area finished tracing; waiting on GPU readback to write to disk.
+            BakingSky,       // Dispatched sky mean-radiance kernel; waiting on readback.
+            Finalizing       // All GPU work done; doing asset/scene bookkeeping.
         }
 
         class UpdateLoopData : IDisposable
@@ -254,7 +255,7 @@ namespace SLZ.SLZEditorTools
             public int currentFrame = 0;
 
             public int totalSamples;
-            public int totalAreaSamples;
+            public int totalAreaSamples;          // Direct-pass sample budget per area (excludes indirect).
             public int environmentSampleCount;
             public int areaLightSampleCount;
             public int currentAreaIndex = 0;
@@ -265,6 +266,17 @@ namespace SLZ.SLZEditorTools
             public int currentAreaSamplesTraced = 0;
             public int chunkSampleCount;
             public float areaSeed;
+
+            // ---- Indirect bounce config & runtime state ----
+            // V_{n+1} = D + B(V_n). Each iteration starts by copying directCache → rendertarget,
+            // then dispatches IndirectRayGenShader (which adds B(prevVolume) onto rendertarget),
+            // and finishes by copying rendertarget → prevVolume for the next iteration.
+            public int indirectSampleCount;          // Samples per voxel per iteration (0 disables).
+            public int indirectIterations;           // Number of bounce iterations per area (0 disables).
+            public int currentIndirectIteration;     // 0..indirectIterations-1 within an area.
+            public int indirectSamplesTracedThisIter;// Per-iteration running counter, parallels currentAreaSamplesTraced.
+            public RenderTexture directCache;        // Snapshot of D for the current area, persists across iterations.
+            public RenderTexture prevVolume;         // V_n, bound as g_Input during indirect dispatches.
 
             // Bake state machine / async save plumbing.
             public BakePhase phase = BakePhase.Tracing;
@@ -339,6 +351,18 @@ namespace SLZ.SLZEditorTools
                         rendertarget = null;
                     }
 
+                    if (directCache)
+                    {
+                        CoreUtils.Destroy(directCache);
+                        directCache = null;
+                    }
+
+                    if (prevVolume)
+                    {
+                        CoreUtils.Destroy(prevVolume);
+                        prevVolume = null;
+                    }
+
                     disposed = true;
                 }
             }
@@ -371,6 +395,18 @@ namespace SLZ.SLZEditorTools
                 {
                     CoreUtils.Destroy(rendertarget);
                     rendertarget = null;
+                }
+
+                if (directCache)
+                {
+                    CoreUtils.Destroy(directCache);
+                    directCache = null;
+                }
+
+                if (prevVolume)
+                {
+                    CoreUtils.Destroy(prevVolume);
+                    prevVolume = null;
                 }
                 if (cookieAtlasIsGenerated && cookieAtlas)
                     CoreUtils.Destroy(cookieAtlas);
@@ -459,7 +495,14 @@ namespace SLZ.SLZEditorTools
         }
         #endregion
 
-        public static void BakeDXR(int chunkSampleCount, int environmentSampleCount, int areaLightSampleCount, bool skyboxContributes, Cubemap customSkyTexture)
+        public static void BakeDXR(
+            int chunkSampleCount,
+            int environmentSampleCount,
+            int areaLightSampleCount,
+            int indirectSampleCount,
+            int indirectIterations,
+            bool skyboxContributes,
+            Cubemap customSkyTexture)
         {
             int numVolumetricAreas = VolumetricRegisters.volumetricAreas.Count;
             if (numVolumetricAreas == 0)
@@ -511,8 +554,13 @@ namespace SLZ.SLZEditorTools
             udata.areaLightCount = areaLights.Count;
             udata.environmentSampleCount = environmentSampleCount;
             udata.areaLightSampleCount = areaLightSampleCount;
+            udata.indirectSampleCount = Mathf.Max(0, indirectSampleCount);
+            udata.indirectIterations  = Mathf.Max(0, indirectIterations);
             udata.totalAreaSamples = udata.pointLightCount + udata.coneLightCount + udata.dirLightCount + udata.environmentSampleCount + (udata.areaLightSampleCount * udata.areaLightCount);
-            udata.totalSamples = udata.totalAreaSamples * VolumetricRegisters.volumetricAreas.Count;
+            // totalSamples is used for progress UI only — include indirect so the bar reflects
+            // the full GPU budget instead of jumping from 100% to 100%-then-restart per iteration.
+            int indirectPerArea = udata.indirectIterations * udata.indirectSampleCount;
+            udata.totalSamples = (udata.totalAreaSamples + indirectPerArea) * VolumetricRegisters.volumetricAreas.Count;
             udata.chunkSampleCount = chunkSampleCount;
             udata.startTime = EditorApplication.timeSinceStartup;
             //Debug.Log($"Skybox {skyboxContributes}, {pointLights.Count} Point Lights, {coneLights.Count} Cone Lights, {dirLights.Count} Dir Lights, {areaLights.Count} area lights.");
@@ -548,6 +596,17 @@ namespace SLZ.SLZEditorTools
             rendertarget.Create();
 
             udata.rendertarget = rendertarget;
+
+            // Indirect ping-pong RTs. Allocated up front (cheap) so the per-area
+            // resize path in TraceChunk's first-chunk init is uniform across all three.
+            // If indirectIterations == 0, these still exist but are never written/read.
+            if (udata.indirectIterations > 0 && udata.indirectSampleCount > 0)
+            {
+                udata.directCache = new RenderTexture(rtDesc);
+                udata.directCache.Create();
+                udata.prevVolume = new RenderTexture(rtDesc);
+                udata.prevVolume.Create();
+            }
 
             AssetDatabase.StartAssetEditing();
             udata.assetEditingOpen = true;
@@ -620,12 +679,29 @@ namespace SLZ.SLZEditorTools
             // Progress + cancel. Cancel routes through EndBake so StopAssetEditing() always fires.
             if (!Application.isBatchMode && udata.phase != BakePhase.Finalizing)
             {
-                int currentSampleForUI = udata.currentChunkIndex * udata.chunkSampleCount;
                 TimeSpan runningTime = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
+
+                string detail;
+                float pct;
+                if (udata.phase == BakePhase.TracingIndirect)
+                {
+                    detail = $"Volume {udata.currentAreaIndex} / {VolumetricRegisters.volumetricAreas.Count}, " +
+                             $"Indirect iter {udata.currentIndirectIteration + 1} / {udata.indirectIterations}, " +
+                             $"Sample {udata.indirectSamplesTracedThisIter} / {udata.indirectSampleCount} [{udata.phase}]";
+                    pct = (float)udata.currentAreaIndex / (float)VolumetricRegisters.volumetricAreas.Count;
+                }
+                else
+                {
+                    int currentSampleForUI = udata.currentChunkIndex * udata.chunkSampleCount;
+                    detail = $"Volume {udata.currentAreaIndex} / {VolumetricRegisters.volumetricAreas.Count}, " +
+                             $"Sample {currentSampleForUI} / {udata.totalAreaSamples} [{udata.phase}]";
+                    pct = (float)udata.currentAreaIndex / (float)VolumetricRegisters.volumetricAreas.Count;
+                }
+
                 if (EditorUtility.DisplayCancelableProgressBar(
                         $"Baking Volumes ({runningTime:hh\\:mm\\:ss})",
-                        $"Volume {udata.currentAreaIndex} / {VolumetricRegisters.volumetricAreas.Count}, Sample {currentSampleForUI} / {udata.totalAreaSamples} [{udata.phase}]",
-                        (float)udata.currentAreaIndex / (float)VolumetricRegisters.volumetricAreas.Count))
+                        detail,
+                        pct))
                 {
                     EndBake(false, "Bake cancelled by user.");
                     return;
@@ -638,6 +714,9 @@ namespace SLZ.SLZEditorTools
                 {
                     case BakePhase.Tracing:
                         TickTracing();
+                        break;
+                    case BakePhase.TracingIndirect:
+                        TickTracingIndirect();
                         break;
                     case BakePhase.SavingArea:
                         PollPendingAreaSave();
@@ -696,8 +775,97 @@ namespace SLZ.SLZEditorTools
             }
             else
             {
-                BeginSaveAreaAsync();
+                // Direct + env complete for this area. Either kick off the bounce iterations,
+                // or jump straight to readback if indirect is disabled.
+                if (udata.indirectIterations > 0 && udata.indirectSampleCount > 0)
+                    BeginIndirectIterations();
+                else
+                    BeginSaveAreaAsync();
             }
+        }
+
+        /// <summary>
+        /// Direct pass for this area is done — rendertarget currently holds D.
+        /// Snapshot D into directCache (read at the start of every iteration to reset
+        /// rendertarget) and seed prevVolume = D so iteration 0 produces V_1 = D + B(D).
+        /// </summary>
+        static void BeginIndirectIterations()
+        {
+            if (udata.directCache == null || udata.prevVolume == null)
+            {
+                Debug.LogError("[VolBake] Indirect RTs not allocated; falling back to save.");
+                BeginSaveAreaAsync();
+                return;
+            }
+
+            // Match the rendertarget's per-area resolution. Same helper as the direct path.
+            int3 res = int3(udata.rendertarget.width, udata.rendertarget.height, udata.rendertarget.volumeDepth);
+            ReallocateRendertarget(udata.directCache, res);
+            ReallocateRendertarget(udata.prevVolume,  res);
+
+            Graphics.CopyTexture(udata.rendertarget, udata.directCache);
+            Graphics.CopyTexture(udata.rendertarget, udata.prevVolume);
+
+            udata.currentIndirectIteration = 0;
+            udata.indirectSamplesTracedThisIter = 0;
+            udata.phase = BakePhase.TracingIndirect;
+
+            Debug.Log(
+                $"[VolBake] Area {udata.currentAreaIndex} direct complete; starting " +
+                $"{udata.indirectIterations} indirect iteration(s) at {udata.indirectSampleCount} samples each."
+            );
+        }
+
+        /// <summary>
+        /// Indirect tracing tick. Mirrors TickTracing but the outer loop is the iteration
+        /// counter — when an iteration's per-voxel sample budget is hit, swap rendertarget
+        /// → prevVolume, reset rendertarget = D, and start the next iteration. After the
+        /// last iteration completes, hand off to the async save path.
+        /// </summary>
+        static void TickTracingIndirect()
+        {
+            int N = udata.indirectSampleCount;
+            int traced = udata.indirectSamplesTracedThisIter;
+
+            if (traced >= N)
+            {
+                // Iteration complete: rendertarget = V_{iter+1}. Snapshot for next iter's input.
+                Graphics.CopyTexture(udata.rendertarget, udata.prevVolume);
+                udata.currentIndirectIteration++;
+                udata.indirectSamplesTracedThisIter = 0;
+
+                if (udata.currentIndirectIteration >= udata.indirectIterations)
+                {
+                    // All iterations done. rendertarget now holds V_final.
+                    BeginSaveAreaAsync();
+                    return;
+                }
+
+                // Reset rendertarget to D so the next iteration's accumulation produces D + B(V_n).
+                Graphics.CopyTexture(udata.directCache, udata.rendertarget);
+                return;
+            }
+
+            int raysThisChunk = Mathf.Min(udata.chunkSampleCount, N - traced);
+            if (raysThisChunk <= 0)
+            {
+                // Defensive: shouldn't happen, but don't dispatch a zero-ray chunk.
+                return;
+            }
+
+            double t0 = EditorApplication.timeSinceStartup;
+            TraceIndirectChunk(traced, raysThisChunk);
+            double chunkMs = (EditorApplication.timeSinceStartup - t0) * 1000.0;
+
+            udata.indirectSamplesTracedThisIter += raysThisChunk;
+
+            // Same adaptive sizing as TickTracing — we share chunkSampleCount because the
+            // per-ray cost characteristics (one closest-hit, one trilinear fetch) are similar
+            // enough to direct that the heuristic carries over.
+            if (chunkMs > kTargetChunkMs * 1.5)
+                udata.chunkSampleCount = Mathf.Max(kMinChunkSamples, udata.chunkSampleCount / 2);
+            else if (chunkMs < kTargetChunkMs * 0.5)
+                udata.chunkSampleCount = Mathf.Min(kMaxChunkSamples, udata.chunkSampleCount * 2);
         }
 
         /// <summary>
@@ -801,6 +969,8 @@ namespace SLZ.SLZEditorTools
 
             udata.currentChunkIndex = 0;
             udata.currentAreaSamplesTraced = 0;
+            udata.currentIndirectIteration = 0;
+            udata.indirectSamplesTracedThisIter = 0;
             udata.currentAreaIndex += 1;
 
             if (udata.currentAreaIndex >= VolumetricRegisters.volumetricAreas.Count)
@@ -845,6 +1015,8 @@ namespace SLZ.SLZEditorTools
 
             udata.currentChunkIndex = 0;
             udata.currentAreaSamplesTraced = 0;
+            udata.currentIndirectIteration = 0;
+            udata.indirectSamplesTracedThisIter = 0;
             udata.currentAreaIndex += 1;
 
             if (udata.currentAreaIndex >= VolumetricRegisters.volumetricAreas.Count)
@@ -1058,7 +1230,7 @@ namespace SLZ.SLZEditorTools
         static List<Renderer> GatherStaticRenderers()
         {
             Renderer[] allRenderers = Object.FindObjectsByType<Renderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            List<Renderer> staticRenderers = new List<Renderer>(allRenderers.Length);
+            List<Renderer> staticRenderers = new List<Renderer>();
             for (int rIdx = 0; rIdx < allRenderers.Length; rIdx++)
             {
                 if (GameObjectUtility.AreStaticEditorFlagsSet(allRenderers[rIdx].gameObject, StaticEditorFlags.ContributeGI) &&
@@ -1438,6 +1610,10 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
         static int id__OutColor   = Shader.PropertyToID("_OutColor");
         static int id__GlobalSeed = Shader.PropertyToID("_GlobalSeed");
         static int id__MipLevel   = Shader.PropertyToID("_MipLevel");
+
+        // Indirect bounce uniforms (consumed by IndirectRayGenShader / IndirectCast).
+        static int id_IndirectSamples = Shader.PropertyToID("IndirectSamples");
+        static int id_g_Input         = Shader.PropertyToID("g_Input");
         
         /// <summary>
         /// Traces a chunk of rays for the current volume. The caller is responsible for
@@ -1548,6 +1724,63 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
             udata.currentChunkIndex += 1;
         }
 
+        /// <summary>
+        /// Indirect-pass equivalent of TraceChunk. Dispatches IndirectRayGenShader, which
+        /// reads g_Input (= prevVolume = V_n) at hit points to gather B(V_n) and adds it
+        /// onto rendertarget. Caller is responsible for ensuring rendertarget = D before
+        /// the first chunk of an iteration (the Graphics.CopyTexture in TickTracingIndirect
+        /// handles this between iterations; BeginIndirectIterations seeds it for iteration 0).
+        ///
+        /// Most uniforms (BVH, sky tex, WPosition, Size, HalfVoxelSize, light buffers) are
+        /// still bound from the direct pass — they don't change within an area. We rebind
+        /// the per-chunk-varying ones explicitly to keep this function self-contained and
+        /// avoid action-at-a-distance bugs if the binding order ever changes.
+        /// </summary>
+        static void TraceIndirectChunk(int sampleStart, int raysThisChunk)
+        {
+            int areaIdx = udata.currentAreaIndex;
+            var currentArea = VolumetricRegisters.volumetricAreas[areaIdx];
+
+            TimeSpan elapsed2 = TimeSpan.FromSeconds(EditorApplication.timeSinceStartup - udata.startTime);
+            Debug.Log(
+                $"[VolBake] [{elapsed2:hh\\:mm\\:ss}] " +
+                $"Area {udata.currentAreaIndex + 1}/{VolumetricRegisters.volumetricAreas.Count} " +
+                $"| Indirect iter {udata.currentIndirectIteration + 1}/{udata.indirectIterations} " +
+                $"| chunk rays={raysThisChunk}, chunkSize={udata.chunkSampleCount} " +
+                $"| Iter samples {sampleStart}/{udata.indirectSampleCount}"
+            );
+
+            Vector3Int resolution = currentArea.NormalizedTexelDensity;
+            int3 threads = int3(resolution.x, resolution.y, resolution.z);
+
+            RayTracingShader rtshader = udata.rtShader;
+
+            CommandBuffer cmd = CommandBufferPool.Get("VolBake TraceIndirectChunk");
+            try
+            {
+                cmd.Clear();
+
+                // Per-chunk-varying state.
+                cmd.SetRayTracingIntParam(rtshader, id_IndirectSamples, udata.indirectSampleCount);
+                cmd.SetRayTracingIntParam(rtshader, id_PerDispatchRayCount, raysThisChunk);
+                cmd.SetRayTracingIntParam(rtshader, id_startIdx, sampleStart);
+
+                // Bind ping-pong RTs. g_Output is the same rendertarget the direct pass
+                // wrote to; we accumulate B(V_n) onto D (or onto the previous chunk's
+                // partial result within the same iteration).
+                cmd.SetRayTracingTextureParam(rtshader, id_g_Output, udata.rendertarget);
+                cmd.SetRayTracingTextureParam(rtshader, id_g_Input,  udata.prevVolume);
+
+                cmd.DispatchRays(rtshader, "IndirectRayGenShader",
+                    (uint)threads.x, (uint)threads.y, (uint)threads.z);
+
+                Graphics.ExecuteCommandBuffer(cmd);
+            }
+            finally
+            {
+                CommandBufferPool.Release(cmd);
+            }
+        }
 
         static string CheckDirectoryAndReturnPath()
         {

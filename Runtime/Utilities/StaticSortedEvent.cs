@@ -66,13 +66,13 @@ namespace SLZ
                     // bool to check for destruction
                     if ((d.Target is UnityEngine.Object o) && !o)
                     {
-                        removeSubActions.Add(pair.Value);
+                        removeSubActions.Add((Action)d);
                         numValidDelegates--;
                         continue;
                     }
                     if (d.Target == null)
                     {
-                        removeSubActions.Add(pair.Value);
+                        removeSubActions.Add((Action)d);
                         numValidDelegates--;
                         continue;
                     }
@@ -110,6 +110,7 @@ namespace SLZ
     
             foreach (KeyValuePair<T, Action> pair in eventDictionary)
             {
+                //Debug.Log("Invoking " + pair.Value.Method);
                 try
                 {
                     pair.Value?.Invoke();

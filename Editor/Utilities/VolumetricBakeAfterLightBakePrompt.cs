@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 namespace SLZ.SLZEditorTools
 {
     [InitializeOnLoad]
-    public static class VolumetricBakeAfterLightBakePrompt
+    public static class VolumetricBakeAfterLightBakePrompt 
     {
         // ── Prefs ─────────────────────────────────────────────────────────────
         const string PrefBehavior             = "SLZ.VolBakePrompt.Behavior";
@@ -40,9 +40,11 @@ namespace SLZ.SLZEditorTools
         static VolumetricBakeAfterLightBakePrompt()
         {
             Lightmapping.bakeStarted   -= OnBakeStarted;
-            Lightmapping.bakeCompleted -= OnBakeCompleted;
+            //Lightmapping.bakeCompleted -= OnBakeCompleted;
             Lightmapping.bakeStarted   += OnBakeStarted;
-            Lightmapping.bakeCompleted += OnBakeCompleted;
+            //Lightmapping.bakeCompleted += OnBakeCompleted;
+            SortedPostBakeEvent.Unregister(VolOnBakeCompleted, PostBakeOrder.VolumetricBake);
+            SortedPostBakeEvent.Register(VolOnBakeCompleted, PostBakeOrder.VolumetricBake);
         }
 
         // ── Menu item — pings the prefs page ──────────────────────────────────
@@ -137,7 +139,7 @@ namespace SLZ.SLZEditorTools
             SessionState.SetBool(SessionBakeStartedKey, true);
         }
 
-        static void OnBakeCompleted()
+        static void VolOnBakeCompleted()
         {
             if (Application.isBatchMode) return;
             if (Behavior == AfterLightBakeBehavior.Disabled) return;

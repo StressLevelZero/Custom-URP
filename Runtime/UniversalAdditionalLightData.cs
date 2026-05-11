@@ -59,6 +59,17 @@ namespace UnityEngine.Rendering.Universal
     [URPHelpURL("universal-additional-light-data")]
     public class UniversalAdditionalLightData : MonoBehaviour, ISerializationCallbackReceiver, IAdditionalData
     {
+        /// SLZ MODIFIED 
+        public enum AdditionalLightType
+        {
+            None = 0,
+            Portal = 1
+        }
+
+        [SerializeField] private AdditionalLightType m_AdditionalLightType;
+        public AdditionalLightType additionalLightType => m_AdditionalLightType;
+        /// END SLZ MODIFIED
+
         // Version 0 means serialized data before the version field.
         [SerializeField] int m_Version = 3;
         internal int version

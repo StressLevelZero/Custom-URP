@@ -160,6 +160,8 @@ public class VolumetricBaking : EditorWindow
     public bool SkyboxContribution = true;
     public Cubemap CustomEnvorment;
     public int EnvLightSamples = 2048;
+    public int  indirectSamples  =  2048;
+    public int  indirectIterations  =   5;
     public int RayChunkSize = 4096;
 
     bool checkedD3D12 = false;
@@ -190,7 +192,10 @@ public class VolumetricBaking : EditorWindow
         EditorGUILayout.LabelField("Custom Skybox", EditorStyles.label);
         CustomEnvorment = (Cubemap)EditorGUILayout.ObjectField(CustomEnvorment, typeof(Cubemap), true);
         EditorGUILayout.EndHorizontal();
-        EnvLightSamples = EditorGUILayout.IntSlider("Environmental Samples", EnvLightSamples, 1, 8192); ;
+        EnvLightSamples = EditorGUILayout.IntSlider("Environmental Samples", EnvLightSamples, 1, 8192); 
+        indirectSamples = EditorGUILayout.IntSlider("Indirect Samples", indirectSamples, 1, 8192);
+        indirectIterations = EditorGUILayout.IntSlider("Indirect Iterations", indirectIterations, 0, 100);
+        
         GUI.enabled = true;
         //       EditorGUILayout.IntField(AreaLightSamples, "Area light samples" );
 
@@ -201,7 +206,7 @@ public class VolumetricBaking : EditorWindow
             if (VerifySettings() == false) return; //Check settings and return if something is wrong
             if (DXRAcceletration)
             {
-                VolumetricBakingV2.BakeDXR(RayChunkSize, EnvLightSamples, AreaLightSamples, SkyboxContribution, CustomEnvorment);
+                VolumetricBakingV2.BakeDXR(RayChunkSize, EnvLightSamples, AreaLightSamples, indirectSamples,indirectIterations,SkyboxContribution, CustomEnvorment);
             }
             else
             {

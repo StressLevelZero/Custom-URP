@@ -972,6 +972,37 @@ void SLZGetLightmapLighting(inout half3 diffuse, inout half3 specular, const SLZ
     #endif
 }
 
+/*
+* Evaluate a single channel of the L0 + L1 spherical harmonic at a given normal.
+* Use this when you want to evaluate SH with a different normal per channel
+* (e.g. softened normals for SSS-style channel-shifted ambient diffuse).
+*
+* @param N   Worldspace normal to evaluate at
+* @param shA One of unity_SHAr / unity_SHAg / unity_SHAb
+* @return    L0 + L1 contribution for that channel
+*/
+real SHEvalLinearL0L1Channel(real3 N, real4 shA)
+{
+    return dot(shA, real4(N, 1.0));
+}
+/**
+ * Evaluate a single channel of the L2 SH at a given normal.
+ * Use when evaluating SH with different normals per channel
+ * (e.g. softened normals for SSS-style channel-shifted ambient diffuse).
+ *
+ * @param N         World   space normal to evaluate at
+ * @param shB       One of unity_SHBr / unity_SHBg / unity_SHBb
+ * @param shCChan   Corresponding channel of unity_SHC (.r/.g/.b)
+ * @return          L2 contribution for that channel
+ */
+real SHEvalLinearL2Channel(real3 N, real4 shB, real shCChan)
+{
+    real4 vB = N.xyzz * N.yzzx;
+    real  x2 = dot(shB, vB);
+    real  vC = N.x * N.x - N.y * N.y;
+    return x2 + shCChan * vC;
+}
+
 /**
  * Add to the diffuse the light from spherical harmonics
  *
@@ -984,11 +1015,40 @@ void SLZSHDiffuse(inout half3 diffuse, half3 normal)
         #if defined(EVALUATE_SH_VERTEX) // all of spherical harmonics are calculated in the vertex program
            // do nothing 
         #else // Calculate all or some of the SH in the frag
+    
+            #if defined(_BRDFMAP)
+            // Soften N toward the L1-derived ambient gather direction
+            // Larger softening factor = larger wraparound (deeper scatter)
+            // Dominant direction from luminance-summed L1
+            float3 l1Vec = unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz;
+            float  l1LenSq = max(dot(l1Vec, l1Vec), FLT_MIN);
+            half3  dominantDir = (half3)(l1Vec * rsqrt(l1LenSq));
+            
+            // Soften normal per channel — red scatters deepest, blue not at all.
+            // Tune these to taste / expose as material params.
+            half3 nR = SLZSafeHalf3Normalize(lerp(normal, dominantDir, _SSSColor.r));
+            half3 nG = SLZSafeHalf3Normalize(lerp(normal, dominantDir, _SSSColor.g));
+            half3 nB = SLZSafeHalf3Normalize(lerp(normal, dominantDir, _SSSColor.b));
+            
+            half3 shL0L1 ;
+            shL0L1.r = SHEvalLinearL0L1Channel(nR, unity_SHAr);
+            shL0L1.g = SHEvalLinearL0L1Channel(nG, unity_SHAg);
+            shL0L1.b = SHEvalLinearL0L1Channel(nB, unity_SHAb);
+            #else 
             half3 shL0L1 = SHEvalLinearL0L1(normal, unity_SHAr, unity_SHAg, unity_SHAb);
+            #endif
             #if defined(EVALUATE_SH_MIXED) // In mixed mode, the L2 component is calculated in the vertex
                 half3 shL2 = half3(0,0,0);
             #else
+                #if defined(_BRDFMAP)
+                half3 shL2;
+                shL2.r = SHEvalLinearL2Channel(nR, unity_SHBr, unity_SHC.r);
+                shL2.g = SHEvalLinearL2Channel(nG, unity_SHBg, unity_SHC.g);
+                shL2.b = SHEvalLinearL2Channel(nB, unity_SHBb, unity_SHC.b);
+                #else
                 half3 shL2 = SHEvalLinearL2(normal, unity_SHBr, unity_SHBg, unity_SHBb, unity_SHC);
+                #endif
+    
             #endif
             diffuse += shL2 + shL0L1;
             //shL1 += shL0;
@@ -1174,7 +1234,7 @@ void SLZMainLight(inout diffuseLight diffuse, inout half3 specular, const SLZFra
 
         #endif
     #endif
-    
+    diffuse += diffuseBRDF;
 
 }
 

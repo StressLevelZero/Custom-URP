@@ -1,35 +1,51 @@
 
 #define SHADERPASS SHADERPASS_RAYTRACE
 
-#include "UnityRaytracingMeshUtils.cginc"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+//#include "UnityRaytracingMeshUtils.cginc"
 
 #pragma raytracing BakeHit
+//#include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/BakedRaytraceParts.hlsl"
 
-struct RayPayload
-{
-    float4 color;
-	float3 dir;
-};
-  
-struct AttributeData
-{
-    float2 barycentrics;
-};
+//float4 _BaseColor;
+Texture2D<float4> _BaseMap;
+//float4 _BaseMap_ST;
+SamplerState sampler_BaseMap;
+Texture2D<float4> _EmissionMap;
+SamplerState sampler_EmissionMap;
 
-struct Vertex
-{
-    float2 texcoord;
-    float3 normal;
-};
-
-
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
   
 //https://coty.tips/raytracing-in-unity/
-[shader("closesthit")]
-void MyClosestHit(inout RayPayload payload, AttributeData attributes : SV_IntersectionAttributes) {
+// [shader("closesthit")]
+// void MyClosestHit(inout RayPayload payload, AttributeData attributes : SV_IntersectionAttributes) {
+//
+// 	EARLY_OUT_ON_BACKFACE(payload);	
+// 	InterpolationData interpData;	
+// 	InterpolatedSurface(attributes, interpData, payload);
+// 	float4 albedo = 0;
+// 	float4 emission = 0;
+// 	// Begin Injection CLOSEST_HIT from Injection_Emission_BakedRT.hlsl ----------------------------------------------------------
+// 	
+// 	albedo = float4(_BaseMap.SampleLevel(sampler_BaseMap, interpData.vertex.texcoord.xy * _BaseMap_ST.xy + _BaseMap_ST.zw, 0).rgb, 1) * _BaseColor;
+// 		emission = _Emission * _EmissionMap.SampleLevel(sampler_EmissionMap, interpData.vertex.texcoord * _BaseMap_ST.xy + _BaseMap_ST.zw, 0) * _EmissionColor;
+// 	emission.rgb *= lerp(albedo.rgb, 1, emission.a);
+// 	emission = max(emission * _BakedMutiplier,0);
+// 	
+// 	// End Injection CLOSEST_HIT from Injection_Emission_BakedRT.hlsl ----------------------------------------------------------
+// 	WritePayloads(payload,albedo,emission);
+//
+// }
 
-	payload.color = float4(0,0,0,1); //Intializing
-	payload.dir = float3(1,0,0);
-
+#define MATERIAL_PROVIDES_EVALUATE
+void EvaluateMaterial(float2 hitUV, out float3 albedo, out float3 emission)
+{
+    float2 uv = hitUV * _BaseMap_ST.xy + _BaseMap_ST.zw;
+    float3 baseRGB = _BaseMap.SampleLevel(sampler_BaseMap, uv, 0).rgb * _BaseColor.rgb;
+    albedo = baseRGB;
+    float4 em = _Emission * _EmissionMap.SampleLevel(sampler_EmissionMap, uv, 0) * _EmissionColor;
+    em.rgb  *= lerp(baseRGB, 1.0, em.a);   // alpha = how "untinted" the emission reads
+    emission = em.rgb * _BakedMutiplier;
 }
+#include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/BakedRaytracePass.hlsl"

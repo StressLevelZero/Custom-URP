@@ -79,11 +79,14 @@ struct VertOut
 //#define UNPACK_FOG(i) i.wPos_fog.w
 #define UNPACK_VERTLIGHTS(i) i.SHVertLights_btSign.xyz
 
+//#!INJECT_POINT DEFAULT_TEXTURES
+//#!INJECT_DEFAULT
 TEXTURE2D(_BaseMap);
 SAMPLER(sampler_BaseMap);
 
 TEXTURE2D(_BumpMap);
 TEXTURE2D(_MetallicGlossMap);
+//#!INJECT_END
 
 
 

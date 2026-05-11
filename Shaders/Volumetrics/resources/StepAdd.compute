@@ -182,8 +182,10 @@ float OneMinusExpNegOverX(float x)
         float x2 = x * x;
         return 1.0f - 0.5f * x + (1.0f / 6.0f) * x2 - (1.0f / 24.0f) * x2 * x;
     }
-
-    return (1.0f - exp(-x)) / x;
+    else //needed to account for FXC being bad at control-flow analysis and throwing "potentially uninitialized" warnings
+    {
+        return (1.0f - exp(-x)) / x;
+    }
 }
 
 [numthreads(8, 8, 1)]	

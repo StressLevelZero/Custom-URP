@@ -196,6 +196,10 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         // jitter pattern cache
         public bool xyInit = false;
         public Vector2[] xySeq = new Vector2[7];
+        
+        public bool   panicPrevValid;
+        public float  panicPrevExtinction;
+        public float  panicPrevStaticLightMul;
 
        public void EnsureAllocated(Settings s, Camera cam, bool stereo)
         {
@@ -418,6 +422,7 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         CameraResources m_Res;
 
         static readonly ProfilingSampler s_Profile = new ProfilingSampler("Volumetrics (2022)");
+        static readonly ProfilingSampler s_Volumeping = new ProfilingSampler("Volumes ping");
 
         // ---- IDs / names used by your compute shaders ----
         static readonly int ID_Result                = Shader.PropertyToID("Result");
@@ -471,7 +476,51 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
             m_Cam = cam;
             m_Res = res;
         }
-      
+        // Property IDs (cache as static readonly on the pass class)
+        static readonly int ID_GlobalExtinction      = Shader.PropertyToID("_GlobalExtinction");
+        static readonly int ID_StaticLightMultiplier = Shader.PropertyToID("_StaticLightMultiplier");
+        static readonly int ID_PanicRefresh          = Shader.PropertyToID("_PanicRefresh");
+
+        void ApplyVolumeGlobals(CommandBuffer cmd, Volumetrics vol)
+        {
+            if (vol == null || !vol.active)
+            {
+                // Defaults when no volume is present
+                cmd.SetGlobalFloat(ID_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(50f));
+                cmd.SetGlobalFloat(ID_StaticLightMultiplier, 1f);
+                cmd.SetGlobalFloat(ID_PanicRefresh, 0f);
+                m_Res.panicPrevValid = false;  // reset history when volume disappears
+                return;
+            }
+
+            float extinction = VolumeRenderingUtils.ExtinctionFromMeanFreePath(vol.FogViewDistance.value);
+            float staticMul  = vol.GlobalStaticLightMultiplier.value;
+
+            // Panic detection — strictly per-camera, no Time.frameCount guard needed.
+            float panic = 0f;
+            if (vol.PanicRefreshEnabled.value && m_Res.panicPrevValid)
+            {
+                float dExt = RelDiff(extinction, m_Res.panicPrevExtinction);
+                float dMul = RelDiff(staticMul,  m_Res.panicPrevStaticLightMul);
+                float delta = Mathf.Max(dExt, dMul);
+                if (delta >= vol.PanicRefreshThreshold.value)
+                    panic = 1f;
+            }
+
+            m_Res.panicPrevExtinction     = extinction;
+            m_Res.panicPrevStaticLightMul = staticMul;
+            m_Res.panicPrevValid          = true;
+
+            cmd.SetGlobalFloat(ID_GlobalExtinction,      extinction);
+            cmd.SetGlobalFloat(ID_StaticLightMultiplier, staticMul);
+            cmd.SetGlobalFloat(ID_PanicRefresh,          panic);
+        }
+
+        static float RelDiff(float a, float b)
+        {
+            float denom = Mathf.Max(Mathf.Max(Mathf.Abs(a), Mathf.Abs(b)), 1e-4f);
+            return Mathf.Abs(a - b) / denom;
+        }
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
@@ -594,23 +643,29 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
                 // ------------------------------------------------------------
                 // Volume stack controller: 
                 // ------------------------------------------------------------
-                //m_Cam.UpdateVolumeStack();
-                //var stack = m_Res.VolMana.stack;
-                // var vol = stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
-                var vol = VolumeManager.instance.stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
+                using (new ProfilingScope(cmd, s_Volumeping))
+                {
+                    //m_Cam.UpdateVolumeStack();
+                    //var stack = m_Res.VolMana.stack;
+                    // var vol = stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
+                    var vol = VolumeManager.instance.stack.GetComponent<UnityEngine.Rendering.Universal.Volumetrics>();
 
-                 if (vol != null && vol.active) // active = component enabled + any overrides
-                 {
-                     // Apply globals for this camera for this pass
-                     vol.SetGlobalsOnCmdBuffer(cmd); //TODO: Refactor and move the logic off the volume system. Causing garbage
-                 }
-                 else
-                 {
-                    // Defaults if no volume is present 
-                    cmd.SetGlobalFloat(Shader.PropertyToID("_GlobalExtinction"), VolumeRenderingUtils.ExtinctionFromMeanFreePath(50f));
-                    cmd.SetGlobalFloat(Shader.PropertyToID("_StaticLightMultiplier"), 1f);
-                    cmd.SetGlobalFloat(Shader.PropertyToID("_PanicRefresh"), 0f);
+                    if (vol != null && vol.active) // active = component enabled + any overrides
+                    {
+                        // Apply globals for this camera for this pass
+                        // vol.SetGlobalsOnCmdBuffer(cmd); //TODO: Refactor and move the logic off the volume system. Causing garbage
+                        ApplyVolumeGlobals(cmd, vol);
+                    }
+                    else
+                    {
+                        // Defaults if no volume is present 
+                        cmd.SetGlobalFloat(ID_GlobalExtinction, VolumeRenderingUtils.ExtinctionFromMeanFreePath(50f));
+                        cmd.SetGlobalFloat(ID_StaticLightMultiplier, 1f);
+                        cmd.SetGlobalFloat(ID_PanicRefresh, 0f);
+                    }
+                    
                 }
+
                 // ------------------------------------------------------------
                 // Clipmaps: update + bind into Scatter
                 // ------------------------------------------------------------

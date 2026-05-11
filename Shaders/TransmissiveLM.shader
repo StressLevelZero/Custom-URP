@@ -342,22 +342,8 @@ Shader "SLZ/Transmissive Lightmap"
                 float4 _MainTex_ST;
             CBUFFER_END
 
-            struct RayPayload
-            {
-                float4 color;
-                float3 dir;
-            };
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/BakedRaytraceData.hlsl"
 
-            struct AttributeData
-            {
-                float2 barycentrics;
-            };
-
-            struct Vertex
-            {
-                float2 texcoord;
-                // Other per-vertex properties would go here
-            };
 
             #define UNLIT_IS_EMISSIVE // uncomment if you want your unlit shader to emit light
 

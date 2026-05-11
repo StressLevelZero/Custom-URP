@@ -17,6 +17,8 @@ namespace SLZ.SLZEditorTools
         const string kPrefsRayChunk    = "VolBake.vb_rayChunk";
         const string kPrefsEnvSamples  = "VolBake.vb_envSamples";
         const string kPrefsAreaSamples = "VolBake.vb_areaSamples";
+        const string kPrefsIndirectSamples = "VolBake.vb_indirectSamples";
+        const string kPrefsIndirectIterations = "VolBake.vb_indirectIterations";
         const string kPrefsSkybox      = "VolBake.vb_skybox";
 
         // [MenuItem("Stress Level Zero/Volumetrics/Bake Active Scene (DX12 Batch)")]
@@ -53,6 +55,8 @@ namespace SLZ.SLZEditorTools
             string unityExe    = EditorApplication.applicationPath;
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             int    rayChunk    = EditorPrefs.GetInt(kPrefsRayChunk,    4096);
+            int    indirectSamples = EditorPrefs.GetInt(kPrefsIndirectSamples, 2048);
+            int    indirectIterations = EditorPrefs.GetInt(kPrefsIndirectIterations, 5);
             int    envSamples  = EditorPrefs.GetInt(kPrefsEnvSamples,  2048);
             int    areaSamples = EditorPrefs.GetInt(kPrefsAreaSamples, 256);
             bool   skybox      = EditorPrefs.GetBool(kPrefsSkybox,     true);
@@ -79,7 +83,7 @@ namespace SLZ.SLZEditorTools
 
             File.WriteAllText(ps1MainPath,
                 BuildPS1Main(unityExe, projectRoot, batchLog, scenePaths, scenesSummary,
-                             scenesArg, rayChunk, envSamples, areaSamples, skyboxVal),
+                             scenesArg, rayChunk, envSamples, areaSamples, indirectSamples, indirectIterations, skyboxVal),
                 Encoding.UTF8);
 
             File.WriteAllText(ps1TailPath, BuildPS1Tail(batchLog), Encoding.UTF8);
@@ -105,7 +109,7 @@ namespace SLZ.SLZEditorTools
         static string BuildPS1Main(
             string unityExe, string projectRoot, string logPath,
             List<string> scenePaths, string scenesSummary, string scenesArg,
-            int rayChunk, int envSamples, int areaSamples, string skyboxVal)
+            int rayChunk, int envSamples, int areaSamples, int indirectSamples, int indirectIterations,  string skyboxVal)
         {
             var b = new StringBuilder();
 
@@ -121,6 +125,8 @@ namespace SLZ.SLZEditorTools
             b.AppendLine($"$rayChunk     = {rayChunk}");
             b.AppendLine($"$envSamples   = {envSamples}");
             b.AppendLine($"$areaSamples  = {areaSamples}");
+            b.AppendLine($"$indirectSamples  = {indirectSamples}");
+            b.AppendLine($"$indirectIterations  = {indirectIterations}");
             b.AppendLine($"$useSkybox    = {skyboxVal}");
 
             // ── Notification provider config (baked in from EditorPrefs) ──────
@@ -151,6 +157,8 @@ namespace SLZ.SLZEditorTools
             b.AppendLine( "    \"-vb_rayChunk=$rayChunk\",");
             b.AppendLine( "    \"-vb_envSamples=$envSamples\",");
             b.AppendLine( "    \"-vb_areaSamples=$areaSamples\",");
+            b.AppendLine( "    \"-vb_indirectSamples=$indirectSamples\",");
+            b.AppendLine( "    \"-vb_indirectIterations=$indirectIterations\",");
             b.AppendLine( "    \"-vb_skybox=$useSkybox\"");
             b.AppendLine( ")");
             b.AppendLine( "$startTime     = Get-Date");
@@ -228,7 +236,7 @@ namespace SLZ.SLZEditorTools
             b.AppendLine( "    Write-Host ($marker + ' ' + $sceneList[$i]) -ForegroundColor Gray");
             b.AppendLine( "}");
             b.AppendLine( "Write-Host ''");
-            b.AppendLine( "Write-Host \"  Settings : rayChunk=$rayChunk  envSamples=$envSamples  areaSamples=$areaSamples  skybox=$useSkybox\" -ForegroundColor Gray");
+            b.AppendLine( "Write-Host \"  Settings : rayChunk=$rayChunk  envSamples=$envSamples  areaSamples=$areaSamples indirectSamples=$indirectSamples indirectIterations=$indirectIterations skybox=$useSkybox\" -ForegroundColor Gray");
             b.AppendLine( "Write-Host $sepLine -ForegroundColor DarkGray");
             b.AppendLine( "Write-Host ''");
 

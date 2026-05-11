@@ -19,6 +19,7 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         [HDR]_HitColor("HitColor", Color) = (0,0,0,0)
         [HideInInspector]_NumberOfHits("_NumberOfHits", Int) = 0
         [Space(30)][Header(BRDF map)][Space(10)][Toggle(_BRDFMAP)] BRDFMAP("BRDFMAP enabled", Float) = 0
+    	[Gamma]_SSSColor("SSS Color", Color) = (.32,.18,.018,0)
         [NoScaleOffset][SingleLineTexture]g_tBRDFMap("BRDF Ramp", 2D) = "black" {}
         [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 1
         //[Header(This should be 0 for skinned meshes)]
@@ -40,6 +41,7 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         _FluorColor("Fluorescence Color", Color) = (1,1,1,1)
         _FluorAbsorbance("Fluorescence Absorbance", Color) = (0,0.1875,0.929,1)
         _FluorAlbedoTint("Fluorescence Albedo Influence", Range( 0 , 1)) = 1
+    	
     }
     SubShader
     {

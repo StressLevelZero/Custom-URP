@@ -1,3 +1,6 @@
+#if !UNITY_BURST_EXPERIMENTAL_ATOMIC_INTRINSICS
+#error MeshProjectedUvVariant needs UNITY_BURST_EXPERIMENTAL_ATOMIC_INTRINSICS set in Project Settings->Player->Scripting Define Symbols!
+#endif
 using System.Collections;
 using System.Collections.Generic;
 using UnityEditor.AssetImporters;
@@ -11,12 +14,21 @@ using UnityEditorInternal;
 using UnityEngine.Rendering;
 using Unity.Jobs;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using System.Runtime.CompilerServices;
 using System.Reflection;
+using System.Threading;
 
 [ScriptedImporter(version: 3, ext: "projUV", AllowCaching = true)]
 public class MeshProjectedUvVariant : ScriptedImporter
 {
+
+    public enum ProjectionMethod
+    {
+        Flat = 0,
+        Triplanar = 1
+    }
+
     delegate bool d_GetGUIDAndLocalIdentifierInFile(int instanceID, out GUID outGuid, out long outLocalId);
     static d_GetGUIDAndLocalIdentifierInFile s_GetGUIDAndLocalIdentifierInFile;
     static d_GetGUIDAndLocalIdentifierInFile GetGUIDAndLocalIdentifierInFile
@@ -37,6 +49,8 @@ public class MeshProjectedUvVariant : ScriptedImporter
     public LazyLoadReference<Mesh> parentMesh;
     
     public float4x4 projectionSpace = Unity.Mathematics.float4x4.identity;
+
+    ProjectionMethod projectionMethod = ProjectionMethod.Flat;
 
     public override void OnImportAsset(AssetImportContext ctx)
     {
@@ -231,6 +245,122 @@ public class MeshProjectedUvVariant : ScriptedImporter
             int absTanOffset = vtxOffset + tangentOffset;
 
             Store4Floats(ref meshData, absTanOffset, float4(tangent, bitangentSign));
+        }
+    }
+
+    [BurstCompile(FloatPrecision.Low, FloatMode.Fast, CompileSynchronously = true)]
+    struct TriMarkFaceOrientationJob : IJobParallelFor
+    {
+        [NativeDisableParallelForRestriction]
+        NativeList<int> vtxFaceFlags;
+        [WriteOnly]
+        NativeArray<byte> triFaceDir;
+
+        [ReadOnly]
+        NativeArray<ushort> indexBuffer;
+        [ReadOnly]
+        NativeArray<float> vertexBuffer;
+
+        int vertexStride;
+
+        public float3x3 projectionSpace;
+
+        public void Execute(int i)
+        {
+            int triIndex = 3 * i;
+            int index0 = indexBuffer[triIndex];
+            int index1 = indexBuffer[triIndex + 1];
+            int index2 = indexBuffer[triIndex + 2];
+
+            float3 vtx0 = GetVtx(index0);
+            float3 vtx1 = GetVtx(index1);
+            float3 vtx2 = GetVtx(index2);
+
+            float3 edge0 = mul(projectionSpace, vtx2 - vtx1);
+            float3 edge1 = mul(projectionSpace, vtx0 - vtx1);
+            float3 normal = cross(edge0, edge1);
+            float normLenSq = dot(normal, normal);
+            
+            if (normLenSq == 0)
+            {
+                normal = float3(0,1,0);
+                normLenSq = 1;
+            }
+
+            normal = normal * rsqrt(normLenSq);
+
+            float3 absNorm = abs(normal);
+            int bitmask = 0;
+            if (absNorm.x >= absNorm.y && absNorm.x >= absNorm.z)
+            {
+                bitmask = normal.x > 0 ? 1 : 1 << 1; 
+            }
+            else if (absNorm.y >= absNorm.x && absNorm.y >= absNorm.z)
+            {
+                bitmask = normal.y > 0 ? 1 << 2 : 1 << 3; 
+            }
+            else
+            {
+                bitmask = normal.z > 0 ? 1 << 4 : 1 << 5; 
+            }
+            triFaceDir[i] = (byte)bitmask;
+            Unity.Burst.Intrinsics.Common.InterlockedAnd(ref vtxFaceFlags.ElementAt(index0), bitmask);
+            Unity.Burst.Intrinsics.Common.InterlockedAnd(ref vtxFaceFlags.ElementAt(index1), bitmask);
+            Unity.Burst.Intrinsics.Common.InterlockedAnd(ref vtxFaceFlags.ElementAt(index2), bitmask);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        float3 GetVtx(int index)
+        {
+            int offset = index * vertexStride;
+            return new float3(
+                vertexBuffer[offset],
+                vertexBuffer[offset + 1],
+                vertexBuffer[offset + 2]
+            );
+        }
+    }
+
+    struct TriplanarCount
+    {
+        public int xp;
+        public int xn;
+        public int yp;
+        public int yn;
+        public int zp;
+        public int zn;
+
+        public int Sum()
+        {
+            return xp + xn + yp + yn + zp + zn;
+        }
+    }
+
+    [BurstCompile(FloatPrecision.Low, FloatMode.Fast, CompileSynchronously = true)]
+    struct CalculateVertexBufferSizeJob : IJobParallelFor
+    {
+        [ReadOnly]
+        NativeArray<int> vtxFaceFlags;
+        [WriteOnly]
+        NativeArray<TriplanarCount> outSize;
+
+        public int chunkSize;
+
+        public void Execute(int i)
+        {
+            int startIndex = chunkSize * i;
+            int endIndex = min(startIndex + chunkSize, vtxFaceFlags.Length);
+            TriplanarCount count = new TriplanarCount();
+            for (int vIdx = startIndex; vIdx < endIndex; vIdx++)
+            {
+                count.xp += (vtxFaceFlags[vIdx] & 1         ) > 0 ? 1 : 0;
+                count.xn += (vtxFaceFlags[vIdx] & (1 << 1)  ) > 0 ? 1 : 0;
+                count.yp += (vtxFaceFlags[vIdx] & (1 << 2)  ) > 0 ? 1 : 0;
+                count.yn += (vtxFaceFlags[vIdx] & (1 << 3)  ) > 0 ? 1 : 0;
+                count.zp += (vtxFaceFlags[vIdx] & (1 << 4)  ) > 0 ? 1 : 0;
+                count.zn += (vtxFaceFlags[vIdx] & (1 << 5)  ) > 0 ? 1 : 0;
+            }
+            outSize[i] = count;
         }
     }
 }

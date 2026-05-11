@@ -46,11 +46,16 @@ float4 clearColor;
 // Safe integer modulo: produces a non-negative result for negative absVoxel.
 int3 WrapCoord(int3 absVoxel, int r)
 {
-    int3 w;
-    w.x = ((absVoxel.x % r) + r) % r;
-    w.y = ((absVoxel.y % r) + r) % r;
-    w.z = ((absVoxel.z % r) + r) % r;
-    return w;
+    // absVoxel can be negative. Adding a large multiple of r guarantees
+    // positivity without changing the result mod r. One unsigned mod, no
+    // signed mod. We add 2*r to handle absVoxel as negative as -2*r,
+    // which covers any slab base within one full window of the origin.
+    uint ur = (uint)r;
+    uint3 w;
+    w.x = (uint(absVoxel.x) + 2u * ur) % ur;
+    w.y = (uint(absVoxel.y) + 2u * ur) % ur;
+    w.z = (uint(absVoxel.z) + 2u * ur) % ur;
+    return int3(w);
 }
 
 // =============================================================================

@@ -52,6 +52,8 @@ public static class VolumetricBakeBatchRunner
             var  args        = Environment.GetCommandLineArgs();
             int  rayChunk    = GetArgInt(args,  "-vb_rayChunk",    4096);
             int  envSamples  = GetArgInt(args,  "-vb_envSamples",  2048);
+            int  indirectSamples  = GetArgInt(args,  "-vb_indirectSamples",  2048);
+            int  indirectIterations  = GetArgInt(args,  "-vb_indirectIterations",  5);
             int  areaSamples = GetArgInt(args,  "-vb_areaSamples", 1024);
             bool skybox      = GetArgBool(args, "-vb_skybox",      true);
 
@@ -73,7 +75,7 @@ public static class VolumetricBakeBatchRunner
             for (int i = 0; i < scenePaths.Length; i++)
                 Debug.Log($"[VolBake]   [{i}] {scenePaths[i]}");
 
-            Debug.Log($"[VolBake] Args: rayChunk={rayChunk} envSamples={envSamples} areaSamples={areaSamples} skybox={skybox}");
+            Debug.Log($"[VolBake] Args: rayChunk={rayChunk} envSamples={envSamples} areaSamples={areaSamples} indirectSamples={indirectSamples} indirectIterations={indirectIterations} skybox={skybox}");
 
             if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Direct3D12)
                 throw new Exception($"DX12 not active. Current API: {SystemInfo.graphicsDeviceType}");
@@ -111,7 +113,7 @@ public static class VolumetricBakeBatchRunner
                 a.bakedTexture = null;
 
             Debug.Log("[VolBake] Calling VolumetricBakingV2.BakeDXR(…)");
-            VolumetricBakingV2.BakeDXR(rayChunk, envSamples, areaSamples, skybox, null);
+            VolumetricBakingV2.BakeDXR(rayChunk, envSamples, areaSamples, indirectSamples,indirectIterations,skybox, null);
 
             EditorApplication.update += Poll;
         }

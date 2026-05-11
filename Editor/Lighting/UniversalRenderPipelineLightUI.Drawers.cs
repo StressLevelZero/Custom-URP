@@ -28,7 +28,6 @@ namespace UnityEditor.Rendering.Universal
             Volumetrics = 1 << 6
             // END SLZ MODIFIED
         }
-
         static readonly ExpandedState<Expandable, Light> k_ExpandedState = new(~-1, "URP");
 
         public static readonly CED.IDrawer Inspector = CED.Group(
@@ -203,9 +202,18 @@ namespace UnityEditor.Rendering.Universal
             serializedLight.settings.DrawInnerAndOuterSpotAngle();
         }
 
+        enum AreaLightBehavior
+        {
+            Standard = 0,
+            Portal = 1
+        }
+        static bool s_PortalFoldout = false;
+
         static void DrawAreaShapeContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
-            int selectedShape = serializedLight.settings.isAreaLightType ? serializedLight.settings.lightType.intValue : 0;
+            int selectedShape = serializedLight.settings.isAreaLightType
+                ? serializedLight.settings.lightType.intValue
+                : 0;
 
             // Handle all lights that are not in the default set
             if (!Styles.LightTypeValues.Contains(serializedLight.settings.lightType.intValue))
@@ -219,18 +227,50 @@ namespace UnityEditor.Rendering.Universal
             var rect = EditorGUILayout.GetControlRect();
             EditorGUI.BeginProperty(rect, Styles.AreaLightShapeContent, serializedLight.settings.lightType);
             EditorGUI.BeginChangeCheck();
-            int shape = EditorGUI.IntPopup(rect, Styles.AreaLightShapeContent, selectedShape, Styles.AreaLightShapeTitles, Styles.AreaLightShapeValues);
+            int shape = EditorGUI.IntPopup(rect, Styles.AreaLightShapeContent, selectedShape,
+                Styles.AreaLightShapeTitles, Styles.AreaLightShapeValues);
 
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(serializedLight.settings.light, "Adjust Light Shape");
                 serializedLight.settings.lightType.intValue = shape;
             }
+
             EditorGUI.EndProperty();
 
             using (new EditorGUI.IndentLevelScope())
+                /// SLZ MODIFIED
+            {
                 serializedLight.settings.DrawArea();
+
+                if (serializedLight.settings.lightType.intValue == 3 && serializedLight.additionalLightData.advancedOptions)
+                {
+                    s_PortalFoldout = EditorGUILayout.Foldout(s_PortalFoldout, Styles.PortalAdvancedFoldout, true);
+                    if (s_PortalFoldout )
+                    {
+                        using (new EditorGUI.IndentLevelScope())
+                        {
+                            EditorGUILayout.HelpBox(Styles.PortalHelpText, MessageType.Info);
+
+                            AreaLightBehavior behavior =
+                                (AreaLightBehavior)serializedLight.additionalLightType.enumValueIndex;
+                            EditorGUI.BeginChangeCheck();
+                            behavior = (AreaLightBehavior)EditorGUILayout.EnumPopup(Styles.Portal, behavior);
+                            if (EditorGUI.EndChangeCheck())
+                            {
+                                serializedLight.additionalLightType.enumValueIndex =
+                                    behavior == AreaLightBehavior.Portal
+                                        ? (int)UniversalAdditionalLightData.AdditionalLightType.Portal
+                                        : (int)UniversalAdditionalLightData.AdditionalLightType.None;
+                                serializedLight.serializedAdditionalDataObject.ApplyModifiedProperties();
+                            }
+                        }
+                    }
+                }
+            }
+            /// END SLZ MODIFIED
         }
+
         static bool UseSimpleBakedShadowUI(UniversalRenderPipelineSerializedLight serializedLight)
         {
             // "Bake mode" = not Realtime (so Baked or Mixed)
@@ -364,7 +404,7 @@ namespace UnityEditor.Rendering.Universal
                 {
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.HelpBox("Non-Physical Values!", MessageType.Warning);
-                    if (GUILayout.Button("FIT IT!"))
+                    if (GUILayout.Button("Fix it"))
                     {
                         serializedLight.settings.light.bounceIntensity = 1;
                         serializedLight.additionalLightData.volumetricDimmer = 1;

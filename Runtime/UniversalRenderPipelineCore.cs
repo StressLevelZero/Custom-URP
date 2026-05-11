@@ -1604,7 +1604,9 @@ namespace UnityEngine.Rendering.Universal
                         LightmapperUtils.Extract(light, ref pointLight);
                         lightData.Init(ref pointLight, ref cookie);
                      // float pointdistfrominversesqr = 1/math.sqrt(256 * light.intensity );
-                        if (additionalLightData.IsPatched ) lightData.range = 9999999;
+#if UNITY_EDITOR
+                        if (UnityEditor.SessionState.GetInt("SLZ.KernelPatched", -1) == 1) lightData.range = 9999999;
+#endif
                         
                         break;
                     case LightType.Spot:
@@ -1614,7 +1616,9 @@ namespace UnityEngine.Rendering.Universal
                         spotLight.angularFalloff = AngularFalloffType.AnalyticAndInnerAngle;
                         lightData.Init(ref spotLight, ref cookie);
                       //  float spotdistfrominversesqr = math.sqrt(512 * light.intensity);
-                        if (additionalLightData.IsPatched ) lightData.range = 9999999;
+#if UNITY_EDITOR
+                        if (UnityEditor.SessionState.GetInt("SLZ.KernelPatched", -1) == 1) lightData.range = 9999999;
+#endif
                         break;
 #if UNITY_6000_0_OR_NEWER
                     case LightType.Rectangle:
@@ -1623,14 +1627,33 @@ namespace UnityEngine.Rendering.Universal
 #endif
                         RectangleLight rectangleLight = new RectangleLight();
                         LightmapperUtils.Extract(light, ref rectangleLight);
-                        rectangleLight.range = 9999999;
+                        rectangleLight.range = 9999999; //modify After Extract
                         rectangleLight.mode = LightMode.Baked;
-                        lightData.Init(ref rectangleLight, ref cookie);
+                        if (additionalLightData.additionalLightType == UniversalAdditionalLightData.AdditionalLightType.Portal)
+                        {
+                            SpotLightBoxShape box = new SpotLightBoxShape();
+
+                            box.instanceID =    rectangleLight.instanceID;
+	                        box.shadow =        rectangleLight.shadow;
+	                        box.mode =          rectangleLight.mode;
+	                        box.position =      rectangleLight.position;
+	                        box.orientation =   rectangleLight.orientation;
+	                        box.color =         rectangleLight.color;
+	                        box.indirectColor = rectangleLight.indirectColor;
+	                        box.range =         rectangleLight.range;
+                            box.width =         rectangleLight.width;
+                            box.height =        rectangleLight.height;
+                            lightData.Init(ref box, ref cookie);
+                        }
+                        else
+                        {
+                            lightData.Init(ref rectangleLight, ref cookie);
+                        }
                         break;
                     case LightType.Disc:
                         DiscLight discLight = new DiscLight();
-                        discLight.range = 9999999;
                         LightmapperUtils.Extract(light, ref discLight);
+                        discLight.range = 9999999;
                         discLight.mode = LightMode.Baked;
                         lightData.Init(ref discLight, ref cookie);
                         break;

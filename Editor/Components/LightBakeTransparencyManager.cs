@@ -16,7 +16,7 @@ namespace SLZ.SLZEditorTools
         static void RegisterBakeEvents()
         {
             Lightmapping.bakeStarted += AssignTransparentLmMaterials;
-            SLZ.SLZEditorTools.SortedPostBakeEvent.Register(ResetTransparentBakeObjects, -1000.0f);
+            SortedPostBakeEvent.Register(ResetTransparentBakeObjects, PostBakeOrder.ResetTransparent);
         }
 
         static readonly int ID_MainTex = Shader.PropertyToID("_MainTex");

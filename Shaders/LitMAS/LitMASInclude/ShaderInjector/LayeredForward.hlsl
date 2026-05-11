@@ -88,17 +88,27 @@ struct VertOut
 //#define UNPACK_FOG(i) i.wPos_fog.w
 #define UNPACK_VERTLIGHTS(i) i.SHVertLights_btSign.xyz
 
-TEXTURE2D(_BaseMap);
+// Begin Injection DEFAULT_TEXTURES from Injection_Layered.hlsl ----------------------------------------------------------
+Texture2D<min16float4> _BaseMap;
 SAMPLER(sampler_BaseMap);
 
 TEXTURE2D(_BumpMap);
-TEXTURE2D(_MetallicGlossMap);
+Texture2D<min16float3> _MetallicGlossMap;
+// End Injection DEFAULT_TEXTURES from Injection_Layered.hlsl ----------------------------------------------------------
 
 
 
 // Begin Injection UNIFORMS from Injection_Layered.hlsl ----------------------------------------------------------
 TEXTURE2D(_SplatMap);
 SAMPLER(sampler_SplatMap);
+
+#if defined(SHADER_API_MOBILE)
+#define SAMPLER_SPLAT sampler_LinearRepeat
+#define SAMPLER_CHEAP sampler_LinearRepeat
+#else
+#define SAMPLER_SPLAT sampler_SplatMap
+#define SAMPLER_CHEAP sampler_BaseMap
+#endif
 
 Texture2D<min16float> _HeightMap;
 Texture2D<min16float> _HeightMap1;
@@ -108,15 +118,15 @@ Texture2D<min16float> _HeightMap4;
 
 SAMPLER(sampler_HeightMap);
 
-TEXTURE2D(_BaseMap1);
-TEXTURE2D(_BaseMap2);
-TEXTURE2D(_BaseMap3);
-TEXTURE2D(_BaseMap4);
+Texture2D<min16float4> _BaseMap1;
+Texture2D<min16float4> _BaseMap2;
+Texture2D<min16float4> _BaseMap3;
+Texture2D<min16float4> _BaseMap4;
 
-TEXTURE2D(_MetallicGlossMap1);
-TEXTURE2D(_MetallicGlossMap2);
-TEXTURE2D(_MetallicGlossMap3);
-TEXTURE2D(_MetallicGlossMap4);
+Texture2D<min16float3> _MetallicGlossMap1;
+Texture2D<min16float3> _MetallicGlossMap2;
+Texture2D<min16float3> _MetallicGlossMap3;
+Texture2D<min16float3> _MetallicGlossMap4;
 
 TEXTURE2D(_BumpMap1);
 TEXTURE2D(_BumpMap2);
@@ -225,100 +235,107 @@ FragOut frag(VertOut i
 /*---------------------------------------------------------------------------------------------------------------------------*/
 
 // Begin Injection FRAG_READ_INPUTS from Injection_Layered.hlsl ----------------------------------------------------------
-
+#define _Surface 0
 float2 uv2 = i.uv_splat;
-float2 splatDim;
-_SplatMap.GetDimensions(splatDim.x, splatDim.y);
+//float2 splatDim;
+//_SplatMap.GetDimensions(splatDim.x, splatDim.y);
 //float4 stupidUnityTexelSize = float4(rcp(width), rcp(height), width, height);
 //uv2 = IQTextureNiceUVDistort(uv2, splatDim);
 half4 layerWeights = SAMPLE_TEXTURE2D(_SplatMap, sampler_SplatMap, uv2);
 //half4 layerWeights = SampleBSplineRGBA_LOD(_SplatMap, sampler_SplatMap, uv2, stupidUnityTexelSize);
-half baseWeight = saturate(1.0 - (layerWeights.x + layerWeights.y + layerWeights.z + layerWeights.w));
+
 
 SLZ::Layering::Layer layers[3];
-SLZ::Layering::GetThreeActiveLayers(baseWeight, layerWeights, layers);
+SLZ::Layering::GetThreeActiveLayersNoBase(layerWeights, layers);
+layers[2].index = 0;
 
 float2 uv0 = UNPACK_UV0(i);
-half2 dx = ddx(uv0);
-half2 dy = ddy(uv0);
-
+half2 dx = 0;
+half2 dy = 0;
 
 half layerHeight0 = 0;
 float2 uv_height; half2 dx_height, dy_height;
-LAYER_UVS(layers[0].index, uv_height, dx_height, dy_height);
-SAMPLE_LAYERED(layerHeight0, r, _HeightMap, sampler_HeightMap, uv_height, layers[0].index, dx_height, dy_height);
-layers[0].weight *= layerHeight0;
+dx = (half2)ddx(uv0);
+dy = (half2)ddy(uv0);
+if (layers[0].weight > HALF_MIN)
+{
+	LAYER_UVS(layers[0].index, uv_height, dx_height, dy_height);
+	SAMPLE_LAYERED(layerHeight0, r, _HeightMap, SAMPLER_SPLAT, uv_height, layers[0].index, dx_height, dy_height);
+	layers[0].weight *= layerHeight0;
+}
 
 if (layers[1].weight > HALF_MIN)
 {
 	half layerHeight1 = 0;
 	LAYER_UVS(layers[1].index, uv_height, dx_height, dy_height);
-	SAMPLE_LAYERED(layerHeight1, r, _HeightMap, sampler_HeightMap, uv_height, layers[1].index, dx_height, dy_height);
+	SAMPLE_LAYERED(layerHeight1, r, _HeightMap, SAMPLER_SPLAT, uv_height, layers[1].index, dx_height, dy_height);
 	layers[1].weight *= layerHeight1;
 }
 
-if (layers[2].weight > HALF_MIN)
-{
-	half layerHeight2 = 0;
-	LAYER_UVS(layers[2].index, uv_height, dx_height, dy_height);
-	SAMPLE_LAYERED(layerHeight2, r, _HeightMap, sampler_HeightMap, uv_height, layers[2].index, dx_height, dy_height);
-	layers[2].weight *= layerHeight2;
-}
+
+half layerHeight2 = 0;
+LAYER_UVS(layers[2].index, uv_height, dx_height, dy_height);
+SAMPLE_LAYERED(layerHeight2, r, _HeightMap, SAMPLER_SPLAT, uv_height, layers[2].index, dx_height, dy_height);
+layers[2].weight = layerHeight2 * saturate(1.0 - layers[0].weight - layers[1].weight);
+
 
 // sort the layers, pick the two most important
 if (layers[0].weight < layers[2].weight) SLZ::Layering::Swap(layers, 0, 2);
 if (layers[0].weight < layers[1].weight) SLZ::Layering::Swap(layers, 0, 1);
 if (layers[1].weight < layers[2].weight) SLZ::Layering::Swap(layers, 1, 2);
 
-// Sort the indicies so we don't get divergence when sampling the same textures
-if (layers[0].index > layers[1].index) SLZ::Layering::Swap(layers, 0, 1);
+layers[1].weight += HALF_MIN;
+
+//if (layers[1].weight < 1e-5) layers[1].weight = 1 - layers[0].weight;
+
+half layerWeightTotal = layers[0].weight + layers[1].weight;
+
+layers[0].weight /= layerWeightTotal;
+layers[1].weight /= layerWeightTotal;
 
 SLZ::Layering::Layer layer0 = layers[0];
 SLZ::Layering::Layer layer1 = layers[1];
 
-layer0.weight += HALF_MIN;
-
-half layerWeightTotal = layer0.weight + layer1.weight;
-
-layer0.weight /= layerWeightTotal;
-layer1.weight /= layerWeightTotal;
-
 half4 albedo = (half4)0;
-half4 mas = (half4)0;
-half4 normalMap2 = (half4)0;
+half3 mas = (half3)0;
+half4 normalMap2 = half4(0,0,0,1);
+dx = 1 * (half2)ddx(uv0);
+dy = 1 * (half2)ddy(uv0);
 float2 uv_layer0; half2 dx_layer0, dy_layer0;
-LAYER_UVS(layers[0].index, uv_layer0, dx_layer0, dy_layer0);
-float2 uv_layer1; half2 dx_layer1, dy_layer1;
-LAYER_UVS(layers[1].index, uv_layer1, dx_layer1, dy_layer1);
+LAYER_UVS(layer0.index, uv_layer0, dx_layer0, dy_layer0);
 
-if (layer0.weight > 2 * HALF_MIN)
-{
-	SAMPLE_LAYERED(albedo, rgba, _BaseMap, sampler_BaseMap, uv_layer0, layer0.index, dx_layer0, dy_layer0)
-	albedo *= layer0.weight;
-	
-	SAMPLE_LAYERED(mas, rgba, _MetallicGlossMap, sampler_BaseMap, uv_layer0, layer0.index, dx_layer0, dy_layer0)
-	mas *= layer0.weight;
+SAMPLE_LAYERED(albedo, rgba, _BaseMap, sampler_BaseMap, uv_layer0, layer0.index, dx_layer0, dy_layer0)
+albedo *= layer0.weight;
 
-	SAMPLE_LAYERED(normalMap2, rgba, _BumpMap, sampler_BaseMap, uv_layer0, layer0.index, dx_layer0, dy_layer0)
-	normalMap2 *= layer0.weight;
-}
+SAMPLE_LAYERED(mas, rgb, _MetallicGlossMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0)
+//normalMap2.rg = half(0.5) * ((half(2) * mas.gb - half(1)) * layer0.weight) + half(0.5);
+mas *= layer0.weight;
+
+SAMPLE_LAYERED(normalMap2, rgba, _BumpMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0)
+normalMap2 *= layer0.weight;
+
 
 if (layer1.weight > 2 * HALF_MIN)
 {
+	layer1.weight = half(1) - layer0.weight;
+	float2 uv_layer1; half2 dx_layer1, dy_layer1;
+	LAYER_UVS(layer1.index, uv_layer1, dx_layer1, dy_layer1);
+
 	half4 albedo1 = (half4)0;
-	SAMPLE_LAYERED(albedo1, rgba, _BaseMap, sampler_BaseMap, uv_layer1, layer1.index, dx_layer1, dy_layer1)
+	SAMPLE_LAYERED(albedo1, rgba, _BaseMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
 	albedo += albedo1 * layer1.weight;
 
-	half4 mas1 = (half4)0;
-	SAMPLE_LAYERED(mas1, rgba, _MetallicGlossMap, sampler_BaseMap, uv_layer1, layer1.index, dx_layer1, dy_layer1)
-	mas += mas1 * layer1.weight;
+	half3 mas1 = (half3)0;
+	SAMPLE_LAYERED(mas1, rgb, _MetallicGlossMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
+	mas += mas1 *  layer1.weight;
 
 	half4 normalMap1 = 0;
-	SAMPLE_LAYERED(normalMap1, rgba, _BumpMap, sampler_BaseMap, uv_layer1, layer1.index, dx_layer1, dy_layer1)
-	normalMap2 += normalMap1 * layer1.weight;
+	SAMPLE_LAYERED(normalMap1, rgba, _BumpMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
+	normalMap2 += normalMap1 * (half(1.0f) - layer0.weight);
+	//normalMap2.rg += half(0.5) * ((half(2) * mas1.gb - half(1)) * layer1.weight) + half(0.5);
 }
 
-
+albedo.a = 1;
 // End Injection FRAG_READ_INPUTS from Injection_Layered.hlsl ----------------------------------------------------------
 
 

@@ -5,8 +5,41 @@
 
 // Define 'select' function introduced into later versions of DXC
 // Ternary operations on vectors are no longer legal, select should be used instead
-#if !defined(SLZ_DXC_UPDATED) || !defined(UNITY_COMPILER_DXC) || (SLZ_DXC_VERSION_MAJOR <= 1 && SLZ_DXC_VERSION_MINOR <= 6)
-	#define select(a, b, c) ((a) ? (b) : (c))
+#define COMPILER_MACRO(hash, value) hash value
+#define COMPILER_MACRO3(hash, func, params, value) hash define func##params value
+
+#if defined(UNITY_COMPILER_DXC)
+    COMPILER_MACRO(#, if defined(__HLSL_VERSION) && __HLSL_VERSION >= 2021)
+    COMPILER_MACRO(#, define HLSL_2021)
+    COMPILER_MACRO(#, endif)
+
+
+    #define PARAMS3 (a,b,c)
+    #define PAREN_RIGHT )
+    #define COMMA ,
+
+
+
+    COMPILER_MACRO(#, if __HLSL_VERSION < 2021)
+    
+    #if SLZ_DXC_VERSION_MAJOR >= 1 && SLZ_DXC_VERSION_MINOR >= 8
+    COMPILER_MACRO(#, warning DXC Update State indicates version > 1.8 but hlsl version is less than 2021 )
+    #endif
+
+    #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/HLSL2021SupportTemplates.hlsl"
+    //COMPILER_MACRO(#, define (select(a,b,c)) ((a) ? (b) : (c)))
+    //COMPILER_MACRO(#, define and(a, b) ((a) && (b)))
+    //COMPILER_MACRO(#, define or(a, b) ((a) || (b)))
+    COMPILER_MACRO(#, endif)
+#endif 
+
+// Define HLSL2021's vector logic functions to equivalents for pre-HLSL2021. These were introduced to allow short-circuiting
+// ternary operations on non-vector conditions.
+#if !defined(UNITY_COMPILER_DXC)
+    COMPILER_MACRO(#, define __HLSL_VERSION 2015)
+    #define select(a, b, c) ((a) ? (b) : (c))
+    #define and(a, b) ((a) && (b))
+    #define or(a, b) ((a) || (b))
 #endif
 
 #endif // SLZ_HLSL2021

@@ -28,6 +28,8 @@ int   PerDispatchRayCount;
 int   StartRayIdx;
 float HalfVoxelSize;
 
+uint IndirectSamples;
+
 // Environment
 TextureCube  _SkyTexture;
 SamplerState sampler_SkyTexture;
@@ -35,6 +37,9 @@ SamplerState sampler_SkyTexture;
 // Point light cookies
 TextureCubeArray _PointCookies;
 SamplerState     sampler_PointCookies;
+
+
+SamplerState sampler_LinearClamp;
 
 struct PointLightData
 {
@@ -112,8 +117,12 @@ Texture3D<float4>   g_Input;
 
 struct RayPayload
 {
-    float4 color;
-    float3 dir;
+    float4 color;        // emission (hit) | sky (miss) | shadow alpha
+    float3 dir;          // ray dir in
+    float3 hitPos;       // world-space hit
+    float3 worldNormal;  // world-space normal at hit
+    float3 albedo;       // diffuse albedo for indirect gather
+    float  hitT;         // -1 = miss/sky, >0 = hit (backface or front)
 };
 
 struct EnvRayPayload
@@ -131,7 +140,7 @@ void MainMissShader(inout RayPayload payload : SV_RayPayload)
 [shader("miss")]
 void zEnvMissShader(inout EnvRayPayload payload : SV_RayPayload)
 {
-    payload.color = _SkyTexture.SampleLevel(sampler_SkyTexture, payload.dir, 0) / 2;
+    payload.color = _SkyTexture.SampleLevel(sampler_SkyTexture, payload.dir, 0) ;
 }
 
 // -----------------------------------------------------------------------------
@@ -236,6 +245,133 @@ EnvHaltonSample envHalton5D(uint globalIdx, uint N,
     return s;
 }
 
+// Signed-positive solid angle of triangle (a,b,c) viewed from p.
+// Van Oosterom & Strackee 1983.
+float SolidAngleTri(float3 p, float3 a, float3 b, float3 c)
+{
+    float3 A = a - p, B = b - p, C = c - p;
+    float la = length(A), lb = length(B), lc = length(C);
+    float num = abs(dot(A, cross(B, C)));
+    float den = la*lb*lc
+              + dot(A,B)*lc
+              + dot(B,C)*la
+              + dot(C,A)*lb;
+    return 2.0 * atan2(num, den);
+}
+
+// Quad as two tris (consistent winding).
+float SolidAngleQuad(float3 p, float3 v0, float3 v1, float3 v2, float3 v3)
+{
+    return SolidAngleTri(p, v0, v1, v2) + SolidAngleTri(p, v0, v2, v3);
+}
+
+struct SphQuad
+{
+    float3 o, x, y, z;
+    float z0, x0, y0, x1, y1;
+    float b0, b1, k, S;
+};
+
+SphQuad SphQuadInit(float3 s, float3 ex, float3 ey, float3 origin)
+{
+    // s = corner of rect, ex/ey = edge vectors (not normalized)
+    SphQuad sq;
+    sq.o = origin;
+    float exl = length(ex), eyl = length(ey);
+    sq.x = ex / exl;
+    sq.y = ey / eyl;
+    sq.z = cross(sq.x, sq.y);
+
+    float3 d = s - origin;
+    sq.z0 = dot(d, sq.z);
+    // Flip if origin is on the back side
+    if (sq.z0 > 0) { sq.z = -sq.z; sq.z0 = -sq.z0; }
+    sq.x0 = dot(d, sq.x);
+    sq.y0 = dot(d, sq.y);
+    sq.x1 = sq.x0 + exl;
+    sq.y1 = sq.y0 + eyl;
+
+    float3 v00 = float3(sq.x0, sq.y0, sq.z0);
+    float3 v01 = float3(sq.x0, sq.y1, sq.z0);
+    float3 v10 = float3(sq.x1, sq.y0, sq.z0);
+    float3 v11 = float3(sq.x1, sq.y1, sq.z0);
+
+    float3 n0 = normalize(cross(v00, v10));
+    float3 n1 = normalize(cross(v10, v11));
+    float3 n2 = normalize(cross(v11, v01));
+    float3 n3 = normalize(cross(v01, v00));
+
+    float g0 = acos(clamp(-dot(n0, n1), -1.0, 1.0));
+    float g1 = acos(clamp(-dot(n1, n2), -1.0, 1.0));
+    float g2 = acos(clamp(-dot(n2, n3), -1.0, 1.0));
+    float g3 = acos(clamp(-dot(n3, n0), -1.0, 1.0));
+
+    sq.b0 = n0.z;
+    sq.b1 = n2.z;
+    sq.k  = 2.0 * M_PI - g2 - g3;
+    sq.S  = g0 + g1 - sq.k;          // solid angle, replaces SolidAngleQuad
+    return sq;
+}
+
+float3 SphQuadSample(SphQuad sq, float u, float v)
+{
+    float au = u * sq.S + sq.k;
+    float fu = (cos(au) * sq.b0 - sq.b1) / max(sin(au), 1e-7);
+    float cu = rsqrt(fu*fu + sq.b0*sq.b0) * (fu > 0 ? 1 : -1);
+    cu = clamp(cu, -1.0, 1.0);
+
+    float xu = -(cu * sq.z0) * rsqrt(max(1.0 - cu*cu, 1e-7));
+    xu = clamp(xu, sq.x0, sq.x1);
+
+    float d2 = xu*xu + sq.z0*sq.z0;
+    float d  = sqrt(d2);
+    float h0 = sq.y0 * rsqrt(d2 + sq.y0*sq.y0);
+    float h1 = sq.y1 * rsqrt(d2 + sq.y1*sq.y1);
+    float hv = h0 + v * (h1 - h0);
+    float hv2 = hv*hv;
+    float yv = (hv2 < 1.0 - 1e-6) ? (hv * d) * rsqrt(max(1.0 - hv2, 1e-7)) : sq.y1;
+
+    return sq.o + xu * sq.x + yv * sq.y + sq.z0 * sq.z;
+}
+// Arvo 1995 / pbrt-v4 spherical triangle sampling.
+// va, vb, vc: unit vectors from receiver to triangle verts (CCW from receiver).
+// area: precomputed solid angle of the triangle.
+// Returns a unit direction sampled uniformly in solid angle within (va,vb,vc).
+float3 SampleSphTri(float3 va, float3 vb, float3 vc, float area, float u1, float u2)
+{
+    float3 nab = normalize(cross(va, vb));
+    float3 nca = normalize(cross(vc, va));
+
+    float cos_a = clamp(dot(nab, -nca), -1.0, 1.0);
+    float alpha = acos(cos_a);
+    float sin_a = sqrt(saturate(1.0 - cos_a*cos_a));
+
+    // Sub-area sample: A' in [π, π + area]
+    float Ap = lerp(M_PI, M_PI + area, u1);
+    float sP = sin(Ap) * cos_a - cos(Ap) * sin_a;
+    float cP = cos(Ap) * cos_a + sin(Ap) * sin_a;
+
+    float k1 = cP + cos_a;
+    float k2 = sP - sin_a * dot(va, vb);     // dot(va,vb) = cos(arc ab)
+
+    float num = k2 + (k2 * cP - k1 * sP) * cos_a;
+    float den = (k2 * sP + k1 * cP) * sin_a;
+    float cosBp = clamp(num / (sign(den) * max(abs(den), 1e-7)), -1.0, 1.0);
+    float sinBp = sqrt(saturate(1.0 - cosBp * cosBp));
+
+    // c' on arc va→vc (Gram-Schmidt of vc against va)
+    float3 cPerp = vc - dot(vc, va) * va;
+    float  lcp   = length(cPerp);
+    float3 cp    = (lcp > 1e-7) ? (cosBp * va + sinBp * (cPerp / lcp)) : va;
+
+    // Final point on arc vb→cp
+    float dotCB = dot(cp, vb);
+    float cT = 1.0 - u2 * (1.0 - dotCB);
+    float sT = sqrt(saturate(1.0 - cT * cT));
+    float3 pPerp = cp - dotCB * vb;
+    float  lpp   = length(pPerp);
+    return (lpp > 1e-7) ? (cT * vb + sT * (pPerp / lpp)) : vb;
+}
 // -----------------------------------------------------------------------------
 // Cookie helpers
 // -----------------------------------------------------------------------------
@@ -519,144 +655,191 @@ float4 DirLightCast(float3 VoxelWS, uint Num, uint sampleCount = 8)
 // Area lights
 // -----------------------------------------------------------------------------
 
-float4 AreaLightCast(float3 origin, uint Num, int startIdx, int endIdx)
+float4 AreaLightCast(float3 voxelCenter, uint Num, int startIdx, int endIdx)
 {
-    float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3],
-                          ALD[Num].AreaLightsMatrix[1][3],
-                          ALD[Num].AreaLightsMatrix[2][3]);
+    float3 Xws = mul(float3(1,0,0), ALD[Num].AreaLightsMatrixInv);
+    float3 Yws = mul(float3(0,1,0), ALD[Num].AreaLightsMatrixInv);
+    float3 Nws = mul(float3(0,0,1), ALD[Num].AreaLightsMatrixInv);
 
-    float3 VoxelLS = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-    if (VoxelLS.z <= 0) return 0;
+    float3 C  = ALD[Num].AreaLightsWS;
+    float  hW = ALD[Num].AreaLightsSize.x * 0.5;
+    float  hH = ALD[Num].AreaLightsSize.y * 0.5;
 
-    uint3 id = DispatchRaysIndex().xyz;
-    uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
-    seed ^= Num * 0x9e3779b9u;
+    if (dot(voxelCenter - C, Nws) <= 0) return 0;
 
-    // Stratification grid: round AreaLightSamples down to a square
-    int kSide = max(1, (int)floor(sqrt((float)AreaLightSamples)));
-    float invK = 1.0 / (float)kSide;
+    // SphQuad once at voxel centre. Ω varies slowly across a cell so the
+    // origin/centre mismatch is O(|jitter|/distance) — negligible in practice
+    // and worth it to skip 32× SphQuadInit.
+    float3 s  = C - hW * Xws - hH * Yws;
+    float3 ex = (2.0 * hW) * Xws;
+    float3 ey = (2.0 * hH) * Yws;
+    SphQuad sq = SphQuadInit(s, ex, ey, voxelCenter);
+    if (sq.S <= 0) return 0;
 
-    float2 sizeXY = float2(ALD[Num].AreaLightsSize.x, ALD[Num].AreaLightsSize.y);
+    uint3 id    = DispatchRaysIndex().xyz;
+    uint  vseed = id.x*73856093u ^ id.y*19349663u ^ id.z*83492791u;
+    vseed      ^= Num * 0x9e3779b9u;
+    float2 cpUV     = rand2(vseed ^ 0xAB1234CDu);
+    float3 cpOrigin = rand3(vseed ^ 0xCAFEBABEu);
 
-    float4 accum = 0;
+    float  visAccum    = 0;
+    float3 cookieAccum = 0;
+    int    n           = 0;
 
     for (int j = startIdx; j < endIdx; ++j)
     {
-        int sx = j % kSide;
-        int sy = (j / kSide) % kSide;
-        float2 xi = rand2(seed + (uint)j * 6151u);
-        float2 stratified = (float2(sx, sy) + xi) * invK;        // [0,1]^2
-        float2 offsetXY = (stratified - 0.5) * sizeXY;           // emitter-local
+        // 5D stratified over the full [0, AreaLightSamples) range.
+        // uv: Hammersley.   origin: 3D Halton (bases 3,5,7).
+        // CP rotation per voxel preserves stratification, decorrelates neighbours.
+        float u = frac((float)j / (float)AreaLightSamples + cpUV.x);
+        float v = frac(radicalInverse_VdC((uint)j)        + cpUV.y);
+        float3 oOff = float3(
+            frac(radicalInverseN((uint)j, 3u) + cpOrigin.x),
+            frac(radicalInverseN((uint)j, 5u) + cpOrigin.y),
+            frac(radicalInverseN((uint)j, 7u) + cpOrigin.z)) * 2.0 - 1.0;
 
-        // Cookie mask on emitter surface
-        float3 cookie = AreaCookieRectAt(Num, offsetXY);
-        if (all(cookie == 0)) continue;
+        float3 jitteredOrigin = voxelCenter + oOff * HalfVoxelSize;
+        float3 sampleWS       = SphQuadSample(sq, u, v);
 
-        float3 VoxelLS_j = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-        float3 LocalLightPos    = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-        float3 LightPosSampleLS = LocalLightPos + float3(offsetXY, 0);
+        float3 d     = sampleWS - C;
+        float2 offXY = float2(dot(d, Xws), dot(d, Yws));
+        cookieAccum += AreaCookieRectAt(Num, offXY);
 
-        float3 toLightLS = LightPosSampleLS - VoxelLS_j;
-        float  dist      = length(toLightLS);
-        float3 rayDirLS  = toLightLS / dist;
-
-        float cosEmitter = saturate(dot(float3(0, 0, 1), -rayDirLS));
-        if (cosEmitter <= 0) continue;
+        float3 toLight = sampleWS - jitteredOrigin;
+        float  dist    = length(toLight);
+        float3 dir     = toLight / dist;
 
         RayDesc ray;
-        ray.Origin    = origin;
-        ray.Direction = mul(rayDirLS, ALD[Num].AreaLightsMatrixInv);
-        ray.TMin      = 1e-3f;
-        ray.TMax      = dist - 1e-3f;
+        ray.Origin = jitteredOrigin; ray.Direction = dir;
+        ray.TMin   = 1e-3f;          ray.TMax      = dist - 1e-3f;
 
         RayPayload payload;
-        payload.color = float4(0, 0, 0, 1);
-
+        payload.color = float4(0,0,0,1);
         TraceRay(g_SceneAccelStruct,
                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
                  0xFF, 0, 1, 0, ray, payload);
 
-        float vis = 1 - payload.color.a;
-
-        // Geometry term: cosEmitter / dist^2, with 1/pdf = area for uniform area sampling
-        float safeDist2 = max(dist * dist, HalfVoxelSize * HalfVoxelSize);
-        float G = cosEmitter / safeDist2;
-
-        float4 contrib = vis * G * M_INVPI * ALD[Num].AreaLightsColor;
-        contrib.rgb *= cookie;
-
-        accum += contrib / (float)AreaLightSamples;
+        visAccum += 1.0 - payload.color.a;
+        ++n;
     }
 
-    return accum;
+    if (n == 0) return 0;
+
+    float  Vbar = visAccum    / (float)n;
+    float3 Cbar = cookieAccum / (float)n;
+    float  frac = (float)n    / (float)AreaLightSamples;
+
+    float4 col = ALD[Num].AreaLightsColor;
+    col.rgb *= Cbar;
+    return col * (Vbar * sq.S * frac) * M_INV4PI; //dividing by 4pi to match Unity's lightmapper 
 }
 
-float4 DiscLightCast(float3 origin, uint Num, int startIdx, int endIdx)
+#define DISC_POLY_N 16
+
+float4 DiscLightCast(float3 voxelCenter, uint Num, int startIdx, int endIdx)
 {
-    float3 lsPos = float3(ALD[Num].AreaLightsMatrix[0][3],
-                          ALD[Num].AreaLightsMatrix[1][3],
-                          ALD[Num].AreaLightsMatrix[2][3]);
+    float3 Xws = mul(float3(1,0,0), ALD[Num].AreaLightsMatrixInv);
+    float3 Yws = mul(float3(0,1,0), ALD[Num].AreaLightsMatrixInv);
+    float3 Nws = mul(float3(0,0,1), ALD[Num].AreaLightsMatrixInv);
 
-    float3 VoxelLS = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-    if (VoxelLS.z <= 0) return 0;
+    float3 C  = ALD[Num].AreaLightsWS;
+    float  R  = max(ALD[Num].AreaLightsSize.x, 1e-4);
+    float  R2 = R * R;
 
-    uint3 id = DispatchRaysIndex().xyz;
-    uint seed = id.x * 73856093u ^ id.y * 19349663u ^ id.z * 83492791u;
-    seed ^= Num * 0xa511e9b3u;
+    if (dot(voxelCenter - C, Nws) <= 0) return 0;
 
-    int   kSide = max(1, (int)floor(sqrt((float)AreaLightSamples)));
-    float invK  = 1.0 / (float)kSide;
+    // Circumscribed: edges tangent to the disc, mask handles the rounded silhouette.
+    const float kRimInv = 1.01959 /* 1 / cos(π/16) */;
+    float Rrim = R * kRimInv;
 
-    float radius = max(ALD[Num].AreaLightsSize.x, 1e-4);
+    // Build rim direction vectors and per-tri solid angles from voxelCenter once.
+    // Per-sample origin jitter only affects the shadow ray, not the integration domain.
+    float3 dC = normalize(C - voxelCenter);
+    float3 dRim[DISC_POLY_N];
+    [unroll]
+    for (int k = 0; k < DISC_POLY_N; ++k)
+    {
+        float ang = (2.0 * M_PI / (float)DISC_POLY_N) * (float)k;
+        dRim[k] = normalize((C + Rrim * (cos(ang) * Xws + sin(ang) * Yws)) - voxelCenter);
+    }
 
-    float4 accum = 0;
+    float omega[DISC_POLY_N];
+    [unroll]
+    for (int k2 = 0; k2 < DISC_POLY_N; ++k2)
+    {
+        int kn = (k2 + 1) & (DISC_POLY_N - 1);
+        float num = abs(dot(dC, cross(dRim[k2], dRim[kn])));
+        float den = 1.0 + dot(dC, dRim[k2]) + dot(dRim[k2], dRim[kn]) + dot(dRim[kn], dC);
+        omega[k2] = 2.0 * atan2(num, den);
+    }
+
+    uint3 id    = DispatchRaysIndex().xyz;
+    uint  vseed = id.x*73856093u ^ id.y*19349663u ^ id.z*83492791u;
+    vseed      ^= Num * 0xa511e9b3u;
+    float2 cpUV     = rand2(vseed ^ 0xAB1234CDu);
+    float3 cpOrigin = rand3(vseed ^ 0xCAFEBABEu);
+
+    float3 weightedRGB = 0;
+    float  weightedA   = 0;
+    int    subN = max((int)AreaLightSamples / DISC_POLY_N, 1);
 
     for (int j = startIdx; j < endIdx; ++j)
     {
-        int sx = j % kSide;
-        int sy = (j / kSide) % kSide;
-        float2 xi = rand2(seed + (uint)j * 6151u);
-        float2 stratified = (float2(sx, sy) + xi) * invK;
-        float2 discXY     = ConcentricSampleDisk(stratified) * radius;
+        // Sample j → triangle (j mod 16). Sub-stratify within the tri's
+        // sample subset (j / 16) using the same 5D LDS pattern as the rect path.
+        int triIdx = j & (DISC_POLY_N - 1);
+        int subIdx = j / DISC_POLY_N;
 
-        float3 cookie = AreaCookieDiscAt(Num, discXY);
-        if (all(cookie == 0)) continue;
+        float u1 = frac((float)subIdx / (float)subN          + cpUV.x);
+        float u2 = frac(radicalInverse_VdC((uint)subIdx)     + cpUV.y);
+        float3 oOff = float3(
+            frac(radicalInverseN((uint)subIdx, 3u) + cpOrigin.x),
+            frac(radicalInverseN((uint)subIdx, 5u) + cpOrigin.y),
+            frac(radicalInverseN((uint)subIdx, 7u) + cpOrigin.z)) * 2.0 - 1.0;
 
-        float3 VoxelLS_j = mul(float4(origin, 1) - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-        float3 LocalLightPos    = mul(ALD[Num].AreaLightsWS - lsPos, ALD[Num].AreaLightsMatrix).xyz;
-        float3 LightPosSampleLS = LocalLightPos + float3(discXY, 0);
+        if (omega[triIdx] <= 0) continue;
 
-        float3 toLightLS = LightPosSampleLS - VoxelLS_j;
-        float  dist      = length(toLightLS);
-        float3 rayDirLS  = toLightLS / dist;
+        int kn = (triIdx + 1) & (DISC_POLY_N - 1);
+        float3 dirSample = SampleSphTri(dC, dRim[triIdx], dRim[kn], omega[triIdx], u1, u2);
 
-        float cosEmitter = saturate(dot(float3(0, 0, 1), -rayDirLS));
-        if (cosEmitter <= 0) continue;
+        // Intersect with disc plane to recover the world-space sample point.
+        float denom = dot(dirSample, Nws);
+        if (abs(denom) < 1e-6) continue;
+        float tHit = dot(C - voxelCenter, Nws) / denom;
+        if (tHit <= 0) continue;
+        float3 sampleWS = voxelCenter + dirSample * tHit;
+
+        // Cookie path: circular mask gives the perfect disc edge.
+        float3 d     = sampleWS - C;
+        float2 offXY = float2(dot(d, Xws), dot(d, Yws));
+        float  r2    = dot(offXY, offXY);
+        if (r2 > R2) continue;                      // outside disc → masked
+        float3 cookie = AreaCookieDiscAt(Num, offXY);
+
+        // Shadow ray from per-sample-jittered origin to the actual sample point.
+        float3 jitteredOrigin = voxelCenter + oOff * HalfVoxelSize;
+        float3 toLight = sampleWS - jitteredOrigin;
+        float  dist    = length(toLight);
+        float3 dir     = toLight / dist;
 
         RayDesc ray;
-        ray.Origin    = origin;
-        ray.Direction = mul(rayDirLS, ALD[Num].AreaLightsMatrixInv);
-        ray.TMin      = 1e-3f;
-        ray.TMax      = dist - 1e-3f;
+        ray.Origin = jitteredOrigin; ray.Direction = dir;
+        ray.TMin   = 1e-3f;          ray.TMax      = dist - 1e-3f;
 
         RayPayload payload;
-        payload.color = float4(0, 0, 0, 1);
-
+        payload.color = float4(0,0,0,1);
         TraceRay(g_SceneAccelStruct,
                  RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
                  0xFF, 0, 1, 0, ray, payload);
 
-        float vis       = 1 - payload.color.a;
-        float safeDist2 = max(dist * dist, HalfVoxelSize * HalfVoxelSize);
-        float G         = cosEmitter / safeDist2;
-
-        float4 contrib = vis * G * M_INVPI * ALD[Num].AreaLightsColor;
-        contrib.rgb *= cookie;
-
-        accum += contrib / (float)AreaLightSamples;
+        float vis = 1.0 - payload.color.a;
+        weightedRGB += vis * cookie * omega[triIdx];
+        weightedA   += vis          * omega[triIdx];
     }
 
-    return accum;
+    float scale = (float)DISC_POLY_N / (float)AreaLightSamples;
+    float4 col = ALD[Num].AreaLightsColor;
+    return float4(col.rgb * weightedRGB, col.a * weightedA) * scale * M_INV4PI; //dividing by 4pi to match Unity's lightmapper 
 }
 // -----------------------------------------------------------------------------
 // Environment
@@ -711,6 +894,43 @@ float4 EnvCast(float3 voxelCenter, int globalStart, int globalEnd, uint totalEnv
     return accum / (float)totalEnvSamples;
 }
 
+float4 IndirectCast(float3 voxelCenter, int globalStart, int globalEnd, uint totalSamples)
+{
+    if (globalEnd <= globalStart || totalSamples == 0) return 0;
+
+    uint3 id = DispatchRaysIndex().xyz;
+    uint vseed = id.x*73856093u ^ id.y*19349663u ^ id.z*83492791u;
+    float2 cpDir    = rand2(vseed ^ 0xFEEDB0B5u);
+    float3 cpOrigin = rand3(vseed ^ 0xDEADBEEFu);
+
+    float4 accum = 0;
+    for (int g = globalStart; g < globalEnd; ++g)
+    {
+        EnvHaltonSample h = envHalton5D((uint)g, totalSamples, cpDir, cpOrigin);
+        float3 origin = voxelCenter + h.originOffset * HalfVoxelSize;
+
+        RayDesc ray;
+        ray.Origin = origin; ray.Direction = h.direction;
+        ray.TMin   = 1e-3f;  ray.TMax      = 100000.0f;
+
+        RayPayload p;
+        p.color = 0; p.dir = h.direction;
+        p.hitT = -1; p.hitPos = 0; p.worldNormal = 0; p.albedo = 0;
+
+        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, 1, ray, p);
+
+        if (p.hitT > 0)
+        {
+            // Bias along normal to avoid trilinear self-fetch from the partially-lit cell
+            float3 samplePos = p.hitPos + p.worldNormal * HalfVoxelSize * 0.5;
+            float3 uvw       = (samplePos - WPosition) / Size;
+            float3 prevL     = g_Input.SampleLevel(sampler_LinearClamp, uvw, 0).rgb;
+            accum.rgb += p.albedo * prevL;
+        }
+        // miss: env pass already has sky; do nothing here.
+    }
+    return accum / (float)totalSamples;
+}
 // -----------------------------------------------------------------------------
 // Ray generation
 // -----------------------------------------------------------------------------
@@ -801,12 +1021,34 @@ void MainRayGenShader()
                     : (int)AreaLightSamples;
 
                 if (ALD[light].AreaLightsSize.z == 0)
-                    LightAccumulation += AreaLightCast(VoxelWorldPosition, light, localBegin, localEnd);
+                    LightAccumulation += AreaLightCast(VoxelCenter, light, localBegin, localEnd);
                 else
-                    LightAccumulation += DiscLightCast(VoxelWorldPosition, light, localBegin, localEnd);
+                    LightAccumulation += DiscLightCast(VoxelCenter, light, localBegin, localEnd);
             }
         }
     }
 
     g_Output[launchIndex] = g_Output[launchIndex] + LightAccumulation;
+}
+
+
+[shader("raygeneration")]
+void IndirectRayGenShader()
+{
+    uint3 launchIndex = DispatchRaysIndex().xyz;
+    float3 launchDim  = (float3)(DispatchRaysDimensions().xyz);
+
+    float3 VoxelCenter = WPosition + Size * (((float3)launchIndex + 0.5) / launchDim);
+
+    int globalBegin = StartRayIdx;
+    int globalEnd   = StartRayIdx + PerDispatchRayCount;
+
+    int localBegin = max(globalBegin, 0);
+    int localEnd   = min(globalEnd, (int)IndirectSamples);
+
+    if (localBegin < localEnd && IndirectSamples > 0)
+    {
+        float4 indirect = IndirectCast(VoxelCenter, localBegin, localEnd, IndirectSamples);
+        g_Output[launchIndex] = g_Output[launchIndex] + indirect;
+    }
 }

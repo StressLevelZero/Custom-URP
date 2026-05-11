@@ -49,30 +49,10 @@ struct v2f
 	SAMPLER(sampler_BumpMap);
 // End Injection UNIFORMS from Injection_NormalMap_DepthNormals.hlsl ----------------------------------------------------------
 
-CBUFFER_START(UnityPerMaterial)
-    float4 _BaseMap_ST;
-    half4 _BaseColor;
-// Begin Injection MATERIAL_CBUFFER_VECTORS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-    float4 _DetailMap_ST;
-    //half4  _DetailScale;
-// End Injection MATERIAL_CBUFFER_VECTORS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER_VECTORS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
-	float4 _PenMap_ST;
-	half4  _PenMonoColor;
-// End Injection MATERIAL_CBUFFER_VECTORS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
-    
-// Begin Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-half  _Normals;
-// End Injection MATERIAL_CBUFFER from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-    float  _Details;
-// End Injection MATERIAL_CBUFFER from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
-// Begin Injection MATERIAL_CBUFFER from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
-	half  _PenMono;
-// End Injection MATERIAL_CBUFFER from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
-    int _Surface;
-CBUFFER_END
-    
+#if defined(CBUFFER_PATH)
+#include CBUFFER_PATH
+#endif
+
 
 v2f vert(appdata v)
 {

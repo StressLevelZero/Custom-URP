@@ -174,7 +174,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             HLSLPROGRAM
             #pragma only_renderers vulkan
 
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/TriplanarBakedRT.hlsl"
 
             ENDHLSL
         }
@@ -314,7 +314,7 @@ Shader "SLZ/LitMAS/LitMAS Triplanar"
             Tags{ "LightMode" = "BakedRaytrace" }
             HLSLPROGRAM
             #pragma exclude_renderers vulkan
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector//TriplanarBakedRT.hlsl"
 
             ENDHLSL
         }

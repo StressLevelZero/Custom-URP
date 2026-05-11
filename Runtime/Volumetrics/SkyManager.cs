@@ -41,6 +41,8 @@ public static class SkyManager
     private static float[] _skyMonoSHCoefficients = new float[9];
     
     static SLZ.VolumetricSceneBindings bindings;
+    static bool _searchedBindingsThisScene;
+    static int _searchedBindingsSceneHandle = -1;
     
     private const int RuntimeFallbackMeanSkySamples = 256;
 
@@ -169,6 +171,7 @@ public static class SkyManager
     {
         if (mode == LoadSceneMode.Single)
         {
+            InvalidateBakedVolumetricsLookup();
             GenerateSkyTexture();
         }
     }
@@ -176,8 +179,11 @@ public static class SkyManager
     // Callback method that gets called when the active scene changes
     private static void OnActiveSceneChanged(Scene previousScene, Scene newScene)
     {
+        InvalidateBakedVolumetricsLookup();
         GenerateSkyTexture();
     }
+    
+    
 
 #if UNITY_EDITOR
     static void SceneOpenedCallback(Scene scene, OpenSceneMode mode)
@@ -286,7 +292,11 @@ public static class SkyManager
         }
     }
     
-    
+    public static Color GetAmbientSkyColor()
+    {
+        var volumetricbinds = TryGetBakedVolumetricsData();
+        return volumetricbinds ? volumetricbinds.meanSkyRadianceLinear  : Color.black;
+    }
     public static void CheckSky()
     {
 
@@ -312,20 +322,40 @@ public static class SkyManager
             else SetSkyTexture(CoreUtils.blackCubeTexture);
       //  }
     }
-
-    public static Color GetAmbientSkyColor()
-    {
-        var volumetricbinds = TryGetBakedVolumetricsData();
-        return volumetricbinds ? volumetricbinds.meanSkyRadianceLinear  : Color.black;
-    }
     
+    static void InvalidateBakedVolumetricsLookup()
+    {
+        bindings = null;
+        _searchedBindingsThisScene = false;
+        _searchedBindingsSceneHandle = -1;
+    }
+
+    static SLZ.VolumetricSceneBindings GetSceneBindingsOnce()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+
+        if (_searchedBindingsSceneHandle != activeScene.handle)
+        {
+            bindings = null;
+            _searchedBindingsThisScene = false;
+            _searchedBindingsSceneHandle = activeScene.handle;
+        }
+
+        if (!_searchedBindingsThisScene)
+        {
+            _searchedBindingsThisScene = true;
+            bindings = Object.FindFirstObjectByType<SLZ.VolumetricSceneBindings>();
+        }
+
+        return bindings;
+    }
+
     public static SLZ.BakedVolumetricsData TryGetBakedVolumetricsData()
     {
-        if (!bindings)
-            bindings = Object.FindFirstObjectByType<SLZ.VolumetricSceneBindings>();
+        var sceneBindings = GetSceneBindingsOnce();
 
-        if (bindings && bindings.BakedVolumetricsData)
-            return bindings.BakedVolumetricsData;
+        if (sceneBindings && sceneBindings.BakedVolumetricsData)
+            return sceneBindings.BakedVolumetricsData;
 
         return GetOrCreateRuntimeFallbackBakedVolumetricsData();
     }
@@ -431,8 +461,9 @@ public static class SkyManager
 
             _runtimeFallbackBakedVolumetricsData = null;
         }
-
-        bindings = null;
+        
+        InvalidateBakedVolumetricsLookup();
+      //  bindings = null;
     }
     
     public static void CheckSkyNull()

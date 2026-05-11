@@ -1,5 +1,5 @@
 //#define SIMULATE_ADMIN_NECESSARY
-#if !SLZ_RP_INTERNAL || SIMULATE_EXTERNAL
+
 
 using SLZ.SLZEditorTools;
 using System;
@@ -16,29 +16,11 @@ namespace SLZ.DXCUpdater
     /// <summary>
     /// Checks the state of Unity's DXC compiler dlls to determine if they're up-to-date
     /// </summary>
-    internal static class CheckDXCInstallExternal
+    public static class CheckDXCInstallExternal
     {
         static string dxcompilerName = "dxcompiler.dll";
         public static string UnityDxcPath() { return Path.Combine(Path.GetDirectoryName(EditorApplication.applicationPath), "Data", "Tools", dxcompilerName); }
         public static string SlzDxcPath() { return Path.GetFullPath(Path.Combine("Packages","com.unity.render-pipelines.universal","Editor","DXCUpdate","DXC_Patch","dxc~", dxcompilerName)); }
-
-        [InitializeOnLoadMethod()]
-        static void CheckDXC()
-        {
-            // avoid running this method every domain reload
-            if (SessionState.GetBool("DXCChecked", false))
-            {
-                //Debug.Log("Early Exit from CheckDXCInstall");
-                return;
-            }
-
-#if !SKIP_DXC_UPGRADE
-            EditorApplication.update += CheckDXCExternal;
-#else
-            UpdateDXCIncludeState();
-#endif
-            SessionState.SetBool("DXCChecked", true);
-        }
 
         static ulong FileVersionToLong(uint major, uint minor, uint build)
         {
@@ -52,7 +34,7 @@ namespace SLZ.DXCUpdater
 
         static ulong MinSupportedVersion { get => FileVersionToLong(1, 7, 0); }
 
-        static void UpdateDXCIncludeState()
+        public static void UpdateDXCIncludeState()
         {
             string unityDxcPath = UnityDxcPath();
             bool unityDXCExists = File.Exists(unityDxcPath) /* && File.Exists(unityDxilPath) */;
@@ -77,6 +59,28 @@ namespace SLZ.DXCUpdater
         {
             return $"{vi.FileMajorPart}.{vi.FileMinorPart}.{vi.FileBuildPart}.{vi.FilePrivatePart}";
         }
+
+#if !SLZ_RP_INTERNAL || SIMULATE_EXTERNAL
+
+        [InitializeOnLoadMethod()]
+        static void CheckDXC()
+        {
+            // avoid running this method every domain reload
+            if (SessionState.GetBool("DXCChecked", false))
+            {
+                //Debug.Log("Early Exit from CheckDXCInstall");
+                return;
+            }
+
+#if !SKIP_DXC_UPGRADE
+            EditorApplication.update += CheckDXCExternal;
+#else
+            UpdateDXCIncludeState();
+#endif
+            SessionState.SetBool("DXCChecked", true);
+        }
+
+ 
 
 
         [MenuItem("Stress Level Zero/Graphics/DXC Updater/Enable DXC Check")]
@@ -162,7 +166,8 @@ namespace SLZ.DXCUpdater
             UpdateDXCIncludeState(installDXCVersion);
             SessionState.SetBool("DXCChecked", true);
         }
+
+#endif // !SLZ_RP_INTERNAL || SIMULATE_EXTERNAL
     }
 }
 
-#endif

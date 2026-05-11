@@ -3,15 +3,17 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using SLZ.SLZEditorTools;
 
 [InitializeOnLoad]
 internal static class SHDeringBakeHook
 {
     // ---- Persistent keys (survive domain reload within a session) ----
-    const string K_Armed           = "SHDeringBakeHook.Armed";
-    const string K_AnyDeringWasOn  = "SHDeringBakeHook.AnyDeringWasOn";
-    const string K_PendingRun      = "SHDeringBakeHook.PendingRun";
-    const string K_PreBakeHash     = "SHDeringBakeHook.PreBakeHash";
+    // Only span the bakeStarted -> post-bake window. The poll/pending state
+    // that used to live here now belongs to SortedPostBakeEvent.
+    const string K_Armed          = "SHDeringBakeHook.Armed";
+    const string K_AnyDeringWasOn = "SHDeringBakeHook.AnyDeringWasOn";
+    const string K_PreBakeHash    = "SHDeringBakeHook.PreBakeHash";
 
     // Instance-id dictionary of dering flags we flipped. Rebuilt fresh each bake.
     // If lost to a domain reload, RestoreDeringFlags silently no-ops — the on-disk
@@ -19,36 +21,25 @@ internal static class SHDeringBakeHook
     // the snapshot anyway.
     static readonly Dictionary<int, bool> s_prevDeringByInstanceId = new();
 
-    // Poll state — only alive between bake end and stability.
-    static int  s_stableFrames;
-    static bool s_pollSubscribed;
-
-    static LightProbes s_lastLP;
-    static int s_lastCountSelf;
-    static int s_lastBakedLen;
-    static int s_lastPosLen;
-
-    const int RequiredStableFrames = 6;
-
-    // ---- Explicit post-dering chain (replaces bakeCompleted for dependents) ----
-    public static event Action PostDeringCallback;
-
     // ---- SessionState-backed flags ----
-    static bool Armed          { get => SessionState.GetBool(K_Armed, false);         set => SessionState.SetBool(K_Armed, value); }
+    static bool Armed          { get => SessionState.GetBool(K_Armed, false);          set => SessionState.SetBool(K_Armed, value); }
     static bool AnyDeringWasOn { get => SessionState.GetBool(K_AnyDeringWasOn, false); set => SessionState.SetBool(K_AnyDeringWasOn, value); }
-    static bool PendingRun     { get => SessionState.GetBool(K_PendingRun, false);     set => SessionState.SetBool(K_PendingRun, value); }
-    static int  PreBakeHash    { get => SessionState.GetInt(K_PreBakeHash, 0);         set => SessionState.SetInt(K_PreBakeHash, value); }
+    static int  PreBakeHash    { get => SessionState.GetInt (K_PreBakeHash, 0);        set => SessionState.SetInt (K_PreBakeHash, value); }
 
     static SHDeringBakeHook()
     {
         Lightmapping.bakeStarted   += OnBakeStarted;
-        //Lightmapping.bakeCancelled += OnBakeCancelled;
-        Lightmapping.bakeCompleted += OnBakeCompleted;
+#if UNITY_2023_1_OR_NEWER
+        Lightmapping.bakeCancelled += OnBakeCancelled;
+#endif
 
-        // If a domain reload happened mid-pending-run, resume the poll.
-        if (PendingRun) SubscribePoll();
+        // SortedPostBakeEvent gates on lighting-data stability and dispatches
+        // handlers in ascending order. Our custom dering runs synchronously
+        // here — downstream consumers register at PostBakeOrder values
+        // greater than SHDeringHook to see the de-ringed probe data.
+        SortedPostBakeEvent.Unregister(OnPostBake, PostBakeOrder.SHDering);
+        SortedPostBakeEvent.Register  (OnPostBake, PostBakeOrder.SHDering);
     }
-
     static void OnBakeStarted()
     {
         if (Armed) return; // re-entry guard
@@ -59,7 +50,8 @@ internal static class SHDeringBakeHook
         foreach (var lpg in FindAllSceneLightProbeGroups())
         {
             if (lpg == null) continue;
-           // if (!lpg.dering) continue; //Todo: Add some type of global override toggle to dering even without the checkbox 
+            // TODO: global override toggle to dering even without the checkbox.
+            // if (!lpg.dering) continue;
 
             any = true;
             s_prevDeringByInstanceId[lpg.GetInstanceID()] = true;
@@ -67,8 +59,8 @@ internal static class SHDeringBakeHook
         }
 
         AnyDeringWasOn = any;
-        Armed = any;
-        PreBakeHash = any ? ComputeBakedProbesHash() : 0;
+        Armed          = any;
+        PreBakeHash    = any ? ComputeBakedProbesHash() : 0;
     }
 
     static void OnBakeCancelled()
@@ -76,13 +68,11 @@ internal static class SHDeringBakeHook
         if (!Armed) return;
 
         RestoreDeringFlags();
-        Armed = false;
+        Armed          = false;
         AnyDeringWasOn = false;
-        PendingRun = false;
-        UnsubscribePoll();
     }
 
-    static void OnBakeCompleted()
+    static void OnPostBake()
     {
         if (!Armed) return;
 
@@ -92,122 +82,17 @@ internal static class SHDeringBakeHook
             AnyDeringWasOn &&
             ComputeBakedProbesHash() != PreBakeHash;
 
-        Armed = false;
+        Armed          = false;
         AnyDeringWasOn = false;
 
+        // No-op bakes (probes unchanged) skip the dering pass but still let
+        // later SortedPostBakeEvent handlers run — Invoke iterates the rest
+        // of the dictionary regardless of what we do here.
         if (probesActuallyChanged)
-            ArmDeferredRun();
-    }
-
-    static void ArmDeferredRun()
-    {
-        PendingRun = true;
-        s_stableFrames = 0;
-
-        s_lastLP = null;
-        s_lastCountSelf = s_lastBakedLen = s_lastPosLen = -1;
-
-        SubscribePoll();
-    }
-
-    static void SubscribePoll()
-    {
-        if (s_pollSubscribed) return;
-        EditorApplication.update += PollForStability;
-        s_pollSubscribed = true;
-    }
-
-    static void UnsubscribePoll()
-    {
-        if (!s_pollSubscribed) return;
-        EditorApplication.update -= PollForStability;
-        s_pollSubscribed = false;
-    }
-
-    static void PollForStability()
-    {
-        if (!PendingRun)
-        {
-            UnsubscribePoll();
-            return;
-        }
-
-        if (IsLightingDataStableThisFrame())
-        {
-            s_stableFrames++;
-            if (s_stableFrames >= RequiredStableFrames)
-            {
-                PendingRun = false;
-                s_stableFrames = 0;
-                UnsubscribePoll();
-                EditorApplication.delayCall += RunCustomDeringAndNotify;
-            }
-        }
-        else
-        {
-            s_stableFrames = 0;
-        }
-    }
-
-    static bool IsLightingDataStableThisFrame()
-    {
-        if (EditorApplication.isCompiling) return false;
-        if (EditorApplication.isUpdating)  return false;
-        if (Lightmapping.isRunning)        return false;
-
-        var lp = LightmapSettings.lightProbes;
-        if (lp == null) return false;
-
-        var baked = lp.bakedProbes;
-        if (baked == null || baked.Length == 0) return false;
-
-        int countSelf = lp.count;
-        if (countSelf <= 0) return false;
-
-        int bakedLen = baked.Length;
-        int posLen;
-        try { posLen = lp.positions.Length; }
-        catch { return false; }
-
-        if (bakedLen != countSelf) return false;
-        if (posLen   != countSelf) return false;
-
-        bool stableNow =
-            ReferenceEquals(lp, s_lastLP) &&
-            countSelf == s_lastCountSelf &&
-            bakedLen  == s_lastBakedLen  &&
-            posLen    == s_lastPosLen;
-
-        s_lastLP        = lp;
-        s_lastCountSelf = countSelf;
-        s_lastBakedLen  = bakedLen;
-        s_lastPosLen    = posLen;
-
-        return stableNow;
-    }
-
-    static void RunCustomDeringAndNotify()
-    {
-        try
-        {
             SHDeringMenu.RunCustomDering_OnlyTickedLPGs_ActiveScene();
-        }
-        catch (Exception e)
-        {
-            Debug.LogException(e);
-        }
-        finally
-        {
-            var cb = PostDeringCallback;
-            if (cb != null)
-            {
-                foreach (var d in cb.GetInvocationList())
-                {
-                    try { ((Action)d)(); }
-                    catch (Exception e) { Debug.LogException(e); }
-                }
-            }
-        }
+
+        // Exceptions propagate to SortedPostBakeEvent.Invoke, which logs
+        // per-handler and continues with the next order key.
     }
 
     static void RestoreDeringFlags()
