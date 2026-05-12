@@ -15,6 +15,7 @@ Shader "SLZ/LitMAS/LitMAS Posespace"
         _BakedMutiplier("Emission Baked Mutiplier", Float) = 1
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("DetailMap", 2D) = "gray" {}
+        _DetailNormalScale("Detail Normal Scale", Float) = 1.0
         [NoScaleOffset][SingleLineTexture][Space(20)][Header(Hit Setup)][Space(10)]_HitRamp("Hit Ramp", 2D) = "black" {}
         [HDR]_HitColor("HitColor", Color) = (0,0,0,0)
         [HideInInspector]_NumberOfHits("_NumberOfHits", Int) = 0

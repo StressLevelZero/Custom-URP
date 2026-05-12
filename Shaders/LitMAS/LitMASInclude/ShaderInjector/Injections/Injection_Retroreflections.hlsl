@@ -10,6 +10,6 @@ TEXTURE2D(_RetroReflMap);
 	surfData.retroReflPercent = _RetroReflIntensity * SAMPLE_TEXTURE2D(_RetroReflMap, sampler_BaseMap, uv0).r;
 	surfData.retroReflSharpness = _RetroReflSharpness;
 	#if defined(_FLUORESCENCE)
-		surfData.fluorescence = saturate(surfData.fluorescence - 4 * surfData.retroReflPercent);
+		//surfData.fluorescence = saturate(surfData.fluorescence - 4 * surfData.retroReflPercent);
 	#endif
 //#!INJECT_END

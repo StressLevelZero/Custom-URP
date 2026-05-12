@@ -15,6 +15,7 @@ Shader "SLZ/LitMAS/LitMAS Vertex Color AO"
         _BakedMutiplier("Emission Baked Mutiplier", Float) = 1
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("DetailMap", 2D) = "gray" {}
+        _DetailNormalScale("Detail Normal Scale", Float) = 1.0
         [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 0
         [Header(This should be 0 for skinned meshes)]
         [HideInInspector]_SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0

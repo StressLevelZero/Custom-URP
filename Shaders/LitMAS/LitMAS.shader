@@ -15,7 +15,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
         _BakedMutiplier("Emission Baked Mutiplier", Float) = 1
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("Detail Map", 2D) = "gray" {}
-        //[HideInInspector]_DetailScale("Detail Scale", Vector) = (1.0, 1.0, 1.0, 1.0)
+        _DetailNormalScale("Detail Normal Scale", Float) = 1.0
         [Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 0
         // SSR temporal accumulation, no longer used
         // [Header(This should be 0 for skinned meshes)]

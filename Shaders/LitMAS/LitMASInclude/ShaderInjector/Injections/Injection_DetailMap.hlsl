@@ -31,8 +31,8 @@ TEXTURE2D(_DetailMap);
 
 //#!INJECT_BEGIN DETAIL_MAP 0
     #if defined(_DETAILS_ON) && defined(_FRACTAL_DETAILS_OFF)
-        BlendDetailMap( _DetailMap, sampler_DetailMap, uv_detail, albedo.rgb, smoothness, normalTS);
+        BlendDetailMap( _DetailMap, sampler_DetailMap, uv_detail, albedo.rgb, smoothness, normalTS, _DetailNormalScale);
     #elif defined(_DETAILS_ON)
-        BlendDetailMapFractal( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main, albedo.rgb, smoothness, normalTS);
+        BlendDetailMapFractal( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main, albedo.rgb, smoothness, normalTS, _DetailNormalScale);
     #endif
 //#!INJECT_END

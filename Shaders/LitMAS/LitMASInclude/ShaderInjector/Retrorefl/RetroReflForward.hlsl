@@ -252,9 +252,9 @@ FragOut frag(VertOut i
 
 // Begin Injection DETAIL_MAP from Injection_DetailMap.hlsl ----------------------------------------------------------
     #if defined(_DETAILS_ON) && defined(_FRACTAL_DETAILS_OFF)
-        BlendDetailMap( _DetailMap, sampler_DetailMap, uv_detail, albedo.rgb, smoothness, normalTS);
+        BlendDetailMap( _DetailMap, sampler_DetailMap, uv_detail, albedo.rgb, smoothness, normalTS, _DetailNormalScale);
     #elif defined(_DETAILS_ON)
-        BlendDetailMapFractal( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main, albedo.rgb, smoothness, normalTS);
+        BlendDetailMapFractal( _DetailMap, _BaseMap,  sampler_DetailMap,  uv_detail, uv_main, albedo.rgb, smoothness, normalTS, _DetailNormalScale);
     #endif
 // End Injection DETAIL_MAP from Injection_DetailMap.hlsl ----------------------------------------------------------
 // Begin Injection DETAIL_MAP from Injection_Fluorescence.hlsl ----------------------------------------------------------
@@ -334,7 +334,7 @@ FragOut frag(VertOut i
 	surfData.retroReflPercent = _RetroReflIntensity * SAMPLE_TEXTURE2D(_RetroReflMap, sampler_BaseMap, uv0).r;
 	surfData.retroReflSharpness = _RetroReflSharpness;
 	#if defined(_FLUORESCENCE)
-		surfData.fluorescence = saturate(surfData.fluorescence - 4 * surfData.retroReflPercent);
+		//surfData.fluorescence = saturate(surfData.fluorescence - 4 * surfData.retroReflPercent);
 	#endif
 // End Injection PRE_LIGHTING_CALC from Injection_Retroreflections.hlsl ----------------------------------------------------------
 

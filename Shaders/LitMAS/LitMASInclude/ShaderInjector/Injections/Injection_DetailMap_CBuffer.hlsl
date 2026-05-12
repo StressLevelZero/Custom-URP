@@ -5,4 +5,5 @@
 
 //#!INJECT_BEGIN MATERIAL_CBUFFER_HALF_SCALARS 0
     half  _Details;
+    half  _DetailNormalScale;
 //#!INJECT_END

@@ -17,6 +17,8 @@ using static UnityEngine.Rendering.DebugUI.MessageBox;
 using UnityEditor.Search;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
+using UnityEngine.Experimental.GlobalIllumination;
+
 
 
 
@@ -75,7 +77,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             _BakedMutiplier,
             _Details,
             _DetailMap,
-            _DetailScale,
+            _DetailNormalScale,
             g_tBRDFMap,
             BRDFMAP,
             _HitRamp,
@@ -120,7 +122,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "_BakedMutiplier",
             "_Details",
             "_DetailMap",
-            "_DetailScale",
+            "_DetailNormalScale",
             "g_tBRDFMap",
             "BRDFMAP",
             "_HitRamp",
@@ -294,13 +296,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             ZOffsetWarning.style.display = DisplayStyle.None;
             AlphaClipWarning = new HelpBox("Opaque alpha clip materials are very expensive on Quest, prefer transparency if possible!", HelpBoxMessageType.Warning);
             AlphaClipWarning.style.display = DisplayStyle.None;
-            DetailScaleError = new HelpBox("Detail Scale Property Set! This is ONLY for modders. Use the correct textures instead of fudging it with a scale!", HelpBoxMessageType.Error);
-            DetailScaleError.style.display = DisplayStyle.None;
 
             MainWindow.Add(TransparentWarning);
             MainWindow.Add(AlphaClipWarning);
             MainWindow.Add(ZOffsetWarning);
-            MainWindow.Add(DetailScaleError);
 
             //----------------------------------------------------------------
             // Rendering Properties ------------------------------------------
@@ -803,7 +802,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             Foldout detailProps = new Foldout();
            
             bool hasDetails = false;
-
+            
             //var detailsBody = new VisualElement();
             // detailProps.tooltip = "Fractal texture sampling is effectively infinite textile density. UV is legacy behavior and should only be used if one fixed resolution or tiling is needed ";
             // detailProps.Add(detailsBody); // everything that should be disabled goes in here
@@ -820,19 +819,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 detailProps.Add(detailScaleOffset);
                 materialFields.Add(detailScaleOffset);
             }
-           
-            int detailScaleIdx = PropertyIdx(ref propTable, PName._DetailScale);
-            if (detailScaleIdx != -1)
-            {
-                
 
-                #if SLZ_RP_INTERNAL
-                if (props[detailScaleIdx].vectorValue != Vector4.one)
-                {
-                    DetailScaleError.style.display = DisplayStyle.Flex;
-                }
-                #endif
-            }
             
 
             MaterialIntPopup detailPopup = new MaterialIntPopup();
@@ -899,6 +886,14 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 detailToggle = detailMatToggle;
             }
 
+            int detailNrmScaleIdx = PropertyIdx(ref propTable, PName._DetailNormalScale);
+            if (detailNrmScaleIdx != -1)
+            {
+                MaterialFloatField detailNrmScaleField = new MaterialFloatField();
+                detailNrmScaleField.Initialize(props[detailNrmScaleIdx], propIdx[detailNrmScaleIdx]);
+                materialFields.Add(detailNrmScaleField);
+                detailProps.contentContainer.Add(detailNrmScaleField);
+            }
 
             if (hasDetails)
             {

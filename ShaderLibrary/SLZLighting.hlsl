@@ -1234,8 +1234,10 @@ void SLZMainLight(inout diffuseLight diffuse, inout half3 specular, const SLZFra
 
         #endif
     #endif
-    diffuse += diffuseBRDF;
-
+    
+    #if !defined(_RETROREFLECTIVE) || defined(SLZ_NO_SPECULAR)
+        diffuse += diffuseBRDF;
+    #endif
 }
 
 /**

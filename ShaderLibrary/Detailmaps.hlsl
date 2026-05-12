@@ -32,7 +32,7 @@ half OverlayBlendDetail(half source, half destination)
 
 /// Automatically accounts for texture scaling 
 void BlendDetailMapFractal(Texture2D _DetailMap, Texture2D _BaseMap, SamplerState sampler_DetailMap, float2 uv_detail, float2 uv_main,
-                            inout half3 albedo, inout half smoothness, inout half3 normalTS  )
+                            inout half3 albedo, inout half smoothness, inout half3 normalTS, half scale = 1.0 )
 {
     half4 detailMap = SAMPLE_TEXTURE2D_FRACTAL(_DetailMap, sampler_DetailMap, uv_detail);
 
@@ -41,7 +41,7 @@ void BlendDetailMapFractal(Texture2D _DetailMap, Texture2D _BaseMap, SamplerStat
     half FadeIntensity = lerp( rcp(MainTextureDetailDensity), half(1), half(0.2)); //add control here
     detailMap = lerp(half(0.5) ,detailMap, saturate( FadeIntensity ) );
     
-    half3 detailTS = UnpackNormalAG(detailMap);
+    half3 detailTS = UnpackNormalAG(detailMap, scale);
     normalTS = SafeNormalize(BlendNormalRNM(normalTS, detailTS));       
     smoothness = OverlayBlendDetail(detailMap.b, smoothness);
     albedo = OverlayBlendDetail(detailMap.r, albedo);
@@ -50,10 +50,10 @@ void BlendDetailMapFractal(Texture2D _DetailMap, Texture2D _BaseMap, SamplerStat
 
 /// Standard UV texture behavior
 void BlendDetailMap(Texture2D _DetailMap, SamplerState sampler_DetailMap, float2 uv_detail,
-                            inout half3 albedo, inout half smoothness, inout half3 normalTS  )
+                            inout half3 albedo, inout half smoothness, inout half3 normalTS, half scale = 1.0 )
 {
     half4 detailMap = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, uv_detail);
-    half3 detailTS = UnpackNormalAG(detailMap);
+    half3 detailTS = UnpackNormalAG(detailMap, scale);
     normalTS = SafeNormalize(BlendNormalRNM(normalTS, detailTS));       
     smoothness = OverlayBlendDetail(detailMap.b, smoothness);
     albedo = OverlayBlendDetail(detailMap.r, albedo);
