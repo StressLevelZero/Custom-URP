@@ -14,7 +14,7 @@ using UnityEngine.SceneManagement;
 using UnityEditor.SceneManagement;
 #endif
 
-namespace SLZ.SLZEditorTools
+namespace SLZ.SLZEditorTools.MeshVariant
 {
     public class MeshVariantReference : ScriptableObject
     {

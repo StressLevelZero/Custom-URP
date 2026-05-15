@@ -1,3 +1,5 @@
+#if UNITY_EDITOR
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,17 +10,12 @@ using UnityEngine.Experimental.Rendering;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using Unity.Collections;
-using UnityEditorInternal;
-using Unity.VisualScripting;
 using Unity.Collections.LowLevel.Unsafe;
 
 
-
-
-
-#if UNITY_EDITOR
 using System;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine.SceneManagement;
 using UnityEditor.SceneManagement;
 using System.IO;
@@ -30,22 +27,10 @@ using Object = UnityEngine.Object;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor.EditorTools;
 using System.Reflection;
-#endif
 
-namespace SLZ.SLZEditorTools
+
+namespace SLZ.SLZEditorTools.MeshVariant
 {
-    [RequireComponent(typeof(MeshFilter))]
-    [RequireComponent(typeof(MeshRenderer))]
-    public partial class TriplanarUvGenerator : MonoBehaviour
-    {
-        public LazyLoadReference<Mesh> originalMesh;
-        public Mesh generatedMesh;
-        public Transform projectionSpace;
-        public float3 projectionScale = new float3(1,1,1);
-        public MeshProjectedUvVariant.ProjectionMethod projectionMethod = MeshProjectedUvVariant.ProjectionMethod.Triplanar;
-    }
-
-    #if UNITY_EDITOR
 
     [CustomEditor(typeof(TriplanarUvGenerator))]
     [CanEditMultipleObjects]
@@ -386,5 +371,5 @@ namespace SLZ.SLZEditorTools
             }
         }
     }
-    #endif
 }
+#endif // UNITY_EDITOR
