@@ -231,69 +231,91 @@ inline float2 LinearUV_To_FroxelGridUV(float2 uvLinear, float2 centerUV, float a
     return saturate(SignedToUV(sGrid, centerUV));
 }
 
+// Positive value pulls the volume sample toward the camera. Combats light leaking
+#define VOLUMETRIC_SURFACE_DEPTH_BIAS_TEXELS 1.0
+
 half4 GetVolumetricColor(float3 positionWS)
 {
     half4 ls = half4(positionWS - _VolCameraPos, -1); //_WorldSpaceCameraPos
     ls = mul(ls, TransposedCameraProjectionMatrix);
     ls.xyz = ls.xyz / ls.w;
+
     float vdistance = distance(positionWS, _VolCameraPos);
     float W = EncodeLogarithmicDepthGeneralized(vdistance, _VBufferDistanceEncodingParams);
 
-    // ls.xy is per-eye linear UV in [0..1] (as your current code assumes)
+    // ls.xy is per-eye linear UV in [0..1]
     float2 uvLinear = (float2)ls.xy;
 
-    // Convert linear UV -> froxel grid UV (inverse of the warp used during froxel rendering)
+    // Convert linear UV -> froxel grid UV
     float2 uvGrid = LinearUV_To_FroxelGridUV(uvLinear, _FoveaCenterUV, _FoveaStrength);
 
-    // Pack into side-by-side stereo atlas (X half per eye)
-
-    // unity_StereoEyeIndex may not exist in non-stereo variants, so guard it.
     int eye = 0;
     #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED) || defined(UNITY_SINGLE_PASS_STEREO)
     eye = (int)unity_StereoEyeIndex;
     #endif
+
     eye = clamp(eye, 0, VOL_EYE_COUNT - 1);
 
     float invEyeCount = rcp((float)VOL_EYE_COUNT);
-    
-    // float xPacked = uvGrid.x * 0.5 + eye * 0.5;
-    // float2 uvPacked = float2(uvGrid.x * 0.5 + eye * 0.5, uvGrid.y);
-    // float3 DoubleUV = float3(xPacked, uvGrid.y, W);
-    
+
     // Atlas-space UV for the 3D volume
-    float2 uvPacked = float2(uvGrid.x * invEyeCount + (float)eye * invEyeCount, uvGrid.y);
+    float2 uvPacked = float2(
+        uvGrid.x * invEyeCount + (float)eye * invEyeCount,
+        uvGrid.y
+    );
+
     float3 sampleUVW = float3(uvPacked.x, uvPacked.y, W);
 
-    
     float2 pixCoord = floor(uvPacked * _ScaledScreenParams.xy);
+
     // ---- Noise / jitter ----
     float noise = InterleavedGradientNoise(pixCoord, _FrameIndex);
+
     float2 xyoffset[7];
-    GetHexagonalClosePackedSpheres7(xyoffset);  
+    GetHexagonalClosePackedSpheres7(xyoffset);
+
     float2 invXY = rcp(float2(_VolumetricResultDim.x, _VolumetricResultDim.y));
     float  invZ  = rcp(_VolumetricResultDim.z);
-    
-    int idx = (int)(noise * 7.0) % 7.;    
-    // jitterRadiusTexels = how many *texels* you want at maximum.
-    // Start small: 0.20–0.40 texels is a good range. //Make variable or keep magic numbers?
-    float jitterRadiusTexelsXY = .3;   // e.g. 0.30
-    float jitterRadiusTexelsZ  = .05;    // e.g. 0.05 (optional, tiny)
+
+    // ---------------------------------------------------------------------
+    // Surface depth bias:
+    // Pull the sample toward the camera so opaque surfaces do not sample
+    // the froxel cell behind the wall.
+    //
+    // Since W is the normalized froxel-depth coordinate, subtracting invZ
+    // moves the sample by roughly one froxel slice toward the camera.
+    // ---------------------------------------------------------------------
+    sampleUVW.z -= VOLUMETRIC_SURFACE_DEPTH_BIAS_TEXELS * invZ;
+    sampleUVW.z = saturate(sampleUVW.z);
+
+    int idx = (int)(noise * 7.0) % 7;
+
+    float jitterRadiusTexelsXY = 0.3;
+    float jitterRadiusTexelsZ  = 0.05;
+
     float2 jitterUV = xyoffset[idx] * (jitterRadiusTexelsXY * invXY);
-    // Apply
+
     sampleUVW.xy += jitterUV;
-    sampleUVW.z += (noise - 0.5) * (jitterRadiusTexelsZ * invZ);
 
+    // Important:
+    // Do not allow Z jitter to push the sample behind the surface again.
+    // Either disable it:
+    //
+    // sampleUVW.z += 0;
+    //
+    // Or only jitter toward the camera:
+    sampleUVW.z -= noise * (jitterRadiusTexelsZ * invZ);
+    sampleUVW.z = saturate(sampleUVW.z);
 
-   // #if (_HiQSampling) //
     #if (_VOLUMETRICS_ENABLED_HQ)
-    //Get's rid of stair-stepping from bilinear 
-    float4 volsample = SampleTricubicLevel(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0) ;
-    #else    
-    float4 volsample = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0) ;
+        float4 volsample = SampleTricubicLevel(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
+    #else
+        float4 volsample = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
     #endif
-       
-    volsample = DitherVolumetrics(volsample, noise * 0.08 + .5);    
-    return volsample ;
+
+    volsample = DitherVolumetrics(volsample, noise * 0.08 + .5);
+
+    return volsample;
 }
 
 half4 Volumetrics(half4 color, float3 positionWS) {

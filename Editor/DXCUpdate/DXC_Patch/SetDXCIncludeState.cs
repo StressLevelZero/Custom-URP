@@ -8,7 +8,7 @@ namespace SLZ.DXCUpdater
 {
     public static class SetDXCIncludeState
     {
-        static string packageName = "com.stresslevelzero.urpconfig";
+        //static string packageName = "com.stresslevelzero.urpconfig";
         public static bool Set(bool patched, uint major, uint minor, uint patch, uint build)
         {
             //Debug.Log($"Setting DXCUpdateState");

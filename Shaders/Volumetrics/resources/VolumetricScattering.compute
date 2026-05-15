@@ -278,7 +278,7 @@
 float4 SampleClipToroidal(
 	float3 ws, float3 wsnoise,
 	float voxelSize, int res,
-	Texture3D<float4> tex, float lod)
+	Texture3D<float4> tex)
 		{
 			// Toroidal sampling: texel index is ws / voxelSize mod res, regardless of
 			// origin. The origin is only relevant for the InsideClipVoxel window test
@@ -289,18 +289,18 @@ float4 SampleClipToroidal(
 			float invRes   = 1.0 / (float)res;
 
 			float3 uvw = frac(ws * invVoxel * invRes);
-			float4 s0  = tex.SampleLevel(sampler_LinearRepeat, uvw, lod);
+			float4 s0  = tex.SampleLevel(sampler_LinearRepeat, uvw, 0);
 
-		#if defined(_VOLUMETRIC_TURBULENCE)
+			#if defined(_VOLUMETRIC_TURBULENCE)
 			// Turbulence active: alpha samples at an offset world position, so we need
 			// a second 3D fetch. Costly; only compile this path when turbulence is on.
 			float3 uvwNoise = frac(wsnoise * invVoxel * invRes);
-			float  alpha    = tex.SampleLevel(sampler_LinearRepeat, uvwNoise, lod).a;
+			float  alpha    = tex.SampleLevel(sampler_LinearRepeat, uvwNoise, 0).a;
 			return float4(s0.rgb, alpha);
-		#else
+			#else
 			// No turbulence: ws == wsnoise, reuse the single fetch.
 			return s0;
-		#endif
+			#endif
 		}
         
      //   shared TextureCube<float4> _SkyTexture;       
@@ -572,67 +572,67 @@ float4 SampleClipToroidal(
 		    return irradianceRGB;
 		}
 		        
-// Same rational curve as before:
-// r' = r / (1 + a(1-r))     (a >= 0)
-// inv: r = r'(1+a) / (1 + a r')
+		// Same rational curve as before:
+		// r' = r / (1 + a(1-r))     (a >= 0)
+		// inv: r = r'(1+a) / (1 + a r')
 
-// "Square radial" using Chebyshev norm so the square boundary stays pinned.
-float2 WarpSigned_SquareRadial(float2 s, float a)
-		{
-			float2 as = abs(s);
-			float r = max(as.x, as.y);     // 0..1 everywhere inside the square
-			if (r < 1e-6) return s;
+		// "Square radial" using Chebyshev norm so the square boundary stays pinned.
+		float2 WarpSigned_SquareRadial(float2 s, float a)
+				{
+					float2 as = abs(s);
+					float r = max(as.x, as.y);     // 0..1 everywhere inside the square
+					if (r < 1e-6) return s;
 
-			float2 dir = s / r;           // max(|dir|) == 1
-			float rw = r / (1.0 + a * (1.0 - r)); //WarpRadius_Rational
-			return dir * rw;
-		}
+					float2 dir = s / r;           // max(|dir|) == 1
+					float rw = r / (1.0 + a * (1.0 - r)); //WarpRadius_Rational
+					return dir * rw;
+				}
 
-// float2 InvWarpSigned_SquareRadial(float2 sw, float a)
-// 		{
-// 			float2 asw = abs(sw);
-// 			float rw = max(asw.x, asw.y);  // 0..1
-// 			if (rw < 1e-6) return sw;
-//
-// 			float2 dir = sw / rw;
-// 			float r = (rw * (1.0 + a)) / (1.0 + a * rw); //InvWarpRadius_Rational
-// 			return dir * r;
-// 		}
-//
-// // Map uv in [0..1] to signed coord in [-1..1] around a center,
-// // with asymmetric extents so edges stay pinned even if center != 0.5.
-// float2 UVToSigned(float2 uv, float2 centerUV)
-// 		{
-// 			float2 leftExtent  = centerUV;            // distance to left/bottom edge
-// 			float2 rightExtent = 1.0 - centerUV;      // distance to right/top edge
-//
-// 			float2 s;
-// 			s.x = (uv.x < centerUV.x) ? ( (uv.x - centerUV.x) / max(leftExtent.x,  1e-6) )
-// 									  : ( (uv.x - centerUV.x) / max(rightExtent.x, 1e-6) );
-// 			s.y = (uv.y < centerUV.y) ? ( (uv.y - centerUV.y) / max(leftExtent.y,  1e-6) )
-// 									  : ( (uv.y - centerUV.y) / max(rightExtent.y, 1e-6) );
-// 			return s; // [-1..1]
-// 		}
-// float2 SignedToUV(float2 s, float2 centerUV)
-// 		{
-// 			float2 leftExtent  = centerUV;
-// 			float2 rightExtent = 1.0 - centerUV;
-//
-// 			float2 uv;
-// 			uv.x = (s.x < 0) ? centerUV.x + s.x * leftExtent.x
-// 							 : centerUV.x + s.x * rightExtent.x;
-// 			uv.y = (s.y < 0) ? centerUV.y + s.y * leftExtent.y
-// 							 : centerUV.y + s.y * rightExtent.y;
-// 			return uv;
-// 		}
+		// float2 InvWarpSigned_SquareRadial(float2 sw, float a)
+		// 		{
+		// 			float2 asw = abs(sw);
+		// 			float rw = max(asw.x, asw.y);  // 0..1
+		// 			if (rw < 1e-6) return sw;
+		//
+		// 			float2 dir = sw / rw;
+		// 			float r = (rw * (1.0 + a)) / (1.0 + a * rw); //InvWarpRadius_Rational
+		// 			return dir * r;
+		// 		}
+		//
+		// // Map uv in [0..1] to signed coord in [-1..1] around a center,
+		// // with asymmetric extents so edges stay pinned even if center != 0.5.
+		// float2 UVToSigned(float2 uv, float2 centerUV)
+		// 		{
+		// 			float2 leftExtent  = centerUV;            // distance to left/bottom edge
+		// 			float2 rightExtent = 1.0 - centerUV;      // distance to right/top edge
+		//
+		// 			float2 s;
+		// 			s.x = (uv.x < centerUV.x) ? ( (uv.x - centerUV.x) / max(leftExtent.x,  1e-6) )
+		// 									  : ( (uv.x - centerUV.x) / max(rightExtent.x, 1e-6) );
+		// 			s.y = (uv.y < centerUV.y) ? ( (uv.y - centerUV.y) / max(leftExtent.y,  1e-6) )
+		// 									  : ( (uv.y - centerUV.y) / max(rightExtent.y, 1e-6) );
+		// 			return s; // [-1..1]
+		// 		}
+		// float2 SignedToUV(float2 s, float2 centerUV)
+		// 		{
+		// 			float2 leftExtent  = centerUV;
+		// 			float2 rightExtent = 1.0 - centerUV;
+		//
+		// 			float2 uv;
+		// 			uv.x = (s.x < 0) ? centerUV.x + s.x * leftExtent.x
+		// 							 : centerUV.x + s.x * rightExtent.x;
+		// 			uv.y = (s.y < 0) ? centerUV.y + s.y * leftExtent.y
+		// 							 : centerUV.y + s.y * rightExtent.y;
+		// 			return uv;
+		// 		}
 
-inline float ComputeNoiseLOD_FromSlice(
-	float e1, float invDimZ,
-	Texture3D<float4> noiseTex,
-	float worldToNoiseUV,     // your 0.15
-	float footprintScale,     // NEW: 0.25..1.0 (start at 0.35)
-	float lodBias,            // negative = sharper
-	float lodMax)
+		inline float ComputeNoiseLOD_FromSlice(
+			float e1, float invDimZ,
+			Texture3D<float4> noiseTex,
+			float worldToNoiseUV,     // your 0.15
+			float footprintScale,     // NEW: 0.25..1.0 (start at 0.35)
+			float lodBias,            // negative = sharper
+			float lodMax)
 		{
 			uint w, h, d, mips;
 			noiseTex.GetDimensions(0, w, h, d, mips);
@@ -925,51 +925,65 @@ if (isLeader)
 			
 	int   r0 = _ClipmapResolution0, r1 = _ClipmapResolution1,
       r2 = _ClipmapResolution2, r3 = _ClipmapResolution3;
-	float v0 = _ClipmapVoxelSize0,  v1 = _ClipmapVoxelSize1,
-	      v2 = _ClipmapVoxelSize2,  v3 = _ClipmapVoxelSize3;
-	int3  o0 = _ClipmapVoxelOrigin0, o1 = _ClipmapVoxelOrigin1,
-	      o2 = _ClipmapVoxelOrigin2, o3 = _ClipmapVoxelOrigin3;
+float v0 = _ClipmapVoxelSize0,  v1 = _ClipmapVoxelSize1,
+      v2 = _ClipmapVoxelSize2,  v3 = _ClipmapVoxelSize3;
+int3  o0 = _ClipmapVoxelOrigin0, o1 = _ClipmapVoxelOrigin1,
+      o2 = _ClipmapVoxelOrigin2, o3 = _ClipmapVoxelOrigin3;
 
-	// Move distance is level-independent; compute once outside the ladder.
-	float move = max(length(wsRGB - wsStable), length(wsA - wsStable));
+float in0 = InsideClipVoxel(wsStable, v0, o0, r0);
+float in1 = (1 - in0)                         * InsideClipVoxel(wsStable, v1, o1, r1);
+float in2 = (1 - in0) * (1 - in1)             * InsideClipVoxel(wsStable, v2, o2, r2);
+float in3 = (1 - in0) * (1 - in1) * (1 - in2) * InsideClipVoxel(wsStable, v3, o3, r3);
 
-	// Decide which level to use (smallest enclosing)
-	float in0 = InsideClipVoxel(wsStable, v0, o0, r0);
-	float in1 = (1 - in0)                         * InsideClipVoxel(wsStable, v1, o1, r1);
-	float in2 = (1 - in0) * (1 - in1)             * InsideClipVoxel(wsStable, v2, o2, r2);
-	float in3 = (1 - in0) * (1 - in1) * (1 - in2) * InsideClipVoxel(wsStable, v3, o3, r3);
+// Fade-region depth as a fraction of the inset-box scale. ~0.08 means the
+// fade ramps from "all next level" at the inset boundary to "all this level"
+// over ~2.4 voxels (at r=32). Increase for smoother transitions, decrease to
+// shrink the 2-sample region. Tune by eye.
+const float kFadeFrac = 0.08;
 
-
-	if (in0 > 0.5)
-	{
-	    uint w0,h0,d0,m0; _VolumetricClipmapTexture0.GetDimensions(0, w0,h0,d0, m0);
-	    float lod0 = ComputeClipLOD_Temporal(move, v0 * (float)r0, w0, m0, lodBias, lodMax);
-	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v0,  r0,
-	                              _VolumetricClipmapTexture0, lod0);
-
-		
-	}
-	else if (in1 > 0.5)
-	{
-	    uint w1,h1,d1,m1; _VolumetricClipmapTexture1.GetDimensions(0, w1,h1,d1, m1);
-	    float lod1 = ComputeClipLOD_Temporal(move, v1 * (float)r1, w1, m1, lodBias, lodMax);
-	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v1,  r1,
-	                              _VolumetricClipmapTexture1, lod1);
-	}
-	else if (in2 > 0.5)
-	{
-	    uint w2,h2,d2,m2; _VolumetricClipmapTexture2.GetDimensions(0, w2,h2,d2, m2);
-	    float lod2 = ComputeClipLOD_Temporal(move, v2 * (float)r2, w2, m2, lodBias, lodMax);
-	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v2,  r2,
-	                              _VolumetricClipmapTexture2, lod2);
-	}
-	else if (in3 > 0.5)
-	{
-	    uint w3,h3,d3,m3; _VolumetricClipmapTexture3.GetDimensions(0, w3,h3,d3, m3);
-	    float lod3 = ComputeClipLOD_Temporal(move, v3 * (float)r3, w3, m3, lodBias, lodMax);
-	    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v3,  r3,
-	                              _VolumetricClipmapTexture3, lod3);
-	}
+if (in0 > 0.5)
+{
+    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v0, r0, _VolumetricClipmapTexture0);
+    float3 c0    = ((float3)o0 + 0.5 * (float)r0) * v0;
+    float  fade  = EdgeFade(wsStable, (float)(r0 - 2) * v0, c0, kFadeFrac);
+    if (fade < 1.0)
+    {
+        float4 colaNext = SampleClipToroidal(WS_coordinate, clipnoisedWS, v1, r1, _VolumetricClipmapTexture1);
+        cola = lerp(colaNext, cola, fade);
+    }
+}
+else if (in1 > 0.5)
+{
+    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v1, r1, _VolumetricClipmapTexture1);
+    float3 c1    = ((float3)o1 + 0.5 * (float)r1) * v1;
+    float  fade  = EdgeFade(wsStable, (float)(r1 - 2) * v1, c1, kFadeFrac);
+    if (fade < 1.0)
+    {
+        float4 colaNext = SampleClipToroidal(WS_coordinate, clipnoisedWS, v2, r2, _VolumetricClipmapTexture2);
+        cola = lerp(colaNext, cola, fade);
+    }
+}
+else if (in2 > 0.5)
+{
+    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v2, r2, _VolumetricClipmapTexture2);
+    float3 c2    = ((float3)o2 + 0.5 * (float)r2) * v2;
+    float  fade  = EdgeFade(wsStable, (float)(r2 - 2) * v2, c2, kFadeFrac);
+    if (fade < 1.0)
+    {
+        float4 colaNext = SampleClipToroidal(WS_coordinate, clipnoisedWS, v3, r3, _VolumetricClipmapTexture3);
+        cola = lerp(colaNext, cola, fade);
+    }
+}
+else if (in3 > 0.5)
+{
+    cola = SampleClipToroidal(WS_coordinate, clipnoisedWS, v3, r3, _VolumetricClipmapTexture3);
+    // Last level: no L4 to fade to. Attenuate to zero at the edge so the
+    // clipmap contribution dies smoothly instead of cutting off at the
+    // inset boundary.
+    float3 c3   = ((float3)o3 + 0.5 * (float)r3) * v3;
+    float  fade = EdgeFade(wsStable, (float)(r3 - 2) * v3, c3, kFadeFrac);
+    cola *= fade;
+}
 
 	//cola.rgb *=_StaticLightMultiplier;
     accumLighting += cola ;

@@ -1437,7 +1437,7 @@ public class VolumetricBaking : EditorWindow
         //}
 
     //    VolumetricBakingRegisters._meshObjectsNeedRebuilding = false;
-        int _currentSample = 0;
+        //int _currentSample = 0;
 
         // Clear all lists
         _meshObjects.Clear();
@@ -1532,7 +1532,7 @@ public class VolumetricBaking : EditorWindow
         //buffer = new ComputeBuffer(data.Count, stride);
 
         // Do we already have a compute buffer?
-        if (buffer != null && data != null && stride != null)
+        if (buffer != null && data != null)
         {
             // If no data or buffer doesn't match the given criteria, release it
             if (data.Count == 0 || buffer.count != data.Count || buffer.stride != stride)

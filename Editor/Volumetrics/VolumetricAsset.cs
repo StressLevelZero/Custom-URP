@@ -90,7 +90,7 @@ namespace SLZ.SLZEditorTools
         {
             var buildTarget = ctx.selectedBuildTarget;
             string path = Path.GetFullPath(ctx.assetPath);
-            bool dispFileBytes = false;
+            //bool dispFileBytes = false;
             NativeArray<byte> fileBytes = Vol3d.ReadVol3DToNative(path, out Vol3d.ImageInfo info);
             try
             {

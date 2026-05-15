@@ -68,7 +68,6 @@ namespace SLZ.SLZEditorTools
                     if (sd == null)
                     {
                         throw new FileNotFoundException("CRITICAL ERROR: Failed to open ProjectShaderSymbols with the asset database or InternalEditorUtility.LoadSerializedFileAndForget! Shader symbols will not be regenerated!!!!!");
-                        return;
                     }
                 }
             }

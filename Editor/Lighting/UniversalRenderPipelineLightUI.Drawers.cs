@@ -383,14 +383,14 @@ namespace UnityEditor.Rendering.Universal
                 if (lightType != LightType.Directional && lightType != LightType.Area)
                 {
 #if UNITY_2020_1_OR_NEWER
-                    
+
                     DrawRangeSLZ(serializedLight);
 #else
                     serializedLight.settings.DrawRange(false);
 #endif
                 }
             }
-
+            
             DrawLightCookieContent(serializedLight, owner);
             
             //advanced overrides
@@ -416,15 +416,28 @@ namespace UnityEditor.Rendering.Universal
         }
 
         // SLZ MODIFIED
+        static readonly GUIContent k_UltravioletStyle = new GUIContent(
+            "Ultraviolet",
+            "Ultraviolet light intensity. Used by fluorescent materials");
+
         static void DrawUVContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)
         {
-            var lightType = serializedLight.settings.light.type;
-            var lightbake = serializedLight.settings.light.lightmapBakeType;
-            if (lightbake == LightmapBakeType.Baked || lightType == LightType.Area) return;
-            GUIContent UltravioletStyle = new GUIContent("Ultraviolet", "Ultraviolet light intensity. Used by fluorescent materials");            var light = (Light)owner.target;
-            light.color = new Color(light.color.r, light.color.g, light.color.b, EditorGUILayout.Slider(UltravioletStyle, light.color.a, 0f, 1f));
-        }
+            var light = serializedLight.settings.light;
+            if (light.lightmapBakeType == LightmapBakeType.Baked || light.type == LightType.Area)
+                return;
 
+            var colorProp = serializedLight.settings.color; // SerializedProperty for m_Color
+            var current = colorProp.colorValue;
+
+            EditorGUI.BeginChangeCheck();
+            float uv = EditorGUILayout.Slider(k_UltravioletStyle, current.a, 0f, 1f);
+            if (EditorGUI.EndChangeCheck())
+            {
+                current.a = uv;
+                colorProp.colorValue = current;
+            }
+        }
+        
         // END SLZ MODIFIED
 
         static void DrawRenderingContent(UniversalRenderPipelineSerializedLight serializedLight, Editor owner)

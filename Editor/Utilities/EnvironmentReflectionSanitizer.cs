@@ -422,7 +422,7 @@ public static class EnvironmentReflectionSanitizer
 
     private static Texture GetCustomReflectionTexture()
     {
-#if UNITY_6000_0_OR_NEWER
+#if true // UNITY_6000_0_OR_NEWER
         return RenderSettings.customReflectionTexture;
 #else
         // Older versions: either customReflectionTexture exists, or customReflection is Cubemap.
@@ -435,7 +435,7 @@ public static class EnvironmentReflectionSanitizer
 
     private static void SetCustomReflectionTexture(Texture tex)
     {
-#if UNITY_6000_0_OR_NEWER
+#if true //UNITY_6000_0_OR_NEWER
         RenderSettings.customReflectionTexture = tex;
 #else
         RenderSettings.customReflection = tex as Cubemap;

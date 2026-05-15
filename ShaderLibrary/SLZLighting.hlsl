@@ -1056,6 +1056,16 @@ void SLZSHDiffuse(inout half3 diffuse, half3 normal)
     #endif
 }
 
+// 'Safe' epsilon for rsqrt, this is just picked at random as I can't find any answer as to what is actually safe.
+// The problem is rsqrt is a fast approximation with no standardization on how it is calculated. Thus just using 
+// the sqrt of the normal float min (about 1.085e-19) is not safe. rsqrt seems to error out at anything smaller than
+// half min (6.104e-5) on Quest. Nvidia seems to not ever have issues unless the value is literally 0.
+// I've arbitrarily set the safe min to 1e-11 on PC just in case other vendors have issues
+#if defined(SHADER_API_MOBILE)
+#define SAFE_FLT_RSQRT_MIN HALF_MIN
+#else
+#define SAFE_FLT_RSQRT_MIN 1.0e-11
+#endif
 /**
  * A crude attempt to get a specular highlight from light probes. The L1 ceofficient is similar in shape
  * to the diffuse shading from a single light, so it stands to reason that the L1 will often represent
@@ -1072,7 +1082,7 @@ void SLZSHDiffuse(inout half3 diffuse, half3 normal)
 half3 SLZSHSpecularDirection()
 {
     float3 direction = (unity_SHAr.xyz + unity_SHAg.xyz + unity_SHAb.xyz);
-    float lengthSq = max(float(dot(direction, direction)), FLT_MIN);
+    float lengthSq = max(float(dot(direction, direction)), SAFE_FLT_RSQRT_MIN);
     float invLength = rsqrt(lengthSq);
     direction = direction * invLength;
     return direction;
