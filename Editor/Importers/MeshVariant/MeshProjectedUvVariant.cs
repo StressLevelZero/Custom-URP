@@ -25,7 +25,7 @@ using SLZ.SLZEditorTools;
 
 namespace SLZ.SLZEditorTools.MeshVariant
 {
-    [ScriptedImporter(version: 21, exts: new string[] {"projUV"}, overrideExts: new string[] {"asset"},  AllowCaching = true)]
+    [ScriptedImporter(version: 22, exts: new string[] {"projUV"}, overrideExts: new string[] {"asset"},  AllowCaching = true)]
     public class MeshProjectedUvVariant : ScriptedImporter
     {
 
@@ -163,6 +163,7 @@ namespace SLZ.SLZEditorTools.MeshVariant
             Mesh.ApplyAndDisposeWritableMeshData(newDataArray, newMesh, MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds);
             oldDataArray.Dispose();
             newMesh.bounds = oldMesh.bounds;
+            newMesh.RecalculateTangents();
             newMesh.RecalculateUVDistributionMetrics();
             newMesh.UploadMeshData(true);
         }
@@ -317,7 +318,7 @@ namespace SLZ.SLZEditorTools.MeshVariant
             int oldTriCount = oldIndexCount / 3;
             NativeArray<uint> oldVertexBuffer = oldMeshData.GetVertexData<uint>(0);
 
-            MeshUpdateFlags nothing = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds;
+            MeshUpdateFlags updateFlagsNone = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds;
 
             NativeList<int>             vtxFaceFlags   = default;
             NativeList<TriplanarCount>  triCountPerDir = default;
@@ -407,7 +408,7 @@ namespace SLZ.SLZEditorTools.MeshVariant
             newMeshData.subMeshCount = numSubmeshes;
             for (int smIdx = 0; smIdx < numSubmeshes; smIdx++)
             {
-                newMeshData.SetSubMesh(smIdx, oldMeshData.GetSubMesh(smIdx), nothing);
+                newMeshData.SetSubMesh(smIdx, oldMeshData.GetSubMesh(smIdx), updateFlagsNone);
             }
 
 
@@ -436,6 +437,7 @@ namespace SLZ.SLZEditorTools.MeshVariant
 
             Mesh.ApplyAndDisposeWritableMeshData(newDataArray, newMesh, MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds);
             newMesh.bounds = oldMesh.bounds;
+            newMesh.RecalculateTangents(updateFlagsNone);
             newMesh.RecalculateUVDistributionMetrics();
             newMesh.UploadMeshData(true);
 
