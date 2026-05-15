@@ -198,10 +198,6 @@ Shader "SLZ/LitMAS/LitMAS Retroreflections"
         ColorMask RGBA
         LOD 100
 
-        HLSLINCLUDE
-        //
-        ENDHLSL
-
         Pass
         {
             Blend [_BlendSrc] [_BlendDst]
@@ -227,7 +223,7 @@ Shader "SLZ/LitMAS/LitMAS Retroreflections"
             //#define _SM6_QUAD 1
             //#endif
 
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardForward.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/Retrorefl/RetroreflForward.hlsl"
 
             ENDHLSL
         }
