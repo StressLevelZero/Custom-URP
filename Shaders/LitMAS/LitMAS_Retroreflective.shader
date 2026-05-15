@@ -15,6 +15,7 @@ Shader "SLZ/LitMAS/LitMAS Retroreflections"
         _BakedMutiplier("Emission Baked Mutiplier", Float) = 1
         [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
         _DetailMap("Detail Map", 2D) = "gray" {}
+        _DetailNormalScale("Detail Normal Scale", Float) = 1.0
 
         [HideInInspector]_SSRTemporalMul("Temporal Accumulation Factor", Range(0, 2)) = 1.0
         [Toggle(_ALPHATEST_ON)]_Alphatest("Alpha Clipping", float) = 0
