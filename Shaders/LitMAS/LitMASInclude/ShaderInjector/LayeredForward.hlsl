@@ -123,15 +123,21 @@ Texture2D<min16float4> _BaseMap2;
 Texture2D<min16float4> _BaseMap3;
 Texture2D<min16float4> _BaseMap4;
 
-Texture2D<min16float3> _MetallicGlossMap1;
-Texture2D<min16float3> _MetallicGlossMap2;
-Texture2D<min16float3> _MetallicGlossMap3;
-Texture2D<min16float3> _MetallicGlossMap4;
+Texture2D<min16float4> _AYSXMap;
+Texture2D<min16float4> _AYSXMap1;
+Texture2D<min16float4> _AYSXMap2;
+Texture2D<min16float4> _AYSXMap3;
+Texture2D<min16float4> _AYSXMap4;
 
-TEXTURE2D(_BumpMap1);
-TEXTURE2D(_BumpMap2);
-TEXTURE2D(_BumpMap3);
-TEXTURE2D(_BumpMap4);
+//Texture2D<min16float3> _MetallicGlossMap1;
+//Texture2D<min16float3> _MetallicGlossMap2;
+//Texture2D<min16float3> _MetallicGlossMap3;
+//Texture2D<min16float3> _MetallicGlossMap4;
+//
+//TEXTURE2D(_BumpMap1);
+//TEXTURE2D(_BumpMap2);
+//TEXTURE2D(_BumpMap3);
+//TEXTURE2D(_BumpMap4);
 
 // End Injection UNIFORMS from Injection_Layered.hlsl ----------------------------------------------------------
 
@@ -140,6 +146,8 @@ TEXTURE2D(_BumpMap4);
 #endif
 
 // Begin Injection FUNCTIONS from Injection_Layered.hlsl ----------------------------------------------------------
+
+
 
 #define SAMPLE_LAYERED(outp, swizzle, tex, sampler_tex, uv, index, dx, dy) 									\
 	[forcecase] switch (clamp(index, min16int(0), min16int(4))) 											\
@@ -298,7 +306,7 @@ SLZ::Layering::Layer layer1 = layers[1];
 
 half4 albedo = (half4)0;
 half3 mas = (half3)0;
-half4 normalMap2 = half4(0,0,0,1);
+half2 normalMap2 = half2(0,0);
 dx = 1 * (half2)ddx(uv0);
 dy = 1 * (half2)ddy(uv0);
 float2 uv_layer0; half2 dx_layer0, dy_layer0;
@@ -307,12 +315,18 @@ LAYER_UVS(layer0.index, uv_layer0, dx_layer0, dy_layer0);
 SAMPLE_LAYERED(albedo, rgba, _BaseMap, sampler_BaseMap, uv_layer0, layer0.index, dx_layer0, dy_layer0)
 albedo *= layer0.weight;
 
-SAMPLE_LAYERED(mas, rgb, _MetallicGlossMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0)
-//normalMap2.rg = half(0.5) * ((half(2) * mas.gb - half(1)) * layer0.weight) + half(0.5);
-mas *= layer0.weight;
+half4 aysx0 = 0;
+SAMPLE_LAYERED(aysx0, rgba, _AYSXMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0);
+mas = layer0.weight * half3(0.0f, aysx0.r, aysx0.b);
+normalMap2 = (half(2.0) * aysx0.ag - half(1.0)); 
 
-SAMPLE_LAYERED(normalMap2, rgba, _BumpMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0)
-normalMap2 *= layer0.weight;
+
+//SAMPLE_LAYERED(mas, rgb, _MetallicGlossMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0)
+////normalMap2.rg = half(0.5) * ((half(2) * mas.gb - half(1)) * layer0.weight) + half(0.5);
+//mas *= layer0.weight;
+//
+//SAMPLE_LAYERED(normalMap2, rgba, _BumpMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0)
+////normalMap2 *= layer0.weight;
 
 
 if (layer1.weight > 2 * HALF_MIN)
@@ -325,14 +339,20 @@ if (layer1.weight > 2 * HALF_MIN)
 	SAMPLE_LAYERED(albedo1, rgba, _BaseMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
 	albedo += albedo1 * layer1.weight;
 
-	half3 mas1 = (half3)0;
-	SAMPLE_LAYERED(mas1, rgb, _MetallicGlossMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
-	mas += mas1 *  layer1.weight;
+	half4 aysx1 = 0;
+	SAMPLE_LAYERED(aysx1, rgba, _AYSXMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1);
 
-	half4 normalMap1 = 0;
-	SAMPLE_LAYERED(normalMap1, rgba, _BumpMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
-	normalMap2 += normalMap1 * (half(1.0f) - layer0.weight);
-	//normalMap2.rg += half(0.5) * ((half(2) * mas1.gb - half(1)) * layer1.weight) + half(0.5);
+	mas += layer1.weight * half3(0.0f, aysx1.r, aysx1.b);
+	normalMap2 += layer1.weight * (half(2.0) * aysx1.ag - half(1.0)); 
+
+	//half3 mas1 = (half3)0;
+	//SAMPLE_LAYERED(mas1, rgb, _MetallicGlossMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
+	//mas += mas1 *  layer1.weight;
+	//
+	//half4 normalMap1 = 0;
+	//SAMPLE_LAYERED(normalMap1, rgba, _BumpMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
+	//normalMap2 += normalMap1 * (half(1.0f) - layer0.weight);
+	////normalMap2.rg += half(0.5) * ((half(2) * mas1.gb - half(1)) * layer1.weight) + half(0.5);
 }
 
 albedo.a = 1;
@@ -355,11 +375,9 @@ albedo.a = 1;
     half4 normalMap = half4(0, 0, 1, 0);
 
 // Begin Injection NORMAL_MAP from Injection_Layered.hlsl ----------------------------------------------------------
-	normalMap = normalMap2;
-	normalTS = UnpackNormal(normalMap);
-	normalTS = _Normals ? normalTS : half3(0, 0, 1);
-	geoSmooth = _Normals ? 1.0 - normalMap.b : 1.0;
-	smoothness = saturate(smoothness + geoSmooth - 1.0);
+	
+	normalTS = SLZAccurateNormalize(UnpackNormalHemiOctEncodeNoNormalize(normalMap2));
+
 // End Injection NORMAL_MAP from Injection_Layered.hlsl ----------------------------------------------------------
 
 /*---------------------------------------------------------------------------------------------------------------------------*/
