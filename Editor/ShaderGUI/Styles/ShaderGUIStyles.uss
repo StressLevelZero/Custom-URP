@@ -96,3 +96,33 @@
     text-overflow: ellipsis;
     overflow: hidden;
 }
+
+.layeredMaterialGUILeftBox
+{
+    flex-basis: 15%;
+    flex-direction: row;
+    flex-shrink: 0.4;
+    flex-grow: 0.4;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.layeredMaterialGUIRightBox
+{
+    flex-basis: 85%;
+    flex-direction: row;
+    flex-shrink: 0.6;
+    flex-grow: 0.6;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.layeredMaterialAltBackground
+{
+    background-color: var(--unity-colors-highlight-background-hover-lighter);
+    border-top-width: 1px;
+    border-top-color: var(--unity-colors-highlight-background-hover-lighter);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-highlight-background-hover-lighter);
+}

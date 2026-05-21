@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -17,9 +18,19 @@ namespace UnityEditor.SLZMaterialUI
             this.shaderPropertyIdx = shaderPropertyIdx;
             this.RegisterValueChangedCallback(OnChangedEvent);
             this.SetValueWithoutNotify(materialProperty.floatValue);
-            this.lowValue = materialProperty.rangeLimits.x;
-            this.highValue = materialProperty.rangeLimits.y;
+
+            if (materialProperty.rangeLimits.x != 0 || materialProperty.rangeLimits.y != 0)
+            {
+                this.lowValue = materialProperty.rangeLimits.x;
+                this.highValue = materialProperty.rangeLimits.y;
+            }
             this.showInputField = true;
+            if (this.showInputField && (materialProperty.floatValue < this.lowValue || materialProperty.floatValue > this.highValue) )
+            {
+                TextField inputField = (TextField) this.Children().Last().Children().Last();
+                inputField.SetValueWithoutNotify(materialProperty.floatValue.ToString());
+            }
+            
             style.marginRight = 3;
             if (materialProperty.hasMixedValue)
             {

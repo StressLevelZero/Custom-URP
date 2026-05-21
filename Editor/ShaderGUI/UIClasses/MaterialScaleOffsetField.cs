@@ -14,8 +14,10 @@ namespace UnityEditor.SLZMaterialUI
         public MaterialProperty materialProperty;
         Vector2Field tilingField;
         Vector2Field offsetField;
+        public VisualElement tilingInput;
+        public VisualElement offsetInput;
         public Vector4 value;
-        public MaterialScaleOffsetField(MaterialProperty boundProp, int shaderPropertyIdx)
+        public MaterialScaleOffsetField(MaterialProperty boundProp, int shaderPropertyIdx, bool noLabels = false)
         {
             this.materialProperty = boundProp;
             this.shaderPropertyIdx = shaderPropertyIdx;
@@ -24,22 +26,31 @@ namespace UnityEditor.SLZMaterialUI
             tilingField.style.marginRight = 4;
             tilingField.label = "Tiling";
             VisualElement tilingLabel = tilingField.ElementAt(0);
-            VisualElement tilingInput = tilingField.ElementAt(1);
+            if (noLabels) tilingLabel.style.display = DisplayStyle.None;
+            tilingInput = tilingField.ElementAt(1);
             tilingInput.RemoveAt(2);
-            tilingLabel.AddToClassList("materialGUILeftBox");
-            tilingInput.AddToClassList("materialGUIRightBox");
+            if (!noLabels)
+            {
+                tilingLabel.AddToClassList("materialGUILeftBox");
+                tilingInput.AddToClassList("materialGUIRightBox");
+            }
             tilingField.SetValueWithoutNotify(new Vector2(value.x, value.y));
             tilingField.RegisterValueChangedCallback(OnChangedEventTiling);
 
             offsetField = new Vector2Field();
             offsetField.style.marginRight = 4;
             offsetField.label = "Offset";
+            
             VisualElement offsetLabel = offsetField.ElementAt(0);
-            VisualElement offsetInput = offsetField.ElementAt(1);
+            if (noLabels) offsetLabel.style.display = DisplayStyle.None;
+            offsetInput = offsetField.ElementAt(1);
             
             offsetInput.RemoveAt(2);
-            offsetLabel.AddToClassList("materialGUILeftBox");
-            offsetInput.AddToClassList("materialGUIRightBox");
+            if (!noLabels)
+            {
+                offsetLabel.AddToClassList("materialGUILeftBox");
+                offsetInput.AddToClassList("materialGUIRightBox");
+            }
             offsetField.SetValueWithoutNotify(new Vector2(value.z, value.w));
             offsetField.RegisterValueChangedCallback(OnChangedEventOffset);
 

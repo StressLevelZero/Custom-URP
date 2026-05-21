@@ -107,6 +107,27 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             _FluorColor,
             _FluorAbsorbance,
             _FluorAlbedoTint,
+
+            // Layered
+            _BaseMap1,
+            _BaseMap2,
+            _BaseMap3,
+            _BaseMap4,
+
+            _AYSXMap,
+            _AYSXMap1,
+            _AYSXMap2,
+            _AYSXMap3,
+            _AYSXMap4,
+
+            _HeightMap,
+            _HeightMap1,
+            _HeightMap2,
+            _HeightMap3,
+            _HeightMap4,
+
+            _SplatMap,
+            _UseGRID,
         };
 
         static ReadOnlySpan<string> propertyNames => new string[] {
@@ -152,6 +173,27 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             "_FluorColor",
             "_FluorAbsorbance",
             "_FluorAlbedoTint",
+
+            // Layered
+            "_BaseMap1",
+            "_BaseMap2",
+            "_BaseMap3",
+            "_BaseMap4",
+
+            "_AYSXMap",
+            "_AYSXMap1",
+            "_AYSXMap2",
+            "_AYSXMap3",
+            "_AYSXMap4",
+
+            "_HeightMap",
+            "_HeightMap1",
+            "_HeightMap2",
+            "_HeightMap3",
+            "_HeightMap4",
+
+            "_SplatMap",
+            "_UseGRID",
         };
 
         static readonly Dictionary<string, PName> upgradeTextures = new Dictionary<string, PName>()
@@ -246,7 +288,12 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
         int AlphaClipWarningCount;
         HelpBox ZOffsetWarning;
         int ZOffsetWarningCount;
-        HelpBox DetailScaleError;
+        HelpBox DetailScaleWarning;
+        int DetailScaleWarningCount;
+     
+        HelpBox AdvancedModeWarning;
+        bool hasHiddenProperties;
+        
         SurfaceTypeField surfaceTypeField;
         RenderQueueDropdown renderQueue;
         MaterialToggleField alphaClipToggle;
@@ -254,6 +301,15 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
         public override VisualElement CreateInspectorGUI()
         {
             VisualElement root = new VisualElement();
+
+            #if MARROW_INTERNAL
+                bool advancedMode = AdvancedMaterialProps.GetVisibility();
+                AdvancedMaterialProps.stateChangeCallback += RebuildOnAdvVisChange;
+                root.RegisterCallback<DetachFromPanelEvent>(UnregisterVisChangeOnDetach);
+            #else
+                bool advancedMode = true;
+            #endif
+
             VisualElement MainWindow = new VisualElement();
             root.Add(MainWindow);
             bool success = base.Initialize(root,MainWindow);
@@ -296,10 +352,22 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             ZOffsetWarning.style.display = DisplayStyle.None;
             AlphaClipWarning = new HelpBox("Opaque alpha clip materials are very expensive on Quest, prefer transparency if possible!", HelpBoxMessageType.Warning);
             AlphaClipWarning.style.display = DisplayStyle.None;
+            DetailScaleWarning = new HelpBox("Detail Normal Scale is not 1", HelpBoxMessageType.Warning);
+            DetailScaleWarning.style.display = DisplayStyle.None;
+
+            #if MARROW_INTERNAL
+            if (advancedMode)
+            {
+                AdvancedModeWarning = new HelpBox("Showing Advanced Properties", HelpBoxMessageType.Info);
+                MainWindow.Add(AdvancedModeWarning);
+            }
+            #endif
+
 
             MainWindow.Add(TransparentWarning);
             MainWindow.Add(AlphaClipWarning);
             MainWindow.Add(ZOffsetWarning);
+            MainWindow.Add(DetailScaleWarning);
 
             //----------------------------------------------------------------
             // Rendering Properties ------------------------------------------
@@ -552,7 +620,8 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             TextureField baseMapField = null;
             int baseMapIdx = PropertyIdx(ref propTable, PName._BaseMap);
-            if (baseMapIdx != -1)
+            int baseMap1Idx = PropertyIdx(ref propTable, PName._BaseMap1); // Don't render the basemap here if this is layered
+            if (baseMapIdx != -1 && baseMap1Idx == -1)
             {
                 baseMapField = new TextureField(props[baseMapIdx], propIdx[baseMapIdx], false);
                 baseMapField.tooltip2 = LitMASGui_Tooltips.BaseMap.ToString();
@@ -641,6 +710,64 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             }
 #endregion // Core Properties
 
+#region Layered
+           
+            if (baseMap1Idx != -1)
+            {
+                int splatMapIdx = PropertyIdx(ref propTable, PName._SplatMap);
+                TextureField splatMapField = new TextureField(props[splatMapIdx], propIdx[splatMapIdx], false);
+                splatMapField.tooltip2 = LitMASGui_Tooltips.SplatMap.ToString();
+                baseProps.Add(splatMapField);
+                materialFields.Add(splatMapField);
+
+                int useGRIDIdx = PropertyIdx(ref propTable, PName._UseGRID);
+                MaterialToggleField useGridField = new MaterialToggleField();
+                useGridField.Initialize(props[useGRIDIdx], propIdx[useGRIDIdx], null);
+                useGridField.label = "World Projected UVs";
+                baseProps.Add(useGridField);
+                materialFields.Add(useGridField);
+
+                ScrollView scrollView = new ScrollView(ScrollViewMode.Horizontal);
+                scrollView.contentContainer.style.minWidth = 580;
+                scrollView.contentContainer.style.flexDirection = FlexDirection.Column;
+                scrollView.style.marginTop = 8;
+                //scrollView.style.flexGrow = 1;
+
+                scrollView.Add(LayeredHeader());
+                hasCoreProperty = true;
+                Span<int> layerMapIdxs = stackalloc int[5];
+                layerMapIdxs[0] = baseMapIdx;
+                layerMapIdxs[1] = baseMap1Idx;
+                layerMapIdxs[2] = PropertyIdx(ref propTable, PName._BaseMap2);
+                layerMapIdxs[3] = PropertyIdx(ref propTable, PName._BaseMap3);
+                layerMapIdxs[4] = PropertyIdx(ref propTable, PName._BaseMap4);
+                VisualElement baseMaps = LayeredTextureField(ref layerMapIdxs, props, propIdx, "Base Maps", LitMASGui_Tooltips.BaseMap);
+                scrollView.Add(baseMaps);
+
+                VisualElement ScaleOffsets = LayeredScaleOffsetField(ref layerMapIdxs, props, propIdx, "Scale Offsets", "");
+
+                layerMapIdxs[0] = PropertyIdx(ref propTable, PName._AYSXMap);
+                layerMapIdxs[1] = PropertyIdx(ref propTable, PName._AYSXMap1);
+                layerMapIdxs[2] = PropertyIdx(ref propTable, PName._AYSXMap2);
+                layerMapIdxs[3] = PropertyIdx(ref propTable, PName._AYSXMap3);
+                layerMapIdxs[4] = PropertyIdx(ref propTable, PName._AYSXMap4);
+                VisualElement aysxMaps = LayeredTextureField(ref layerMapIdxs, props, propIdx, "AYSX Maps", LitMASGui_Tooltips.AYSXMap);
+                scrollView.Add(aysxMaps);
+                
+                layerMapIdxs[0] = PropertyIdx(ref propTable, PName._HeightMap);
+                layerMapIdxs[1] = PropertyIdx(ref propTable, PName._HeightMap1);
+                layerMapIdxs[2] = PropertyIdx(ref propTable, PName._HeightMap2);
+                layerMapIdxs[3] = PropertyIdx(ref propTable, PName._HeightMap3);
+                layerMapIdxs[4] = PropertyIdx(ref propTable, PName._HeightMap4);
+                VisualElement heightMaps = LayeredTextureField(ref layerMapIdxs, props, propIdx, "Height Maps", LitMASGui_Tooltips.HeightMap);
+                scrollView.Add(heightMaps);
+
+                scrollView.Add(ScaleOffsets);
+
+                baseProps.Add(scrollView);
+            }
+#endregion
+
 #region Triplanar
             //----------------------------------------------------------------
             // Triplanar options ---------------------------------------------
@@ -675,7 +802,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
             // Base map tiling offset ----------------------------------------
 
-            if (baseMapIdx != -1 && (propertyFlags(props[baseMapIdx]) & MaterialPropertyFlags.NoScaleOffset) == 0)
+            if (baseMapIdx != -1 && (propertyFlags(props[baseMapIdx]) & MaterialPropertyFlags.NoScaleOffset) == 0 && baseMap1Idx == -1)
             {
                 MaterialScaleOffsetField baseScaleOffsetField = new MaterialScaleOffsetField(props[baseMapIdx], propIdx[baseMapIdx]);
                 baseProps.Add(baseScaleOffsetField);
@@ -889,10 +1016,28 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             int detailNrmScaleIdx = PropertyIdx(ref propTable, PName._DetailNormalScale);
             if (detailNrmScaleIdx != -1)
             {
-                MaterialFloatField detailNrmScaleField = new MaterialFloatField();
-                detailNrmScaleField.Initialize(props[detailNrmScaleIdx], propIdx[detailNrmScaleIdx]);
-                materialFields.Add(detailNrmScaleField);
-                detailProps.contentContainer.Add(detailNrmScaleField);
+                hasHiddenProperties = true;
+                VisualElement detailNrmScaleField;
+                if (advancedMode)
+                {
+                    MaterialFloatField detailNrmScaleRawField = new MaterialFloatField();
+                    detailNrmScaleRawField.Initialize(props[detailNrmScaleIdx], propIdx[detailNrmScaleIdx]);
+                    materialFields.Add(detailNrmScaleRawField);
+                    detailNrmScaleField = detailNrmScaleRawField;
+                    detailProps.contentContainer.Add(detailNrmScaleField);
+                }
+                else
+                {
+                    MaterialRangeField detailScaleRangeField = new MaterialRangeField();
+                    detailScaleRangeField.lowValue  = 0.1f;
+                    detailScaleRangeField.highValue = 1.0f;
+                    detailScaleRangeField.Initialize(props[detailNrmScaleIdx], propIdx[detailNrmScaleIdx]);
+                    materialFields.Add(detailScaleRangeField);
+                    detailNrmScaleField = detailScaleRangeField;
+                    advancedProps.contentContainer.Add(detailNrmScaleField);
+                    hasAdvancedProps = true;
+                    detailScaleRangeField.RegisterValueChangedCallback(SetDetailScaleWarningVisibility);
+                }
             }
 
             if (hasDetails)
@@ -1242,6 +1387,24 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             }
         }
 
+        void SetDetailScaleWarningVisibility(ChangeEvent<float> evt)
+        {
+            //Debug.Log($"Change Event? {evt.previousValue}, {evt.newValue}, {default(T)}");
+
+            // Unity's .NET isn't new enough to have INumber<T> so abuse the fact that we only need to compare against 0, which is the default value
+            if (evt.previousValue != 1.0f && evt.newValue != 1.0f) return;
+            if (evt.previousValue == 1.0f && evt.newValue != 1.0f)
+            {
+                DetailScaleWarningCount += 1;
+                DetailScaleWarning.style.display = DisplayStyle.Flex;
+            }
+            if (evt.previousValue != 1.0f && evt.newValue == 1.0f)
+            {
+                DetailScaleWarningCount -= 1;
+                DetailScaleWarning.style.display = DetailScaleWarningCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+        }
+
 #region PropertyUpgrades
 
         interface IMigrateProp
@@ -1422,6 +1585,195 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 target.ApplyModifiedProperties();
             }
             return removedElements;
+        }
+
+        void RebuildOnAdvVisChange(bool b)
+        {
+            this.RebuildUI();
+        }
+
+        void UnregisterVisChangeOnDetach(DetachFromPanelEvent evt)
+        {
+            AdvancedMaterialProps.stateChangeCallback -= RebuildOnAdvVisChange;
+        }
+
+
+        VisualElement LayeredTextureField(ref Span<int> baseMapIdxs, MaterialProperty[] props, int[] propIdx, string label, ReadOnlySpan<char> tooltip)
+        {
+            VisualElement baseMaps = new VisualElement();
+            baseMaps.style.flexDirection = FlexDirection.Row;
+            baseMaps.style.alignContent = Align.Center;
+            baseMaps.style.alignItems = Align.Center;
+            baseMaps.style.marginBottom = 0;
+            baseMaps.style.marginTop = 0;
+            //baseMaps.style.height = 36;
+            baseMaps.AddToClassList("unity-base-field");
+            baseMaps.AddToClassList("unity-base-field__inspector-field");
+            VisualElement leftAlignBox = new VisualElement();
+            leftAlignBox.AddToClassList("layeredMaterialGUILeftBox");
+            baseMaps.Add(leftAlignBox);
+            Label baseMapLabel = new Label(label);
+            baseMapLabel.AddToClassList("unity-base-field__label");
+            baseMapLabel.AddToClassList("unity-base-text-field__label");
+            leftAlignBox.Add(baseMapLabel);
+            VisualElement rightAlignBox = new VisualElement();
+            rightAlignBox.AddToClassList("layeredMaterialGUIRightBox");
+            rightAlignBox.style.flexDirection = FlexDirection.Row;
+            rightAlignBox.style.justifyContent = Justify.SpaceBetween;
+            baseMaps.Add(rightAlignBox);
+            for (int i = 0; i < 5; i++)
+            {
+                TextureField baseMapXField = new TextureField(props[baseMapIdxs[i]], propIdx[baseMapIdxs[i]], false, null, 48);
+                if ((i & 1) != 1)
+                {
+                    baseMapXField.AddToClassList("layeredMaterialAltBackground");
+                }
+                baseMapXField.tooltip2 = tooltip.ToString();
+                baseMapXField.label.style.display = DisplayStyle.None;
+                baseMapXField.rightAlignBox.style.display = DisplayStyle.None;
+                baseMapXField.style.flexBasis  = 1.0f / 5.0f;
+                baseMapXField.style.flexGrow   = 1.0f / 5.0f;
+                baseMapXField.style.flexShrink = 1.0f / 5.0f;
+                baseMapXField.ElementAt(0).style.alignContent = Align.Center;
+                baseMapXField.ElementAt(0).style.justifyContent = Justify.Center;
+                baseMapXField.leftAlignBox.style.flexGrow = 1.0f;
+                rightAlignBox.Add(baseMapXField);
+                materialFields.Add(baseMapXField);
+            }
+            return baseMaps;
+        }
+
+        VisualElement LayeredHeader()
+        {
+            VisualElement root = new VisualElement();
+            root.style.flexDirection = FlexDirection.Row;
+            root.style.alignContent = Align.Center;
+            root.style.alignItems = Align.Center;
+            root.style.marginBottom = 0;
+            root.style.marginTop = 0;            
+            //baseMaps.style.height = 36;
+            root.AddToClassList("unity-base-field");
+            root.AddToClassList("unity-base-field__inspector-field");
+            VisualElement leftAlignBox = new VisualElement();
+            leftAlignBox.AddToClassList("layeredMaterialGUILeftBox");
+            root.Add(leftAlignBox);
+
+            VisualElement rightAlignBox = new VisualElement();
+            rightAlignBox.AddToClassList("layeredMaterialGUIRightBox");
+            rightAlignBox.style.flexDirection = FlexDirection.Row;
+            rightAlignBox.style.justifyContent = Justify.SpaceBetween;
+            root.Add(rightAlignBox);
+            for (int i = 0; i < 5; i++)
+            {
+                Label labelX = new Label("Layer " + i);
+                if ((i & 1) != 1)
+                {
+                    labelX.AddToClassList("layeredMaterialAltBackground");
+                }
+                labelX.style.unityFontStyleAndWeight = FontStyle.Bold;
+                labelX.style.flexBasis  = 1.0f / 5.0f;
+                labelX.style.flexGrow   = 1.0f / 5.0f;
+                labelX.style.flexShrink = 1.0f / 5.0f;
+                labelX.style.unityTextAlign = TextAnchor.MiddleCenter;
+                rightAlignBox.Add(labelX);
+            }
+            return root;
+        }
+        
+        VisualElement LayeredScaleOffsetField(ref Span<int> baseMapIdxs, MaterialProperty[] props, int[] propIdx, string label, ReadOnlySpan<char> tooltip)
+        {
+            VisualElement baseMaps = new VisualElement();
+            baseMaps.style.flexDirection = FlexDirection.Row;
+            baseMaps.style.alignContent = Align.Center;
+            baseMaps.style.alignItems = Align.Center;
+            baseMaps.style.marginBottom = 0;
+            baseMaps.style.marginTop = 0;
+            //baseMaps.style.height = 36;
+            baseMaps.AddToClassList("unity-base-field");
+            baseMaps.AddToClassList("unity-base-field__inspector-field");
+            VisualElement leftAlignBox = new VisualElement();
+            leftAlignBox.AddToClassList("layeredMaterialGUILeftBox");
+            baseMaps.Add(leftAlignBox);
+            Label baseMapLabel = new Label(label);
+            baseMapLabel.AddToClassList("unity-base-field__label");
+            baseMapLabel.AddToClassList("unity-base-text-field__label");
+            leftAlignBox.Add(baseMapLabel);
+            VisualElement rightAlignBox = new VisualElement();
+            rightAlignBox.AddToClassList("layeredMaterialGUIRightBox");
+            rightAlignBox.style.flexDirection = FlexDirection.Row;
+            rightAlignBox.style.justifyContent = Justify.SpaceBetween;
+            baseMaps.Add(rightAlignBox);
+            for (int i = 0; i < 5; i++)
+            {
+
+                MaterialScaleOffsetField baseMapXField = new MaterialScaleOffsetField(props[baseMapIdxs[i]], propIdx[baseMapIdxs[i]], true);
+                if ((i & 1) != 1)
+                {
+                    baseMapXField.AddToClassList("layeredMaterialAltBackground");
+                }
+                baseMapXField.style.flexBasis  = 1.0f / 5.0f;
+                baseMapXField.style.flexGrow   = 1.0f / 5.0f;
+                baseMapXField.style.flexShrink = 1.0f / 5.0f;
+                FloatField offsetXInput = (FloatField) baseMapXField.offsetInput.ElementAt(0);
+                offsetXInput.style.flexGrow   = 0.5f;
+                offsetXInput.style.flexShrink = 0.5f;
+                offsetXInput.style.flexBasis  = 0.5f;
+                //offsetXInput.style.paddingRight = 4;
+                //offsetXInput.RemoveAt(0);
+                int grabWidth = 4;
+                float labelFlexSize = 0.05f;
+                offsetXInput.label = " ";
+                //offsetXInput.labelElement.style.maxWidth = grabWidth;
+                offsetXInput.labelElement.style.minWidth = grabWidth;
+                offsetXInput.labelElement.style.flexGrow  = labelFlexSize;
+                offsetXInput.labelElement.style.flexShrink= labelFlexSize;
+                offsetXInput.labelElement.style.flexBasis = labelFlexSize;
+                offsetXInput.labelElement.style.textOverflow = TextOverflow.Clip;
+
+                FloatField offsetYInput = (FloatField) baseMapXField.offsetInput.ElementAt(1);
+                offsetYInput.style.flexGrow   = 0.5f;
+                offsetYInput.style.flexShrink = 0.5f;
+                offsetYInput.style.flexBasis  = 0.5f;
+                //offsetYInput.RemoveAt(0);
+                offsetYInput.label = " ";
+                //offsetYInput.labelElement.style.maxWidth = grabWidth;
+                offsetYInput.labelElement.style.minWidth = grabWidth;
+                offsetYInput.labelElement.style.flexGrow  = labelFlexSize;
+                offsetYInput.labelElement.style.flexShrink= labelFlexSize;
+                offsetYInput.labelElement.style.flexBasis = labelFlexSize;
+                offsetYInput.labelElement.style.textOverflow = TextOverflow.Clip;
+
+                FloatField tilingXInput = (FloatField) baseMapXField.tilingInput.ElementAt(0);
+                tilingXInput.style.flexGrow   = 0.5f;
+                tilingXInput.style.flexShrink = 0.5f;
+                tilingXInput.style.flexBasis  = 0.5f;
+                //tilingXInput.RemoveAt(0);
+                tilingXInput.label = " ";
+                //tilingXInput.labelElement.style.maxWidth = grabWidth;
+                tilingXInput.labelElement.style.minWidth = grabWidth;
+                tilingXInput.labelElement.style.flexGrow  = labelFlexSize;
+                tilingXInput.labelElement.style.flexShrink= labelFlexSize;
+                tilingXInput.labelElement.style.flexBasis = labelFlexSize;
+                tilingXInput.labelElement.style.textOverflow = TextOverflow.Clip;
+
+                FloatField tilingYInput = (FloatField) baseMapXField.tilingInput.ElementAt(1);
+                tilingYInput.style.flexGrow   = 0.5f;
+                tilingYInput.style.flexShrink = 0.5f;
+                tilingYInput.style.flexBasis  = 0.5f;
+
+                //tilingYInput.RemoveAt(0);
+                tilingYInput.label = " ";
+                //tilingYInput.labelElement.style.maxWidth = grabWidth;
+                tilingYInput.labelElement.style.minWidth = grabWidth;
+                tilingYInput.labelElement.style.flexGrow  = labelFlexSize;
+                tilingYInput.labelElement.style.flexShrink= labelFlexSize;
+                tilingYInput.labelElement.style.flexBasis = labelFlexSize;
+                tilingYInput.labelElement.style.textOverflow = TextOverflow.Clip;
+
+                rightAlignBox.Add(baseMapXField);
+                materialFields.Add(baseMapXField);
+            }
+            return baseMaps;
         }
 
 #endregion

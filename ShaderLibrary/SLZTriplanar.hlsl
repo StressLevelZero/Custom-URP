@@ -86,9 +86,9 @@ void GetTPUVCheap(out float2 triplanarUV, out half3x3 tanToWrld, float3 wPos, ha
     triplanarUV = mad(dir.z, uvZ, triplanarUV);
 
     tanToWrld = half3x3(
-        dir.y * dirSign.y + dir.z * dirSign.z, 0, wNorm.x,
-        0, dir.x + dir.z, wNorm.y,
-        dir.x * dirSign.x, dir.y, wNorm.z
+        dir.y * dirSign.y + dir.z * dirSign.z,  0,              wNorm.x,
+        0,                                      dir.x + dir.z,  wNorm.y,
+        dir.x * dirSign.x,                      dir.y,          wNorm.z
         );
 }
 

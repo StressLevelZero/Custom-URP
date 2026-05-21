@@ -25,14 +25,17 @@ Shader "SLZ/LitMAS/LitMAS Layered"
         [NoScaleOffset]_AYSXMap2("Layer 2 AYSX", 2D) = "white" {}
         [NoScaleOffset]_AYSXMap3("Layer 3 AYSX", 2D) = "white" {}
         [NoScaleOffset]_AYSXMap4("Layer 4 AYSX", 2D) = "white" {}
-        [Space(30)][Header(Emissions)][Space(10)][ToggleUI] _Emission("Emission Enable", Float) = 0
-        [NoScaleOffset]_EmissionMap("Emission Map", 2D) = "white" {}
-        [HDR]_EmissionColor("Emission Color", Color) = (1,1,1,1)
-        _EmissionFalloff("Emission Falloff", Float) = 1
-        _BakedMutiplier("Emission Baked Mutiplier", Float) = 1
-        [Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
-        _DetailMap("Detail Map", 2D) = "gray" {}
+
+        //[Space(30)][Header(Emissions)][Space(10)][ToggleUI] _Emission("Emission Enable", Float) = 0
+        //[NoScaleOffset]_EmissionMap("Emission Map", 2D) = "white" {}
+        //[HDR]_EmissionColor("Emission Color", Color) = (1,1,1,1)
+        //_EmissionFalloff("Emission Falloff", Float) = 1
+        //_BakedMutiplier("Emission Baked Mutiplier", Float) = 1
+
+        //[Space(30)][Header(Details)][Space(10)][Toggle(_DETAILS_ON)] _Details("Details enabled", Float) = 0
+        //_DetailMap("Detail Map", 2D) = "gray" {}
         //[HideInInspector]_DetailScale("Detail Scale", Vector) = (1.0, 1.0, 1.0, 1.0)
+
         //[Space(30)][Header(Screen Space Reflections)][Space(10)][Toggle(_SLZ_SSR_DISABLED)] _SSROff("Disable SSR", Float) = 0
         // SSR temporal accumulation, no longer used
         // [Header(This should be 0 for skinned meshes)]
@@ -61,7 +64,7 @@ Shader "SLZ/LitMAS/LitMAS Layered"
         [NoScaleOffset] _HeightMap3 ("Layer 3 Height map", 2D) = "white" {}
         [NoScaleOffset] _HeightMap4 ("Layer 4 Height map", 2D) = "white" {}
 
-        _LightmapScaleOffset("Lightmap Scale Offset", Vector) = (1,1,0,0)
+        [HideInInspector]_LightmapScaleOffset("Lightmap Scale Offset", Vector) = (1,1,0,0)
         [ToggleUI]_UseGRID("Triplanar projection UVs", float) = 0
 
     }
@@ -194,7 +197,7 @@ Shader "SLZ/LitMAS/LitMAS Layered"
 
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardMeta.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/LayeredMeta.hlsl" 
             ENDHLSL
         }
 
@@ -341,7 +344,7 @@ Shader "SLZ/LitMAS/LitMAS Layered"
 
             #define SHADERPASS SHADERPASS_META
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardMeta.hlsl" 
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/LayeredMeta.hlsl" 
             ENDHLSL
         }
 

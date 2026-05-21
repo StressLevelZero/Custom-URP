@@ -24,6 +24,7 @@ namespace UnityEditor.SLZMaterialUI
 
         public string tooltip2 { get { return texObjField.tooltip; } set { texObjField.tooltip = value; } }
         public Texture defaultTexture;
+        public Label label;
 
         public UnityEditor.UIElements.ObjectField texObjField;
         Texture currentValue;
@@ -56,7 +57,7 @@ namespace UnityEditor.SLZMaterialUI
             }
 
         }
-        public TextureField(MaterialProperty textureProperty, int texturePropertyIdx, bool isNormalMap, Texture defaultTexture = null)
+        public TextureField(MaterialProperty textureProperty, int texturePropertyIdx, bool isNormalMap, Texture defaultTexture = null, int size = 32)
         {
             this.textureProperty = textureProperty;
             this.currentValue = textureProperty.textureValue;
@@ -149,7 +150,7 @@ namespace UnityEditor.SLZMaterialUI
             fakeRadial.pickingMode = PickingMode.Ignore;
             fakeRadial.style.backgroundColor = Color.clear;
 
-            Label label = new Label(textureProperty.displayName);
+            label = new Label(textureProperty.displayName);
             label.pickingMode = PickingMode.Ignore;
 
             label.style.textOverflow = TextOverflow.Ellipsis;
@@ -162,16 +163,19 @@ namespace UnityEditor.SLZMaterialUI
             thumbnail = new Image();
             thumbnail.AddToClassList("textureFieldThumb");
             thumbnail.AddToClassList("unity-object-field-display__icon");
+            thumbnail.style.maxWidth = size;
+            thumbnail.style.maxHeight = size;
             thumbnail.pickingMode = PickingMode.Ignore;
             thumbnail.scaleMode = ScaleMode.StretchToFill;
             thumbnail.tintColor = Color.white;
-            thumbnailRT = new RenderTexture((int)(32.0f * EditorGUIUtility.pixelsPerPoint), (int)(32.0f * EditorGUIUtility.pixelsPerPoint), 1, RenderTextureFormat.ARGB32, 1);
+            thumbnailRT = new RenderTexture((int)(size * EditorGUIUtility.pixelsPerPoint), (int)(size * EditorGUIUtility.pixelsPerPoint), 1, RenderTextureFormat.ARGB32, 1);
             thumbnailRT.depth = 0;
             thumbnailRT.name = textureProperty.name + "_icon";
             thumbnailRT.Create();
             thumbnail.image = thumbnailRT;
 
             contents.Insert(0, thumbnail);
+
 
             texObjField.RegisterValueChangedCallback(OnObjectFieldChanged);
 

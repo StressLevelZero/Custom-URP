@@ -14,14 +14,21 @@ namespace SLZ.SLZEditorTools
             "Base color, tints the albedo map";
 
         public static ReadOnlySpan<char> MASMap =>
-            "Metallic (R), Ambient Occlusion (G), Smoothness (B).\nThe metallic controls how reflective the surface is and how much the albedo tints reflections. " +
-            "Ambient occlusion is fake pre-baked shadows that darkens areas like crevices or creases which are likely to be shadowed by surface itself. " +
-            "Smoothness controls the sharpness of reflections, and for non-metallic surfaces the strength of reflections.";
+            "<color=#e45252>(R) = Metallic</color>    \n" +
+            "<color=#30d137>(G) = Ambient Occlusion</color>    \n" +
+            "<color=#2f82ff>(B) = Smoothness</color>    \n";
+
+        public static ReadOnlySpan<char> AYSXMap =>
+            "<color=#e45252>(R) = Ambient Occlusion</color>    \n" +
+            "<color=#30d137>(G) = Hemi-octahedral Normal X</color>    \n" +
+            "<color=#2f82ff>(B) = Smoothness</color>    \n" +
+            "<color=#ffffff>(A) = Hemi-octahedral Normal Y</color>    ";
 
         public static ReadOnlySpan<char> NormalMap =>
-            "Unused (R), Normal Oct Y (G), Geometric Roughness (B), Normal Oct X (A).\nVector map that offsets the normal (direction the surface is facing) when calculating lighting. Used to add high-resolution detail to otherwise simple mesh geometry. " +
-            "Also contains roughness calculated from the normal variance for the mips in the blue channel. Assumes normals are encoded into hemi-octahedral format and stored in the G and A channels. " +
-            "The texture importer will by default automatically convert textures marked as normal maps to hemi-octahedral format and calculate geometric roughness";
+            "<color=#e45252>(R) = Unused</color>    \n" +
+            "<color=#30d137>(G) = Hemi-octahedral Normal X</color>    \n" +
+            "<color=#2f82ff>(B) = Geometric Roughness</color>    \n" +
+            "<color=#ffffff>(A) = Hemi-octahedral Normal Y</color>    ";
 
         public static ReadOnlySpan<char> EmissionMap =>
             "Emission Color (RGB).\nControls the intensity and color of light being emitted by the material";
@@ -62,5 +69,11 @@ namespace SLZ.SLZEditorTools
 
         public static ReadOnlySpan<char> FluorAlbedoTint =>
             "How much the base map and color tint the fluorescence";
+
+       public static ReadOnlySpan<char> SplatMap =>
+            "Contains the weights layers 1 through 4 encoded into the R,G,B, and A channels. The weight of layer 0 is implicitly stored as 1 minus the sum of the other layer weights";
+        
+        public static ReadOnlySpan<char> HeightMap =>
+            "<color=#e45252>(R) = Splat Weight Multiplier</color>\nScales the weight of the layer in the Splatmap to give more natural looking blending between layers.";
     }
 }
