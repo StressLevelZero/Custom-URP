@@ -14,8 +14,8 @@
 //   _SlabVoxelSize      : int3    voxels covered by this dispatch
 // =============================================================================
 
-#pragma kernel ClipMapDensity
-
+#pragma kernel ClipMapDensity 
+#pragma multi_compile_local _ CLIPMAP_RES_POWER_OF_TWO
 #define M_PI 3.1415926535897932384626433832795
 #define VolumeExponent M_PI
 
@@ -55,27 +55,20 @@ float BoxFalloffWS(float3 mapUVW)
     return pow(t, max(VolumeExponent, 1e-5));
 }
 
-// Safe integer modulo: non-negative result for negative absVoxel.
 int3 WrapCoord(int3 absVoxel, int r)
 {
-    // absVoxel can be negative. Adding a large multiple of r guarantees
-    // positivity without changing the result mod r. One unsigned mod, no
-    // signed mod. We add 2*r to handle absVoxel as negative as -2*r,
-    // which covers any slab base within one full window of the origin.
+    #if defined(CLIPMAP_RES_POWER_OF_TWO)
+    // Bitmask works correctly on negative ints via two's complement, no signed % needed.
+    return (int3)((uint3)absVoxel & (uint)(r - 1));
+    #else
+    // Bias by a large multiple of r so (absVoxel + bias) >= 0, then use uint %.
+    // r * (1<<20) is exact multiple of r, so result is identical to PositiveMod.
+    // Safe for r <= 2048 (r * 2^20 < INT_MAX) and coords > ~-268M.
+    uint3 biased = (uint3)(absVoxel + r * (1 << 20));
     uint ur = (uint)r;
-    uint3 w;
-    w.x = (uint(absVoxel.x) + 2u * ur) % ur;
-    w.y = (uint(absVoxel.y) + 2u * ur) % ur;
-    w.z = (uint(absVoxel.z) + 2u * ur) % ur;
-    return int3(w);
+    return (int3)(uint3(biased.x % ur, biased.y % ur, biased.z % ur));
+    #endif
 }
-
-//fast Pow of 2 version
-// int3 WrapCoord(int3 absVoxel, int r)
-// {
-//     // Power-of-two fast path. Works for negative absVoxel.
-//     return absVoxel & (r - 1);
-// }
 
 [numthreads(4,4,4)]
 void ClipMapDensity(uint3 tid : SV_DispatchThreadID)

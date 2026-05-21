@@ -218,7 +218,21 @@ public sealed class VolumetricClipmapManager : IDisposable
             _framesWaiting[i] = 0;
         }
     }
+    
+    private const string KW_CLIPMAP_RES_POWER_OF_TWO = "CLIPMAP_RES_POWER_OF_TWO";
 
+    private static bool IsPowerOfTwo(int x)
+    {
+        return x > 0 && (x & (x - 1)) == 0;
+    }
+    
+    private static void SetPow2WrapKeyword(ComputeShader cs, bool enabled)
+    {
+        if (cs == null) return;
+
+        if (enabled) cs.EnableKeyword(KW_CLIPMAP_RES_POWER_OF_TWO);
+        else         cs.DisableKeyword(KW_CLIPMAP_RES_POWER_OF_TWO);
+    }
     public void EnsureInitialized(VolumetricData data, ComputeShader clipmapCompute, string namePrefix)
     {
         if (clipmapCompute == null) throw new ArgumentNullException(nameof(clipmapCompute));
@@ -239,6 +253,8 @@ public sealed class VolumetricClipmapManager : IDisposable
         _clipCS  = clipmapCompute;
         _kGen    = _clipCS.FindKernel("ClipMapGen");
         _kClear  = _clipCS.FindKernel("ClipMapClear");
+        
+        SetPow2WrapKeyword(_clipCS, true);
 
         for (int i = 0; i < kClipLevels; i++)
         {
@@ -583,6 +599,7 @@ public sealed class VolumetricClipmapManager : IDisposable
 
                             var mediaCS = media.computeShader;
                             if (mediaCS == null) continue;
+                            SetPow2WrapKeyword(mediaCS, true);
 
                             int mediaKernel = GetMediaKernel(mediaCS);
                             if (mediaKernel < 0) continue;

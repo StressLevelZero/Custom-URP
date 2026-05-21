@@ -17,6 +17,7 @@ using UnityEngine.SceneManagement;
 
 using Unity.Collections;
 using System.IO;
+using System.Text;
 using UnityEditor.SceneManagement;
 
 namespace SLZ.SLZEditorTools
@@ -295,6 +296,8 @@ namespace SLZ.SLZEditorTools
             public ComputeBuffer skyColorBuffer;
             public Color bakedSkyMeanRadiance = Color.black;
             public bool hasBakedSkyMeanRadiance = false;
+            
+            public List<GameObject> shadowRenderers = new List<GameObject>();
 
             private bool disposed = false;
 
@@ -418,6 +421,16 @@ namespace SLZ.SLZEditorTools
 
                 pointCookieArray = null;
                 pointCookieToLayer = null;
+                
+                if (shadowRenderers != null)
+                {
+                    for (int i = 0; i < shadowRenderers.Count; i++)
+                    {
+                        if (shadowRenderers[i] != null)
+                            CoreUtils.Destroy(shadowRenderers[i]);
+                    }
+                    shadowRenderers.Clear();
+                }
             }
         }
 
@@ -493,6 +506,30 @@ namespace SLZ.SLZEditorTools
                 return s_clear3DTex;
             }
         }
+        
+        const string BakedRaytraceFallbackShaderGUID = "f2486f97befb7ea43a9875754afd167c";
+
+        static Shader s_bakedRaytraceFallbackShader;
+        static Shader BakedRaytraceFallbackShader
+        {
+            get
+            {
+                if (s_bakedRaytraceFallbackShader == null)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(BakedRaytraceFallbackShaderGUID);
+                    if (string.IsNullOrEmpty(path))
+                        throw new FileNotFoundException(
+                            "Volumetric Baking: Failed to load BakedRaytrace fallback shader by hard-coded GUID (" +
+                            BakedRaytraceFallbackShaderGUID + "). Either the shader is missing or its meta file got regenerated.");
+                    s_bakedRaytraceFallbackShader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+                    if (s_bakedRaytraceFallbackShader == null)
+                        throw new FileNotFoundException(
+                            "Volumetric Baking: No shader found at fallback GUID path. Check for GUID collisions.");
+                }
+                return s_bakedRaytraceFallbackShader;
+            }
+        }
+
         #endregion
 
         public static void BakeDXR(
@@ -516,7 +553,7 @@ namespace SLZ.SLZEditorTools
                 Debug.LogError("Volumetric Baking: global data not cleared. Either a bake is currently in progress or baking was terminated abnormally");
                 return;
             }
-
+            
             udata = new UpdateLoopData();
             
             udata.skyShader = SkyMeanRadianceCompute;
@@ -1187,45 +1224,166 @@ namespace SLZ.SLZEditorTools
 
         static RayTracingAccelerationStructure BuildRTAccelerationStruct()
         {
-            RayTracingAccelerationStructure accelerationStructure = new RayTracingAccelerationStructure();
-            List<Renderer> renderers = GatherStaticRenderers();
-            RayTracingSubMeshFlags[] smflags = new RayTracingSubMeshFlags[64];
-            for (int smIdx = 0; smIdx < 64; smIdx++)
-            {
-                smflags[smIdx] = RayTracingSubMeshFlags.Enabled;
-            }
+            var accelerationStructure = new RayTracingAccelerationStructure();
+            var renderers = GatherStaticRenderers();
+            var smflags = new RayTracingSubMeshFlags[64];
+            for (int i = 0; i < 64; i++) smflags[i] = RayTracingSubMeshFlags.Enabled;
+            int submeshesSubstituted = 0;
+            int submeshesExcluded = 0;
 
             for (int rIdx = 0; rIdx < renderers.Count; rIdx++)
             {
-                Material[] mats = renderers[rIdx].sharedMaterials;
+                var renderer = renderers[rIdx];
+                Material[] mats = renderer.sharedMaterials;
                 int smCount = mats.Length;
-                bool hasShownWarning = false;
+                bool hasShownNullWarning = false;
+
+        #if UNITY_6000_0_OR_NEWER
+                // Unity 6 path: split renderers with any broken submesh into per-submesh
+                // mesh-based instances, where each broken submesh gets the fallback material
+                // bound explicitly via RayTracingMeshInstanceConfig. Clean renderers go through
+                // the legacy fast path unchanged.
+                bool anyNeedsSwap = false;
                 for (int smIdx = 0; smIdx < smCount; smIdx++)
                 {
-                    if (mats[smIdx] == null)
+                    var m = mats[smIdx];
+                    if (m == null || m.renderQueue >= 2450) continue;
+                    if (!HasValidBakedRaytracePass(m)) { anyNeedsSwap = true; break; }
+                }
+
+                if (anyNeedsSwap)
+                {
+                    Mesh mesh = ResolveMeshFromRenderer(renderer);
+                    if (mesh == null)
                     {
-                        if (!hasShownWarning)
+                        Debug.LogWarning($"[VolBake] Could not resolve Mesh from '{renderer.name}' for fallback substitution; renderer fully excluded from BVH.");
+                        continue;
+                    }
+
+                    Matrix4x4 xform = renderer.transform.localToWorldMatrix;
+
+                    for (int smIdx = 0; smIdx < smCount; smIdx++)
+                    {
+                        var mat = mats[smIdx];
+                        if (mat == null || mat.renderQueue >= 2450) continue;
+
+                        Material useMat = mat;
+                        if (!HasValidBakedRaytracePass(mat))
                         {
-                            Debug.LogWarning($"Volumetric Baking: Renderer with unpopulated material slots, fix this! : {AnimationUtility.CalculateTransformPath(renderers[rIdx].transform, null)}");
-                            hasShownWarning = true;
+                            Debug.LogWarning(
+                                $"[VolBake] '{mat.name}' (shader '{mat.shader.name}') on " +
+                                $"'{AnimationUtility.CalculateTransformPath(renderer.transform, null)}' sm{smIdx} " +
+                                $"has no resolvable BakedRaytrace pass — substituting fallback material via RayTracingMeshInstanceConfig."
+                            );
+                            useMat = GetOrCreateFallbackMaterial();
+                            submeshesSubstituted++;
+                        }
+
+                        var cfg = new RayTracingMeshInstanceConfig(mesh, (uint)smIdx, useMat);
+                        // The default config sets ClosestHitOnly + Enabled, which is what we want.
+                        // If you need to mirror your existing smflags semantics exactly (no triangle
+                        // culling, etc.) override the fields here.
+                        accelerationStructure.AddInstance(in cfg, xform);
+                    }
+                    continue;
+                }
+                // Fall through to the legacy renderer path for clean renderers.
+        #endif
+
+                // Legacy renderer path. In Unity 2022 this is the *only* path. In Unity 6 it
+                // covers the "no swap needed" fast case.
+                for (int smIdx = 0; smIdx < smCount; smIdx++)
+                {
+                    var mat = mats[smIdx];
+
+                    if (mat == null)
+                    {
+                        if (!hasShownNullWarning)
+                        {
+                            Debug.LogWarning($"Volumetric Baking: Renderer with unpopulated material slots: {AnimationUtility.CalculateTransformPath(renderer.transform, null)}");
+                            hasShownNullWarning = true;
                         }
                         smflags[smIdx] = RayTracingSubMeshFlags.Disabled;
                         continue;
                     }
-                    if (mats[smIdx].renderQueue < 2450)
-                    {
-                        smflags[smIdx] = RayTracingSubMeshFlags.Enabled;
-                    }
-                    else
+
+                    if (mat.renderQueue >= 2450)
                     {
                         smflags[smIdx] = RayTracingSubMeshFlags.Disabled;
+                        continue;
                     }
+
+                    #if !UNITY_6000_0_OR_NEWER
+                    if (!HasValidBakedRaytracePass(mat))
+                    {
+                        Mesh sourceMesh = ResolveMeshFromRenderer(renderer);
+                        if (sourceMesh == null)
+                        {
+                            Debug.LogWarning(
+                                $"[VolBake] '{mat.name}' on '{AnimationUtility.CalculateTransformPath(renderer.transform, null)}' " +
+                                $"sm{smIdx} has no BakedRaytrace pass AND no resolvable Mesh — excluding from BVH (occlusion lost)."
+                            );
+                            smflags[smIdx] = RayTracingSubMeshFlags.Disabled;
+                            submeshesExcluded++;
+                            continue;
+                        }
+
+                        Debug.LogWarning(
+                            $"[VolBake] '{mat.name}' (shader '{mat.shader.name}') on " +
+                            $"'{AnimationUtility.CalculateTransformPath(renderer.transform, null)}' sm{smIdx} " +
+                            $"has no resolvable BakedRaytrace pass — disabling on source and adding shadow renderer with fallback material."
+                        );
+
+                        // Step 1: disable this submesh on the original so the broken material's
+                        // closest-hit shader never runs.
+                        smflags[smIdx] = RayTracingSubMeshFlags.Disabled;
+
+                        // Step 2: create the shadow renderer. It's a fresh GameObject — sharedMaterials
+                        // contains the fallback from instantiation, so AddInstance has nothing else
+                        // to read. No mutation, no timing window.
+                        var shadowGO = CreateShadowRenderer(renderer, sourceMesh, GetOrCreateFallbackMaterial());
+                        var shadowMR = shadowGO.GetComponent<MeshRenderer>();
+                        udata.shadowRenderers.Add(shadowGO);
+
+                        // Step 3: build a per-shadow smflags array. Only the broken submesh is Enabled
+                        // on the shadow — every other submesh of this mesh is already covered by the
+                        // original renderer (with its own valid materials), so we don't want to
+                        // double-count them.
+                        var shadowFlags = new RayTracingSubMeshFlags[sourceMesh.subMeshCount];
+                        for (int i = 0; i < shadowFlags.Length; i++)
+                            shadowFlags[i] = (i == smIdx) ? RayTracingSubMeshFlags.Enabled : RayTracingSubMeshFlags.Disabled;
+
+                        accelerationStructure.AddInstance(shadowMR, shadowFlags);
+                        submeshesSubstituted++;
+                        continue;
+                    }
+                    #endif
+                    smflags[smIdx] = RayTracingSubMeshFlags.Enabled;
                 }
-                accelerationStructure.AddInstance(renderers[rIdx], smflags);
+
+                accelerationStructure.AddInstance(renderer, smflags);
             }
+
             accelerationStructure.Build();
+
+            if (submeshesSubstituted > 0)
+                Debug.Log($"[VolBake] Substituted fallback material via shadow renderer on {submeshesSubstituted} submesh(es).");
+            if (submeshesExcluded > 0)
+                Debug.LogWarning($"[VolBake] Excluded {submeshesExcluded} submesh(es) from BVH (no resolvable Mesh — occlusion lost).");
             return accelerationStructure;
         }
+
+        // Helper for Unity 6+ path. Pulls the mesh from either a MeshFilter (MeshRenderer)
+        // or a SkinnedMeshRenderer. If you also support custom Renderer subclasses, extend here.
+        static Mesh ResolveMeshFromRenderer(Renderer r)
+        {
+            if (r is MeshRenderer && r.TryGetComponent(out MeshFilter mf))
+                return mf.sharedMesh;
+            if (r is SkinnedMeshRenderer smr)
+                return smr.sharedMesh;
+            return null;
+        }
+          
 
         static List<Renderer> GatherStaticRenderers()
         {
@@ -1542,6 +1700,46 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
             dirBuffer.SetData(dirDatas);
             areaBuffer.SetData(areaDatas);
         }
+        
+        static GameObject CreateShadowRenderer(Renderer source, Mesh sourceMesh, Material fallbackMat)
+        {
+            // GameObject name carries diagnostic info so it's recognizable in any debugger
+            // attached during the bake. HideAndDontSave keeps it out of scene serialization,
+            // hierarchy, and the asset DB.
+            var go = new GameObject($"VolBake_Shadow_{source.name}");
+            go.hideFlags = HideFlags.DontSave;
+
+            // Match the source's world transform. position/rotation/lossyScale captures the
+            // world matrix correctly as long as the source doesn't have a skewed parent
+            // (rare in level geometry — non-uniform scales on multiple ancestors). If you
+            // need to handle skew, parent the shadow under the source and zero the local TRS.
+            Transform srcT = source.transform;
+            go.transform.SetPositionAndRotation(srcT.position, srcT.rotation);
+            go.transform.localScale = srcT.lossyScale;
+
+            var mf = go.AddComponent<MeshFilter>();
+            mf.sharedMesh = sourceMesh;
+
+            var mr = go.AddComponent<MeshRenderer>();
+            // Match source casting mode so the BVH treats this geometry equivalently for
+            // any shadow-ray flag combinations the bake shaders use.
+            mr.shadowCastingMode = source.shadowCastingMode;
+
+            // We don't want the shadow renderer to actually rasterize in scene/game view.
+            // stops rasterization but the BVH builder still picks up
+            mr.forceRenderingOff = true;
+            
+            // Materials array length must match submeshCount. We fill every slot with the
+            // fallback because the original submesh slots are now Disabled on the source
+            // renderer — only the slot(s) we want this shadow to contribute will be Enabled
+            // in its own smflags array.
+            int submeshCount = sourceMesh.subMeshCount;
+            var matsArr = new Material[submeshCount];
+            for (int i = 0; i < submeshCount; i++) matsArr[i] = fallbackMat;
+            mr.sharedMaterials = matsArr;
+
+            return go;
+        }
 
         static Texture GetEnvironmentCubemap(bool useSkybox, Cubemap customTexture)
         {
@@ -1794,6 +1992,40 @@ static (CubemapArray array, Dictionary<Texture, int> map) BuildPointCookieArray(
                 AssetDatabase.Refresh();
             }
             return path;
+        }
+        
+        
+     
+// Lazily created, lives for the duration of the bake. HideAndDontSave keeps it out of
+// the asset DB and scene serialization — it's a transient editor-only object.
+        static Material s_bakedRaytraceFallbackMaterial;
+        static Material GetOrCreateFallbackMaterial()
+        {
+            if (s_bakedRaytraceFallbackMaterial == null)
+            {
+                s_bakedRaytraceFallbackMaterial = new Material(BakedRaytraceFallbackShader)
+                {
+                    name = "VolBake_FallbackMaterial",
+                    hideFlags = HideFlags.DontSave
+                };
+            }
+            return s_bakedRaytraceFallbackMaterial;
+        }
+
+// Don't forget to destroy it in EndBake / DisposeGraphicsResources to avoid leak.
+        static void DestroyFallbackMaterial()
+        {
+            if (s_bakedRaytraceFallbackMaterial != null)
+            {
+                CoreUtils.Destroy(s_bakedRaytraceFallbackMaterial);
+                s_bakedRaytraceFallbackMaterial = null;
+            }
+        }
+
+        static bool HasValidBakedRaytracePass(Material mat)
+        {
+            if (mat == null || mat.shader == null) return false;
+            return mat.FindPass("BakedRaytrace") >= 0;
         }
 
         // Note: the old synchronous SaveAreaToDisk has been replaced by the

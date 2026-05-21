@@ -288,7 +288,7 @@ half4 GetVolumetricColor(float3 positionWS)
     sampleUVW.z -= VOLUMETRIC_SURFACE_DEPTH_BIAS_TEXELS * invZ;
     sampleUVW.z = saturate(sampleUVW.z);
 
-    int idx = (int)(noise * 7.0) % 7;
+    uint idx = min((uint)(noise * 7.0), 6u);
 
     float jitterRadiusTexelsXY = 0.3;
     float jitterRadiusTexelsZ  = 0.05;
