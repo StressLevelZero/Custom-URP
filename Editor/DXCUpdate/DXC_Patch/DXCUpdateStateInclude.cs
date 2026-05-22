@@ -7,13 +7,14 @@ using SLZ.DXCUpdater;
 
 namespace SLZ.SLZEditorTools
 {
-    [ScriptedImporter(0, "dxcguard")]
+    [ScriptedImporter(0, "dxcguard", -3000)]
     public class DXCUpdateStateInclude : ScriptedImporter
     {
         public override void OnImportAsset(AssetImportContext ctx)
         {
-            ctx.DependsOnSourceAsset("Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl");
+            URPConfigManager.Initialize();
             CheckDXCInstallExternal.UpdateDXCIncludeState();
+            ctx.DependsOnSourceAsset("Packages/com.stresslevelzero.urpconfig/include/DXCUpdateState.hlsl");
         }
     }
 }
