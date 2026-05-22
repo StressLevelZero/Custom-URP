@@ -501,7 +501,9 @@ namespace UnityEngine.Rendering.Universal.Internal
             uint lightLayerMask;
             bool isSubtractive;
             InitializeLightConstants(lightData.visibleLights, lightData.mainLightIndex, out lightPos, out lightColor, out lightAttenuation, out lightSpotDir, out lightOcclusionChannel, out lightLayerMask, out isSubtractive);
-            lightColor.w = isSubtractive ? 0f : 1f;
+            /// SLZ MODIFIED - We use alpha for UV
+            //lightColor.w = isSubtractive ? 0f : 1f;
+            /// END SLZ MODIFIED
 
             cmd.SetGlobalVector(LightConstantBuffer._MainLightPosition, lightPos);
             cmd.SetGlobalVector(LightConstantBuffer._MainLightColor, lightColor);

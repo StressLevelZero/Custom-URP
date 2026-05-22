@@ -1866,9 +1866,6 @@ namespace UnityEngine.Rendering.Universal
 
             // VisibleLight.finalColor already returns color in active color space
             lightColor = lightData.finalColor;
-            /// SLZ MODIFIED - alpha is UV, need to multiply alpha by light intensity
-            lightColor.w *= light.intensity;
-            /// END SLZ MODIFIED
             if (light != null && light.bakingOutput.lightmapBakeType == LightmapBakeType.Mixed &&
                 0 <= light.bakingOutput.occlusionMaskChannel &&
                 light.bakingOutput.occlusionMaskChannel < 4)

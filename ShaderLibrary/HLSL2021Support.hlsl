@@ -22,8 +22,10 @@
 
     COMPILER_MACRO(#, if __HLSL_VERSION < 2021)
     
-    #if SLZ_DXC_VERSION_MAJOR >= 1 && SLZ_DXC_VERSION_MINOR >= 8
-    COMPILER_MACRO(#, warning DXC Update State indicates version > 1.8 but hlsl version is less than 2021 )
+    #if SLZ_DXC_VERSION_MAJOR > 1 || SLZ_DXC_VERSION_MINOR >= 8
+
+    COMPILER_MACRO(#, error DXCUpdateState.hlsl is invalid! Claims DXC version SLZ_DXC_VERSION_MAJOR SLZ_DXC_VERSION_MINOR SLZ_DXC_VERSION_PATCH SLZ_DXC_VERSION_BUILD but the hlsl version is less than 2021 indicating the old 1.6 or 1.7 compiler is being used )
+
     #endif
 
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/HLSL2021SupportTemplates.hlsl"

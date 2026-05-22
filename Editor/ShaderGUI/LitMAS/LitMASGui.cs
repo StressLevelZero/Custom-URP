@@ -1038,6 +1038,9 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                     hasAdvancedProps = true;
                     detailScaleRangeField.RegisterValueChangedCallback(SetDetailScaleWarningVisibility);
                 }
+                #if MARROW_INTERNAL
+                if (props[detailNrmScaleIdx].floatValue != 1.0f) EnableDetailScaleWarning();
+                #endif
             }
 
             if (hasDetails)
@@ -1395,14 +1398,17 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             if (evt.previousValue != 1.0f && evt.newValue != 1.0f) return;
             if (evt.previousValue == 1.0f && evt.newValue != 1.0f)
             {
-                DetailScaleWarningCount += 1;
                 DetailScaleWarning.style.display = DisplayStyle.Flex;
             }
             if (evt.previousValue != 1.0f && evt.newValue == 1.0f)
             {
-                DetailScaleWarningCount -= 1;
-                DetailScaleWarning.style.display = DetailScaleWarningCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                DetailScaleWarning.style.display = DisplayStyle.None;
             }
+        }
+
+        void EnableDetailScaleWarning()
+        {
+            DetailScaleWarning.style.display = DisplayStyle.Flex;
         }
 
 #region PropertyUpgrades

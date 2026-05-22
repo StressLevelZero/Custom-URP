@@ -125,7 +125,7 @@ public static class KernelPatchSplashBoot
 
     private static void ShowIfNeeded()
     {
-        if (UnityKernelDirectLightingPatchStatus.IsPatched)
+        if (UnityKernelDirectLightingPatchStatus.IsPatched || SessionState.GetBool(DismissedKey, false))
             return;
 
         KernelPatchSplashWindow.ShowWindow();

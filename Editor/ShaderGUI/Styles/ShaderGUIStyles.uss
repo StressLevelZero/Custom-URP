@@ -121,8 +121,5 @@
 .layeredMaterialAltBackground
 {
     background-color: var(--unity-colors-highlight-background-hover-lighter);
-    border-top-width: 1px;
-    border-top-color: var(--unity-colors-highlight-background-hover-lighter);
-    border-bottom-width: 1px;
-    border-bottom-color: var(--unity-colors-highlight-background-hover-lighter);
+
 }
