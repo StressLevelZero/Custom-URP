@@ -21,10 +21,10 @@ Shader "SLZ/LitMAS/LitMAS Layered"
         // [NoScaleOffset]_MetallicGlossMap3("Layer 3 MAS", 2D) = "white" {}
         // [NoScaleOffset]_MetallicGlossMap4("Layer 4 MAS", 2D) = "white" {}
         [NoScaleOffset]_AYSXMap("AYSX", 2D) = "white" {}
-        [NoScaleOffset]_AYSXMap1("Layer 1 AYSX", 2D) = "white" {}
-        [NoScaleOffset]_AYSXMap2("Layer 2 AYSX", 2D) = "white" {}
-        [NoScaleOffset]_AYSXMap3("Layer 3 AYSX", 2D) = "white" {}
-        [NoScaleOffset]_AYSXMap4("Layer 4 AYSX", 2D) = "white" {}
+        [NoScaleOffset]_AYSXMap1("Layer 1 AYSX", 2D) = "Gray" {}
+        [NoScaleOffset]_AYSXMap2("Layer 2 AYSX", 2D) = "Gray" {}
+        [NoScaleOffset]_AYSXMap3("Layer 3 AYSX", 2D) = "Gray" {}
+        [NoScaleOffset]_AYSXMap4("Layer 4 AYSX", 2D) = "Gray" {}
 
         //[Space(30)][Header(Emissions)][Space(10)][ToggleUI] _Emission("Emission Enable", Float) = 0
         //[NoScaleOffset]_EmissionMap("Emission Map", 2D) = "white" {}
@@ -58,7 +58,7 @@ Shader "SLZ/LitMAS/LitMAS Layered"
 
         [NoScaleOffset]_SplatMap("Splat Map", 2D) = "black" {}
 
-        [NoScaleOffset] _HeightMap  ("Base Height map", 2D) = "white" {}
+        [NoScaleOffset] _HeightMap  ("Base Height map", 2D) = "LinearGray" {}
         [NoScaleOffset] _HeightMap1 ("Layer 1 Height map", 2D) = "white" {}
         [NoScaleOffset] _HeightMap2 ("Layer 2 Height map", 2D) = "white" {}
         [NoScaleOffset] _HeightMap3 ("Layer 3 Height map", 2D) = "white" {}

@@ -59,4 +59,19 @@ SLZ_REQUEST_FRAG_SIZE_CAPS
 #endif
 void RequestFragmentDensityEXT() { }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#Scope_-id-
+// Only device (0) and subgroup (3) are valid for fragment shader invocations
+#if defined(SLZ_VK_EXT_ENABLED)
+[[vk::ext_extension("SPV_KHR_shader_clock")]]
+[[vk::ext_capability(/*ShaderClockKHR*/ 5055)]]
+[[vk::ext_instruction(/*OpReadClockKHR*/ 5056)]]
+#endif
+uint2 ReadClock(uint scope = 3) { return (uint2)0; }
+
+// https://developer.nvidia.com/blog/profiling-dxr-shaders-with-timer-instrumentation/
+uint DeltaShaderClockTime(uint start, uint end)
+{
+  return end < start ? (~0u - (start - end)) : (end - start);
+}
+
 #endif // SLZ_VK_EXTENSIONS

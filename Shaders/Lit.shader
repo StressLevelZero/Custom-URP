@@ -161,14 +161,14 @@ Shader "Universal Render Pipeline/Lit"
             // Universal Pipeline keywords
 
             //_MAIN_LIGHT_SHADOWS_SCREEN
-            #pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
+            //#pragma multi_compile_fragment _ _VOLUMETRICS_ENABLED
             //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
 
             // -------------------------------------
             // Unity defined keywords
             
-            #pragma multi_compile_fog
-            #pragma skip_variants FOG_LINEAR FOG_EXP
+            //#pragma multi_compile_fog
+            //#pragma skip_variants FOG_LINEAR FOG_EXP
             //#pragma multi_compile_fragment _ DEBUG_DISPLAY
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DefaultLitVariants.hlsl"

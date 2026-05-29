@@ -301,7 +301,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
         public override VisualElement CreateInspectorGUI()
         {
             VisualElement root = new VisualElement();
-
+        
             #if MARROW_INTERNAL
                 bool advancedMode = AdvancedMaterialProps.GetVisibility();
                 AdvancedMaterialProps.stateChangeCallback += RebuildOnAdvVisChange;
@@ -339,6 +339,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 {
                     serializedObject.ApplyModifiedProperties();
                     materialProperties = MaterialEditor.GetMaterialProperties(this.targets);
+                }
+                if ((this.target.hideFlags & HideFlags.NotEditable) != 0)
+                {
+                    MainWindow.SetEnabled(false);
                 }
             }
 
