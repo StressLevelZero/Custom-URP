@@ -265,6 +265,12 @@ half layerHeight0 = 0;
 float2 uv_height; half2 dx_height, dy_height;
 dx = (half2)ddx(uv0);
 dy = (half2)ddy(uv0);
+
+half layerHeight2 = 0;
+LAYER_UVS(layers[2].index, uv_height, dx_height, dy_height);
+SAMPLE_LAYERED(layerHeight2, r, _HeightMap, SAMPLER_CHEAP, uv_height, layers[2].index, dx_height, dy_height);
+layers[2].weight = layerHeight2 * saturate(1.0 - layers[0].weight - layers[1].weight) + 0.01;
+
 if (layers[0].weight > HALF_MIN)
 {
 	LAYER_UVS(layers[0].index, uv_height, dx_height, dy_height);
@@ -281,10 +287,7 @@ if (layers[1].weight > HALF_MIN)
 }
 
 
-half layerHeight2 = 0;
-LAYER_UVS(layers[2].index, uv_height, dx_height, dy_height);
-SAMPLE_LAYERED(layerHeight2, r, _HeightMap, SAMPLER_CHEAP, uv_height, layers[2].index, dx_height, dy_height);
-layers[2].weight = layerHeight2 * saturate(1.0 - layers[0].weight - layers[1].weight);
+
 
 
 // sort the layers, pick the two most important
@@ -313,12 +316,13 @@ float2 uv_layer0; half2 dx_layer0, dy_layer0;
 LAYER_UVS(layer0.index, uv_layer0, dx_layer0, dy_layer0);
 
 SAMPLE_LAYERED(albedo, rgba, _BaseMap, sampler_BaseMap, uv_layer0, layer0.index, dx_layer0, dy_layer0)
+albedo *= layer0.index == min16int(0) ? _BaseColor : half4(1,1,1,1);
 albedo *= layer0.weight;
 
 half4 aysx0 = 0;
 SAMPLE_LAYERED(aysx0, rgba, _AYSXMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0);
 mas = layer0.weight * half3(0.0f, aysx0.r, aysx0.b);
-normalMap2 = (half(2.0) * aysx0.ag - half(1.0)); 
+normalMap2 = layer0.weight * (half(2.0) * aysx0.ag - half(1.0)); 
 
 
 //SAMPLE_LAYERED(mas, rgb, _MetallicGlossMap, SAMPLER_CHEAP, uv_layer0, layer0.index, dx_layer0, dy_layer0)
@@ -337,6 +341,7 @@ if (layer1.weight > 2 * HALF_MIN)
 
 	half4 albedo1 = (half4)0;
 	SAMPLE_LAYERED(albedo1, rgba, _BaseMap, SAMPLER_CHEAP, uv_layer1, layer1.index, dx_layer1, dy_layer1)
+	albedo1 *= layer1.index == min16int(0) ? _BaseColor : half4(1,1,1,1);
 	albedo += albedo1 * layer1.weight;
 
 	half4 aysx1 = 0;
@@ -359,11 +364,13 @@ albedo.a = 1;
 // End Injection FRAG_READ_INPUTS from Injection_Layered.hlsl ----------------------------------------------------------
 
 
-    albedo *= _BaseColor;
+// Begin Injection PBR_VALUES from Injection_Layered.hlsl ----------------------------------------------------------
+	// Test 8
     albedo.a = _Surface == 0 ? half(1.0) : albedo.a;
     half metallic = mas.r;
     half ao = mas.g;
     half smoothness = mas.b;
+// End Injection PBR_VALUES from Injection_Layered.hlsl ----------------------------------------------------------
 
 
 /*---------------------------------------------------------------------------------------------------------------------------*/

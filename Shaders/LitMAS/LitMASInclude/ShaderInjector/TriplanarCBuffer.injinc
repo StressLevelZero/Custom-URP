@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+   m_Script: {fileID: 11500000, guid: 0a8138f5d4e8cac4cb2cc79bac3f9a0f, type: 3}
+  m_Name: TriplanarCBuffer
+  m_EditorClassIdentifier: 
+  outputInclude: {fileID: 10900000, guid: 62104ec01b08b5a4aaa16c52176705c5, type: 3}
+  baseInclude: {fileID: 10900000, guid: 0561b38c17533e74189481f9782ff091, type: 3}
+  injectableIncludes:
+  - {fileID: 10900000, guid: 62e7edc4426a6494ca9425c59f95f43e, type: 3}
+  - {fileID: 10900000, guid: e9c4013a5ab6b0b4f8f10326087f2fbb, type: 3}
+  - {fileID: 10900000, guid: 6a4eb4ff6d4178b4ca27eca657516d0d, type: 3}

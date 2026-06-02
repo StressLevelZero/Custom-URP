@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+   m_Script: {fileID: 11500000, guid: 0a8138f5d4e8cac4cb2cc79bac3f9a0f, type: 3}
+  m_Name: RetroreflCBuffer
+  m_EditorClassIdentifier: 
+  outputInclude: {fileID: 10900000, guid: fe792227819950d4ba60bdfa49230527, type: 3}
+  baseInclude: {fileID: 10900000, guid: 0561b38c17533e74189481f9782ff091, type: 3}
+  injectableIncludes:
+  - {fileID: 10900000, guid: 86d5c622b75cede49857fef3a19dae5a, type: 3}
+  - {fileID: 10900000, guid: 7e6890bc36b6ec04fa12cb11c69b70ad, type: 3}
+  - {fileID: 10900000, guid: e9c4013a5ab6b0b4f8f10326087f2fbb, type: 3}
+  - {fileID: 10900000, guid: b6edeb87fbde978448e9bc17589f2430, type: 3}
+  - {fileID: 10900000, guid: 31a119b89ea6d744f8e37b9dd5a066d3, type: 3}
+  - {fileID: 10900000, guid: 1b66172f2917a11479a18a834c43ae00, type: 3}

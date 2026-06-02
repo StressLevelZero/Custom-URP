@@ -95,7 +95,7 @@ namespace SLZ.Bonelab
 			" *-----------------------------------------------------------------------------------------------------*/\n\n";
 
 
-		public void CreateShader()
+		public void CreateShaderAndSaveToDisk()
 		{
 			TagIndex = new Dictionary<string, int>();
 			injectionContent = new List<List<Tuple<int, string>>>();
@@ -108,8 +108,35 @@ namespace SLZ.Bonelab
 
 			sortInjectionContent();
 
-			InjectBlocksIntoFile(inputFileDir, outputFileDir);
+			CreateInclude(inputFileDir, outputFileDir);
 		}
+
+		public string CreateShader()
+		{
+			TagIndex = new Dictionary<string, int>();
+			injectionContent = new List<List<Tuple<int, string>>>();
+			texcoordCounter = new Dictionary<int, int>();
+			foreach (string injDir in injectionDirs)
+			{
+				int status = ReadInjectionFile(injDir);
+				if (status != 0) return null;
+			}
+
+			sortInjectionContent();
+
+			string file = "";
+			if (ReadFile(inputFileDir, out file) != 0)
+			{
+				return null;
+			}
+			int result = InjectBlocksIntoFile(inputFileDir, file, out string outputFile);
+			if (result != 0)
+			{
+				return null;
+			}
+			return outputFile;
+		}
+		
 
 		private int ReadInjectionFile(string injDir)
 		{
@@ -119,7 +146,7 @@ namespace SLZ.Bonelab
 				return 1;
 			}
 
-			Debug.Log(file.Length);
+			//Debug.Log(file.Length);
 			SILexer lexer = new SILexer();
 			List<SILexer.CommandInfo> cmd = lexer.LexFile(ref file);
 			if (cmd == null || cmd.Count == 0)
@@ -278,7 +305,7 @@ namespace SLZ.Bonelab
 				{
 					case SILexicon.CmdType.TexcoordCounter:
 						sb.Append(CreateTexcoord(cmd[i]));
-						Debug.Log(cmd[i].parameters[1]);
+						//Debug.Log(cmd[i].parameters[1]);
 						break;
 				}
 
@@ -288,24 +315,18 @@ namespace SLZ.Bonelab
 			}
 		}
 
-		int InjectBlocksIntoFile(string dirIn, string dirOut)
+		int InjectBlocksIntoFile(string baseFilePath, string baseFile, out string outputFile)
 		{
-
-			string file = "";
-			if (ReadFile(dirIn, out file) != 0)
-			{
-				return 1;
-			}
-
+			outputFile = null;
 			SILexer lexer = new SILexer();
-			List<SILexer.CommandInfo> cmd = lexer.LexFile(ref file);
+			List<SILexer.CommandInfo> cmd = lexer.LexFile(ref baseFile);
 			if (cmd == null || cmd.Count == 0)
 			{
-				Debug.LogError("ShaderInjector: No injection commands in file at " + dirIn);
+				Debug.LogError("ShaderInjector: No injection commands in file at " + baseFilePath);
 				return 1;
 			}
 
-			SIParser parser = new SIParser(dirIn);
+			SIParser parser = new SIParser(baseFilePath);
 			if (parser.validateBase(cmd) != 0)
 			{
 				return 1;
@@ -313,7 +334,7 @@ namespace SLZ.Bonelab
 
 			StringBuilder OutputFile = new StringBuilder();
 			OutputFile.Append(warningHeader);
-			OutputFile.Append(file.Substring(0, cmd[0].beginIndex));
+			OutputFile.Append(baseFile.Substring(0, cmd[0].beginIndex));
 			int i = 0;
 			int useDefault = 0;
 
@@ -342,13 +363,13 @@ namespace SLZ.Bonelab
 						break;
 					case SILexicon.CmdType.TexcoordCounter:
 						OutputFile.Append(
-							file.Substring(cmd[i].beginIndex, cmd[i].endIndex - cmd[i].beginIndex + 1));
+							baseFile.Substring(cmd[i].beginIndex, cmd[i].endIndex - cmd[i].beginIndex + 1));
 						break;
 				}
 
 				int beginIndex = cmd[i].endIndex + 1;
-				int endIndex = i != cmd.Count - 1 ? cmd[i + 1].beginIndex : file.Length;
-				OutputFile.Append(file.Substring(beginIndex, endIndex - beginIndex));
+				int endIndex = i != cmd.Count - 1 ? cmd[i + 1].beginIndex : baseFile.Length;
+				OutputFile.Append(baseFile.Substring(beginIndex, endIndex - beginIndex));
 			}
 
 			//OutputFile.Append(file.Substring(0, cmd[0].beginIndex));
@@ -367,14 +388,29 @@ namespace SLZ.Bonelab
 				ParseSecondPass(ref OutputFile2, ref file2, ref cmd2);
 				file2 = OutputFile2.ToString();
 			}
+			outputFile = file2;
+			return 0;
+		}
 
-
-			string assetPath = dirOut.Substring(Path.GetDirectoryName(Application.dataPath).Length + 1);
+		int CreateInclude(string baseFilePath, string outputDir)
+		{
+			string file = "";
+			if (ReadFile(baseFilePath, out file) != 0)
+			{
+				return 1;
+			}
+			int result = InjectBlocksIntoFile(baseFilePath, file, out string file2);
+			if (result != 0)
+			{
+				return result;
+			}
+			string assetPath = outputDir.Substring(Path.GetDirectoryName(Application.dataPath).Length + 1);
 			ShaderInclude fileObj = AssetDatabase.LoadAssetAtPath<ShaderInclude>(assetPath);
-			File.WriteAllText(dirOut, file2);
+			File.WriteAllText(outputDir, file2);
 			EditorUtility.SetDirty(fileObj);
 			//AssetDatabase.ImportAsset(assetPath);
 			fileObj = null;
+			
 			return 0;
 		}
 

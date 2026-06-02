@@ -27,6 +27,7 @@ cbuffer UnityPerMaterial
 // End Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_NormalMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
     half  _Details;
+    half  _DetailNormalScale;
 // End Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_DetailMap_CBuffer.hlsl ----------------------------------------------------------
 // Begin Injection MATERIAL_CBUFFER_HALF_SCALARS from Injection_WhiteBoard_CBuffer.hlsl ----------------------------------------------------------
 	half  _PenMono;

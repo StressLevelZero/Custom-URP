@@ -14,6 +14,52 @@ namespace SLZ.Bonelab
 		public ShaderInclude outputInclude;
 		public ShaderInclude baseInclude;
 		public List<ShaderInclude> injectableIncludes;
+
+		public void UpdateInjection()
+		{
+			if (outputInclude == null)
+			{
+				Debug.LogError(this.name + ": Missing output file");
+				return;
+			}
+
+			if (baseInclude == null)
+			{
+				Debug.LogError(this.name + ": Missing base file");
+				return;
+			}
+
+			string projectDir = Path.GetDirectoryName(Application.dataPath);
+			string outputDir = Path.Combine(projectDir, AssetDatabase.GetAssetPath(outputInclude));
+			string baseDir = Path.Combine(projectDir, AssetDatabase.GetAssetPath(baseInclude));
+
+			List<ShaderInclude> injectionsCleaned = new List<ShaderInclude>();
+			foreach (ShaderInclude injection in injectableIncludes)
+			{
+				if (injection != null)
+				{
+					injectionsCleaned.Add(injection);
+				}
+			}
+
+			//if(injectionsCleaned.Count == 0)
+			//{
+			//    Debug.Log("No injections!");
+			//    return;
+			//}
+			string[] injectionDirs = new string[injectionsCleaned.Count];
+			for (int i = 0; i < injectionsCleaned.Count; i++)
+			{
+				string injProjPath = AssetDatabase.GetAssetPath(injectionsCleaned[i]);
+				injectionDirs[i] = Path.Combine(projectDir, injProjPath);
+			}
+
+			ShaderInjector shaderInjector = new ShaderInjector();
+			shaderInjector.outputFileDir = outputDir;
+			shaderInjector.inputFileDir = baseDir;
+			shaderInjector.injectionDirs = injectionDirs;
+			shaderInjector.CreateShaderAndSaveToDisk();
+		}
 	}
 
 	[CustomEditor(typeof(InjectedInclude))]
@@ -61,7 +107,7 @@ namespace SLZ.Bonelab
 				{
 					InjectedInclude injShader = (InjectedInclude)selected;
 					Debug.Log("Updating Injection");
-					updateInjection(injShader.outputInclude, injShader.baseInclude, injShader.injectableIncludes,
+					UpdateInjection(injShader.outputInclude, injShader.baseInclude, injShader.injectableIncludes,
 						injShader);
 				}
 
@@ -70,7 +116,7 @@ namespace SLZ.Bonelab
 			return Inspector;
 		}
 
-		private void updateInjection(ShaderInclude outp, ShaderInclude baseInj, List<ShaderInclude> injections,
+		internal void UpdateInjection(ShaderInclude outp, ShaderInclude baseInj, List<ShaderInclude> injections,
 			InjectedInclude thisObj)
 		{
 			if (outp == null)
@@ -114,7 +160,7 @@ namespace SLZ.Bonelab
 			shaderInjector.outputFileDir = outputDir;
 			shaderInjector.inputFileDir = baseDir;
 			shaderInjector.injectionDirs = injectionDirs;
-			shaderInjector.CreateShader();
+			shaderInjector.CreateShaderAndSaveToDisk();
 		}
 	}
 }
