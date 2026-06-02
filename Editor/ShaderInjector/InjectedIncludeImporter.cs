@@ -12,7 +12,7 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace SLZ.SLZEditorTools
 {
-    [ScriptedImporter(4, new string[] { "injinc" }, null, -3000, AllowCaching = false)]
+    [ScriptedImporter(4, new string[] { "injinc" }, null, -3000, AllowCaching = true)]
     public class InjectedIncludeImporter : ScriptedImporter
     {
         public override void OnImportAsset(AssetImportContext ctx)
