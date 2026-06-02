@@ -144,7 +144,7 @@ dy = (half2)ddy(uv0);
 half layerHeight2 = 0;
 LAYER_UVS(layers[2].index, uv_height, dx_height, dy_height);
 SAMPLE_LAYERED(layerHeight2, r, _HeightMap, SAMPLER_CHEAP, uv_height, layers[2].index, dx_height, dy_height);
-layers[2].weight = layerHeight2 * saturate(1.0 - layers[0].weight - layers[1].weight) + 0.01;
+layers[2].weight = saturate(layerHeight2 - layers[0].weight - layers[1].weight) + 0.01;
 
 if (layers[0].weight > HALF_MIN)
 {
@@ -160,10 +160,6 @@ if (layers[1].weight > HALF_MIN)
 	SAMPLE_LAYERED(layerHeight1, r, _HeightMap, SAMPLER_CHEAP, uv_height, layers[1].index, dx_height, dy_height);
 	layers[1].weight *= layerHeight1;
 }
-
-
-
-
 
 // sort the layers, pick the two most important
 if (layers[0].weight < layers[2].weight) SLZ::Layering::Swap(layers, 0, 2);
