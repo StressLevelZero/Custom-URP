@@ -211,7 +211,6 @@ if (layerWeights.x > 0)
 	{
 		half3 layer1albedo = (half3)0;
 		SAMPLE_LAYERED(layer1albedo, rgb, _BaseMap, SAMPLER_CHEAP, layer1uv, layer1idx, layer1dx, layer1dy)
-		layer1albedo *= _BaseColor;
 		albedoSum += layer1albedo * layer1Height;
 		
 		half4 layer1aysx = (half4)0;
@@ -235,7 +234,6 @@ if (layerWeights.y > 0)
 	{
 		half3 layer2albedo = (half3)0;
 		SAMPLE_LAYERED(layer2albedo, rgb, _BaseMap, SAMPLER_CHEAP, layer2uv, layer2idx, layer2dx, layer2dy)
-		layer2albedo *= _BaseColor;
 		albedoSum += layer2albedo * layer2Height;
 
 		half4 layer2aysx = (half4)0;
@@ -259,7 +257,6 @@ if (layerWeights.z > 0)
 	{
 		half3 layer3albedo = (half3)0;
 		SAMPLE_LAYERED(layer3albedo, rgb, _BaseMap, SAMPLER_CHEAP, layer3uv, layer3idx, layer3dx, layer3dy)
-		layer3albedo *= _BaseColor;
 		albedoSum += layer3albedo * layer3Height;
 
 		half4 layer3aysx = (half4)0;

@@ -58,7 +58,7 @@ Shader "SLZ/LitMAS/LitMAS Layered"
 
         [NoScaleOffset]_SplatMap("Splat Map", 2D) = "black" {}
 
-        [NoScaleOffset] _HeightMap  ("Base Height map", 2D) = "LinearGray" {}
+        [NoScaleOffset] _HeightMap  ("Base Height map", 2D) = "white" {}
         [NoScaleOffset] _HeightMap1 ("Layer 1 Height map", 2D) = "white" {}
         [NoScaleOffset] _HeightMap2 ("Layer 2 Height map", 2D) = "white" {}
         [NoScaleOffset] _HeightMap3 ("Layer 3 Height map", 2D) = "white" {}
