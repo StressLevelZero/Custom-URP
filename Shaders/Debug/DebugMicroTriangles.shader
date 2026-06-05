@@ -9,6 +9,7 @@ Shader "SLZ/Debug/Show Micro Triangles"
         //_MaxThreshold ("Max Triangle Thickness", float) = 16
         //_MinThreshold ("Min Triangle Thickness", float) = 4
         _Conservative ("Conservative Raster", float) = 1
+        _Gradient ("Gradient Texture", 2D) = "black" {}
     }
     SubShader
     {
@@ -80,6 +81,9 @@ Shader "SLZ/Debug/Show Micro Triangles"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
+
+            TEXTURE2D(_Gradient);
+
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -220,9 +224,14 @@ Shader "SLZ/Debug/Show Micro Triangles"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float lerpFactor = saturate((i.triSize - _MaxThreshold) / (_MinThreshold - _MaxThreshold));
+                /*
                 float hue = lerp(0.5,0,(lerpFactor * lerpFactor));
                 float3 color = HsvToRgb(float3(hue, 1, 1));
                 float alpha = (lerpFactor * lerpFactor * lerpFactor);
+                */
+                float4 lut = SAMPLE_TEXTURE2D_LOD(_Gradient, sampler_LinearClamp, float2(lerpFactor, 0), 0);
+                float3 color = lut.rgb;
+                float alpha = lut.a;
                 float blink = i.triSize < _MinThreshold ? (0.75 + 0.3 * sin(6 * _Time[2])) : 1;
                     //lerp(1, (0.75 + 0.3 * sin(6 * _Time[2])), lerpFactor * lerpFactor); 
                 //color *= 0.5*alpha;

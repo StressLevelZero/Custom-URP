@@ -4,6 +4,9 @@ using Unity.Collections;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.Rendering.Universal.Internal;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace SLZ.SLZEditorTools
 {
@@ -16,6 +19,7 @@ namespace SLZ.SLZEditorTools
 
         static readonly int ID_MicroTriVisParams = Shader.PropertyToID("MicroTriVisParams");
         static readonly int ID_Conservative = Shader.PropertyToID("_Conservative");
+        static readonly int ID_Gradient = Shader.PropertyToID("_Gradient");
         static ComputeBuffer m_MicroTriVisParamsBuffer;
         static NativeArray<MicroTriVisParams> m_MicroTriVisParams;
 
@@ -36,6 +40,20 @@ namespace SLZ.SLZEditorTools
 
         [Reload("Shaders/Debug/DebugMicroTriangles.shader")]
         public Shader MicrotriangleShader;
+        [Reload("Textures/HeatmapGradient0.png")]
+        public Texture2D m_Gradient;
+
+#if UNITY_EDITOR
+        const string EDITOR_defaultHeatmapGUID = "aac25ef0107c1c34aa67a2235978803c";
+#endif
+
+        public static Texture2D s_Gradient;
+
+        public static Texture2D Gradient { 
+            get { return s_Gradient; } 
+            set {s_Gradient = value; if (s_Gradient) MicroTriMat.SetTexture(ID_Gradient, s_Gradient); }
+        }
+
         DrawDebugPass m_ScriptablePass;
 
         public static bool active = false;
@@ -66,9 +84,34 @@ namespace SLZ.SLZEditorTools
         {
             _FIXED_SCREEN_DISTANCE = GlobalKeyword.Create("_FIXED_SCREEN_DISTANCE");
             _MICRO_TRI_DISPLAY_AS_WIREFRAME = GlobalKeyword.Create("_MICRO_TRI_DISPLAY_AS_WIREFRAME");
+            Gradient = m_Gradient;
+
             m_ScriptablePass = new DrawDebugPass("Debug Microtriangles", false, RenderPassEvent.AfterRenderingTransparents);
             m_ScriptablePass.renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
 
+            #if UNITY_EDITOR
+            if (m_Gradient == null)
+            {
+                string gradientPath = AssetDatabase.GUIDToAssetPath(EDITOR_defaultHeatmapGUID);
+                if (string.IsNullOrEmpty(gradientPath))
+                {
+                    Debug.LogError($"DebugMicrotriangles: Cannot find default heatmap gradient by guid {EDITOR_defaultHeatmapGUID}");
+                }
+                else
+                {
+                    m_Gradient = AssetDatabase.LoadAssetAtPath<Texture2D>(gradientPath);
+                    if (m_Gradient == null)
+                    {
+                        Debug.LogError($"DebugMicrotriangles: default heatmap gradient guid does not belong to a texture! GUID: {EDITOR_defaultHeatmapGUID}");
+                    }
+                    else
+                    {
+                        EditorUtility.SetDirty(this);
+                        AssetDatabase.SaveAssetIfDirty(this);
+                    }
+                }
+            }
+            #endif
         }
 
         
@@ -192,6 +235,7 @@ namespace SLZ.SLZEditorTools
             if (active && MicrotriangleShader)
             {
                 EnsureBuffersExist();
+                Gradient = m_Gradient;
                 renderer.EnqueuePass(m_ScriptablePass);
             }
         }

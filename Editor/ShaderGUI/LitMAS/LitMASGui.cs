@@ -18,6 +18,8 @@ using UnityEditor.Search;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine.Experimental.GlobalIllumination;
+using UnityEngine.Experimental.Rendering;
+
 
 
 
@@ -293,6 +295,9 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
      
         HelpBox AdvancedModeWarning;
         bool hasHiddenProperties;
+
+        HelpBox basemapAlphaWarning;
+        bool hasBasemapAlpha;
         
         SurfaceTypeField surfaceTypeField;
         RenderQueueDropdown renderQueue;
@@ -358,6 +363,8 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             AlphaClipWarning.style.display = DisplayStyle.None;
             DetailScaleWarning = new HelpBox("Detail Normal Scale is not 1", HelpBoxMessageType.Warning);
             DetailScaleWarning.style.display = DisplayStyle.None;
+            basemapAlphaWarning = new HelpBox("Layer 0 Base Map has an alpha channel. Height is no longer stored in the alpha channel, this should be removed from the texture to reduce memory usage and increase compression quality", HelpBoxMessageType.Error);
+            basemapAlphaWarning.style.display = DisplayStyle.None;
 
             #if MARROW_INTERNAL
             if (advancedMode)
@@ -372,6 +379,7 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             MainWindow.Add(AlphaClipWarning);
             MainWindow.Add(ZOffsetWarning);
             MainWindow.Add(DetailScaleWarning);
+            MainWindow.Add(basemapAlphaWarning);
 
             //----------------------------------------------------------------
             // Rendering Properties ------------------------------------------
@@ -737,6 +745,15 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 scrollView.style.marginTop = 8;
                 //scrollView.style.flexGrow = 1;
 
+                Texture2D layer0Basemap =  props[baseMapIdx].textureValue as Texture2D;
+
+                #if !UNITY_ANDROID && MARROW_INTERNAL
+                if (layer0Basemap && GraphicsFormatUtility.HasAlphaChannel(layer0Basemap.graphicsFormat))
+                {
+                    basemapAlphaWarning.style.display = DisplayStyle.Flex;
+                }
+                #endif
+
                 scrollView.Add(LayeredHeader());
                 hasCoreProperty = true;
                 Span<int> layerMapIdxs = stackalloc int[5];
@@ -747,6 +764,23 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
                 layerMapIdxs[4] = PropertyIdx(ref propTable, PName._BaseMap4);
                 VisualElement baseMaps = LayeredTextureField(ref layerMapIdxs, props, propIdx, "Base Maps", LitMASGui_Tooltips.BaseMap);
                 scrollView.Add(baseMaps);
+
+                #if !UNITY_ANDROID && MARROW_INTERNAL
+                TextureField baseMapField0 = (TextureField)materialFields[materialFields.Count - 5];
+                baseMapField0.texObjField.RegisterValueChangedCallback((ChangeEvent<Object> evt) => 
+                {
+                    Texture2D newTex = evt.newValue as Texture2D;
+                    if (newTex && GraphicsFormatUtility.HasAlphaChannel(newTex.graphicsFormat))
+                    {
+                        basemapAlphaWarning.style.display = DisplayStyle.Flex;
+                    }
+                    else
+                    {
+                        basemapAlphaWarning.style.display = DisplayStyle.None;
+                    }
+                } 
+                );
+                #endif
 
                 VisualElement ScaleOffsets = LayeredScaleOffsetField(ref layerMapIdxs, props, propIdx, "Scale Offsets", "");
 
