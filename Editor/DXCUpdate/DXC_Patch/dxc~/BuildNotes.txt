@@ -1,7 +1,7 @@
-DirectX Shader compiler release-1.8.2407 (8b0a41ba3612c15e8b7d5c84ba14a1cedd74badc)
-Built off of release-1.8.2407 commit 416fab6b5 (https://github.com/microsoft/DirectXShaderCompiler/commit/416fab6b5c4ba956a320d9131102304da995edfc).
+DirectX Shader compiler 1.9.0.5281 (54afd2c6a5f1a5bcbef66967515fa69f5a3650fd)
+Built off of main branch commit 54afd2c6a (https://github.com/microsoft/DirectXShaderCompiler/commit/54afd2c6a5f1a5bcbef66967515fa69f5a3650fd).
 This DXC was modified to force certain compile arguments. The shader model is always promoted to at least 6.5 since unity gatekeeps everything past 6.0 to couple of features it officially supports. The target vulkan version is also forced to 1.2 since unity only asks for 1.0.
-The SPIRV-Tools dependency was modified to undo some optimizations introduced since the DXC version Unity is currently using. These removed unused inputs from the shader, changing the interface in a way unity does not account for resulting in misalignment of the vertex data. Additionally, SPV_KHR_fragment_shading_rate was added to the whitelist for the aggressive dead code optimization pass to stop it from failing if that extension was enabled. Changes made are in the SPIRV-Tools-unityfix.patch patch file.
+The SPIRV-Tools dependency was modified to undo some optimizations introduced after the DXC version Unity is currently using. These removed unused interface variables from the shader, changing the interface in a way unity does not account for resulting in misalignment of the vertex data. Additionally, SPV_KHR_fragment_shading_rate was added to the whitelist for the aggressive dead code optimization pass to stop it from failing if that extension was enabled. Changes made are in the SPIRV-Tools-unityfix.patch patch file.
 
 
 If rebuilding this from source, apply DXC-unityfix.patch to the repo root and SPIRV-Tools-unityfix.patch to the SPIRV-Tools folder (from git terminal or bash: patch -p1 < DXC-unityfix.patch).If using visual studio, select the x64-clang-cl-Release config, disable the LLVM_ENABLE_WARNINGS and SPIRV_WERRROR cmake variables, and add this to the command line arguments:
@@ -12,6 +12,8 @@ Changes in VS 2022 17.10 to make mutex constructors constexpr causes a crash in 
 2024-10-4 Discovered crash on an assert in SPIRV-Tools when compiling with 16 bit types. Visual Studio cmake configs seem to be bugged where it undefines NDEBUG for LLVM, which propagates into SPIRV-Tools and makes it throw assertions in release builds. Using cmake directly to build the project seems to fix the issue
 
 2025-10-9 Attempting to build a year later, previous build instructions were insufficient. The project generation is the only part that must be done with command-line cmake. The actual build can be done by opening the generated "LLVM" solution file with VS and building that. If also building with cmake you need to add `-Wno-error` to the CMAKE_CXX_FLAGS. Something is force setting Werror when built by cmake but not when built with VS.
+
+2026-3-20 Merged from main updating to 1.9.0.5281. HLSL 2021 is now forced as Unity 6 specifies a lower HLSL version.
 
 Other requirements for building the solution:
 1) It has to be done from a powershell terminal that has previously run vcvarsall.bat with the x86_64 option. Don't use the powershell from within VS or the "Developer Powershell" shortcut, those seem to either not set the target architecture or set it to the wrong value somehow. 

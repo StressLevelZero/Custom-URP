@@ -42,12 +42,14 @@ namespace SLZ.SLZEditorTools
         VisualElement m_DistanceHorizBox;
         FloatField m_DistanceValueField;
         Button m_GetCamDistButton;
+        ObjectField m_Gradient;
 
         Toggle m_WireframeToggle;
 
-
         public override VisualElement CreatePanelContent()
         {
+            
+
             DebugMircotriangles.active = true;
 
             VisualElement m_RootPanel = new VisualElement();
@@ -132,6 +134,25 @@ namespace SLZ.SLZEditorTools
             m_DistanceHorizBox.Add(m_GetCamDistButton);
 
             m_ActiveBox.Add(m_DistanceHorizBox);
+
+            m_Gradient = new ObjectField();
+            m_Gradient.objectType = typeof(Texture2D);
+            m_Gradient.value = DebugMircotriangles.Gradient;
+            m_Gradient.RegisterValueChangedCallback((ChangeEvent<Object> evt) => {DebugMircotriangles.Gradient = evt.newValue as Texture2D; Debug.Log("Set gradient?"); });
+            
+            VisualElement background = m_Gradient.ElementAt(0);
+            VisualElement contents = background.ElementAt(0);
+            VisualElement oldlabel = contents.ElementAt(1);
+            oldlabel.style.display = DisplayStyle.None;
+            Image thumbnail = contents.ElementAt(0) as Image;
+            thumbnail.style.width = StyleKeyword.Auto;
+            thumbnail.style.height = 16;
+            thumbnail.style.maxWidth = StyleKeyword.Auto;
+            thumbnail.style.maxHeight = StyleKeyword.Auto;
+            thumbnail.style.flexGrow = 1.0f;
+            thumbnail.scaleMode = ScaleMode.StretchToFill;
+            
+            m_ActiveBox.Add(m_Gradient);
 
             m_RootPanel.Add(activeToggle);
             m_RootPanel.Add(m_ActiveBox);

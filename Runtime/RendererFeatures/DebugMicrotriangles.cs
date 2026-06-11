@@ -42,7 +42,7 @@ namespace SLZ.SLZEditorTools
         public Shader MicrotriangleShader;
         [Reload("Textures/HeatmapGradient0.png")]
         public Texture2D m_Gradient;
-
+        
 #if UNITY_EDITOR
         const string EDITOR_defaultHeatmapGUID = "aac25ef0107c1c34aa67a2235978803c";
 #endif
@@ -57,6 +57,19 @@ namespace SLZ.SLZEditorTools
         DrawDebugPass m_ScriptablePass;
 
         public static bool active = false;
+
+        LocalKeyword m_FallbackGradientKw;
+        LocalKeyword FallbackGradientKw
+        {
+            get
+            {
+                if (!m_FallbackGradientKw.isValid)
+                {
+                    m_FallbackGradientKw = new LocalKeyword(MicroTriMat.shader, "_MICROTRI_USE_BUILTIN_GRADIENT");
+                }
+                return m_FallbackGradientKw;
+            }
+        }
 
         const int MicroTriVisParamsSize = 32;
         [StructLayout(LayoutKind.Explicit, Size = MicroTriVisParamsSize)]
@@ -84,7 +97,7 @@ namespace SLZ.SLZEditorTools
         {
             _FIXED_SCREEN_DISTANCE = GlobalKeyword.Create("_FIXED_SCREEN_DISTANCE");
             _MICRO_TRI_DISPLAY_AS_WIREFRAME = GlobalKeyword.Create("_MICRO_TRI_DISPLAY_AS_WIREFRAME");
-            Gradient = m_Gradient;
+
 
             m_ScriptablePass = new DrawDebugPass("Debug Microtriangles", false, RenderPassEvent.AfterRenderingTransparents);
             m_ScriptablePass.renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
@@ -110,6 +123,11 @@ namespace SLZ.SLZEditorTools
                         AssetDatabase.SaveAssetIfDirty(this);
                     }
                 }
+            }
+
+            if (s_Gradient == null && m_Gradient != null)
+            {
+                s_Gradient = m_Gradient;
             }
             #endif
         }
@@ -235,7 +253,8 @@ namespace SLZ.SLZEditorTools
             if (active && MicrotriangleShader)
             {
                 EnsureBuffersExist();
-                Gradient = m_Gradient;
+                MicroTriMat.SetTexture(ID_Gradient, s_Gradient);
+                MicroTriMat.SetKeyword(FallbackGradientKw, s_Gradient == null);
                 renderer.EnqueuePass(m_ScriptablePass);
             }
         }

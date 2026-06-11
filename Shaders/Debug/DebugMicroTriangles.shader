@@ -35,6 +35,7 @@ Shader "SLZ/Debug/Show Micro Triangles"
 
             #pragma multi_compile _ _FIXED_SCREEN_DISTANCE
             #pragma multi_compile _ _MICRO_TRI_DISPLAY_AS_WIREFRAME
+            #pragma multi_compile _ _MICROTRI_USE_BUILTIN_GRADIENT
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -224,14 +225,17 @@ Shader "SLZ/Debug/Show Micro Triangles"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float lerpFactor = saturate((i.triSize - _MaxThreshold) / (_MinThreshold - _MaxThreshold));
-                /*
-                float hue = lerp(0.5,0,(lerpFactor * lerpFactor));
-                float3 color = HsvToRgb(float3(hue, 1, 1));
-                float alpha = (lerpFactor * lerpFactor * lerpFactor);
-                */
-                float4 lut = SAMPLE_TEXTURE2D_LOD(_Gradient, sampler_LinearClamp, float2(lerpFactor, 0), 0);
-                float3 color = lut.rgb;
-                float alpha = lut.a;
+
+                #if defined(_MICROTRI_USE_BUILTIN_GRADIENT)
+                    float hue = lerp(0.5,0,(lerpFactor * lerpFactor));
+                    float3 color = HsvToRgb(float3(hue, 1, 1));
+                    float alpha = (lerpFactor * lerpFactor * lerpFactor);
+                #else
+                    float4 lut = SAMPLE_TEXTURE2D_LOD(_Gradient, sampler_LinearClamp, float2(lerpFactor, 0), 0);
+                    float3 color = lut.rgb;
+                    float alpha = lut.a;
+                #endif
+
                 float blink = i.triSize < _MinThreshold ? (0.75 + 0.3 * sin(6 * _Time[2])) : 1;
                     //lerp(1, (0.75 + 0.3 * sin(6 * _Time[2])), lerpFactor * lerpFactor); 
                 //color *= 0.5*alpha;
