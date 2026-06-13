@@ -103,8 +103,8 @@ TEXTURE2D(_SplatMap);
 SAMPLER(sampler_SplatMap);
 
 #if defined(SHADER_API_MOBILE)
-#define SAMPLER_SPLAT sampler_LinearRepeat
-#define SAMPLER_CHEAP sampler_TrilinearRepeat
+#define SAMPLER_SPLAT sampler_SplatMap
+#define SAMPLER_CHEAP sampler_BaseMap
 #else
 #define SAMPLER_SPLAT sampler_SplatMap
 #define SAMPLER_CHEAP sampler_BaseMap
@@ -405,7 +405,6 @@ if (layerWeights.w > 0)
 	{
 		half3 layer4albedo = (half3)0;
 		SAMPLE_LAYERED(layer4albedo, rgb, _BaseMap, SAMPLER_CHEAP, layer4uv, layer4idx, layer4dx, layer4dy)
-		layer4albedo *= _BaseColor;
 		albedoSum += layer4albedo * layer4Height;
 
 		half4 layer4aysx = (half4)0;
