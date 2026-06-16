@@ -15,7 +15,9 @@ namespace UnityEngine.Rendering.Universal.Internal
         private static readonly ShaderTagId k_ShaderTagId = new ShaderTagId("DepthOnly");
 
         private RTHandle destination { get; set; }
+        #pragma warning disable 0414
         private GraphicsFormat depthStencilFormat;
+        #pragma warning restore 0414
         internal ShaderTagId shaderTagId { get; set; } = k_ShaderTagId;
 
         private PassData m_PassData;
@@ -136,7 +138,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         internal void Render(RenderGraph renderGraph, out TextureHandle cameraDepthTexture, ref RenderingData renderingData)
         {
             const GraphicsFormat k_DepthStencilFormat = UniversalRenderer.k_DepthStencilFormat;
-            const int k_DepthBufferBits = UniversalRenderer.k_DepthBufferBits;
+            //const int k_DepthBufferBits = UniversalRenderer.k_DepthBufferBits;
 
             using (var builder = renderGraph.AddRenderPass<PassData>("DepthOnly Prepass", out var passData, base.profilingSampler))
             {

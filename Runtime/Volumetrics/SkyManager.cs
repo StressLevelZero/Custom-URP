@@ -13,7 +13,6 @@ using Object = UnityEngine.Object;
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
-using UnityEngine.Profiling;
 
 [InitializeOnLoad] 
 #endif
@@ -36,7 +35,7 @@ public static class SkyManager
     private static readonly int ID_SHMonoCoefficients = Shader.PropertyToID("_SHMonoCoefficients");
     
     public static KdTree<MonoSH> tree; 
-    private static bool _kdtreevalid = false;
+    //private static bool _kdtreevalid = false;
     private static SkyOcclusionData _skyOcclusionData;
     private static float[] _skyMonoSHCoefficients = new float[9];
     
@@ -759,4 +758,12 @@ public static class SkyManager
 
         return (t, index1, index2);
     }
+
+    #if UNITY_EDITOR
+    [InitializeOnLoadMethod]
+    static void EditorRegisterCleanup()
+    {
+        AssemblyReloadEvents.beforeAssemblyReload += ReleaseSkyManagerRuntimeResources;
+    }
+    #endif
 }

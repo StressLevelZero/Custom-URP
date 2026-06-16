@@ -27,9 +27,9 @@ namespace UnityEngine.Rendering.Universal
         private float[] BlueNoiseDim = new float[8]; // width, height, depth, current slice index 
         private bool hasSetBNTextures;
 #if UNITY_EDITOR
-        private static long framecount = 0;
-        private static int unityFrameCount = 0;
-        private static double timeSinceStartup = 0.0;
+        //private static long framecount = 0;
+        //private static int unityFrameCount = 0;
+        //private static double timeSinceStartup = 0.0;
 #endif
         //private int HiZDimBufferID = Shader.PropertyToID("HiZDimBuffer");
         public static readonly int HiZMipNumID = Shader.PropertyToID("_HiZHighestMip");

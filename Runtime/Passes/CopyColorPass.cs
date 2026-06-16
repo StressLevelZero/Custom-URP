@@ -471,10 +471,10 @@ namespace UnityEngine.Rendering.Universal.Internal
 				{
 					destination = renderGraph.ImportTexture(m_PermanentDest.GetRTHandle(ref descriptor));
 				}
-				else
-				{
-					destination = UniversalRenderer.CreateRenderGraphTexture(renderGraph, descriptor, "_CameraOpaqueTexture", true, filterMode);
-				}
+				//else
+				//{
+				//	destination = UniversalRenderer.CreateRenderGraphTexture(renderGraph, descriptor, "_CameraOpaqueTexture", true, filterMode);
+				//}
 				passData.destination = builder.UseColorBuffer(destination, 0);
 				passData.source = builder.ReadTexture(source);
 				passData.cmd = renderingData.commandBuffer;

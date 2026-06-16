@@ -132,7 +132,11 @@ namespace SLZ.SLZEditorTools
             #endif
         }
 
-        
+        public void OnDestroy()
+        {
+            if (m_MicroTriVisParamsBuffer != null) m_MicroTriVisParamsBuffer.Dispose();
+            if (m_MicroTriVisParams.IsCreated) m_MicroTriVisParams.Dispose();
+        }
 
         protected override void Dispose(bool disposing)
         {

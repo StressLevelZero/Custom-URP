@@ -238,7 +238,7 @@ namespace UnityEngine.Rendering.Universal.Internal
         internal void Render(RenderGraph renderGraph, out TextureHandle cameraNormalsTexture, out TextureHandle cameraDepthTexture, ref RenderingData renderingData)
         {
             const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D32_SFloat_S8_UInt;
-            const int k_DepthBufferBits = 32;
+            //const int k_DepthBufferBits = 32;
 
             using (var builder = renderGraph.AddRenderPass<PassData>("DepthNormals Prepass", out var passData, base.profilingSampler))
             {

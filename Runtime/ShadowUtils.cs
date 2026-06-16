@@ -580,6 +580,7 @@ namespace UnityEngine.Rendering.Universal
 
         internal static bool SupportsPerLightSoftShadowQuality()
         {
+            /*
             #if ENABLE_VR && ENABLE_VR_MODULE
             #if PLATFORM_WINRT || PLATFORM_ANDROID
                 // We are using static branches on Quest2 + HL for performance reasons
@@ -587,6 +588,13 @@ namespace UnityEngine.Rendering.Universal
             #endif
             #endif
             return true;
+            */
+            #if ENABLE_VR && ENABLE_VR_MODULE && (PLATFORM_WINRT || PLATFORM_ANDROID)
+                // We are using static branches on Quest2 + HL for performance reasons
+                return !PlatformAutoDetect.isXRMobile;
+            #else
+            return true;
+            #endif
         }
 
         internal static void SetPerLightSoftShadowKeyword(CommandBuffer cmd, bool hasSoftShadows)

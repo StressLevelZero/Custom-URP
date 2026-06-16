@@ -33,7 +33,9 @@ public class LocalVolumetricFog : MonoBehaviour
     
     // Optional one-time migration from your old field.
     [FormerlySerializedAs("ViewDistance")]
+    #pragma warning disable 0414
     [SerializeField, HideInInspector] private float _legacyViewDistance = 1f;
+    #pragma warning restore 0414
     [SerializeField, HideInInspector] private bool _densityMigrated;
     // [Tooltip("Density of the volume. How far you can see through it. The lower the number, the denser it is")]
     // [Range(0.01f,100)] public float ViewDistance = 1f;

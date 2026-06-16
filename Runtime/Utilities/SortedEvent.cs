@@ -53,7 +53,7 @@ namespace SLZ
                 Delegate[] delegates = pair.Value.GetInvocationList();
                 int numDelegates = delegates.Length;
                 int numValidDelegates = delegates.Length;
-                int numRemoved = 0;
+
                 List<Action> removeAction = new List<Action>();
                 for (int dIdx = numValidDelegates - 1; dIdx >= 0; dIdx--)
                 {

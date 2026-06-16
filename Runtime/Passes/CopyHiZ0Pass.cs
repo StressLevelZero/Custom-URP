@@ -43,7 +43,9 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         int m_SampleOffsetShaderHandle;
         Material m_SamplingMaterial;
+        #pragma warning disable 0414
         Downsampling m_DownsamplingMethod;
+        #pragma warning restore 0414
         Material m_CopyColorMaterial;
         ComputeShader m_ColorPyramidCompute;
         public bool m_RequiresMips;
