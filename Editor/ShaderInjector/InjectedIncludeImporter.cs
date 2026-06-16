@@ -58,7 +58,7 @@ namespace SLZ.SLZEditorTools
         [SerializeField] SerializedProperty propBase;
         [SerializeField] SerializedProperty propInjections;
 
-        [SerializeField] protected override bool needsApplyRevert => true;
+        protected override bool needsApplyRevert => true;
         [SerializeField] private bool isModified = false; 
 
         [SerializeField] List<System.Tuple<IBindable, string>> fields = new List<System.Tuple<IBindable, string>>(8);
