@@ -11,6 +11,7 @@ namespace SLZ.DXCUpdater
     public class DXCWarningWindow : EditorWindow
     {
         SerializedObject thisSerialized;
+        public static bool updateOptional = false;
         public static string unityDXCInfo;
         public static string slzDXCInfo;
         public static string unityDXCPath;
@@ -68,13 +69,14 @@ namespace SLZ.DXCUpdater
         {
             thisSerialized = new SerializedObject(this);
 
-            if (!string.IsNullOrEmpty(unityDXCInfo))
+            //if (!string.IsNullOrEmpty(unityDXCInfo))
             {
-                n_unityDXCInfo = unityDXCInfo;
-                n_slzDXCInfo = slzDXCInfo;
-                n_unityDXCPath = unityDXCPath;
-                n_slzDXCPath = slzDXCPath;
-                thisSerialized.Update();
+                bool needsUpdate = false;
+                if (!string.IsNullOrEmpty(unityDXCInfo)) { n_unityDXCInfo = unityDXCInfo; needsUpdate = true; }  
+                if (!string.IsNullOrEmpty(slzDXCInfo  )) { n_slzDXCInfo   = slzDXCInfo;   needsUpdate = true; }
+                if (!string.IsNullOrEmpty(unityDXCPath)) { n_unityDXCPath = unityDXCPath; needsUpdate = true; }  
+                if (!string.IsNullOrEmpty(slzDXCPath  )) { n_slzDXCPath   = slzDXCPath;   needsUpdate = true; }
+                if (needsUpdate) thisSerialized.Update();
             }
 
             rootVisualElement.style.paddingTop    = 6;
@@ -87,24 +89,47 @@ namespace SLZ.DXCUpdater
             Label mainText = new Label();
             //label.style.flexWrap = Wrap.Wrap;
             mainText.style.whiteSpace = WhiteSpace.Normal;
-            mainText.text =
-                        $"The DirectX Shader Compiler (DXC) in the Unity Editor installation is too old to support Quest.\n\nCurrent version is {n_unityDXCInfo}, " +
+            if (!updateOptional)
+            {
+                mainText.text =
+                        $"The DirectX Shader Compiler (DXC) in the Unity Editor installation is too old to support Quest.\n\nInstalled version is {n_unityDXCInfo}, " +
                         $"version 1.7 or above is needed to support multiview stereo. The legacy compiler will be used instead. Shaders may be less efficient," +
                         $" compilation times may be longer, and some advanced features will be unavailable.\n\n" +
                         "Unity uses the DXC shared library at:";// +
+            }
+            else
+            {
+                mainText.text =
+                        $"A more up to date fork of the DirectX Shader Compiler is included with this render pipeline which allows the use of HLSL 2021 and shader model 6.5 features.\n\nInstalled version is {n_unityDXCInfo} " +
+                        "located at:";
+            }
             mainRoot.Add(mainText);
 
             FileHyperLink toolsDirHotlink = new FileHyperLink(n_unityDXCPath);
             mainRoot.Add(toolsDirHotlink);
 
             Label mainText2 = new Label();
-            mainText2.text = $"\nA unity-compatible fork of DXC {n_slzDXCInfo} is included at:";
+            if (!updateOptional)
+            {
+                mainText2.text = $"\nA unity-compatible fork of DXC {n_slzDXCInfo} is included at:";
+            }
+            else
+            {
+                mainText2.text = $"\nThe included DXC fork of {n_slzDXCInfo} is included at:";
+            }
             mainText2.style.whiteSpace = WhiteSpace.Normal;
             mainRoot.Add(mainText2);
 
             FileHyperLink slzDxcHotlink = new FileHyperLink(n_slzDXCPath);
 
             mainRoot.Add(slzDxcHotlink);
+
+            if (!updateOptional)
+            {
+            Label mainText3 = new Label();
+            mainText3.text = "This fork has been modified to force HLSL 2021 and a minimum of Shader Model 6.5";
+            mainRoot.Add(mainText3);
+            }
 
             VisualElement buttonRoot = new VisualElement();
             buttonRoot.style.minHeight = 24;

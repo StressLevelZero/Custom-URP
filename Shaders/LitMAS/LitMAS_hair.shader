@@ -153,7 +153,7 @@ ENDHLSL
             Tags{ "LightMode" = "BakedRaytrace" }
             HLSLPROGRAM
 
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/BakedRayTrace.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/BakedRTBase.hlsl"
 
             ENDHLSL
         }

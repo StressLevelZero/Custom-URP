@@ -1,5 +1,5 @@
-//#define SIMULATE_ADMIN_NECESSARY
-
+//#define SIMULATE_EXTERNAL
+//#define SIMULATE_OLD_DXC
 
 using SLZ.SLZEditorTools;
 using System;
@@ -20,7 +20,7 @@ namespace SLZ.DXCUpdater
     {
 
 
-#if !SLZ_RP_INTERNAL || SIMULATE_EXTERNAL
+#if (!SLZ_RP_INTERNAL && !MARROW_INTERNAL) || SIMULATE_EXTERNAL
 
         [InitializeOnLoadMethod()]
         static void CheckDXC()
@@ -68,6 +68,7 @@ namespace SLZ.DXCUpdater
 #endif
         static void CheckDXCExternal()
         {
+            #if !SIMULATE_OLD_DXC
             EditorApplication.update -= CheckDXCExternal;
             if (EditorPrefs.GetBool("SkipDXCUpdate", false))
             {
@@ -76,6 +77,7 @@ namespace SLZ.DXCUpdater
                 SetDXCIncludeState.UpdateDXCIncludeState();
                 return;
             }
+            #endif
             
             GetDXCVersions(SetDXCIncludeState.unityDxcPath, SetDXCIncludeState.slzDxcPath, out bool unityDXCExists, out FileVersionInfo installDXCVersion, out bool localDXCExists, out FileVersionInfo localDXCVersion);
 
@@ -83,7 +85,11 @@ namespace SLZ.DXCUpdater
 
             int defaultNewDXCVersionMajor = 1;
             int defaultNewDXCVersionMinor = 7;
-            bool needsUpdate = !unityDXCExists || !localDXCExists || (installDXCVersion.FileMajorPart < defaultNewDXCVersionMajor || installDXCVersion.FileMinorPart < defaultNewDXCVersionMinor);
+            bool needsUpdate = !unityDXCExists || !localDXCExists || (installDXCVersion.FileMajorPart <= defaultNewDXCVersionMajor && installDXCVersion.FileMinorPart < defaultNewDXCVersionMinor);
+            bool optionalUpdate = (installDXCVersion.FileMajorPart <= localDXCVersion.FileMajorPart && installDXCVersion.FileMinorPart < localDXCVersion.FileMinorPart);
+            #if SIMULATE_OLD_DXC
+            needsUpdate = false;
+            #endif
 
             DXCWarningWindow[] warnWindows = Resources.FindObjectsOfTypeAll<DXCWarningWindow>();
             foreach (var warnWindow in warnWindows)
@@ -93,20 +99,21 @@ namespace SLZ.DXCUpdater
             }
 
             // for legal reasons, we can't auto update the compiler on end-user's machines. Auto-updater moved to internal package
-            if (needsUpdate)
+            if (needsUpdate || optionalUpdate)
             {
                 EditorPrefs.DeleteKey(typeof(DXCWarningWindow).ToString() + "x");
                 EditorPrefs.DeleteKey(typeof(DXCWarningWindow).ToString() + "y");
                 EditorPrefs.SetFloat(typeof(DXCWarningWindow).ToString() + "w", 800);
                 EditorPrefs.SetFloat(typeof(DXCWarningWindow).ToString() + "h", 240);
-                DXCWarningWindow.unityDXCInfo = FileVersionToStr(installDXCVersion);
-                DXCWarningWindow.slzDXCInfo = FileVersionToStr(localDXCVersion);
-                DXCWarningWindow.unityDxcPath = SetDXCIncludeState.unityDxcPath;
+                DXCWarningWindow.unityDXCInfo = $"{installDXCVersion.FileMajorPart}.{installDXCVersion.FileMinorPart}.{installDXCVersion.FileBuildPart}.{installDXCVersion.FilePrivatePart}";
+                DXCWarningWindow.slzDXCInfo =   $"{localDXCVersion.FileMajorPart}.{localDXCVersion.FileMinorPart}.{localDXCVersion.FileBuildPart}.{localDXCVersion.FilePrivatePart}";
+                DXCWarningWindow.unityDXCPath = SetDXCIncludeState.unityDxcPath;
                 DXCWarningWindow.slzDXCPath = SetDXCIncludeState.slzDxcPath;
+                DXCWarningWindow.updateOptional = !needsUpdate;
                 DXCWarningWindow warnWindow = EditorWindow.GetWindow<DXCWarningWindow>( true, "DXC Shader Compiler Out Of Date", true);
                 DXCWarningWindow.unityDXCInfo  = null;
                 DXCWarningWindow.slzDXCInfo    = null;
-                DXCWarningWindow.unityDxcPath  = null;
+                DXCWarningWindow.unityDXCPath  = null;
                 DXCWarningWindow.slzDXCPath    = null;
                 //warnWindow.position = ContainerWindowBridge.ParentBorderSize(warnWindow, new Rect(new Vector2(0,0), new Vector2(800, 240)));
                 warnWindow.ShowUtility();
@@ -121,9 +128,11 @@ namespace SLZ.DXCUpdater
                     UnityEngine.Object.DestroyImmediate(window);
                 }
             }
+            #if !SIMULATE_OLD_DXC
             URPConfigManager.Initialize();
             SetDXCIncludeState.UpdateDXCIncludeState(installDXCVersion);
             SessionState.SetBool("DXCChecked", true);
+            #endif
         }
 
 #endif // !SLZ_RP_INTERNAL || SIMULATE_EXTERNAL

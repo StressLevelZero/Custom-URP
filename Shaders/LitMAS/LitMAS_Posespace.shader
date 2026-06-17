@@ -179,6 +179,7 @@ ENDHLSL
 
 HLSLINCLUDE
 #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PlatformCompiler.hlsl"
+#define CBUFFER_PATH "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/ImpactsCBuffer.hlsl"
 ENDHLSL
 
         Pass
@@ -270,6 +271,7 @@ ENDHLSL
 			ENDHLSL
 		}
 
+        /*
         Pass
 		{
 			
@@ -277,11 +279,12 @@ ENDHLSL
             Tags{ "LightMode" = "BakedRaytrace" }
 			HLSLPROGRAM
             #pragma exclude_renderers vulkan
-
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/BakedRayTrace.hlsl"
+            //#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/PosespaceImpacts.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/BakedRTBase.hlsl"
 
             ENDHLSL
         }
+        */
     }
 	CustomEditor "LitMASGUI"
     //CustomEditor "UnityEditor.ShaderGraphLitGUI"
