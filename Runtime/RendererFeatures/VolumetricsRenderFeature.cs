@@ -47,7 +47,7 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
     VolumetricPass m_Pass;
     ClearVolumetricGlobalsPass m_ClearPass;
     
-    readonly Dictionary<int, CameraResources> m_Resources = new();
+    readonly Dictionary<Camera, CameraResources> m_Resources = new();
 
     public override void Create()
     {
@@ -60,6 +60,8 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         {
             renderPassEvent = settings.passEvent
         };
+
+        RenderPipelineManager.beginContextRendering += GarbageCollectPeriodic;
     }
     
 
@@ -121,11 +123,11 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
 
     void ReleaseForCamera(Camera cam)
     {
-        int id = cam.GetInstanceID();
-        if (m_Resources.TryGetValue(id, out var r))
+        //int id = cam.GetInstanceID();
+        if (m_Resources.TryGetValue(cam, out var r))
         {
             r.Dispose();
-            m_Resources.Remove(id);
+            m_Resources.Remove(cam);
         }
     }
     protected override void Dispose(bool disposing)
@@ -133,15 +135,88 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         if (!disposing) return;
         foreach (var kv in m_Resources) kv.Value.Dispose();
         m_Resources.Clear();
+        RenderPipelineManager.beginContextRendering -= GarbageCollectPeriodic;
+    }
+
+    Camera[] garbageCollectArray = new Camera[16];
+    static readonly Unity.Profiling.ProfilerMarker s_GCMarker = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.GarbageCollectResources");
+    public void GarbageCollectResources()
+    {
+        using (s_GCMarker.Auto())
+        {
+            garbageCollectArray ??= new Camera[16];
+            int gcIdx = 0;
+            int gcArrayLength = garbageCollectArray.Length;
+
+            // Only allocate a list if we have more than 16 cameras to remove, otherwise just use the fixed length array
+            bool needsListAlloc = false;
+            List<Camera> garbageCollectList = null;
+
+            // We can't remove items
+            var enumerator = m_Resources.GetEnumerator();
+            while (enumerator.MoveNext()) // foreach creates garbage, use enumerator directly
+            {
+                KeyValuePair<Camera, CameraResources> kvp = enumerator.Current;
+#if UNITY_EDITOR
+                if (kvp.Key == null)
+#else   
+                if (kvp.Key == null || kvp.Key.isActiveAndEnabled == false)
+#endif  
+                {
+                    kvp.Value.Dispose();
+                    if (gcIdx < gcArrayLength)
+                    {
+                        garbageCollectArray[gcIdx] = kvp.Key;
+                        gcIdx++;
+                    }
+                    else if (needsListAlloc)
+                    {
+                        garbageCollectList.Add(kvp.Key);
+                    }
+                    else
+                    {
+                        needsListAlloc = true;
+                        garbageCollectList = new List<Camera>(gcArrayLength);
+                        garbageCollectList.Add(kvp.Key);
+                    }
+                }
+            }
+            for (int i = 0; i < gcIdx; i++)
+            {
+                m_Resources.Remove(garbageCollectArray[i]);
+            }
+            if (garbageCollectList != null)
+            {
+                int numList = garbageCollectList.Count;
+                for (int i = 0; i < numList; i++)
+                {
+                     m_Resources.Remove(garbageCollectList[i]);
+                }
+            }
+            //Debug.Log($"Removed {gcIdx + (garbageCollectList == null ? 0 : garbageCollectList.Count)} cameras");
+        }
+    }
+
+    int frameCount = 0;
+    const int gcTimerCount = 900;
+    void GarbageCollectPeriodic(ScriptableRenderContext ctx, List<Camera> cameras)
+    {
+        frameCount++;
+        if (frameCount > gcTimerCount)
+        {
+            //Debug.Log("Garbage Collecting volumes...");
+            frameCount = 0;
+            GarbageCollectResources();
+        }
     }
 
     CameraResources GetOrCreate(Camera cam)
     {
-        int id = cam.GetInstanceID();
-        if (!m_Resources.TryGetValue(id, out var r))
+        //int id = cam.GetInstanceID();
+        if (!m_Resources.TryGetValue(cam, out var r))
         {
             r = new CameraResources();
-            m_Resources.Add(id, r);
+            m_Resources.Add(cam, r);
         }
         return r;
     }
