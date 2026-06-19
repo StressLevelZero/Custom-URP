@@ -554,6 +554,13 @@ namespace UnityEngine.Rendering.Universal
             m_RendererIndex = index;
         }
 
+        /// SLZ MODIFIED - Add get method for the renderer index
+        public int GetRenderer()
+        {
+            return m_RendererIndex;
+        }
+        /// END SLZ MODIFIED
+
         /// <summary>
         /// Returns the selected scene-layers affecting this camera.
         /// </summary>

@@ -121,7 +121,7 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         return cd.cameraType == CameraType.Game || cam.cameraType == CameraType.Game;
     }
 
-    void ReleaseForCamera(Camera cam)
+    public void ReleaseForCamera(Camera cam)
     {
         //int id = cam.GetInstanceID();
         if (m_Resources.TryGetValue(cam, out var r))
