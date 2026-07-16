@@ -9,6 +9,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
+using DefaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode;
 
 public static class EnvironmentReflectionSanitizer
 {

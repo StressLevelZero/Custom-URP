@@ -75,7 +75,7 @@ namespace SLZ.Bonelab
 		public string inputFileDir;
 		public string[] injectionDirs;
 		public Dictionary<string, int> TagIndex;
-		public List<List<Tuple<int, string>>> injectionContent;
+		public List<List<System.Tuple<int, string>>> injectionContent;
 		public Dictionary<int, int> texcoordCounter;
 		public string texcoord = "	{0} {1} : TEXCOORD{2};\n";
 
@@ -98,7 +98,7 @@ namespace SLZ.Bonelab
 		public void CreateShaderAndSaveToDisk()
 		{
 			TagIndex = new Dictionary<string, int>();
-			injectionContent = new List<List<Tuple<int, string>>>();
+			injectionContent = new List<List<System.Tuple<int, string>>>();
 			texcoordCounter = new Dictionary<int, int>();
 			foreach (string injDir in injectionDirs)
 			{
@@ -114,7 +114,7 @@ namespace SLZ.Bonelab
 		public string CreateShader()
 		{
 			TagIndex = new Dictionary<string, int>();
-			injectionContent = new List<List<Tuple<int, string>>>();
+			injectionContent = new List<List<System.Tuple<int, string>>>();
 			texcoordCounter = new Dictionary<int, int>();
 			foreach (string injDir in injectionDirs)
 			{
@@ -181,10 +181,10 @@ namespace SLZ.Bonelab
 					if (!TagIndex.ContainsKey(tag))
 					{
 						TagIndex.Add(tag, TagIndex.Count);
-						injectionContent.Add(new List<Tuple<int, string>>());
+						injectionContent.Add(new List<System.Tuple<int, string>>());
 					}
 
-					Tuple<int, string> cmdTuple = new Tuple<int, string>(order, block);
+					System.Tuple<int, string> cmdTuple = new System.Tuple<int, string>(order, block);
 					injectionContent[TagIndex[tag]].Add(cmdTuple);
 				}
 			}
@@ -423,7 +423,7 @@ namespace SLZ.Bonelab
 			}
 
 			int tagIndex = TagIndex[tag];
-			foreach (Tuple<int, string> block in injectionContent[tagIndex])
+			foreach (System.Tuple<int, string> block in injectionContent[tagIndex])
 			{
 				outp.Append(block.Item2);
 			}
@@ -467,7 +467,7 @@ namespace SLZ.Bonelab
 							   
 								if (injectEnd.Equals(lineClipped.Substring(prefix.Length,injectEnd.Length)))
 								{
-									injectionContent[currentTagIndex].Add(new Tuple<int, string>(currentTagOrder, injectBlock.ToString()));
+									injectionContent[currentTagIndex].Add(new System.Tuple<int, string>(currentTagOrder, injectBlock.ToString()));
 									isReadingInjection = false;
 									injectBlock.Clear();
 								}
@@ -524,7 +524,7 @@ namespace SLZ.Bonelab
 					if (!TagIndex.ContainsKey(words[1]))
 					{
 						TagIndex.Add(words[1], TagIndex.Count);
-						injectionContent.Add(new List<Tuple<int, string>>());
+						injectionContent.Add(new List<System.Tuple<int, string>>());
 					}
 
 					currTagIndex = TagIndex[words[1]];

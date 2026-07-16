@@ -50,13 +50,16 @@ namespace UnityEditor.Rendering.Universal
             OnEnable();
         }
 
+        public static GUIContent styles_cameras = EditorGUIUtility.TrTextContent("Cameras", "The list of overlay cameras assigned to this camera.");
+        public static string styles_inspectorOverlayCameraText = L10n.Tr("Inspector Overlay Camera");
+
         void UpdateCameras()
         {
             m_SerializedCamera.Refresh();
 
             m_LayerList = new ReorderableList(m_SerializedCamera.serializedObject, m_SerializedCamera.cameras, true, true, true, true)
             {
-                drawHeaderCallback = rect => EditorGUI.LabelField(rect, Styles.cameras),
+                drawHeaderCallback = rect => EditorGUI.LabelField(rect, styles_cameras /*Styles.cameras // Does not exist in 6000.3.20*/),
                 drawElementCallback = DrawElementCallback,
                 onSelectCallback = SelectElement,
                 onRemoveCallback = RemoveCamera,
@@ -361,7 +364,7 @@ namespace UnityEditor.Rendering.Universal
 
             if (additionalCameraData.renderType == CameraRenderType.Base)
             {
-                Undo.RecordObject(additionalCameraData, Styles.inspectorOverlayCameraText);
+                Undo.RecordObject(additionalCameraData, styles_inspectorOverlayCameraText);
                 additionalCameraData.renderType = CameraRenderType.Overlay;
                 EditorUtility.SetDirty(additionalCameraData);
             }
@@ -373,7 +376,7 @@ namespace UnityEditor.Rendering.Universal
                 return;
 
             serializedCamera.Update();
-            Undo.RecordObject(camera, Styles.inspectorOverlayCameraText);
+            Undo.RecordObject(camera, styles_inspectorOverlayCameraText);
 
             bool isChanged = false;
 
