@@ -414,11 +414,11 @@ namespace UnityEngine.Rendering.Universal
 
 
             if (camData.xrRendering && camData.xrUniversal != null && camData.xrUniversal.hasValidOcclusionMesh && camData.requiresOpaqueTexture)   
-                //if (true)
+            //if (true)
             {
                 bool xrOccMeshIsValid = (SLZGlobals.instance.VrOccDistanceTex.width == (camData.cameraTargetDescriptor.width / 4)) &&
                                         (SLZGlobals.instance.VrOccDistanceTex.height == (camData.cameraTargetDescriptor.height / 4));
-                if (!xrOccMeshIsValid)
+                if (!xrOccMeshIsValid || !SLZGlobals.instance.hasGeneratedVrOcDistTex)
                 {
                     passData.generateXrOcclusionMeshDistance = true;
 
@@ -496,6 +496,7 @@ namespace UnityEngine.Rendering.Universal
                     cmd.SetRenderTarget(data.xrOccDistanceTex, 0, CubemapFace.Unknown, -1);
 
                     Blitter.BlitCameraTexture(cmd, data.xrOccDistanceTex, data.xrOccDistanceTex, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, data.xrOccDistanceMat, 0);
+                    SLZGlobals.instance.hasGeneratedVrOcDistTex = true;
                     //data.xrPass.RenderOcclusionMesh(cmd, true, data.xrOccDistanceMat);
                 }
                 cmd.SetGlobalTexture(SLZGlobals.VrOccMeshDistanceID, data.xrOccDistanceTex);
