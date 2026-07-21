@@ -326,7 +326,12 @@ namespace UnityEngine.Rendering.Universal.Internal
 					samplingMaterial);
 				return;
 			}
-
+			
+			if (source == null || source.rt == null)
+			{
+				Debug.LogError("RTHandle source passed to CopyColorPass was NULL, skipping");
+				return;
+			}
 			// TODO RENDERGRAPH: cmd.Blit is not compatible with RG but RenderingUtils.Blits would still call into it in some cases
 			using (new ProfilingScope(cmd, ProfilingSampler.Get(URPProfileId.CopyColor)))
 			{
