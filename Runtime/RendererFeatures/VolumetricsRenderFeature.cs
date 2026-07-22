@@ -64,32 +64,51 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         RenderPipelineManager.beginContextRendering += GarbageCollectPeriodic;
     }
     
-
+    static readonly Unity.Profiling.ProfilerMarker s_AddRenderPassesMarker = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.AddRenderPasses");
+    static readonly Unity.Profiling.ProfilerMarker s_ARPNullCheckMarker = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.AddRenderPasses.InitNullChecks");
+    static readonly Unity.Profiling.ProfilerMarker s_ARPShouldRunForCamera = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.AddRenderPasses.ShouldRunForCamera");
+    static readonly Unity.Profiling.ProfilerMarker s_ARPNotRun = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.AddRenderPasses.NotShouldRun");
+    static readonly Unity.Profiling.ProfilerMarker s_ARPEnsureAllocated = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.AddRenderPasses.EnsureAllocated");
+    static readonly Unity.Profiling.ProfilerMarker s_ARPSetup = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.AddRenderPasses.Setup");
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        using (s_AddRenderPassesMarker.Auto())
+        {
+            Camera cam;
+            s_ARPNullCheckMarker.Begin();
         if (!SystemInfo.supportsComputeShaders) return;
 
         var s = settings;
         if (s.volumetricData == null) return;
         if (s.froxelFogCompute == null || s.froxelIntegrationCompute == null || s.clipmapCompute == null) return;
 
-        var cam = renderingData.cameraData.camera;
+        cam = renderingData.cameraData.camera;
         if (cam == null) return;
+            s_ARPNullCheckMarker.End();
 
+s_ARPShouldRunForCamera.Begin();
         bool shouldRun = ShouldRunForCamera(cam, ref renderingData, s);
+s_ARPShouldRunForCamera.End();
 
         if (!shouldRun)
         {
+            s_ARPNotRun.Begin();
             ReleaseForCamera(cam);
             renderer.EnqueuePass(m_ClearPass);
+            s_ARPNotRun.End();
             return;
         }
 
+        s_ARPEnsureAllocated.Begin();
         var res = GetOrCreate(cam);
         res.EnsureAllocated(s, cam, renderingData.cameraData.xrRendering);
+        s_ARPEnsureAllocated.End();
 
+        s_ARPSetup.Begin();
         m_Pass.Setup(cam, res);
+        s_ARPSetup.End();
         renderer.EnqueuePass(m_Pass);
+        }
     }
     
     static bool ShouldRunForCamera(Camera cam, ref RenderingData renderingData, Settings s)
@@ -276,8 +295,13 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         public float  panicPrevExtinction;
         public float  panicPrevStaticLightMul;
 
+    static readonly Unity.Profiling.ProfilerMarker s_EA1 = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.CameraResources.EnsureAllocated.1");
+    static readonly Unity.Profiling.ProfilerMarker s_EAFindKernels = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.CameraResources.EnsureAllocated.FindKernel");
+    static readonly Unity.Profiling.ProfilerMarker s_EA2 = new Unity.Profiling.ProfilerMarker("VolumetricsRenderFeature.CameraResources.EnsureAllocated.2");
+
        public void EnsureAllocated(Settings s, Camera cam, bool stereo)
         {
+            s_EA1.Begin();
             var vd = s.volumetricData;
 
             rVC.froxelWidth  = vd.FroxelWidthResolution;
@@ -294,9 +318,10 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
                 rVC.froxelDepth  = 256;
             }
         #endif
-
+            s_EAFindKernels.Begin();
             if (kScatter < 0) kScatter = s.froxelFogCompute.FindKernel("Scatter");
             if (kIntegrate < 0) kIntegrate = s.froxelIntegrationCompute.FindKernel("StepAdd");
+            s_EAFindKernels.End();
 
             int eyeCount = stereo ? 2 : 1;
             //rVC.eyeCount = eyeCount;
@@ -310,7 +335,8 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
             FilterMode integrationFilter = eyeCount == 2 ? FilterMode.Trilinear : FilterMode.Point;
             Ensure3DRT(ref integrate, integrateWidth, rVC.froxelHeight, rVC.froxelDepth,
                 GraphicsFormat.R16G16B16A16_SFloat, false, $"{cam.name}_Integrate", integrationFilter);
-
+s_EA1.End();
+s_EA2.Begin();
 
             s.froxelFogCompute.GetKernelThreadGroupSizes(kScatter, out uint sx, out uint sy, out uint sz);
             scatterGX = Mathf.CeilToInt(rVC.froxelWidth  / (float)sx);
@@ -345,7 +371,7 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
             // public float sliceDistributionUniformity;
             //
             // public bool foveationEnabled;
-
+s_EA2.End();
         }
 
         public void Dispose()
@@ -354,12 +380,15 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
             ReleaseRT(ref froxel[1]);
             ReleaseRT(ref integrate);
 
+            
             ReleaseCB(ref shaderGlobalsCB);
             ReleaseCB(ref scatterCB);
             ReleaseCB(ref stepAddCB);
 
             clipmaps?.Dispose();
             clipmaps = null;
+
+            Shader.SetGlobalConstantBuffer(VolumetricPass.ID_VolumetricsCB, (ComputeBuffer)null, 0, 0);
         }
 
         static void Ensure3DRT(ref RenderTexture rt, int w, int h, int d, GraphicsFormat fmt, bool useMips, string name, FilterMode filter)
@@ -518,8 +547,8 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         static readonly int ID_StereoEnabled           = Shader.PropertyToID("_StereoEnabled");
         static readonly int ID_StereoDisparityOverride = Shader.PropertyToID("_StereoDisparityOverride");
 
-        static readonly int ID_PerFrameCB                   = Shader.PropertyToID("PerFrameCB");
-        static readonly int ID_VolumetricsCB                = Shader.PropertyToID("VolumetricsCB");
+        internal static readonly int ID_PerFrameCB          = Shader.PropertyToID("PerFrameCB");
+        internal static readonly int ID_VolumetricsCB       = Shader.PropertyToID("VolumetricsCB");
 
         static readonly int ID_PreviousFrameMatrix          = Shader.PropertyToID("PreviousFrameMatrix");
 
@@ -915,9 +944,7 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
                 cmd.SetGlobalTexture(ID_VolumetricResult, m_Res.integrate); //Main integrated result 
                 cmd.SetGlobalTexture(ID_InLightingTexture, m_Res.froxel[cur]);   //Preintegration
 
-                // publish global constant buffer (optional, mirrors your old "VolumetricsCB" usage)
-                cmd.SetGlobalConstantBuffer(m_Res.shaderGlobalsCB, ID_VolumetricsCB, 0, m_Res.shaderGlobalsCB.stride);
-
+               
                 // update history for next frame
                 m_Res.previousFrameMatrix = projectionMatrix;
                 m_Res.previousCameraPos   = m_Cam.transform.position;
@@ -944,6 +971,9 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
                         0f)
                 };
                 m_Res.shaderGlobalsCB.SetData(m_Res.shaderGlobalsArr);
+
+                // publish global constant buffer (optional, mirrors your old "VolumetricsCB" usage)
+                cmd.SetGlobalConstantBuffer(m_Res.shaderGlobalsCB, ID_VolumetricsCB, 0, m_Res.shaderGlobalsCB.stride);
             }
 
             context.ExecuteCommandBuffer(cmd);
