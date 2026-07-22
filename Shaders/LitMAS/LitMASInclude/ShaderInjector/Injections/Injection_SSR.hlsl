@@ -18,6 +18,10 @@
 #if !defined(_SLZ_SSR_DISABLED) && !defined(SHADER_API_MOBILE)
     #define _SSR_ENABLED
 #endif
+
+#if defined(_SSR_ENABLED)
+    #define LITMAS_NEEDS_FRAG_SIZE
+#endif
 //#!INJECT_END
 
 //#!INJECT_BEGIN INCLUDES 0

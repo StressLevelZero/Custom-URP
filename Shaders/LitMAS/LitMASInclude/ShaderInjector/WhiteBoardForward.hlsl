@@ -175,14 +175,18 @@ struct FragOut
 
 FragOut frag(VertOut i 
     , bool frontFace : SV_IsFrontFace
+    #if defined(LITMAS_NEEDS_FRAG_SIZE)
     SLZ_DECLARE_FRAG_SIZE
+    #endif
 ) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(i);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
+    #if defined(LITMAS_NEEDS_FRAG_SIZE)
     RequestFragmentDensityEXT();
     SLZ_SETUP_FRAG_SIZE(i.vertex.xy);
+    #endif
 
     if (!frontFace)
     {
