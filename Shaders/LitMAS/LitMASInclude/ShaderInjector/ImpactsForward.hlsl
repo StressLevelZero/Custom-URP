@@ -66,7 +66,7 @@
 
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZVkExtensions.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Texture.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -78,6 +78,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
+
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
 
 // Begin Injection INCLUDES from Injection_DetailMap.hlsl ----------------------------------------------------------
@@ -235,15 +236,14 @@ struct FragOut
 
 FragOut frag(VertOut i 
     , bool frontFace : SV_IsFrontFace
-// Begin Injection FRAG_PARAMETERS from Injection_SSR.hlsl ----------------------------------------------------------
-#if defined(SLZ_VK_EXT_ENABLED) && defined(_SSR_ENABLED)
-SLZ_DECLARE_FRAG_SIZE
-#endif
-// End Injection FRAG_PARAMETERS from Injection_SSR.hlsl ----------------------------------------------------------
+    SLZ_DECLARE_FRAG_SIZE
 ) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(i);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+
+    RequestFragmentDensityEXT();
+    SLZ_SETUP_FRAG_SIZE(i.vertex.xy);
 
     if (!frontFace)
     {
@@ -387,13 +387,7 @@ SLZ_DECLARE_FRAG_SIZE
 // Begin Injection LIGHTING_CALC from Injection_SSR.hlsl ----------------------------------------------------------
     #if defined(_SSR_ENABLED)
         float2 noiseScreenCoords = i.vertex.xy;
-        #if defined(SLZ_VK_EXT_ENABLED)
-        RequestFragmentDensityEXT();
-        SLZ_SETUP_FRAG_SIZE
-        noiseScreenCoords = noiseScreenCoords / float2(SLZ_FRAG_SIZE);
-        #endif
-        //half4 noiseRGBA = GetScreenNoiseRGBASlice(fragData.screenUV, 0);
-        half4 noiseRGBA = SSRGetInterleavedGradientNoise(i.vertex.xy, _BlueNoise_Frame);
+        half4 noiseRGBA = SSRGetInterleavedGradientNoise(noiseScreenCoords, _BlueNoise_Frame);
 
         SSRExtraData ssrExtra;
         ssrExtra.meshNormal = UNPACK_NORMAL(i);

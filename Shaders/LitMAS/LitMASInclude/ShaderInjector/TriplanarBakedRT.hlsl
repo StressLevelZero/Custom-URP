@@ -48,6 +48,7 @@
 
 #pragma raytracing BakeHit
 
+
 #include "Packages/com.unity.render-pipelines.universal/Shaders/Volumetrics/BakedRaytraceParts.hlsl"
 
 

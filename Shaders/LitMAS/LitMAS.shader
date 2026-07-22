@@ -183,7 +183,33 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             HLSLPROGRAM
             #pragma only_renderers vulkan
             #pragma multi_compile _ _EMISSION_ON
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
+            #pragma use_dxc
+            #if !defined(SHADER_API_D3D11)
+            //#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/HLSL2021Support.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            #define SLZ_HLSL2021
+
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma shader_feature _DUMMY_VERT_FRAG
+
+            #if _DUMMY_VERT_FRAG
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitMAS/LitMASInclude/ShaderInjector/StandardBakedRT.hlsl"
+            #endif
+
+            void vert()
+            {
+                
+            }
+
+            void frag()
+            {
+                
+            }
+            #endif
+
 
             ENDHLSL
         }

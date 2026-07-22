@@ -16,7 +16,7 @@ CBUFFER_END
 #define _ScaledScreenParams _ScreenParams
 #endif
 
-#ifdef SLZ_VK_EXT_ENABLED
+#if defined(SLZ_VK_EXT_ENABLED)
     // when the fragment size is > 1, we need to divide by the fragment size and round up to get a whole number resolution 
     #define BLUENOISE_SCREEN_DIM ceil(_ScaledScreenParams.xy / (float2)SLZ_FRAG_SIZE )
 #else

@@ -79,6 +79,7 @@ half4 IGNVectorOffset(float2 pixCoord, int frameCount)
 
 half4 SSRGetInterleavedGradientNoise(float2 pixCoord, int frameCount)
 {
+    pixCoord /= (float2)SLZ_FRAG_SIZE; 
 	frameCount = unity_DeltaTime.w > half(59.0) ? (frameCount & 1) : 0;
     #if 1
 	return IGNVectorOffset(pixCoord, frameCount);
