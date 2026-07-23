@@ -25,9 +25,11 @@ const  float  _FoveaStrength;   // a >= 0, 0 disables (try 0.3..0.8 on Quest)
 
 // SH Used for sky occlusion
 // // Monochromatic Spherical Harmonics Coefficients
+/*
 CBUFFER_START(MonoSHBuffer)
     float _SHMonoCoefficients[9];
 CBUFFER_END
+*/
 
 CBUFFER_START(VolumetricsCB)
 float4x4 TransposedCameraProjectionMatrix;
@@ -357,6 +359,7 @@ float4 _MipFogParameters = float4(0,5,0.5,0);
 
 half EvaluateMonochromaticSHL2(half3 normal)
 {
+    /* MonoSHBuffer not assigned by anything, removing it to prevent possible binding issues
     // Monochromatic SH evaluation using the coefficients array
 	half shValue = _SHMonoCoefficients[0] + // L0 term (constant)
                     normal.y * _SHMonoCoefficients[1] +                  // L1 Y term (gradient)
@@ -369,6 +372,8 @@ half EvaluateMonochromaticSHL2(half3 normal)
                     (normal.x * normal.x - normal.y * normal.y) * _SHMonoCoefficients[8];  // L2 X² - Y² term
 
     return shValue;
+    */
+    return 1;
 }
 
 

@@ -44,6 +44,10 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
 
     public Settings settings = new Settings();
 
+    public static ComputeShader s_froxelFogCompute          {get; internal set;}
+    public static ComputeShader s_froxelIntegrationCompute  {get; internal set;}
+    public static ComputeShader s_clipmapCompute            {get; internal set;}
+
     VolumetricPass m_Pass;
     ClearVolumetricGlobalsPass m_ClearPass;
     
@@ -60,7 +64,9 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         {
             renderPassEvent = settings.passEvent
         };
-
+        s_froxelFogCompute          = settings.froxelFogCompute;
+        s_froxelIntegrationCompute  = settings.froxelIntegrationCompute;
+        s_clipmapCompute            = settings.clipmapCompute;
         RenderPipelineManager.beginContextRendering += GarbageCollectPeriodic;
     }
     
@@ -376,6 +382,8 @@ s_EA2.End();
 
         public void Dispose()
         {
+            Debug.Log("Volumetrics: Disposing of per-camera resources");
+
             ReleaseRT(ref froxel[0]);
             ReleaseRT(ref froxel[1]);
             ReleaseRT(ref integrate);
@@ -389,6 +397,8 @@ s_EA2.End();
             clipmaps = null;
 
             Shader.SetGlobalConstantBuffer(VolumetricPass.ID_VolumetricsCB, (ComputeBuffer)null, 0, 0);
+            VolumetricRenderingFeature_2022.s_froxelFogCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)null, 0, 0);
+            VolumetricRenderingFeature_2022.s_froxelIntegrationCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)null, 0, 0);
         }
 
         static void Ensure3DRT(ref RenderTexture rt, int w, int h, int d, GraphicsFormat fmt, bool useMips, string name, FilterMode filter)
@@ -401,11 +411,11 @@ s_EA2.End();
                 rt.useMipMap != useMips;
 
             if (!need) return;
-
-            if (rt != null)
+            
+            if (rt != null && rt.IsCreated())
             {
-                rt.Release();
-                CoreUtils.Destroy(rt);
+                
+                //CoreUtils.Destroy(rt);
             }
 
             var desc = new RenderTextureDescriptor(w, h)
@@ -419,13 +429,33 @@ s_EA2.End();
                 autoGenerateMips = false
             };
 
-            rt = new RenderTexture(desc)
+            if (rt == null)
             {
-                name = name,
-                filterMode = filter,
-                wrapMode = TextureWrapMode.Clamp
-            };
-            rt.Create();
+                rt = new RenderTexture(desc)
+                {
+                    name = name,
+                    filterMode = filter,
+                    wrapMode = TextureWrapMode.Clamp
+                };
+                rt.Create();
+            }
+            else
+            {
+                if (rt.IsCreated()) rt.Release();
+                rt.width             = desc.width;
+                rt.height            = desc.height;
+                rt.dimension         = desc.dimension;
+                rt.volumeDepth       = desc.volumeDepth;
+                rt.antiAliasing      = desc.msaaSamples;
+                rt.enableRandomWrite = desc.enableRandomWrite;
+                rt.graphicsFormat    = desc.graphicsFormat;
+                rt.useMipMap         = desc.useMipMap;
+                rt.autoGenerateMips  = desc.autoGenerateMips;
+                rt.name = name;
+                rt.filterMode = filter;
+                rt.wrapMode = TextureWrapMode.Clamp;
+                rt.Create();
+            }
         }
 
         static void ReleaseRT(ref RenderTexture rt)
@@ -447,7 +477,11 @@ s_EA2.End();
         {
             if (cb != null && cb.count == 1 && cb.stride == strideBytesAligned) return;
 
-            cb?.Release();
+            if (cb != null) 
+            {
+                Debug.Log("EnsureConstantBuffer releasing existing constant buffer.");
+                cb.Release();
+            }
             cb = new ComputeBuffer(1, strideBytesAligned, ComputeBufferType.Constant);
         }
 

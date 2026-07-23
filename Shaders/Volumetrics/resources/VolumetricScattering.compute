@@ -327,8 +327,10 @@ float4 SampleClipToroidal(
 			return sigmaS * ambient;
 		}
 
+		
 		float EvaluateMonochromaticSHL2(float3 normal)
 		{
+			/* MonoSH cbuffer not currently assigned
 			// Monochromatic SH evaluation using the coefficients array
 			float shValue = _SHMonoCoefficients[0] +                             // L0 term (constant)
 							normal.y * _SHMonoCoefficients[1] +                  // L1 Y term (gradient)
@@ -339,8 +341,10 @@ float4 SampleClipToroidal(
 							(3.0 * normal.z * normal.z - 1.0) * _SHMonoCoefficients[6] +  // L2 Z² term
 							normal.x * normal.z * _SHMonoCoefficients[7] +       // L2 XZ term
 							(normal.x * normal.x - normal.y * normal.y) * _SHMonoCoefficients[8];  // L2 X² - Y² term
-
+			
 			return shValue;
+			*/
+			return 1;
 		}
         // Returns the forward (central) direction of the current view in the world space.
         // float3 GetViewForwardDir()
