@@ -397,8 +397,8 @@ s_EA2.End();
             clipmaps = null;
 
             Shader.SetGlobalConstantBuffer(VolumetricPass.ID_VolumetricsCB, (ComputeBuffer)null, 0, 0);
-            VolumetricRenderingFeature_2022.s_froxelFogCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)null, 0, 0);
-            VolumetricRenderingFeature_2022.s_froxelIntegrationCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)null, 0, 0);
+            //VolumetricRenderingFeature_2022.s_froxelFogCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)default, 0, 0);
+            //VolumetricRenderingFeature_2022.s_froxelIntegrationCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)default, 0, 0);
         }
 
         static void Ensure3DRT(ref RenderTexture rt, int w, int h, int d, GraphicsFormat fmt, bool useMips, string name, FilterMode filter)
