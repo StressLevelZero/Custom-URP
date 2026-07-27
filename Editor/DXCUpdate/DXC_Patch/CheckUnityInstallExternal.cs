@@ -32,6 +32,14 @@ namespace SLZ.DXCUpdater
                 return;
             }
 
+            List<string> args = new List<string>(Environment.GetCommandLineArgs());
+            if (args.Contains("-skip-dxc-upgrade"))
+            {
+                Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "External DXC Update check: process launched with -skip-dxc-upgrade, skipping DXC check");
+                SessionState.SetBool("DXCChecked", true);
+                return;
+            }
+
 #if !SKIP_DXC_UPGRADE
             EditorApplication.update += CheckDXCExternal;
 #else

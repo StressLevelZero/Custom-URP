@@ -150,6 +150,7 @@ namespace SLZ.SLZEditorTools
             b.AppendLine( "    '-batchmode',");
             b.AppendLine( "    '-projectPath', $projectPath,");
             b.AppendLine( "    '-force-d3d12',");
+            b.AppendLine( "    '-skip-dxc-upgrade',");
             b.AppendLine( "    '-buildTarget', 'standalone',");
             b.AppendLine($"    '-executeMethod', '{k_ExecuteMethod}',");
             b.AppendLine( "    '-logFile', $logPath,");
