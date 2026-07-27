@@ -11,6 +11,65 @@ using Color = UnityEngine.Color;
 
 public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
 {
+
+    internal static ComputeBuffer s_shaderGlobalsCB;
+    internal static ComputeBuffer s_scatterCB;
+    internal static ComputeBuffer s_stepAddCB;
+
+    public static ComputeBuffer shaderGlobalsCB
+    {
+        get
+        {
+            if (s_shaderGlobalsCB == null) 
+            {
+                s_shaderGlobalsCB = new ComputeBuffer(1, Marshal.SizeOf<ShaderConstants>(), ComputeBufferType.Constant);
+            }
+            else if (!s_shaderGlobalsCB.IsValid())
+            {
+                s_shaderGlobalsCB.Release();
+                s_shaderGlobalsCB = new ComputeBuffer(1, Marshal.SizeOf<ShaderConstants>(), ComputeBufferType.Constant);
+            }
+            
+            return s_shaderGlobalsCB;
+        }
+    }
+
+    public static ComputeBuffer scatterCB
+    {
+        get
+        {
+            if (s_scatterCB == null) 
+            {
+                s_scatterCB = new ComputeBuffer(1, Marshal.SizeOf<ScatteringPerFrameConstants>(), ComputeBufferType.Constant);
+            }
+            else if (!s_scatterCB.IsValid())
+            {
+                s_scatterCB.Release();
+                s_scatterCB = new ComputeBuffer(1, Marshal.SizeOf<ScatteringPerFrameConstants>(), ComputeBufferType.Constant);
+            }
+            
+            return s_scatterCB;
+        }
+    }
+
+    public static ComputeBuffer stepAddCB
+    {
+        get
+        {
+            if (s_stepAddCB == null) 
+            {
+                s_stepAddCB = new ComputeBuffer(1, Marshal.SizeOf<StepAddPerFrameConstants>(), ComputeBufferType.Constant);
+            }
+            else if (!s_stepAddCB.IsValid())
+            {
+                s_stepAddCB.Release();
+                s_stepAddCB = new ComputeBuffer(1, Marshal.SizeOf<StepAddPerFrameConstants>(), ComputeBufferType.Constant);
+            }
+            
+            return s_stepAddCB;
+        }
+    }
+
     [Serializable]
     public sealed class Settings
     {
@@ -285,9 +344,9 @@ s_ARPShouldRunForCamera.End();
         public Vector3 previousCameraPos = Vector3.zero;
 
         // constant buffers
-        public ComputeBuffer shaderGlobalsCB;
-        public ComputeBuffer scatterCB;
-        public ComputeBuffer stepAddCB;
+        //public ComputeBuffer shaderGlobalsCB;
+        //public ComputeBuffer scatterCB;
+        //public ComputeBuffer stepAddCB;
 
         public ShaderConstants[] shaderGlobalsArr = new ShaderConstants[1];
         public ScatteringPerFrameConstants[] scatterArr = new ScatteringPerFrameConstants[1];
@@ -353,9 +412,9 @@ s_EA2.Begin();
             integrateGX = Mathf.CeilToInt(integrateWidth / (float)ix);
             integrateGY = Mathf.CeilToInt(rVC.froxelHeight / (float)iy);
 
-            EnsureConstantBuffer(ref shaderGlobalsCB, MarshalSizeAligned<ShaderConstants>());
-            EnsureConstantBuffer(ref scatterCB,       MarshalSizeAligned<ScatteringPerFrameConstants>());
-            EnsureConstantBuffer(ref stepAddCB,       MarshalSizeAligned<StepAddPerFrameConstants>());
+            //EnsureConstantBuffer(ref shaderGlobalsCB, MarshalSizeAligned<ShaderConstants>());
+            //EnsureConstantBuffer(ref scatterCB,       MarshalSizeAligned<ScatteringPerFrameConstants>());
+            //EnsureConstantBuffer(ref stepAddCB,       MarshalSizeAligned<StepAddPerFrameConstants>());
 
             clipmaps ??= new VolumetricClipmapManager();
             clipmaps.EnsureInitialized(vd, s.clipmapCompute, cam.name);
@@ -389,14 +448,14 @@ s_EA2.End();
             ReleaseRT(ref integrate);
 
             
-            ReleaseCB(ref shaderGlobalsCB);
-            ReleaseCB(ref scatterCB);
-            ReleaseCB(ref stepAddCB);
+            //ReleaseCB(ref shaderGlobalsCB);
+            //ReleaseCB(ref scatterCB);
+            //ReleaseCB(ref stepAddCB);
 
             clipmaps?.Dispose();
             clipmaps = null;
 
-            Shader.SetGlobalConstantBuffer(VolumetricPass.ID_VolumetricsCB, (ComputeBuffer)null, 0, 0);
+            //Shader.SetGlobalConstantBuffer(VolumetricPass.ID_VolumetricsCB, (ComputeBuffer)null, 0, 0);
             //VolumetricRenderingFeature_2022.s_froxelFogCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)default, 0, 0);
             //VolumetricRenderingFeature_2022.s_froxelIntegrationCompute.SetConstantBuffer(VolumetricPass.ID_PerFrameCB, (ComputeBuffer)default, 0, 0);
         }
@@ -667,6 +726,7 @@ s_EA2.End();
             var s  = m_Feature.settings;
            // var vd = s.volumetricData;
             var vd = m_Res.rVC;
+            
             var cmd = CommandBufferPool.Get("Volumetrics");
             
             bool wantVol = ShouldRunForCamera(m_Cam, ref renderingData, m_Feature.settings);
@@ -889,11 +949,13 @@ s_EA2.End();
                     CameraPosition                     = (Vector4)m_Cam.transform.position,
                     CameraMotionVector                 = (Vector4)(m_Cam.transform.position - m_Res.previousCameraPos)
                 };
-                m_Res.scatterCB.SetData(m_Res.scatterArr);
+                cmd.SetBufferData(scatterCB, m_Res.scatterArr);
+                //m_Res.scatterCB.SetData(m_Res.scatterArr);
 //cmd.SetBufferData( m_Res.scatterArr, m_Res.scatterCB );
                 // NOTE: we set constant buffer binding directly on the ComputeShader before executing this cmd.
                 // In this pass we dispatch once, so this is safe even if the binding isn't recorded per-command.
-                fogCS.SetConstantBuffer(ID_PerFrameCB, m_Res.scatterCB, 0, m_Res.scatterCB.stride);
+                
+                cmd.SetComputeConstantBufferParam(fogCS, ID_PerFrameCB, scatterCB, 0, scatterCB.stride);
 
                 cmd.DispatchCompute(fogCS, kScatter, m_Res.scatterGX, m_Res.scatterGY, m_Res.scatterGZ);
 
@@ -968,9 +1030,11 @@ s_EA2.End();
                     _VBufferDistanceDecodingParams = vbuff.depthDecodingParams,
                     SeqOffset = seqOffset // implicit v4->v3
                 };
-                m_Res.stepAddCB.SetData(m_Res.stepAddArr);
+                cmd.SetBufferData(stepAddCB, m_Res.stepAddArr);
+                //m_Res.stepAddCB.SetData(m_Res.stepAddArr);
 
-                intCS.SetConstantBuffer(ID_PerFrameCB, m_Res.stepAddCB, 0, m_Res.stepAddCB.stride);
+                //intCS.SetConstantBuffer(ID_PerFrameCB, m_Res.stepAddCB, 0, m_Res.stepAddCB.stride);
+                cmd.SetComputeConstantBufferParam(intCS, ID_PerFrameCB, stepAddCB, 0, stepAddCB.stride);
 
                 cmd.DispatchCompute(intCS, kIntegrate, m_Res.integrateGX, m_Res.integrateGY, 1);
 
@@ -1004,10 +1068,11 @@ s_EA2.End();
                         m_Cam.transform.position.z,
                         0f)
                 };
-                m_Res.shaderGlobalsCB.SetData(m_Res.shaderGlobalsArr);
+                //m_Res.shaderGlobalsCB.SetData(m_Res.shaderGlobalsArr);
+                cmd.SetBufferData(shaderGlobalsCB, m_Res.shaderGlobalsArr);
 
                 // publish global constant buffer (optional, mirrors your old "VolumetricsCB" usage)
-                cmd.SetGlobalConstantBuffer(m_Res.shaderGlobalsCB, ID_VolumetricsCB, 0, m_Res.shaderGlobalsCB.stride);
+                cmd.SetGlobalConstantBuffer(shaderGlobalsCB, ID_VolumetricsCB, 0, shaderGlobalsCB.stride);
             }
 
             context.ExecuteCommandBuffer(cmd);
