@@ -72,7 +72,7 @@ uint2 FallbackGetFragSize(float2 screenCoords)
     // Fragment Invocation Density
     #define SLZ_REQUEST_FRAG_SIZE_CAPS
     #define SLZ_DECLARE_FRAG_SIZE
-    #define SLZ_INITIALIZE_FRAG_SIZE(screenCoords) SLZ_FragSize = FallbackGetFragSize(screenCoords);
+    #define SLZ_SETUP_FRAG_SIZE(screenCoords) SLZ_FragSize = FallbackGetFragSize(screenCoords);
     #define SLZ_FRAG_SIZE SLZ_FragSize
     
     // Fragment Shading Rate

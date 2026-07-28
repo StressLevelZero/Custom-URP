@@ -15,6 +15,10 @@
     #define VOL_EYE_COUNT 1
 #endif
 
+#if defined(_VOLUMETRICS_ENABLED) || defined(_VOLUMETRICS_ENABLED_HQ)
+#define _VOLUMETRICS_ENABLED_ANY 1
+#endif
+
 TEXTURECUBE(_SkyTexture);
 SAMPLER(sampler_SkyTexture);
 const int _SkyMipCount;
@@ -31,6 +35,8 @@ CBUFFER_START(MonoSHBuffer)
 CBUFFER_END
 */
 
+#if defined(_VOLUMETRICS_ENABLED_ANY)
+
 CBUFFER_START(VolumetricsCB)
 float4x4 TransposedCameraProjectionMatrix;
 float4x4 CameraProjectionMatrix;
@@ -39,9 +45,19 @@ float4 _VolumetricResultDim;
 float3 _VolCameraPos;
 CBUFFER_END
 
-
-
 TEXTURE3D(_VolumetricResult);
+
+#else
+
+#define TransposedCameraProjectionMatrix    ((float4x4)0)
+#define CameraProjectionMatrix              ((float4x4)0)
+#define _VBufferDistanceEncodingParams      ((float4)0)
+#define _VolumetricResultDim                ((float4)0)
+#define _VolCameraPos                       ((float3)0)
+
+#endif
+
+
 //float4 _VolumePlaneSettings; // Not used
 
 // Interleaved Gradient Noise — 3D (isotropic)
@@ -309,10 +325,12 @@ half4 GetVolumetricColor(float3 positionWS)
     sampleUVW.z -= noise * (jitterRadiusTexelsZ * invZ);
     sampleUVW.z = saturate(sampleUVW.z);
 
-    #if (_VOLUMETRICS_ENABLED_HQ)
+    #if defined(_VOLUMETRICS_ENABLED_HQ)
         float4 volsample = SampleTricubicLevel(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
-    #else
+    #elif defined(_VOLUMETRICS_ENABLED) 
         float4 volsample = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
+    #else
+        float4 volsample = (float4)0;
     #endif
 
     volsample = DitherVolumetrics(volsample, noise * 0.08 + .5);
@@ -397,7 +415,6 @@ half3 MipFog(float3 viewDirectionWS, float depth, float numMipLevels) {
     float mipLevel = ((depth )) * (_SkyMipCount - 1);
 #else
     float mipLevel = ((1 -  (_MipFogParameters.z * saturate((depth - nearParam) / (farParam - nearParam)))  ) )  * (_SkyMipCount - 1);
-
 #endif
 
 //#if defined(REFLECTIONFOG)
@@ -450,10 +467,12 @@ half4 SampleVolumetricUVW(float3 sampleUVW)
     sampleUVW.xy += xyoffset[idx] * (jitterRadiusTexelsXY * invXY);
     sampleUVW.z  += (noise - 0.5) * (jitterRadiusTexelsZ * invZ);
 
-    #if (_VOLUMETRICS_ENABLED_HQ)
+    #if defined(_VOLUMETRICS_ENABLED_HQ)
         float4 volsample = SampleTricubicLevel(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
-    #else
+    #elif defined(_VOLUMETRICS_ENABLED)
         float4 volsample = SAMPLE_TEXTURE3D_LOD(_VolumetricResult, sampler_LinearClamp, sampleUVW, 0);
+    #else
+        float4 volsample = (float4)0;
     #endif
 
     volsample = DitherVolumetrics(volsample, noise * 0.08 + 0.5);

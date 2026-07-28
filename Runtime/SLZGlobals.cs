@@ -343,6 +343,8 @@ namespace UnityEngine.Rendering.Universal
 
         private Material vrOccDistMat;
 
+        bool cleanupVrOccMeshTexHandle = false;
+
 
         SLZGlobalsData passData;
         public SLZGlobalsSetPass(RenderPassEvent evt, bool skipSetup, Material vrOccDistMat)
@@ -432,10 +434,13 @@ namespace UnityEngine.Rendering.Universal
 
                     passData.xrPass = camData.xrUniversal;
 
-                    passData.xrOcclusionMeshTexID = new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
-                    cmd.GetTemporaryRT(SLZGlobals.VrOccMeshDistanceID, SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height));
+                    passData.xrOcclusionMeshTex = RTHandles.Alloc(maskDesc, name:"_VrOccMeshDistance");
+                    cleanupVrOccMeshTexHandle = true;
+
+                    //passData.xrOcclusionMeshTexID = new RenderTargetIdentifier(SLZGlobals.VrOccMeshDistanceID);
+                    //cmd.GetTemporaryRT(SLZGlobals.VrOccMeshDistanceID, SLZGlobals.VrOccMaskDescriptor(camData.cameraTargetDescriptor.width, camData.cameraTargetDescriptor.height));
                     SLZGlobals.instance.VrOccDistanceTexHandle = RTHandles.Alloc(SLZGlobals.instance.VrOccDistanceTex);
-                    passData.xrOcclusionMeshTex = RTHandles.Alloc(passData.xrOcclusionMeshTexID);
+
                     passData.xrOccDistanceMat = vrOccDistMat;
                 }
                 else
@@ -457,6 +462,15 @@ namespace UnityEngine.Rendering.Universal
                 passData.opaqueMipLevels = 1;
             }
         }
+
+        public override void OnCameraCleanup(CommandBuffer cmd)
+        {
+            if (cleanupVrOccMeshTexHandle)
+            {
+                RTHandles.Release(passData.xrOcclusionMeshTex);
+            }
+        }
+
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             ExecutePass(passData, ref renderingData.commandBuffer);
@@ -488,10 +502,10 @@ namespace UnityEngine.Rendering.Universal
 
                 if (data.generateXrOcclusionMeshDistance)
                 {
-                    cmd.SetRenderTarget(data.xrOcclusionMeshTexID, 0, CubemapFace.Unknown, -1);
+                    cmd.SetRenderTarget(data.xrOcclusionMeshTex, 0, CubemapFace.Unknown, -1);
                     cmd.ClearRenderTarget(false, true, Color.red);
                     data.xrPass.RenderOcclusionMesh(cmd, true);
-                    cmd.SetGlobalTexture("_MaskTex", data.xrOcclusionMeshTexID);
+                    cmd.SetGlobalTexture("_MaskTex", data.xrOcclusionMeshTex);
 
                     cmd.SetRenderTarget(data.xrOccDistanceTex, 0, CubemapFace.Unknown, -1);
 

@@ -109,6 +109,7 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
 
     VolumetricPass m_Pass;
     ClearVolumetricGlobalsPass m_ClearPass;
+    ClearVolumetricGlobalsPass m_ClearPassAfter;
     
     readonly Dictionary<Camera, CameraResources> m_Resources = new();
 
@@ -122,6 +123,11 @@ public sealed class VolumetricRenderingFeature_2022 : ScriptableRendererFeature
         m_ClearPass = new ClearVolumetricGlobalsPass()
         {
             renderPassEvent = settings.passEvent
+        };
+
+        m_ClearPassAfter = new ClearVolumetricGlobalsPass()
+        {
+            renderPassEvent = RenderPassEvent.AfterRenderingTransparents
         };
         s_froxelFogCompute          = settings.froxelFogCompute;
         s_froxelIntegrationCompute  = settings.froxelIntegrationCompute;
@@ -173,6 +179,7 @@ s_ARPShouldRunForCamera.End();
         m_Pass.Setup(cam, res);
         s_ARPSetup.End();
         renderer.EnqueuePass(m_Pass);
+        renderer.EnqueuePass(m_ClearPassAfter);
         }
     }
     
@@ -267,6 +274,7 @@ s_ARPShouldRunForCamera.End();
             }
             for (int i = 0; i < gcIdx; i++)
             {
+                m_Resources[garbageCollectArray[i]].Dispose();
                 m_Resources.Remove(garbageCollectArray[i]);
             }
             if (garbageCollectList != null)
@@ -274,7 +282,8 @@ s_ARPShouldRunForCamera.End();
                 int numList = garbageCollectList.Count;
                 for (int i = 0; i < numList; i++)
                 {
-                     m_Resources.Remove(garbageCollectList[i]);
+                    m_Resources[garbageCollectList[i]].Dispose();
+                    m_Resources.Remove(garbageCollectList[i]);
                 }
             }
             //Debug.Log($"Removed {gcIdx + (garbageCollectList == null ? 0 : garbageCollectList.Count)} cameras");
@@ -590,7 +599,7 @@ s_EA2.End();
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-            var cmd = CommandBufferPool.Get("Clear Volumetrics");
+            var cmd = CommandBufferPool.Get();
 
             using (new ProfilingScope(cmd, s_Profile))
             {
@@ -599,10 +608,10 @@ s_EA2.End();
 
                 cmd.SetGlobalTexture(ID_VolumetricResult, CoreUtils.blackVolumeTexture);
                 cmd.SetGlobalTexture(ID_InLightingTexture, CoreUtils.blackVolumeTexture);
+                cmd.SetGlobalConstantBuffer((ComputeBuffer)null, VolumetricPass.ID_VolumetricsCB, 0, 0);
 
                 cmd.SetGlobalFloat(ID_PanicRefresh, 0f);
             }
-
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }
