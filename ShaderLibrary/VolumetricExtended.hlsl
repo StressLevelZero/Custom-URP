@@ -3,7 +3,9 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/VolumetricCore.hlsl"
 
+#if defined(_VOLUMETRICS_ENABLED_ANY)
 TEXTURE3D(InLightingTexture);
+#endif
 
 ///Use this is to sample the pre-integrated volumetric lighting
 void volumetricLighting_float(half3 positionWS, out float4 outputVolumetric)
@@ -16,7 +18,7 @@ void volumetricLighting_float(half3 positionWS, out float4 outputVolumetric)
         // Convert linear UV -> froxel grid UV (inverse of the warp used during froxel rendering)
         float2 uvGrid = LinearUV_To_FroxelGridUV(ls.xy, _FoveaCenterUV, _FoveaStrength); 
         //Sampling pre-integrated volume.
- #if VOLUMETRICS_HQ_ENABLED
+ #if defined(_VOLUMETRICS_HQ_ENABLED)
     outputVolumetric = SampleTricubicLevel(InLightingTexture, sampler_LinearClamp,float3 (uvGrid.xy,W) , 0);  
  #else
             outputVolumetric = SAMPLE_TEXTURE3D_LOD(InLightingTexture, sampler_LinearClamp,float3 (uvGrid.xy,W) , 0);

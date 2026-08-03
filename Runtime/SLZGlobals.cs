@@ -413,7 +413,7 @@ namespace UnityEngine.Rendering.Universal
             passData.screenWidth = targetDesc.width;
             passData.screenHeight = targetDesc.height;
             passData.opaqueTexSizeFrac = opaqueTexSizeFrac;
-
+            passData.xrRendering = camData.xrRendering;
 
             if (camData.xrRendering && camData.xrUniversal != null && camData.xrUniversal.hasValidOcclusionMesh && camData.requiresOpaqueTexture)   
             //if (true)
@@ -513,7 +513,14 @@ namespace UnityEngine.Rendering.Universal
                     SLZGlobals.instance.hasGeneratedVrOcDistTex = true;
                     //data.xrPass.RenderOcclusionMesh(cmd, true, data.xrOccDistanceMat);
                 }
-                cmd.SetGlobalTexture(SLZGlobals.VrOccMeshDistanceID, data.xrOccDistanceTex);
+                if (data.xrRendering && SLZGlobals.instance.hasGeneratedVrOcDistTex)
+                {
+                    cmd.SetGlobalTexture(SLZGlobals.VrOccMeshDistanceID, data.xrOccDistanceTex);
+                }
+                else
+                {
+                    cmd.SetGlobalTexture(SLZGlobals.VrOccMeshDistanceID, Texture2D.blackTexture);
+                }
                 SLZGlobals.instance.SetSSRGlobalsCmd(ref cmd, data.ssrMaxSteps, data.ssrMinMip, data.ssrHitRadius, data.temporalWeight, data.fov, data.screenHeight);
                 cmd.SetKeyword(ssrDisabledKW, !enableSSR);
                 cmd.SetKeyword(hiZEnabledKW, requireHiZ);
@@ -583,6 +590,7 @@ namespace UnityEngine.Rendering.Universal
             public int opaqueMipLevels;
             public int opaqueTexSizeFrac;
             public bool generateXrOcclusionMeshDistance;
+            public bool xrRendering;
 
             public XRPassUniversal xrPass;
             public Material xrOccDistanceMat;
