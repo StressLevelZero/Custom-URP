@@ -39,7 +39,9 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZBlueNoise.hlsl"
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MobileAntibanding.hlsl"
-
+#if defined(SLZ_ENABLE_PROFILING)
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SLZVkProfiling.hlsl"
+#endif
 //#!INJECT_POINT INCLUDES
 
 
@@ -153,6 +155,9 @@ FragOut frag(VertOut i
     //#!INJECT_POINT FRAG_PARAMETERS
 ) : SV_Target
 {
+    #if defined(SLZ_ENABLE_PROFILING)
+    uint startTime = ReadClock().x;
+    #endif
     UNITY_SETUP_INSTANCE_ID(i);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
@@ -276,5 +281,11 @@ FragOut frag(VertOut i
     
     //#!INJECT_POINT FRAG_OUT_POPULATE
 
+    #if defined(SLZ_ENABLE_PROFILING)
+    uint endTime = ReadClock().x;
+    uint deltaTime = DeltaShaderClockTime(startTime, endTime);
+    half3 heat = NvHeatmap(deltaTime, 65000.0f);
+    output.color.rgb = (output.color.rgb * 1e-7) + heat;
+    #endif
     return output;
 }

@@ -63,7 +63,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             HLSLPROGRAM
-            
+            #define SLZ_ENABLE_PROFILING
             #pragma only_renderers vulkan
             #pragma vertex vert
             #pragma fragment frag
@@ -78,8 +78,8 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             //#pragma use_dxc vulkan
 
             #if defined(SHADER_API_DESKTOP) && !defined(_SLZ_SSR_DISABLED)
-            #pragma require WaveVote
-            #define _SM6_WAVE_VOTE 1
+            //#pragma require WaveVote
+            //#define _SM6_WAVE_VOTE 1
 
             // Do quad-averaging of the SSR results. 
             #pragma require QuadShuffle

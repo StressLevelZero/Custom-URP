@@ -18,11 +18,13 @@ void volumetricLighting_float(half3 positionWS, out float4 outputVolumetric)
         // Convert linear UV -> froxel grid UV (inverse of the warp used during froxel rendering)
         float2 uvGrid = LinearUV_To_FroxelGridUV(ls.xy, _FoveaCenterUV, _FoveaStrength); 
         //Sampling pre-integrated volume.
- #if defined(_VOLUMETRICS_HQ_ENABLED)
-    outputVolumetric = SampleTricubicLevel(InLightingTexture, sampler_LinearClamp,float3 (uvGrid.xy,W) , 0);  
- #else
-            outputVolumetric = SAMPLE_TEXTURE3D_LOD(InLightingTexture, sampler_LinearClamp,float3 (uvGrid.xy,W) , 0);
- #endif
+#if defined(_VOLUMETRICS_ENABLED_HQ)
+        outputVolumetric = SampleTricubicLevel(InLightingTexture, sampler_LinearClamp,float3 (uvGrid.xy,W) , 0);  
+#elif defined(_VOLUMETRICS_ENABLED_ANY)
+        outputVolumetric = SAMPLE_TEXTURE3D_LOD(InLightingTexture, sampler_LinearClamp,float3 (uvGrid.xy,W) , 0);
+#else
+        outputVolumetric = (float4)0;
+#endif
  
 }
 
@@ -31,8 +33,8 @@ void volumetrics_additiveBlend_float(in half4 color, in float3 positionWS, out h
        // #if defined(_VOLUMETRICS_ENABLED)
 
         half4 FroxelColor = GetVolumetricColor(positionWS);
-       outColor.rgb = color.rgb * FroxelColor.a;
-       outColor.a = FroxelColor.a;
+        outColor.rgb = color.rgb * FroxelColor.a;
+        outColor.a = FroxelColor.a;
        // // outColor.rgb = FroxelColor.rgb + (color.rgb * FroxelColor.a);
       //  outColor = FroxelColor;
        // #endif
