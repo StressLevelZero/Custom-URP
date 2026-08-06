@@ -63,7 +63,7 @@ Shader "SLZ/LitMAS/LitMAS Standard"
             Name "Forward"
             Tags {"Lightmode"="UniversalForward"}
             HLSLPROGRAM
-            #define SLZ_ENABLE_PROFILING
+
             #pragma only_renderers vulkan
             #pragma vertex vert
             #pragma fragment frag
