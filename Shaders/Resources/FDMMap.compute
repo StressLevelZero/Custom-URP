@@ -1,0 +1,24 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+
+
+RWTexture2DArray<float2> Result;
+
+float4 eyePos;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    uint3 dim = 0;
+    Result.GetDimensions(dim.x, dim.y, dim.z);
+    if (any(id >= dim)) return;
+    uint eye = id.z;
+    float2 eyeCenterCoords = eye == 0 ? eyePos.xy : eyePos.zw;
+    float2 fragCoords = (float2(id.xy) / float2(dim.xy) ) +  float2(0.5,0.5);
+    float dist = length(fragCoords - eyeCenterCoords );
+    Result[id.xyz] = dist < 0.15 ? float2(0.25,0.25) : float2(0.25, 0.25);
+}

@@ -1,4 +1,4 @@
-Shader "Hidden/Universal Render Pipeline/XR/XROcclusionMesh"
+Shader "Hidden/Universal Render Pipeline/XR/XROcclusionMeshDepthOnly"
 {
     HLSLINCLUDE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -54,9 +54,9 @@ Shader "Hidden/Universal Render Pipeline/XR/XROcclusionMesh"
             return output;
         }
 
-        float4 Frag() : SV_Target
+        void Frag()
         {
-            return (0.0f).xxxx;
+
         }
 
     ENDHLSL
@@ -67,10 +67,7 @@ Shader "Hidden/Universal Render Pipeline/XR/XROcclusionMesh"
 
         Pass
         {
-            ZWrite On ZTest LEqual Cull Off
-            // SLZ MODIFIED
-            //ColorMask RGBA // Switched from 0 so that the camera clear color doesn't show up on the occlusion mesh
-            // END SLZ MODIFIED
+            ZWrite On ZTest LEqual Blend Off Cull Off
 
             HLSLPROGRAM
                 #pragma vertex Vert

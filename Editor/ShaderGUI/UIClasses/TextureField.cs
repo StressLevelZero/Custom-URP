@@ -87,11 +87,12 @@ namespace UnityEditor.SLZMaterialUI
             //List<SearchProvider> providers = new List<SearchProvider>() { new SearchProvider("sfklahlkjhsa", "hello") };
             //textureField.searchContext = new SearchContext(providers, "t:Texture2D", SearchFlags.Default);
             //textureField.bindingPath = "m_SavedProperties.m_TexEnvs.Array.data[0].second.m_Texture";
+
             textureType = textureProperty.textureDimension;
             switch (textureProperty.textureDimension)
             {
                 case (UnityEngine.Rendering.TextureDimension.Tex2D):
-                    texObjField.objectType = typeof(Texture2D);
+                    texObjField.objectType = typeof(Texture);
                     break;
                 case (UnityEngine.Rendering.TextureDimension.Tex3D):
                     texObjField.objectType = typeof(Texture3D);

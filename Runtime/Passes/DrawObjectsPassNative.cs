@@ -6,6 +6,7 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Profiling;
 using Unity.Collections;
 
+
 namespace UnityEngine.Rendering.Universal.Internal
 {
    
@@ -35,7 +36,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 #endif
 
         
-
+        RTHandle[] colorAttachmentsArray = new RTHandle[2];
         FilteringSettings m_FilteringSettings;
         RenderStateBlock m_RenderStateBlock;
         List<ShaderTagId> m_ShaderTagIdList = new List<ShaderTagId>();
@@ -52,6 +53,8 @@ namespace UnityEngine.Rendering.Universal.Internal
         public RTHandle colorTarget;
         public RTHandle opaqueSubpassTarget;
         public RTHandle depthTarget;
+        public RTHandle memorylessColor;
+
         public int msaaSampleCount = 1;
         public RenderTextureDescriptor cameraTextureDescriptor;
         UniversalRenderer caller; // Keep a reference to the current running renderer so we can check if VRS is enabled on it during the configuration stage
@@ -156,18 +159,9 @@ namespace UnityEngine.Rendering.Universal.Internal
         public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
         {
             this.cameraTextureDescriptor = cameraTextureDescriptor;
-
-            if (true)
-            {
-                ConfigureTarget(colorTarget, depthTarget);
-            }
-            
-            ConfigureInputAttachments(opaqueSubpassTarget, true);
-            {
-                enableFoveatedRendering = false;
-                // if VRS was enabled previously, then the target will remain until reset
-                //ResetTarget();
-            }
+            ConfigureTarget(colorTarget, depthTarget);
+            ConfigureDepthStoreAction(RenderBufferStoreAction.DontCare);
+            ConfigureColorStoreAction(cameraTextureDescriptor.msaaSamples > 1 ? RenderBufferStoreAction.Resolve : RenderBufferStoreAction.Store);
         }
 
         /// <inheritdoc/>
@@ -187,8 +181,9 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_PassData.cameraTextureDescriptor = cameraTextureDescriptor;
             m_PassData.pass = this;
             m_PassData.copySubpassInputMat = m_CopySubpassInputMaterial;
-            //m_PassData.m_UseMotionVectorData = useMotionVectorData;
-            //m_PassData.m_UseMotionVectorData = renderingData.cameraData.enableSSR;
+            m_PassData.memorylessColorInput = memorylessColor;
+            m_PassData.useSubpassAPI = false; // Subpass API is buggy, won't allow foveation to work
+
             CameraSetup(renderingData.commandBuffer, m_PassData, ref renderingData);
             ExecutePass(context, m_PassData, ref renderingData, renderingData.cameraData.IsCameraProjectionMatrixFlipped());
         }
@@ -213,77 +208,57 @@ namespace UnityEngine.Rendering.Universal.Internal
             using (new ProfilingScope(cmd, data.m_ProfilingSampler))
             {
 
-
-                RenderTextureDescriptor desc = data.cameraTextureDescriptor;//renderingData.cameraData.cameraTargetDescriptor;//data.colorTarget.rt == null ? data.cameraTextureDescriptor : data.colorTarget.rt.descriptor;
-                if ((desc.width == 32 && desc.height == 32)) return;
-                //Vector2Int resColor = data.colorTarget.rtHandleProperties.currentRenderTargetSize;
-                //Vector2Int resDepth = data.depthTarget.rtHandleProperties.currentRenderTargetSize;
-                //Vector2Int resOpaque = data.opaqueSubpassTarget.rtHandleProperties.currentRenderTargetSize;
-                //Debug.Log($"Color: {resColor.x} x {resColor.y}, Depth: {resDepth.x}, {resDepth.y}, Opaque: {resOpaque.x}, {resOpaque.y}, ");
+                
+                RenderTextureDescriptor desc = renderingData.cameraData.cameraTargetDescriptor;
+                //if ((desc.width == 32 && desc.height == 32)) return;
+                bool hasMSAA = desc.msaaSamples > 1;
+               
+                NativeArray<AttachmentDescriptor> subpassAttachments = default;
+                NativeArray<int> colorAttachmentIdxArray = default;
                 int colorIdx = 0;
-                int inputIdx = 1;
-                int depthIdx = 2;
+                int depthIdx = 1;
 
-                NativeArray<AttachmentDescriptor> subpassAttachments = new NativeArray<AttachmentDescriptor>(depthIdx + 1, Allocator.Temp);
-                subpassAttachments[colorIdx] = new AttachmentDescriptor()
+                if (data.useSubpassAPI)
                 {
-                    loadStoreTarget = new RenderTargetIdentifier(data.colorTarget.nameID, 0, CubemapFace.Unknown, -1),
-                    loadAction = RenderBufferLoadAction.Clear,
-                    storeAction = RenderBufferStoreAction.Store,
-                    clearColor = renderingData.cameraData.backgroundColor,
-                    clearStencil = 0u,
-                    clearDepth = 1.0f,
+                    bool memorylessResolve = hasMSAA;
+                    subpassAttachments = new NativeArray<AttachmentDescriptor>(depthIdx + 1, Allocator.Temp);
+                    AttachmentDescriptor colorAttachment = new()
+                    {
+                        loadStoreTarget =// hasMSAA ? 
+                           // new RenderTargetIdentifier(BuiltinRenderTextureType.None) :
+                            new RenderTargetIdentifier(data.colorTarget.nameID, 0, CubemapFace.Unknown, -1),
+                        loadAction = RenderBufferLoadAction.DontCare,
+                        storeAction = hasMSAA ? RenderBufferStoreAction.Resolve : RenderBufferStoreAction.Store,
+                        clearColor = renderingData.cameraData.backgroundColor,
+                        clearStencil = 0u,
+                        clearDepth = 1.0f,
+                        graphicsFormat = desc.graphicsFormat,
+                    };
+                    if (hasMSAA)
+                    {
+                        colorAttachment.resolveTarget = new RenderTargetIdentifier(data.colorTarget.nameID, 0, CubemapFace.Unknown, -1);
+                    }
+                    subpassAttachments[colorIdx] = colorAttachment;
+                   
+                    RenderTargetIdentifier depthID = data.depthTarget.nameID == new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget) ? 
+                        new RenderTargetIdentifier(BuiltinRenderTextureType.Depth,0,CubemapFace.Unknown,-1) : 
+                        new RenderTargetIdentifier(data.depthTarget.nameID,0,CubemapFace.Unknown,-1);
+                    //if (memorylessResolve) depthID = new RenderTargetIdentifier(data.memorylessColorInput.nameID, 0, CubemapFace.Unknown, -1);
+                    subpassAttachments[depthIdx] = new AttachmentDescriptor()
+                    {
+                        loadStoreTarget = //new RenderTargetIdentifier(BuiltinRenderTextureType.None),
+                        new RenderTargetIdentifier(data.depthTarget.nameID, 0, CubemapFace.Unknown, -1),
+                        loadAction = RenderBufferLoadAction.Clear,
+                        storeAction = RenderBufferStoreAction.DontCare,
+                        clearColor = renderingData.cameraData.backgroundColor,
+                        clearStencil = 0u,
+                        clearDepth = 1.0f,
+                        graphicsFormat = desc.depthStencilFormat,
+                    };
 
-                    graphicsFormat = desc.graphicsFormat,
-                };
+                    colorAttachmentIdxArray = new NativeArray<int>(1, Allocator.Temp);
 
-                /* Original opaque texture attachment
-                subpassAttachments[1] = new AttachmentDescriptor()
-                {
-                    loadStoreTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.None, 0, CubemapFace.Unknown, -1),
-                    loadAction = RenderBufferLoadAction.DontCare,
-                    storeAction = RenderBufferStoreAction.DontCare,
-                    clearColor = renderingData.cameraData.backgroundColor,
-                    clearStencil = 0u,
-                    clearDepth = 1.0f,
-                    graphicsFormat = desc.graphicsFormat,
-                };
-                */
-                
-                
-                subpassAttachments[inputIdx] = new AttachmentDescriptor()
-                {
-                    loadStoreTarget = new RenderTargetIdentifier(BuiltinRenderTextureType.None, 0, CubemapFace.Unknown, -1),
-                    loadAction = RenderBufferLoadAction.DontCare,
-                    storeAction = RenderBufferStoreAction.DontCare,
-                    clearColor = renderingData.cameraData.backgroundColor,
-                    clearStencil = 0u,
-                    clearDepth = 1.0f,
-                    graphicsFormat = GraphicsFormat.R16_UNorm,
-                };
-                
-
-                RenderTargetIdentifier depthID = data.depthTarget.nameID == new RenderTargetIdentifier(BuiltinRenderTextureType.CameraTarget) ? 
-                    new RenderTargetIdentifier(BuiltinRenderTextureType.Depth,0,CubemapFace.Unknown,-1) : 
-                    new RenderTargetIdentifier(data.depthTarget.nameID,0,CubemapFace.Unknown,-1);
-
-                subpassAttachments[depthIdx] = new AttachmentDescriptor()
-                {
-                    loadStoreTarget = depthID,
-                    loadAction = RenderBufferLoadAction.Clear,
-                    storeAction = RenderBufferStoreAction.DontCare,
-                    clearColor = renderingData.cameraData.backgroundColor,
-                    clearStencil = 0u,
-                    clearDepth = 1.0f,
-                    graphicsFormat = desc.depthStencilFormat,
-                };
-
-                //Debug.Log($"{ data.depthTarget.nameID.ToString()}\n{data.colorTarget.nameID.ToString()}\n{data.opaqueSubpassTarget.nameID}");
-
-                NativeArray<int> colorAttachment = new NativeArray<int>(1, Allocator.Temp);
-                
-                NativeArray<int> inputAttachment = new NativeArray<int>(1, Allocator.Temp);
-
+                }
                 var activeDebugHandler = GetActiveDebugHandler(ref renderingData);
 
                 Camera camera = renderingData.cameraData.camera;
@@ -314,154 +289,164 @@ namespace UnityEngine.Rendering.Universal.Internal
                 //Vector2Int res = data.colorTarget.rtHandleProperties.currentRenderTargetSize;
                
                 //Debug.Log($"Renderpass dimensions {desc.width}, {desc.height}, {desc.volumeDepth}");
-                context.BeginRenderPass(desc.width, desc.height, desc.volumeDepth, Math.Max(desc.msaaSamples, 1), subpassAttachments, depthIdx);
-                subpassAttachments.Dispose();
 
-                colorAttachment[0] = colorIdx; // originally 1, wrote to a separate attachment that would be copied to the backbuffer at the beginning of the transparent pass
-                {
-                    context.BeginSubPass(colorAttachment);
-                   // cmd.ClearRenderTarget(true, true, Color.black);
 #if ENABLE_VR && ENABLE_XR_MODULE
-                    if (data.m_RenderingData.cameraData.xr.enabled && data.m_IsActiveTargetBackBuffer)
+                if (renderingData.cameraData.xr.enabled)
+                {
+                    if (renderingData.cameraData.xr.supportsFoveatedRendering || FoveationManager.enableFoveationInjection)
                     {
-                        cmd.SetViewport(data.m_RenderingData.cameraData.xr.GetViewport());
+                        cmd.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
+                        
                     }
+                }
+#endif
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+                if (data.useSubpassAPI)
+                {
+                    context.BeginRenderPass(desc.width, desc.height, desc.volumeDepth, Math.Max(desc.msaaSamples, 1), subpassAttachments, depthIdx);
+                    subpassAttachments.Dispose();
+
+                    colorAttachmentIdxArray[0] = colorIdx;
+                    context.BeginSubPass(colorAttachmentIdxArray);
+                    colorAttachmentIdxArray.Dispose();
+                }
+                
+#if ENABLE_VR && ENABLE_XR_MODULE
+                if (data.m_RenderingData.cameraData.xr.enabled && data.m_IsActiveTargetBackBuffer)
+                {
+                    cmd.SetViewport(data.m_RenderingData.cameraData.xr.GetViewport());
+                }
 #endif
                    
-                    // scaleBias.x = flipSign
-                    // scaleBias.y = scale
-                    // scaleBias.z = bias
-                    // scaleBias.w = unused
-                    float flipSign = yFlip ? -1.0f : 1.0f;
-                    Vector4 scaleBias = (flipSign < 0.0f)
-                        ? new Vector4(flipSign, 1.0f, -1.0f, 1.0f)
-                        : new Vector4(flipSign, 0.0f, 1.0f, 1.0f);
-                    cmd.SetGlobalVector(ShaderPropertyId.scaleBiasRt, scaleBias);
+                // scaleBias.x = flipSign
+                // scaleBias.y = scale
+                // scaleBias.z = bias
+                // scaleBias.w = unused
+                float flipSign = yFlip ? -1.0f : 1.0f;
+                Vector4 scaleBias = (flipSign < 0.0f)
+                    ? new Vector4(flipSign, 1.0f, -1.0f, 1.0f)
+                    : new Vector4(flipSign, 0.0f, 1.0f, 1.0f);
+                cmd.SetGlobalVector(ShaderPropertyId.scaleBiasRt, scaleBias);
 
-                    // Set a value that can be used by shaders to identify when AlphaToMask functionality may be active
-                    // The material shader alpha clipping logic requires this value in order to function correctly in all cases.
-                    float alphaToMaskAvailable = ((renderingData.cameraData.cameraTargetDescriptor.msaaSamples > 1) && data.m_IsOpaque) ? 1.0f : 0.0f;
-                    cmd.SetGlobalFloat(ShaderPropertyId.alphaToMaskAvailable, alphaToMaskAvailable);
+                // Set a value that can be used by shaders to identify when AlphaToMask functionality may be active
+                // The material shader alpha clipping logic requires this value in order to function correctly in all cases.
+                float alphaToMaskAvailable = ((renderingData.cameraData.cameraTargetDescriptor.msaaSamples > 1) && data.m_IsOpaque) ? 1.0f : 0.0f;
+                cmd.SetGlobalFloat(ShaderPropertyId.alphaToMaskAvailable, alphaToMaskAvailable);
 
-                    cmd.SetGlobalVector(s_DrawObjectPassDataPropID, drawObjectPassDataOpaque);
+                cmd.SetGlobalVector(s_DrawObjectPassDataPropID, drawObjectPassDataOpaque);
 
-                    // TODO RENDERGRAPH: do this as a separate pass, so no need of calling OnExecute here...
-                    data.pass.OnExecute(cmd);
+                // TODO RENDERGRAPH: do this as a separate pass, so no need of calling OnExecute here...
+                data.pass.OnExecute(cmd);
 
-                    context.ExecuteCommandBuffer(cmd);
-                    cmd.Clear();
+                // Draw occlusion mesh here so it's a part of the same renderpass and subpass
+                renderingData.cameraData.xr.RenderOcclusionMesh(cmd, renderIntoTexture: !data.m_IsActiveTargetBackBuffer);
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+                // Draw opaque objects
 #if !DEBUG_NO_SHADERS
-                    if (activeDebugHandler != null)
-                    {
-                        activeDebugHandler.DrawWithDebugRenderState(context, cmd, ref renderingData, ref drawSettingsOpaque, ref filterSettingsOpaque, ref data.m_RenderStateBlock,
-                            (ScriptableRenderContext ctx, ref RenderingData data, ref DrawingSettings ds, ref FilteringSettings fs, ref RenderStateBlock rsb) =>
-                            {
-                                ctx.DrawRenderers(data.cullResults, ref ds, ref fs, ref rsb);
-                            });
-                    }
-                    else
-                    {
-                        context.DrawRenderers(renderingData.cullResults, ref drawSettingsOpaque, ref filterSettingsOpaque, ref data.m_RenderStateBlock);
-
-                        // Render objects that did not match any shader pass with error shader
-                        RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, camera, filterSettingsOpaque, SortingCriteria.None);
-                    }
-#else
-                    drawSettingsOpaque.overrideMaterial = defaultMat;
-                    context.DrawRenderers(renderingData.cullResults, ref drawSettingsOpaque, ref filterSettingsOpaque);
-#endif
-                    if (data.drawSkybox)
-                    {
-                        Material skybox = RenderSettings.skybox;
-                        if (skybox)
-                        {
-                            Light sun = RenderSettings.sun;
-                            Vector4 sunDir;
-                            Vector4 lightColor;
-                            if (sun && sun.isActiveAndEnabled)
-                            {
-                                sunDir = -sun.transform.forward;
-                                lightColor = (Vector4)sun.color * sun.intensity;
-                            }
-                            else
-                            {
-                                sunDir = new Vector4(0, 0, -1, 0);
-                                lightColor = Color.black;
-                            }
-                            skybox.SetVector(s_WorldSpaceLightPos0, sunDir);
-                            skybox.SetVector(s_LightColor0, lightColor);
-                            cmd.EnableKeyword(s_DrawProcedural);
-                            cmd.DrawProcedural(Matrix4x4.identity, skybox, 0, MeshTopology.Triangles, 3, 1);
-                            cmd.DisableKeyword(s_DrawProcedural);
-                            cmd.EnableKeyword(s_SubpassInput0Kw);
-                        }
-                    }
-
-                    context.ExecuteCommandBuffer(cmd);
-                    cmd.Clear();
-                    context.EndSubPass();
-                }
-
-
-                // new - copy depth to input attachment 1
-                // colorAttachment[0] = inputIdx;
-                // inputAttachment[0] = colorIdx;
-                // {
-                //     context.BeginSubPass(colorAttachment, inputAttachment, true);
-                //     //cmd.DrawProcedural(Matrix4x4.identity, data.copySubpassInputMat, 0, MeshTopology.Triangles, 3, 1);
-                //     //context.ExecuteCommandBuffer(cmd);
-                //     //cmd.Clear();
-                //     context.EndSubPass();
-                // }
-                var fence = cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.AllGPUOperations);
-                colorAttachment[0] = colorIdx;
-                inputAttachment[0] = depthIdx;
-
+                if (activeDebugHandler != null)
                 {
-                    context.BeginSubPass(colorAttachment, inputAttachment, true);
-                    cmd.EnableKeyword(s_SubpassInput0Kw);
-                    colorAttachment.Dispose();
-                    inputAttachment.Dispose();
-                    /* original, copy opaque attachment to backbuffer
-                    cmd.DrawProcedural(Matrix4x4.identity, data.copySubpassInputMat, 0, MeshTopology.Triangles, 3, 1);
-                    context.ExecuteCommandBuffer(cmd);
-                    cmd.Clear();
-                    */
+                    activeDebugHandler.DrawWithDebugRenderState(context, cmd, ref renderingData, ref drawSettingsOpaque, ref filterSettingsOpaque, ref data.m_RenderStateBlock,
+                        (ScriptableRenderContext ctx, ref RenderingData data, ref DrawingSettings ds, ref FilteringSettings fs, ref RenderStateBlock rsb) =>
+                        {
+                            ctx.DrawRenderers(data.cullResults, ref ds, ref fs, ref rsb);
+                        });
+                }
+                else
+                {
+                    context.DrawRenderers(renderingData.cullResults, ref drawSettingsOpaque, ref filterSettingsOpaque, ref data.m_RenderStateBlock);
 
-#if !DEBUG_NO_SHADERS
-                    if (activeDebugHandler != null)
+                    // Render objects that did not match any shader pass with error shader
+                    RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, camera, filterSettingsOpaque, SortingCriteria.None);
+                }
+#else
+                drawSettingsOpaque.overrideMaterial = defaultMat;
+                context.DrawRenderers(renderingData.cullResults, ref drawSettingsOpaque, ref filterSettingsOpaque);
+#endif
+                // Draw Skybox
+                Material skybox = RenderSettings.skybox;
+                if (skybox)
+                {
+                    Light sun = RenderSettings.sun;
+                    Vector4 sunDir;
+                    Vector4 lightColor;
+                    if (sun && sun.isActiveAndEnabled)
                     {
-                        activeDebugHandler.DrawWithDebugRenderState(context, cmd, ref renderingData, ref drawSettingsTransparent, ref filterSettingsTransparent, ref data.m_RenderStateBlock,
-                            (ScriptableRenderContext ctx, ref RenderingData data, ref DrawingSettings ds, ref FilteringSettings fs, ref RenderStateBlock rsb) =>
-                            {
-                                ctx.DrawRenderers(data.cullResults, ref ds, ref fs, ref rsb);
-                            });
+                        sunDir = -sun.transform.forward;
+                        lightColor = (Vector4)sun.color * sun.intensity;
                     }
                     else
                     {
-                        context.DrawRenderers(renderingData.cullResults, ref drawSettingsTransparent, ref filterSettingsTransparent, ref data.m_RenderStateBlock);
-
-                        // Render objects that did not match any shader pass with error shader
-                        RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, camera, filterSettingsTransparent, SortingCriteria.None);
+                        sunDir = new Vector4(0, 0, -1, 0);
+                        lightColor = Color.black;
                     }
+                    skybox.SetVector(s_WorldSpaceLightPos0, sunDir);
+                    skybox.SetVector(s_LightColor0, lightColor);
+                    cmd.EnableKeyword(s_DrawProcedural);
+                    cmd.DrawProcedural(Matrix4x4.identity, skybox, 0, MeshTopology.Triangles, 3, 1);
+                    cmd.DisableKeyword(s_DrawProcedural);
+                    cmd.EnableKeyword(s_SubpassInput0Kw);
+                }
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+
+                /* 
+                // Experiment, provide a opaque color subpass attachment by rendering opaque objects to a transient attachment
+                // then provide that to the transparent subpass as an input. Required blitting the opaque attachment to the backbuffer
+                // at the beginning of the pass. Way too slow to be practical, ideally we'd be able to do input attachment feedback but
+                // unity doesn't know how to do that and actively blocks me from trying through native plugins.
+                cmd.DrawProcedural(Matrix4x4.identity, data.copySubpassInputMat, 0, MeshTopology.Triangles, 3, 1);
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+                */
+
+#if !DEBUG_NO_SHADERS
+                if (activeDebugHandler != null)
+                {
+                    activeDebugHandler.DrawWithDebugRenderState(context, cmd, ref renderingData, ref drawSettingsTransparent, ref filterSettingsTransparent, ref data.m_RenderStateBlock,
+                        (ScriptableRenderContext ctx, ref RenderingData data, ref DrawingSettings ds, ref FilteringSettings fs, ref RenderStateBlock rsb) =>
+                        {
+                            ctx.DrawRenderers(data.cullResults, ref ds, ref fs, ref rsb);
+                        });
+                }
+                else
+                {
+                    context.DrawRenderers(renderingData.cullResults, ref drawSettingsTransparent, ref filterSettingsTransparent, ref data.m_RenderStateBlock);
+
+                    // Render objects that did not match any shader pass with error shader
+                    RenderingUtils.RenderObjectsWithError(context, ref renderingData.cullResults, camera, filterSettingsTransparent, SortingCriteria.None);
+                }
 #else
                 drawSettingsTransparent.overrideMaterial = defaultMat;
                 context.DrawRenderers(renderingData.cullResults, ref drawSettingsTransparent, ref filterSettingsTransparent);
 #endif
 
 
-                    // Clean up
-                    CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);
-                    cmd.DisableKeyword(s_SubpassInput0Kw);
-
-                    context.ExecuteCommandBuffer(cmd);
-                    cmd.Clear();
+                // Clean up
+                CoreUtils.SetKeyword(cmd, ShaderKeywordStrings.WriteRenderingLayers, false);
+                cmd.DisableKeyword(s_SubpassInput0Kw);
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+                if (data.useSubpassAPI)
+                {
                     context.EndSubPass();
+                    context.EndRenderPass();
                 }
-              
-                context.EndRenderPass();
+                
 
 
+#if ENABLE_VR && ENABLE_XR_MODULE
+                if (data.m_RenderingData.cameraData.xr.enabled)
+                {
+                    if (data.m_RenderingData.cameraData.xr.supportsFoveatedRendering || FoveationManager.enableFoveationInjection)
+                    {
+                        cmd.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
+                    }
+                }
+#endif
+                context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
             }
         }
 
@@ -488,8 +473,10 @@ namespace UnityEngine.Rendering.Universal.Internal
             internal RTHandle opaqueSubpassTarget;
             internal RTHandle depthTarget;
             internal RTHandle colorTarget;
+            internal RTHandle memorylessColorInput;
             internal RenderTextureDescriptor cameraTextureDescriptor;
             internal Material copySubpassInputMat;
+            internal bool useSubpassAPI;
             // END SLZ MODIFIED
         }
 

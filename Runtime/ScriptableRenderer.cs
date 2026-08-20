@@ -1512,7 +1512,7 @@ namespace UnityEngine.Rendering.Universal
             var cmd = renderingData.commandBuffer;
 
             // Selectively enable foveated rendering
-            if (cameraData.xr.supportsFoveatedRendering)
+            if (cameraData.xr.supportsFoveatedRendering || FoveationManager.enableFoveationInjection)
             {
                 if (renderPass.renderPassEvent >= RenderPassEvent.BeforeRenderingPrePasses && renderPass.renderPassEvent < RenderPassEvent.BeforeRenderingPostProcessing)
                 {
@@ -1539,7 +1539,7 @@ namespace UnityEngine.Rendering.Universal
 
             if (cameraData.xr.enabled)
             {
-                if (cameraData.xr.supportsFoveatedRendering)
+                if (cameraData.xr.supportsFoveatedRendering || FoveationManager.enableFoveationInjection)
                     cmd.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
 
                 // Inform the late latching system for XR once we're done with a render pass
@@ -1840,16 +1840,23 @@ namespace UnityEngine.Rendering.Universal
 
                 cameraData.xr.StartSinglePass(cmd);
 
+                /*
                 if (cameraData.xr.supportsFoveatedRendering)
                 {
                     cmd.ConfigureFoveatedRendering(cameraData.xr.foveatedRenderingInfo);
 
                     if (XRSystem.foveatedRenderingCaps.HasFlag(FoveatedRenderingCaps.NonUniformRaster))
                         cmd.EnableShaderKeyword(ShaderKeywordStrings.FoveatedRenderingNonUniformRaster);
+                    context.ExecuteCommandBuffer(cmd);
+                    cmd.Clear();
                 }
+                */
+
+                FoveationManager.Configure(cmd, ref cameraData, cameraData.IsCameraProjectionMatrixFlipped());
 
                 context.ExecuteCommandBuffer(cmd);
                 cmd.Clear();
+                FoveationManager.CleanupConfigure();
             }
 #endif
         }
@@ -1862,7 +1869,7 @@ namespace UnityEngine.Rendering.Universal
                 cameraData.xr.StopSinglePass(cmd);
 
 
-                if (XRSystem.foveatedRenderingCaps != FoveatedRenderingCaps.None)
+                if (XRSystem.foveatedRenderingCaps != FoveatedRenderingCaps.None || FoveationManager.enableFoveationInjection)
                 {
                     if (XRSystem.foveatedRenderingCaps.HasFlag(FoveatedRenderingCaps.NonUniformRaster))
                         cmd.DisableShaderKeyword(ShaderKeywordStrings.FoveatedRenderingNonUniformRaster);

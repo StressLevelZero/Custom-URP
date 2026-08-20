@@ -147,7 +147,8 @@ namespace UnityEngine.Rendering.Universal
 
             [Reload("Shaders/XR/XROcclusionMeshSDF.shader")]
             public Shader CreateVROcclusionDistanceField;
-
+            [Reload("Shaders/XR/XROcclusionMeshDepthOnly.shader")]
+            public Shader XROcclusionMeshDepthOnly;
             // END SLZ MODIFIED
 
             /// <summary>

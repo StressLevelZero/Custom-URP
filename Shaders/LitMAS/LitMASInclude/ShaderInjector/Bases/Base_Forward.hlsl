@@ -284,7 +284,7 @@ FragOut frag(VertOut i
     #if defined(SLZ_ENABLE_PROFILING)
     uint endTime = ReadClock().x;
     uint deltaTime = DeltaShaderClockTime(startTime, endTime);
-    half3 heat = NvHeatmap(deltaTime, 65000.0f);
+    half3 heat = NvHeatmap(deltaTime, 85000.0f);
     output.color.rgb = (output.color.rgb * 1e-7) + heat;
     #endif
     return output;

@@ -119,6 +119,8 @@ MonoBehaviour:
       type: 3}
     CreateVROcclusionDistanceField: {fileID: 4800000, guid: 8febd36e62b42364da87468b77f520e5,
       type: 3}
+    XROcclusionMeshDepthOnly: {fileID: 4800000, guid: 3c70a38ecdebfea489cc32215ac95e0f,
+      type: 3}
     dataDrivenLensFlare: {fileID: 4800000, guid: 6cda457ac28612740adb23da5d39ea92,
       type: 3}
   m_AssetVersion: 2

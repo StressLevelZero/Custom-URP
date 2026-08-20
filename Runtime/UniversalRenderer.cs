@@ -1,6 +1,7 @@
 #define VULKAN_SUBPASS
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal.Internal;
 
@@ -44,9 +45,9 @@ namespace UnityEngine.Rendering.Universal
         public const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
         public const int k_DepthBufferBits = 24;
         #else
-        public const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D24_UNorm_S8_UInt;
+        public const GraphicsFormat k_DepthStencilFormat = GraphicsFormat.D32_SFloat_S8_UInt;
 
-        public const int k_DepthBufferBits = 24;
+        public const int k_DepthBufferBits = 32;
         #endif
 
         // SLZ MODIFIED // Hacky-ass-bullshit flag that the VRS render feature can set to make passes that should have VRS use an array of rendertagets containing the actual render target duplicated twice
@@ -159,10 +160,15 @@ namespace UnityEngine.Rendering.Universal
         RTHandle m_OpaqueColor;
         RTHandle m_MotionVectorColor;
         RTHandle m_MotionVectorDepth;
-
         // SLZ MODIFIED
 
-        RTHandle m_OpaqueSubpassRT;
+        RTHandle m_MemorylessColorRT;
+        RTHandle m_MemorylessDepthRT;
+
+        #if VULKAN_SUBPASS
+        RTHandle m_CameraTargetMSAAMemoryless;
+        #endif
+
 
 
         BufferedRTHandleSystem m_OpaqueBufferSystem;
@@ -488,7 +494,8 @@ namespace UnityEngine.Rendering.Universal
             m_MotionVectorColor?.Release();
             m_MotionVectorDepth?.Release();
 //#if VULKAN_SUBPASS
-            m_OpaqueSubpassRT?.Release();
+            m_MemorylessColorRT?.Release();
+            m_MemorylessDepthRT?.Release();
 //#endif
             hasReleasedRTs = true;
         }
@@ -620,6 +627,7 @@ namespace UnityEngine.Rendering.Universal
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
             RenderTextureDescriptor cameraTargetDescriptor = cameraData.cameraTargetDescriptor;
+
             CameraDataExtSet cameraExtData = CameraExtDataPool.Instance.GetCameraDataSet(camera);
             var cmd = renderingData.commandBuffer;
             if (DebugHandler != null)
@@ -678,11 +686,12 @@ namespace UnityEngine.Rendering.Universal
 #if VULKAN_SUBPASS
 
                 useRenderPassEnabledSLZ
-                && !useRenderPassEnabled
+                // && !useRenderPassEnabled
                 && !activeDebugHandler
                 && !IsWireframeEnabledForCamera(camera) 
                 && !isPreview
-                //&& ((camera.cameraType & CameraType.Game) != 0 || ((camera.cameraType & CameraType.SceneView) != 0))
+                && (camera.cameraType.HasFlag(CameraType.Game) || camera.cameraType.HasFlag(CameraType.SceneView))
+                && (cameraTargetDescriptor.width != 32 && cameraTargetDescriptor.height != 32)
                 ;
 #else
                 false;
@@ -984,37 +993,71 @@ namespace UnityEngine.Rendering.Universal
             if (cameraUseFusedRenderpass)
             {
                 RenderTextureDescriptor memorylessColor = cameraTargetDescriptor;
-                memorylessColor.depthStencilFormat = GraphicsFormat.None;
-                memorylessColor.graphicsFormat = GraphicsFormat.B10G11R11_UFloatPack32;
+                
+                //memorylessColor.depthStencilFormat = GraphicsFormat.None;
+                
+                RenderTextureDescriptor memorylessDepth = cameraTargetDescriptor;
+                memorylessDepth.stencilFormat      = GraphicsFormat.None;
+                memorylessDepth.depthStencilFormat = GraphicsFormat.D32_SFloat;
+                memorylessDepth.graphicsFormat     = GraphicsFormat.None;
+                //memorylessColor.graphicsFormat = GraphicsFormat.B10G11R11_UFloatPack32;
 
-                memorylessColor.memoryless = RenderTextureMemoryless.Color;
-                RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueSubpassRT, memorylessColor, name: "OpaqueSubpassRT");
-                m_RenderForwardPassNative.colorTarget = m_ActiveCameraColorAttachment;
-                m_RenderForwardPassNative.depthTarget = m_ActiveCameraDepthAttachment;
+                {
+                    #if !UNITY_EDITOR
+                    memorylessColor.memoryless = RenderTextureMemoryless.Color | RenderTextureMemoryless.Depth | RenderTextureMemoryless.MSAA;
+                    memorylessDepth.memoryless = RenderTextureMemoryless.Color | RenderTextureMemoryless.Depth | RenderTextureMemoryless.MSAA;
+                    //memorylessColor.depthStencilFormat = GraphicsFormat.D16_UNorm;
+                    //memorylessDepth.memoryless = RenderTextureMemoryless.Color | RenderTextureMemoryless.Depth | RenderTextureMemoryless.MSAA;
+                    #endif
+                    //if (cameraTargetDescriptor.msaaSamples > 1)
+                    //{
+                        
+                        //RenderingUtils.ReAllocateIfNeeded(ref m_MemorylessDepthRT, memorylessDepth, name: "MemorylessDepthRT");
+                    //}
+                    //RenderingUtils.ReAllocateIfNeeded(ref m_MemorylessDepthRT, memorylessDepth, name: "MemorylessDepthRT");
+                    m_RenderForwardPassNative.depthTarget = m_ActiveCameraDepthAttachment; //m_ActiveCameraDepthAttachment; 
+                    //m_ActiveCameraDepthAttachment = m_MemorylessColorRT;
+                    
+                    if (false)//cameraTargetDescriptor.msaaSamples > 1) 
+                    {
+                        RenderingUtils.ReAllocateIfNeeded(ref m_MemorylessColorRT, memorylessColor, name: "MemorylessColorRT");
+                        m_RenderForwardPassNative.colorTarget = m_MemorylessColorRT;
+                        m_RenderForwardPassNative.memorylessColor = m_MemorylessColorRT;
+                        m_RenderForwardPassNative.depthTarget = m_MemorylessColorRT;
+                        ConfigureCameraTarget(m_MemorylessColorRT, m_MemorylessDepthRT, m_ActiveCameraColorAttachment);//, m_ActiveCameraColorAttachment);
+                    }
+                    else
+                    {
+                        //m_RenderForwardPassNative.colorTarget = m_ActiveCameraColorAttachment;
+                        m_RenderForwardPassNative.colorTarget = m_ActiveCameraColorAttachment;
+                        m_RenderForwardPassNative.memorylessColor = null;
+                        ConfigureCameraTarget(m_ActiveCameraColorAttachment, m_ActiveCameraDepthAttachment);
+                    }
+ 
+
+                }
+
+                //m_RenderForwardPassNative.depthTarget = m_ActiveCameraDepthAttachment;
+               
+                
+                
                 m_RenderForwardPassNative.msaaSampleCount = cameraTargetDescriptor.msaaSamples;
-                m_RenderForwardPassNative.opaqueSubpassTarget = m_OpaqueSubpassRT;
+                //m_RenderForwardPassNative.opaqueSubpassTarget = m_OpaqueSubpassRT;
                 m_RenderForwardPassNative.cameraTextureDescriptor = cameraTargetDescriptor;
             }
             else if (useRenderPassEnabled)
             {
-                RenderTextureDescriptor memorylessColor = cameraTargetDescriptor;
-                //Debug.Log($"OpaqueRTTemp: {memorylessColor.width} {memorylessColor.height} {memorylessColor.volumeDepth}");
-                memorylessColor.depthStencilFormat = GraphicsFormat.None;
-                //memorylessColor.graphicsFormat = GraphicsFormat.R8G8B8A8_SRGB;
-                //memorylessColor.memoryless = RenderTextureMemoryless.Color;
-                RenderingUtils.ReAllocateIfNeeded(ref m_OpaqueSubpassRT, memorylessColor, name: "OpaqueSubpassRT");
-                //Debug.Log($"RT size: {m_OpaqueSubpassRT.rt.descriptor.width} x {m_OpaqueSubpassRT.rt.descriptor.height}");
-
                 m_RenderOpaqueForwardPass.useNativeRenderPass = true;
-                
+                /*
                 //if (m_OpaqueSubpassRT == null) Debug.LogError("Reallocate if needed FAILED!");
                 m_RenderOpaqueForwardPass.overrideTargets = true;
-                m_RenderOpaqueForwardPass.colorTarget = m_OpaqueSubpassRT;
+                m_RenderOpaqueForwardPass.colorTarget = m_MemorylessColorRT;
 
-                m_RenderTransparentForwardPass.subpassInputs[0] = m_OpaqueSubpassRT;
+                m_RenderTransparentForwardPass.subpassInputs[0] = m_MemorylessColorRT;
                 m_RenderTransparentForwardPass.subpassInputsTransient[0] = true;
                 m_RenderTransparentForwardPass.useNativeRenderPass = true;
                 m_RenderTransparentForwardPass.overrideTargets = true;
+                */
             }
             //Debug.Log($"Camera target: {m_ActiveCameraColorAttachment.nameID.ToString()}\nOpaque Subpass: {m_OpaqueSubpassRT.nameID.ToString()}");
 #else
@@ -1030,6 +1073,7 @@ namespace UnityEngine.Rendering.Universal
             copyColorPass &= !isPreviewCamera;
 
             // Assign camera targets (color and depth)
+if (!cameraUseFusedRenderpass)
             ConfigureCameraTarget(m_ActiveCameraColorAttachment, m_ActiveCameraDepthAttachment);
 
             bool hasPassesAfterPostProcessing = activeRenderPassQueue.Find(x => x.renderPassEvent == RenderPassEvent.AfterRenderingPostProcessing) != null;
@@ -1290,7 +1334,7 @@ namespace UnityEngine.Rendering.Universal
             }
 
 #if ENABLE_VR && ENABLE_XR_MODULE
-            if (cameraData.xr.hasValidOcclusionMesh)
+            if (cameraData.xr.hasValidOcclusionMesh && !cameraUseFusedRenderpass)
                 EnqueuePass(m_XROcclusionMeshPass);
 #endif
 
@@ -1310,8 +1354,9 @@ namespace UnityEngine.Rendering.Universal
                 // if following passes won't use it then just resolve (the Resolve action will still store the resolved surface, but discard the MSAA'd surface, which is very expensive to store).
                 RenderBufferStoreAction opaquePassColorStoreAction = RenderBufferStoreAction.Store;
                 if (cameraTargetDescriptor.msaaSamples > 1)
-                    opaquePassColorStoreAction = copyColorPass ? RenderBufferStoreAction.StoreAndResolve : RenderBufferStoreAction.Store;
-
+                {
+                    opaquePassColorStoreAction = copyColorPass ? RenderBufferStoreAction.StoreAndResolve : RenderBufferStoreAction.Resolve;
+                }
 
                 // make sure we store the depth only if following passes need it.
                 RenderBufferStoreAction opaquePassDepthStoreAction = (copyColorPass || requiresDepthCopyPass || !lastCameraInTheStack) ? RenderBufferStoreAction.Store : RenderBufferStoreAction.DontCare;
@@ -1343,10 +1388,14 @@ namespace UnityEngine.Rendering.Universal
                 if (cameraUseFusedRenderpass)
                 {
                     renderOpaqueForwardPass = m_RenderForwardPassNative;
+                    renderOpaqueForwardPass.ConfigureDepthStoreAction(RenderBufferStoreAction.DontCare);
+                    opaquePassDepthStoreAction = RenderBufferStoreAction.DontCare;
+                    opaquePassColorStoreAction = cameraTargetDescriptor.msaaSamples > 1 ? RenderBufferStoreAction.Resolve : RenderBufferStoreAction.Store;
                 }
                 else
 #endif
                 {
+                    //Debug.LogError("using non native renderpass");
                     //DrawObjectsPass renderOpaqueForwardPass = null;
                     if (renderingLayerProvidesRenderObjectPass)
                     {
@@ -1355,9 +1404,12 @@ namespace UnityEngine.Rendering.Universal
                     }
                     else
                         renderOpaqueForwardPass = m_RenderOpaqueForwardPass;
+
+                    renderOpaqueForwardPass.ConfigureColorStoreAction(opaquePassColorStoreAction);
+                    renderOpaqueForwardPass.ConfigureDepthStoreAction(opaquePassDepthStoreAction);
+                    //Debug.Log($"Color Store: {opaquePassColorStoreAction}, Depth Store: {opaquePassDepthStoreAction}");
                 }
-                renderOpaqueForwardPass.ConfigureColorStoreAction(opaquePassColorStoreAction);
-                renderOpaqueForwardPass.ConfigureDepthStoreAction(opaquePassDepthStoreAction);
+
 
                 // If there is any custom render pass renders to opaque pass' target before opaque pass,
                 // we can't clear color as it contains the valid rendering output.

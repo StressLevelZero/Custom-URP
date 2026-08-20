@@ -298,6 +298,10 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
 
         HelpBox basemapAlphaWarning;
         bool hasBasemapAlpha;
+
+        HelpBox disabledPassesWarning;
+        bool hasDisabledPasses;
+
         
         SurfaceTypeField surfaceTypeField;
         RenderQueueDropdown renderQueue;
@@ -359,12 +363,16 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             TransparentWarning.style.display = DisplayStyle.None;
             ZOffsetWarning = new HelpBox("Non-zero Z Offset slope/units. This will prevent this material from SRP batching with any other material that does not have precisely the same ZOffset values.", HelpBoxMessageType.Warning);
             ZOffsetWarning.style.display = DisplayStyle.None;
-            AlphaClipWarning = new HelpBox("Opaque alpha clip materials are very expensive on Quest, prefer transparency if possible!", HelpBoxMessageType.Warning);
+            AlphaClipWarning = new HelpBox("Opaque alpha clip materials are expensive on Quest, use sparingly!", HelpBoxMessageType.Warning);
             AlphaClipWarning.style.display = DisplayStyle.None;
             DetailScaleWarning = new HelpBox("Detail Normal Scale is not 1", HelpBoxMessageType.Warning);
             DetailScaleWarning.style.display = DisplayStyle.None;
             basemapAlphaWarning = new HelpBox("Layer 0 Base Map has an alpha channel. Height is no longer stored in the alpha channel, this should be removed from the texture to reduce memory usage and increase compression quality", HelpBoxMessageType.Error);
             basemapAlphaWarning.style.display = DisplayStyle.None;
+
+            disabledPassesWarning = new HelpBox("This material has disabled passes, this may break rendering", HelpBoxMessageType.Warning);
+            disabledPassesWarning.style.display = DisplayStyle.None;
+
 
             #if MARROW_INTERNAL
             if (advancedMode)
@@ -374,12 +382,12 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             }
             #endif
 
-
             MainWindow.Add(TransparentWarning);
             MainWindow.Add(AlphaClipWarning);
             MainWindow.Add(ZOffsetWarning);
             MainWindow.Add(DetailScaleWarning);
             MainWindow.Add(basemapAlphaWarning);
+            MainWindow.Add(disabledPassesWarning);
 
             //----------------------------------------------------------------
             // Rendering Properties ------------------------------------------
@@ -616,6 +624,33 @@ namespace UnityEditor // This MUST be in the base editor namespace!!!!!
             drawProps.contentContainer.Add(renderQueue);
             //}
             MainWindow.Add(drawProps);
+
+            SerializedProperty disabledPasses = serializedObject.FindProperty("disabledShaderPasses");
+
+            if (advancedMode || disabledPasses.hasMultipleDifferentValues || disabledPasses.arraySize > 0)
+            {
+                hasAdvancedProps = true;
+                PropertyField disabledPassesList = new PropertyField(disabledPasses);
+                disabledPassesList.label = "Disabled Passes";
+                advancedProps.contentContainer.Add(disabledPassesList);
+               
+                if (disabledPasses.arraySize > 0)
+                {
+                    disabledPassesWarning.style.display = DisplayStyle.Flex;
+                    int numDisabled = disabledPasses.arraySize;
+                    if (!disabledPasses.hasMultipleDifferentValues)
+                    for (int dIdx = 0; dIdx < numDisabled; dIdx++)
+                    {
+                        SerializedProperty disabledPassProp = disabledPasses.GetArrayElementAtIndex(dIdx);
+                        string disabledPass = disabledPassProp.stringValue;
+                        if (!string.IsNullOrEmpty(disabledPass) && (disabledPass == "DepthOnly" || disabledPass == "DepthNormals"))
+                        {
+                            disabledPassesWarning.messageType = HelpBoxMessageType.Error;
+                            disabledPassesWarning.text = "DepthOnly or DepthNormals pass disabled! This will break rendering on PC if the render queue is less than 2800!";
+                        }
+                    }
+                }
+            }
 
 #region Core Properties
             //----------------------------------------------------------------
